@@ -1,57 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { createPasskeyWallet, recoverPasskeyWallet } from "@/lib/passkey-wallet";
+import { Navbar } from "@/components/navbar";
+import { useWallet } from "@/lib/wallet-context";
 
 export default function WalletPage() {
-  const [publicKey, setPublicKey] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  const handleCreate = async () => {
-    setError(null);
-    setLoading(true);
-    try {
-      const result = await createPasskeyWallet("sol.new user");
-      setPublicKey(result.publicKey);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to create passkey");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRecover = async () => {
-    setError(null);
-    setLoading(true);
-    try {
-      const result = await recoverPasskeyWallet();
-      setPublicKey(result.publicKey);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to recover wallet");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const copyAddress = () => {
-    if (!publicKey) return;
-    navigator.clipboard.writeText(publicKey);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const { publicKey, balance, connect, recover, disconnect, loading, error } = useWallet();
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-        <Link href="/" className="text-xl font-bold tracking-tight">
-          sol<span className="text-purple-400">.new</span>
-        </Link>
-        <span className="text-sm text-white/40">Wallet</span>
-      </nav>
-
+      <Navbar label="Wallet" />
       <main className="flex-1 flex flex-col items-center justify-center px-6">
         <div className="max-w-lg w-full space-y-8">
           <div className="text-center space-y-3">
@@ -65,19 +22,15 @@ export default function WalletPage() {
           {publicKey ? (
             <div className="space-y-4">
               <div className="bg-white/5 border border-green-500/30 rounded-xl p-6 space-y-3">
-                <div className="flex items-center gap-2 text-green-400 text-sm font-medium">
-                  <span>✓</span> Wallet created
+                <div className="flex items-center justify-between">
+                  <span className="text-green-400 text-sm font-medium">✓ Connected</span>
+                  {balance !== null && (
+                    <span className="text-purple-400 font-mono font-semibold">{balance.toFixed(4)} SOL</span>
+                  )}
                 </div>
-                <div
-                  onClick={copyAddress}
-                  className="bg-black/50 rounded-lg px-4 py-3 font-mono text-sm text-white/70 break-all cursor-pointer hover:text-white transition"
-                  title="Click to copy"
-                >
+                <div className="bg-black/50 rounded-lg px-4 py-3 font-mono text-sm text-white/70 break-all">
                   {publicKey}
                 </div>
-                <p className="text-xs text-white/30">
-                  {copied ? "Copied!" : "Click address to copy"}
-                </p>
               </div>
 
               <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-3">
@@ -90,13 +43,21 @@ export default function WalletPage() {
                 </ul>
               </div>
 
-              <a
-                href={`https://solscan.io/account/${publicKey}`}
-                target="_blank"
-                className="block text-center text-sm text-purple-400 hover:text-purple-300 transition"
-              >
-                View on Solscan →
-              </a>
+              <div className="flex gap-3">
+                <a
+                  href={`https://solscan.io/account/${publicKey}`}
+                  target="_blank"
+                  className="flex-1 text-center bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-purple-400 hover:text-purple-300 transition"
+                >
+                  View on Solscan →
+                </a>
+                <button
+                  onClick={disconnect}
+                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+                >
+                  Disconnect
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -131,15 +92,14 @@ export default function WalletPage() {
               )}
 
               <button
-                onClick={handleCreate}
+                onClick={connect}
                 disabled={loading}
                 className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-purple-500/50 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-wait"
               >
                 {loading ? "Authenticating..." : "Create wallet →"}
               </button>
-
               <button
-                onClick={handleRecover}
+                onClick={recover}
                 disabled={loading}
                 className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white font-medium rounded-xl px-4 py-3 transition text-sm cursor-pointer"
               >
