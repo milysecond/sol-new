@@ -1,12 +1,44 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { useWallet } from "@/lib/wallet-context";
 import { FaucetFooter } from "@/components/faucet-footer";
-import { Coins, Image, Wallet, ShieldCheck } from "lucide-react";
+import { Coins, Image, Wallet, ShieldCheck, Users, Layers, ImageIcon } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import type { LucideIcon } from "lucide-react";
+
+function Stats() {
+  const [stats, setStats] = useState<{ wallets: number; tokens: number; nfts: number } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/stats")
+      .then((r) => r.json())
+      .then((d) => setStats(d))
+      .catch(() => {});
+  }, []);
+
+  if (!stats) return null;
+
+  const items = [
+    { icon: Users, label: "Wallets", value: stats.wallets },
+    { icon: Coins, label: "Tokens", value: stats.tokens },
+    { icon: ImageIcon, label: "NFTs", value: stats.nfts },
+  ];
+
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {items.map((item) => (
+        <div key={item.label} className="bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-center">
+          <item.icon className="w-4 h-4 text-purple-400 mx-auto mb-1.5" />
+          <div className="text-2xl font-bold text-white">{item.value}</div>
+          <div className="text-xs text-white/40">{item.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const products: { href: string; icon: LucideIcon; title: string; desc: string }[] = [
   { href: "/token", icon: Coins, title: "Token", desc: "Launch a token in seconds" },
@@ -65,6 +97,8 @@ export default function Home() {
             <span className="w-1 h-1 rounded-full bg-white/20" />
             <span>Instant</span>
           </div>
+
+          <Stats />
         </div>
       </main>
       <FaucetFooter />
