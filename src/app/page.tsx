@@ -9,7 +9,7 @@ const products = [
   { href: "/token", emoji: "🪙", title: "Token", desc: "Launch a token in seconds" },
   { href: "/nft", emoji: "🖼️", title: "NFT", desc: "Mint an NFT from any image" },
   { href: "/pay", emoji: "💸", title: "Pay", desc: "Create a payment link" },
-  { href: "/dao", emoji: "🏛️", title: "DAO", desc: "Spin up a multisig" },
+  { href: "/multisig", emoji: "🏛️", title: "Multisig", desc: "Create a multisig" },
 ];
 
 export default function Home() {

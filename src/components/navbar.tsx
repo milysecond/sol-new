@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { href: "/token", label: "Token", emoji: "🪙" },
   { href: "/nft", label: "NFT", emoji: "🖼️" },
   { href: "/pay", label: "Pay", emoji: "💸" },
-  { href: "/dao", label: "DAO", emoji: "🏛️" },
+  { href: "/multisig", label: "Multisig", emoji: "🏛️" },
 ];
 
 export function Navbar() {
