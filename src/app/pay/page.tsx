@@ -4,9 +4,12 @@ import { useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 
+const TOKENS = ["SOL", "USDC"];
+
 export default function PayPage() {
   const [amount, setAmount] = useState("");
   const [label, setLabel] = useState("");
+  const [selected, setSelected] = useState("SOL");
   const [created, setCreated] = useState(false);
 
   return (
@@ -22,17 +25,29 @@ export default function PayPage() {
             </div>
             <div className="space-y-4">
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 font-mono">$</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 font-mono">
+                  {selected === "SOL" ? "◎" : "$"}
+                </span>
                 <input type="text" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-3.5 text-white placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition font-mono text-2xl" />
               </div>
               <input type="text" placeholder="What's it for? (optional)" value={label} onChange={(e) => setLabel(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition" />
               <div className="flex gap-2">
-                {["SOL", "USDC"].map((token) => (
-                  <button key={token} className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/60 hover:text-white hover:border-purple-400/30 transition cursor-pointer">{token}</button>
+                {TOKENS.map((token) => (
+                  <button
+                    key={token}
+                    onClick={() => setSelected(token)}
+                    className={`flex-1 border rounded-xl px-4 py-2.5 text-sm transition cursor-pointer ${
+                      selected === token
+                        ? "bg-purple-500/20 border-purple-400/50 text-purple-300"
+                        : "bg-white/5 border-white/10 text-white/60 hover:text-white hover:border-white/20"
+                    }`}
+                  >
+                    {token}
+                  </button>
                 ))}
               </div>
               <button onClick={() => { if (!amount) return; setCreated(true); setTimeout(() => setCreated(false), 3000); }} disabled={!amount} className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-white/10 disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed">
-                {created ? "Coming soon ✨" : "Create link →"}
+                {created ? "Coming soon ✨" : `Create ${selected} link →`}
               </button>
             </div>
           </div>
