@@ -75,6 +75,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setPublicKey(result.publicKey);
       localStorage.setItem("sol.new.wallet", result.publicKey);
       localStorage.setItem("sol.new.credentialId", result.credentialId);
+      fetch("/api/wallet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publicKey: result.publicKey, credentialId: result.credentialId }) }).catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create passkey");
     } finally {
@@ -92,6 +93,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const result = await recoverPasskeyWallet();
       setPublicKey(result.publicKey);
       localStorage.setItem("sol.new.wallet", result.publicKey);
+      fetch("/api/wallet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publicKey: result.publicKey }) }).catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to recover wallet");
     } finally {

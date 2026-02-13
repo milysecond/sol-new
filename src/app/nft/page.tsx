@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { uploadImage, uploadMetadata } from "@/lib/api";
+import { useWallet } from "@/lib/wallet-context";
 
 export default function NftPage() {
   const [name, setName] = useState("");
@@ -13,6 +14,7 @@ export default function NftPage() {
   const [status, setStatus] = useState<"idle" | "uploading" | "done" | "error">("idle");
   const [result, setResult] = useState<{ imageUrl?: string; metadataUri?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { publicKey } = useWallet();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,6 +37,7 @@ export default function NftPage() {
         image: imageUrl,
       });
       setResult({ imageUrl, metadataUri: metadata.uri });
+      fetch("/api/nft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet: publicKey, name, description, imageUrl, metadataUri: metadata.uri }) }).catch(() => {});
       setStatus("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
