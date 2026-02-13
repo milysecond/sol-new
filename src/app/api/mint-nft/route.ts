@@ -21,11 +21,6 @@ const DEVNET_RPC = "https://devnet.helius-rpc.com/?api-key=" + process.env.HELIU
 const MAINNET_RPC = "https://mainnet.helius-rpc.com/?api-key=" + process.env.HELIUS_API_KEY;
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
 
-function getFaucetKeypair(): Keypair {
-  const key = JSON.parse(process.env.FAUCET_PRIVATE_KEY || "[]");
-  return Keypair.fromSecretKey(new Uint8Array(key));
-}
-
 function getRpc(network: string) {
   return network === "devnet" ? DEVNET_RPC : MAINNET_RPC;
 }
@@ -41,8 +36,6 @@ function createMetadataInstruction(
   uri: string,
   owner: PublicKey
 ): TransactionInstruction {
-  // Manually serialize CreateMetadataAccountV3 instruction
-  // Discriminator: 33
   const nameBytes = Buffer.from(name);
   const symbolBytes = Buffer.from(symbol);
   const uriBytes = Buffer.from(uri);
@@ -50,42 +43,22 @@ function createMetadataInstruction(
   const data = Buffer.alloc(1 + 4 + nameBytes.length + 4 + symbolBytes.length + 4 + uriBytes.length + 2 + 1 + 4 + 1 + 32 + 1 + 1 + 1 + 1 + 1 + 1);
   let offset = 0;
 
-  // Discriminator: 33 (CreateMetadataAccountV3)
   data.writeUInt8(33, offset); offset += 1;
-
-  // name (string: 4 byte len + bytes)
   data.writeUInt32LE(nameBytes.length, offset); offset += 4;
   nameBytes.copy(data, offset); offset += nameBytes.length;
-
-  // symbol
   data.writeUInt32LE(symbolBytes.length, offset); offset += 4;
   symbolBytes.copy(data, offset); offset += symbolBytes.length;
-
-  // uri
   data.writeUInt32LE(uriBytes.length, offset); offset += 4;
   uriBytes.copy(data, offset); offset += uriBytes.length;
-
-  // seller_fee_basis_points
   data.writeUInt16LE(0, offset); offset += 2;
-
-  // creators: Option<Vec<Creator>> - Some with 1 creator
-  data.writeUInt8(1, offset); offset += 1; // Some
-  data.writeUInt32LE(1, offset); offset += 4; // vec len
-  // Creator { address, verified, share }
-  owner.toBuffer().copy(data, offset); offset += 32;
-  data.writeUInt8(0, offset); offset += 1; // verified = false
-  data.writeUInt8(100, offset); offset += 1; // share = 100
-
-  // collection: Option<Collection> = None
-  data.writeUInt8(0, offset); offset += 1;
-
-  // uses: Option<Uses> = None
-  data.writeUInt8(0, offset); offset += 1;
-
-  // is_mutable
   data.writeUInt8(1, offset); offset += 1;
-
-  // collection_details: Option<CollectionDetails> = None
+  data.writeUInt32LE(1, offset); offset += 4;
+  owner.toBuffer().copy(data, offset); offset += 32;
+  data.writeUInt8(0, offset); offset += 1;
+  data.writeUInt8(100, offset); offset += 1;
+  data.writeUInt8(0, offset); offset += 1;
+  data.writeUInt8(0, offset); offset += 1;
+  data.writeUInt8(1, offset); offset += 1;
   data.writeUInt8(0, offset); offset += 1;
 
   return new TransactionInstruction({
@@ -102,9 +75,9 @@ function createMetadataInstruction(
   });
 }
 
-async function mintRegularNft(
+// Build unsigned regular NFT transaction — user is payer + mint authority
+async function buildRegularNftTx(
   conn: Connection,
-  payer: Keypair,
   owner: PublicKey,
   name: string,
   symbol: string,
@@ -121,28 +94,31 @@ async function mintRegularNft(
 
   const tx = new Transaction().add(
     SystemProgram.createAccount({
-      fromPubkey: payer.publicKey,
+      fromPubkey: owner,
       newAccountPubkey: mint.publicKey,
       space: getMintLen(0),
       lamports: mintRent,
       programId: TOKEN_PROGRAM_ID,
     }),
-    createInitializeMintInstruction(mint.publicKey, 0, payer.publicKey, payer.publicKey),
-    createAssociatedTokenAccountInstruction(payer.publicKey, ata, owner, mint.publicKey),
-    createMintToInstruction(mint.publicKey, ata, payer.publicKey, 1),
-    createMetadataInstruction(metadataPda, mint.publicKey, payer.publicKey, payer.publicKey, payer.publicKey, name, symbol, uri, owner)
+    createInitializeMintInstruction(mint.publicKey, 0, owner, owner),
+    createAssociatedTokenAccountInstruction(owner, ata, owner, mint.publicKey),
+    createMintToInstruction(mint.publicKey, ata, owner, 1),
+    createMetadataInstruction(metadataPda, mint.publicKey, owner, owner, owner, name, symbol, uri, owner)
   );
 
-  tx.feePayer = payer.publicKey;
+  tx.feePayer = owner;
   tx.recentBlockhash = (await conn.getLatestBlockhash()).blockhash;
-  tx.sign(payer, mint);
+  
+  // Partially sign with the mint keypair (ephemeral, server-side)
+  tx.partialSign(mint);
 
-  const sig = await conn.sendRawTransaction(tx.serialize());
-  await conn.confirmTransaction(sig);
-
-  return { mint: mint.publicKey.toBase58(), signature: sig };
+  return {
+    transaction: tx.serialize({ requireAllSignatures: false }).toString("base64"),
+    mint: mint.publicKey.toBase58(),
+  };
 }
 
+// Compressed NFT via Helius — user pays nothing (Helius covers it)
 async function mintCompressedNft(
   rpcUrl: string,
   owner: string,
@@ -183,13 +159,14 @@ export async function POST(req: NextRequest) {
     const rpcUrl = getRpc(network || "devnet");
 
     if (compressed) {
+      // Compressed NFTs are free via Helius
       const result = await mintCompressedNft(rpcUrl, owner, name, symbol || "NFT", uri, description || "");
       return NextResponse.json({ ok: true, type: "compressed", ...result });
     } else {
+      // Regular NFT — return unsigned tx for client to sign
       const conn = new Connection(rpcUrl);
-      const payer = getFaucetKeypair();
       const ownerPk = new PublicKey(owner);
-      const result = await mintRegularNft(conn, payer, ownerPk, name, symbol || "NFT", uri);
+      const result = await buildRegularNftTx(conn, ownerPk, name, symbol || "NFT", uri);
       return NextResponse.json({ ok: true, type: "regular", ...result });
     }
   } catch (e) {

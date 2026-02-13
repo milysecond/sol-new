@@ -5,6 +5,7 @@ import { useState, useRef } from "react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { uploadImage, uploadMetadata } from "@/lib/api";
+import { signAndSendTransaction } from "@/lib/passkey-wallet";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 
@@ -28,7 +29,7 @@ export default function NftPage() {
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { publicKey } = useWallet();
-  const { network } = useNetwork();
+  const { network, rpc } = useNetwork();
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -82,6 +83,14 @@ export default function NftPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Mint failed");
 
+      let signature = data.signature;
+      let mintAddress = data.mint || data.assetId;
+
+      // For regular NFTs, user needs to sign the transaction
+      if (data.type === "regular" && data.transaction) {
+        signature = await signAndSendTransaction(data.transaction, rpc);
+      }
+
       // Save to DB
       fetch("/api/nft", {
         method: "POST",
@@ -92,11 +101,11 @@ export default function NftPage() {
           description,
           imageUrl,
           metadataUri,
-          mintAddress: data.mint || data.assetId,
+          mintAddress,
         }),
       }).catch(() => {});
 
-      setResult({ imageUrl: displayUrl, metadataUri, ...data });
+      setResult({ imageUrl: displayUrl, metadataUri, mint: mintAddress, signature, type: data.type });
       setStatus("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Mint failed");

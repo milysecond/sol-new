@@ -1,5 +1,5 @@
 // @ts-nocheck — WebAuthn PRF extension types are incomplete
-import { Keypair } from "@solana/web3.js";
+import { Keypair, Transaction, Connection } from "@solana/web3.js";
 
 const CHALLENGE = new TextEncoder().encode("sol.new-wallet-creation");
 
@@ -99,4 +99,49 @@ export async function recoverPasskeyWallet(): Promise<{
   return {
     publicKey: keypair.publicKey.toBase58(),
   };
+}
+
+/**
+ * Sign and send a transaction using the passkey-derived keypair.
+ * Re-authenticates with passkey to derive the secret key.
+ */
+export async function signAndSendTransaction(
+  serializedTx: string,
+  rpc: string,
+  additionalSigners?: string[]
+): Promise<string> {
+  const credential = (await navigator.credentials.get({
+    publicKey: {
+      challenge: CHALLENGE,
+      userVerification: "required",
+      extensions: {
+        prf: {
+          eval: {
+            first: CHALLENGE,
+          },
+        },
+      },
+    },
+  })) as PublicKeyCredential;
+
+  if (!credential) throw new Error("Passkey authentication cancelled");
+
+  const prfResult = credential.getClientExtensionResults()?.prf?.results?.first;
+
+  let seed: Uint8Array;
+  if (prfResult) {
+    seed = await sha256(new Uint8Array(prfResult));
+  } else {
+    seed = await sha256(new Uint8Array(credential.rawId));
+  }
+
+  const keypair = Keypair.fromSeed(seed.slice(0, 32));
+  const tx = Transaction.from(Buffer.from(serializedTx, "base64"));
+  
+  tx.partialSign(keypair);
+
+  const conn = new Connection(rpc);
+  const sig = await conn.sendRawTransaction(tx.serialize());
+  await conn.confirmTransaction(sig);
+  return sig;
 }
