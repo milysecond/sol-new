@@ -21,7 +21,7 @@ export async function uploadMetadata(meta: {
   const res = await fetch(`${API_BASE}/metadata`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(meta),
+    body: JSON.stringify({ ...meta, createdAt: "sol.new" }),
   });
   if (!res.ok) throw new Error("Metadata upload failed");
   const data = await res.json();
