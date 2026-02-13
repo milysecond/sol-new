@@ -32,8 +32,11 @@ export default function TokenPage() {
     setError(null);
     try {
       let imageUrl: string | undefined;
+      let displayUrl: string | undefined;
       if (imageFile) {
-        imageUrl = await uploadImage(imageFile);
+        const uploaded = await uploadImage(imageFile);
+        imageUrl = uploaded.ipfs;
+        displayUrl = uploaded.preview;
       }
       const metadata = await uploadMetadata({
         name,
@@ -41,7 +44,7 @@ export default function TokenPage() {
         description: description || `${name} ($${ticker}) — created on sol.new`,
         image: imageUrl,
       });
-      setResult({ imageUrl, metadataUri: metadata.uri });
+      setResult({ imageUrl: displayUrl || imageUrl, metadataUri: metadata.uri });
       // Save to DB
       fetch("/api/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet: publicKey, name, symbol: ticker, supply, description, imageUrl, metadataUri: metadata.uri }) }).catch(() => {});
       setStatus("done");

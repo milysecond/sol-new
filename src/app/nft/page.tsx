@@ -44,9 +44,12 @@ export default function NftPage() {
     // Step 1: Upload image
     setStatus("uploading");
     let imageUrl: string;
+    let displayUrl: string;
     let metadataUri: string;
     try {
-      imageUrl = await uploadImage(imageFile);
+      const uploaded = await uploadImage(imageFile);
+      imageUrl = uploaded.ipfs;
+      displayUrl = uploaded.preview;
       const metadata = await uploadMetadata({
         name,
         symbol: "NFT",
@@ -93,7 +96,7 @@ export default function NftPage() {
         }),
       }).catch(() => {});
 
-      setResult({ imageUrl, metadataUri, ...data });
+      setResult({ imageUrl: displayUrl, metadataUri, ...data });
       setStatus("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Mint failed");

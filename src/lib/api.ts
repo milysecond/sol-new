@@ -1,13 +1,11 @@
 const API_BASE = "https://api.metasal.xyz/api";
 
-export async function uploadImage(file: File): Promise<string> {
+export async function uploadImage(file: File): Promise<{ ipfs: string; preview: string }> {
   const form = new FormData();
   form.append("image", file);
-  const res = await fetch(`${API_BASE}/upload`, { method: "POST", body: form });
+  const res = await fetch("/api/upload-image", { method: "POST", body: form });
   if (!res.ok) throw new Error("Image upload failed");
-  const url = await res.text();
-  // Replace slow ipfs.io gateway with faster alternatives
-  return url.trim().replace("https://ipfs.io/ipfs/", "https://cf-ipfs.com/ipfs/");
+  return res.json();
 }
 
 export async function uploadMetadata(meta: {
