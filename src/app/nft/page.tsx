@@ -159,6 +159,33 @@ export default function NftPage() {
                     </div>
                   )}
                 </div>
+
+                {/* View NFT button */}
+                {(result.mint || result.assetId) && (
+                  <a
+                    href={result.mint
+                      ? `${explorerBase}/token/${result.mint}${clusterParam}`
+                      : `https://xray.helius.xyz/token/${result.assetId}${clusterParam}`}
+                    target="_blank"
+                    className="block w-full bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-xl px-4 py-3.5 transition text-center"
+                  >
+                    View your NFT ↗
+                  </a>
+                )}
+
+                {/* Copy link */}
+                <button
+                  onClick={() => {
+                    const url = result.mint
+                      ? `${explorerBase}/token/${result.mint}${clusterParam}`
+                      : `https://xray.helius.xyz/token/${result.assetId}${clusterParam}`;
+                    navigator.clipboard.writeText(url);
+                  }}
+                  className="w-full bg-white/5 border border-white/10 text-white/60 rounded-xl px-4 py-3 hover:text-white transition cursor-pointer"
+                >
+                  Copy link to share
+                </button>
+
                 <button
                   onClick={() => {
                     setStatus("idle");
