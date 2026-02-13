@@ -59,9 +59,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [publicKey, rpc]);
 
-  // Fetch balance when publicKey changes
+  // Fetch balance when publicKey or network changes, auto-refresh every 15s
   useEffect(() => {
-    if (publicKey) refreshBalance();
+    if (!publicKey) return;
+    refreshBalance();
+    const interval = setInterval(refreshBalance, 15000);
+    return () => clearInterval(interval);
   }, [publicKey, refreshBalance, network]);
 
   const connect = async () => {

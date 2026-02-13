@@ -28,6 +28,8 @@ export function Navbar() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: publicKey }),
       });
+      // Wait for confirmation to propagate
+      await new Promise((r) => setTimeout(r, 2000));
       await refreshBalance();
     } catch {
       // silently fail
