@@ -23,7 +23,7 @@ export function Navbar() {
     if (!publicKey || network !== "devnet") return;
     setAirdropping(true);
     try {
-      await fetch("https://api.metasal.xyz/api/airdrop", {
+      await fetch("/api/airdrop", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: publicKey }),

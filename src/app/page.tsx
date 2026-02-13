@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Navbar } from "@/components/navbar";
 import { useWallet } from "@/lib/wallet-context";
+import { FaucetFooter } from "@/components/faucet-footer";
 
 const products = [
   { href: "/token", emoji: "🪙", title: "Token", desc: "Launch a token in seconds" },
@@ -63,6 +64,7 @@ export default function Home() {
           </div>
         </div>
       </main>
+      <FaucetFooter />
       <footer className="px-6 py-4 border-t border-white/10 text-center text-xs text-white/20">© 2025 sol.new</footer>
     </div>
   );
