@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/nft", label: "NFT", emoji: "🖼️" },
   { href: "/pay", label: "Pay", emoji: "💸" },
   { href: "/multisig", label: "Multisig", emoji: "🏛️" },
+  { href: "/portfolio", label: "Portfolio", emoji: "📂" },
 ];
 
 export function Navbar() {
