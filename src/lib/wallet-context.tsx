@@ -4,8 +4,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { createPasskeyWallet, recoverPasskeyWallet } from "./passkey-wallet";
-
-const RPC = "https://viviyan-bkj12u-fast-mainnet.helius-rpc.com";
+import { useNetwork } from "./network";
 
 interface WalletState {
   publicKey: string | null;
@@ -38,6 +37,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { rpc, network } = useNetwork();
 
   // Restore from localStorage on mount
   useEffect(() => {
@@ -51,18 +51,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const key = publicKey || localStorage.getItem("sol.new.wallet");
     if (!key) return;
     try {
-      const conn = new Connection(RPC);
+      const conn = new Connection(rpc);
       const bal = await conn.getBalance(new PublicKey(key));
       setBalance(bal / LAMPORTS_PER_SOL);
     } catch {
       setBalance(null);
     }
-  }, [publicKey]);
+  }, [publicKey, rpc]);
 
   // Fetch balance when publicKey changes
   useEffect(() => {
     if (publicKey) refreshBalance();
-  }, [publicKey, refreshBalance]);
+  }, [publicKey, refreshBalance, network]);
 
   const connect = async () => {
     setError(null);

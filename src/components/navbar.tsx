@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
+import { useNetwork } from "@/lib/network";
 import { useState } from "react";
 
 const NAV_ITEMS = [
@@ -14,6 +15,7 @@ const NAV_ITEMS = [
 
 export function Navbar() {
   const { publicKey, balance, connect, recover, disconnect, loading } = useWallet();
+  const { network, toggle } = useNetwork();
   const [showMenu, setShowMenu] = useState(false);
   const pathname = usePathname();
 
@@ -45,6 +47,14 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={toggle}
+            className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/50 transition cursor-pointer"
+            title={`Switch to ${network === "mainnet" ? "devnet" : "mainnet"}`}
+          >
+            <span className={`w-2 h-2 rounded-full ${network === "mainnet" ? "bg-green-500" : "bg-yellow-500"}`} />
+            <span className="hidden sm:inline">{network === "mainnet" ? "mainnet" : "devnet"}</span>
+          </button>
           {publicKey ? (
             <div className="relative">
               <button
@@ -73,7 +83,7 @@ export function Navbar() {
                       👛 Wallet details
                     </Link>
                     <a
-                      href={`https://solscan.io/account/${publicKey}`}
+                      href={`https://solscan.io/account/${publicKey}${network === "devnet" ? "?cluster=devnet" : ""}`}
                       target="_blank"
                       className="block px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 hover:text-white transition"
                     >
