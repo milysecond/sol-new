@@ -6,7 +6,8 @@ export async function uploadImage(file: File): Promise<string> {
   const res = await fetch(`${API_BASE}/upload`, { method: "POST", body: form });
   if (!res.ok) throw new Error("Image upload failed");
   const url = await res.text();
-  return url.trim();
+  // Replace slow ipfs.io gateway with faster alternatives
+  return url.trim().replace("https://ipfs.io/ipfs/", "https://cf-ipfs.com/ipfs/");
 }
 
 export async function uploadMetadata(meta: {

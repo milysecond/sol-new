@@ -1,3 +1,4 @@
+import { fastIpfsUrl } from "@/lib/ipfs";
 "use client";
 
 import { useState, useRef } from "react";
@@ -122,7 +123,7 @@ export default function NftPage() {
                     ✓ {result.type === "compressed" ? "Compressed" : "Regular"} NFT minted!
                   </div>
                   {result.imageUrl && (
-                    <img src={result.imageUrl} alt={name} className="w-full rounded-xl" />
+                    <img src={fastIpfsUrl(result.imageUrl || null) || ""} alt={name} className="w-full rounded-xl" />
                   )}
                   <div>
                     <p className="text-white font-semibold">{name}</p>
@@ -222,7 +223,7 @@ export default function NftPage() {
                 >
                   {imagePreview ? (
                     <div className="flex flex-col items-center gap-2">
-                      <img src={imagePreview} alt="preview" className="w-24 h-24 rounded-xl object-cover" />
+                      <img src={imagePreview || ""} alt="preview" className="w-24 h-24 rounded-xl object-cover" />
                       <span className="text-white/50 text-sm">{imageFile?.name}</span>
                     </div>
                   ) : (

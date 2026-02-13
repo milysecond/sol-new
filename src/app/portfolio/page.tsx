@@ -1,3 +1,5 @@
+import { fastIpfsUrl } from "@/lib/ipfs";
+import { fastIpfsUrl } from "@/lib/ipfs";
 "use client";
 
 import { useEffect, useState } from "react";
@@ -107,7 +109,7 @@ export default function PortfolioPage() {
                     >
                       {nft.image_url && (
                         <img
-                          src={nft.image_url}
+                          src={fastIpfsUrl(nft.image_url) || ""}
                           alt={nft.name}
                           className="w-full aspect-square object-cover"
                         />
@@ -151,7 +153,7 @@ export default function PortfolioPage() {
                     className="flex items-center gap-4 bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 hover:border-purple-400/30 transition"
                   >
                     {token.image_url ? (
-                      <img src={token.image_url} alt={token.name} className="w-10 h-10 rounded-lg object-cover" />
+                      <img src={fastIpfsUrl(token.image_url) || ""} alt={token.name} className="w-10 h-10 rounded-lg object-cover" />
                     ) : (
                       <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center text-lg">
                         🪙
