@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 
 const NAV_ITEMS = [
   { href: "/token", label: "Token", emoji: "🪙" },
@@ -14,9 +15,25 @@ const NAV_ITEMS = [
 ];
 
 export function Navbar() {
-  const { publicKey, balance, connect, recover, disconnect, loading } = useWallet();
-  const { network, toggle } = useNetwork();
+  const { publicKey, balance, connect, recover, disconnect, loading, refreshBalance } = useWallet();
+  const { network, rpc, toggle } = useNetwork();
   const [showMenu, setShowMenu] = useState(false);
+  const [airdropping, setAirdropping] = useState(false);
+
+  const handleAirdrop = useCallback(async () => {
+    if (!publicKey || network !== "devnet") return;
+    setAirdropping(true);
+    try {
+      const conn = new Connection(rpc);
+      const sig = await conn.requestAirdrop(new PublicKey(publicKey), 1 * LAMPORTS_PER_SOL);
+      await conn.confirmTransaction(sig);
+      await refreshBalance();
+    } catch {
+      // silently fail
+    } finally {
+      setAirdropping(false);
+    }
+  }, [publicKey, network, rpc, refreshBalance]);
   const pathname = usePathname();
 
   const shortKey = publicKey ? `${publicKey.slice(0, 4)}...${publicKey.slice(-4)}` : null;
@@ -98,6 +115,15 @@ export function Navbar() {
                     >
                       Copy address
                     </button>
+                    {network === "devnet" && (
+                      <button
+                        onClick={() => { handleAirdrop(); setShowMenu(false); }}
+                        disabled={airdropping}
+                        className="block w-full text-left px-4 py-2.5 text-sm text-yellow-400 hover:bg-white/5 transition cursor-pointer disabled:opacity-50"
+                      >
+                        {airdropping ? "Airdropping..." : "💧 Airdrop 1 SOL"}
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         disconnect();
