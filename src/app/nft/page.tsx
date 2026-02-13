@@ -1,6 +1,6 @@
-import { fastIpfsUrl } from "@/lib/ipfs";
 "use client";
 
+import { fastIpfsUrl } from "@/lib/ipfs";
 import { useState, useRef } from "react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";

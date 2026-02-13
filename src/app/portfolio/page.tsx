@@ -1,6 +1,6 @@
-import { fastIpfsUrl } from "@/lib/ipfs";
-import { fastIpfsUrl } from "@/lib/ipfs";
 "use client";
+
+import { fastIpfsUrl } from "@/lib/ipfs";
 
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/navbar";
