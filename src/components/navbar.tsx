@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { useState, useCallback } from "react";
-import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 
 const NAV_ITEMS = [
   { href: "/token", label: "Token", emoji: "🪙" },
@@ -24,16 +23,18 @@ export function Navbar() {
     if (!publicKey || network !== "devnet") return;
     setAirdropping(true);
     try {
-      const conn = new Connection(rpc);
-      const sig = await conn.requestAirdrop(new PublicKey(publicKey), 1 * LAMPORTS_PER_SOL);
-      await conn.confirmTransaction(sig);
+      await fetch("https://api.metasal.xyz/api/airdrop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: publicKey }),
+      });
       await refreshBalance();
     } catch {
       // silently fail
     } finally {
       setAirdropping(false);
     }
-  }, [publicKey, network, rpc, refreshBalance]);
+  }, [publicKey, network, refreshBalance]);
   const pathname = usePathname();
 
   const shortKey = publicKey ? `${publicKey.slice(0, 4)}...${publicKey.slice(-4)}` : null;
@@ -121,7 +122,7 @@ export function Navbar() {
                         disabled={airdropping}
                         className="block w-full text-left px-4 py-2.5 text-sm text-yellow-400 hover:bg-white/5 transition cursor-pointer disabled:opacity-50"
                       >
-                        {airdropping ? "Airdropping..." : "💧 Airdrop 1 SOL"}
+                        {airdropping ? "Airdropping..." : "💧 Airdrop 0.1 SOL"}
                       </button>
                     )}
                     <button
