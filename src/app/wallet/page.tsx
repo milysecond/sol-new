@@ -8,7 +8,7 @@ export default function WalletPage() {
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
-      <Navbar label="Wallet" />
+      <Navbar />
       <main className="flex-1 flex flex-col items-center justify-center px-6">
         <div className="max-w-lg w-full space-y-8">
           <div className="text-center space-y-3">
