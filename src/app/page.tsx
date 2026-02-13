@@ -4,12 +4,15 @@ import Link from "next/link";
 import { Navbar } from "@/components/navbar";
 import { useWallet } from "@/lib/wallet-context";
 import { FaucetFooter } from "@/components/faucet-footer";
+import { Coins, Image, Wallet, ShieldCheck } from "lucide-react";
+import { AnimatedIcon } from "@/components/animated-icon";
+import type { LucideIcon } from "lucide-react";
 
-const products = [
-  { href: "/token", emoji: "🪙", title: "Token", desc: "Launch a token in seconds" },
-  { href: "/nft", emoji: "🖼️", title: "NFT", desc: "Mint an NFT from any image" },
-  { href: "/pay", emoji: "💸", title: "Pay", desc: "Create a payment link" },
-  { href: "/multisig", emoji: "🏛️", title: "Multisig", desc: "Create a multisig" },
+const products: { href: string; icon: LucideIcon; title: string; desc: string }[] = [
+  { href: "/token", icon: Coins, title: "Token", desc: "Launch a token in seconds" },
+  { href: "/nft", icon: Image, title: "NFT", desc: "Mint an NFT from any image" },
+  { href: "/multisig", icon: ShieldCheck, title: "Multisig", desc: "Create a multisig" },
+  { href: "/wallet", icon: Wallet, title: "Wallet", desc: "Get SOL, pay, and manage assets" },
 ];
 
 export default function Home() {
@@ -45,7 +48,7 @@ export default function Home() {
                 href={p.href}
                 className="group flex items-center gap-4 bg-white/[0.03] hover:bg-white/[0.07] border border-white/10 hover:border-purple-400/30 rounded-2xl px-5 py-4 transition"
               >
-                <span className="text-3xl">{p.emoji}</span>
+                <AnimatedIcon icon={p.icon} size={28} className="text-purple-400" />
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-white group-hover:text-purple-300 transition">{p.title}</div>
                   <div className="text-sm text-white/40">{p.desc}</div>

@@ -84,7 +84,8 @@ async function buildRegularNftTx(
   uri: string
 ) {
   const mint = Keypair.generate();
-  const mintRent = await conn.getMinimumBalanceForRentExemption(getMintLen(0));
+  const mintLen = getMintLen([]);
+  const mintRent = await conn.getMinimumBalanceForRentExemption(mintLen);
   const ata = await getAssociatedTokenAddress(mint.publicKey, owner);
 
   const [metadataPda] = PublicKey.findProgramAddressSync(
@@ -96,7 +97,7 @@ async function buildRegularNftTx(
     SystemProgram.createAccount({
       fromPubkey: owner,
       newAccountPubkey: mint.publicKey,
-      space: getMintLen(0),
+      space: mintLen,
       lamports: mintRent,
       programId: TOKEN_PROGRAM_ID,
     }),

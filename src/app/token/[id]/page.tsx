@@ -1,3 +1,5 @@
+import { Coins } from "lucide-react";
+
 export default async function TokenPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   
@@ -9,7 +11,7 @@ export default async function TokenPage({ params }: { params: Promise<{ id: stri
         </a>
         <div className="bg-white/5 border border-white/10 rounded-2xl p-8 space-y-4">
           <div className="w-16 h-16 bg-purple-500/20 rounded-full mx-auto flex items-center justify-center">
-            <span className="text-2xl">🪙</span>
+            <Coins size={24} className="text-purple-400" />
           </div>
           <h1 className="text-xl font-semibold">Token {id}</h1>
           <p className="text-white/40 text-sm">

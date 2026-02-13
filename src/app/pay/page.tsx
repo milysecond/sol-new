@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
+import { CreditCard } from "lucide-react";
+import { AnimatedIcon } from "@/components/animated-icon";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import QRCode from "qrcode";
@@ -70,7 +72,7 @@ export default function PayPage() {
         <ConnectGate action="create a payment link">
           <div className="max-w-lg w-full space-y-8">
             <div className="text-center space-y-3">
-              <div className="text-4xl">💸</div>
+              <AnimatedIcon icon={CreditCard} size={40} className="text-purple-400" />
               <h1 className="text-3xl font-bold tracking-tight">Payment link</h1>
               <p className="text-white/50">Create a Solana Pay link anyone can pay with.</p>
             </div>

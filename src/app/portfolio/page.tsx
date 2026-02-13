@@ -3,11 +3,11 @@
 import { fastIpfsUrl } from "@/lib/ipfs";
 
 import { useEffect, useState } from "react";
+import { Image as ImageIcon, Coins } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-
 interface Token {
   id: number;
   name: string;
@@ -76,7 +76,7 @@ export default function PortfolioPage() {
                     : "bg-white/5 text-white/50 border border-white/10 hover:text-white"
                 }`}
               >
-                🖼️ NFTs {nfts.length > 0 && `(${nfts.length})`}
+                <ImageIcon size={14} className="inline mr-1" /> NFTs {nfts.length > 0 && `(${nfts.length})`}
               </button>
               <button
                 onClick={() => setTab("tokens")}
@@ -86,7 +86,7 @@ export default function PortfolioPage() {
                     : "bg-white/5 text-white/50 border border-white/10 hover:text-white"
                 }`}
               >
-                🪙 Tokens {tokens.length > 0 && `(${tokens.length})`}
+                <Coins size={14} className="inline mr-1" /> Tokens {tokens.length > 0 && `(${tokens.length})`}
               </button>
             </div>
 
@@ -155,8 +155,8 @@ export default function PortfolioPage() {
                     {token.image_url ? (
                       <img src={fastIpfsUrl(token.image_url) || ""} alt={token.name} className="w-10 h-10 rounded-lg object-cover" />
                     ) : (
-                      <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center text-lg">
-                        🪙
+                      <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                        <Coins size={20} className="text-purple-400" />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">

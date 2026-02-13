@@ -8,6 +8,8 @@ import { uploadImage, uploadMetadata } from "@/lib/api";
 import { signAndSendTransaction } from "@/lib/passkey-wallet";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
+import { Image, Zap, Coins, Paperclip } from "lucide-react";
+import { AnimatedIcon } from "@/components/animated-icon";
 
 type MintType = "compressed" | "regular";
 
@@ -28,7 +30,7 @@ export default function NftPage() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { publicKey } = useWallet();
+  const { publicKey, refreshBalance } = useWallet();
   const { network, rpc } = useNetwork();
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,6 +109,8 @@ export default function NftPage() {
 
       setResult({ imageUrl: displayUrl, metadataUri, mint: mintAddress, signature, type: data.type });
       setStatus("done");
+      // Refresh balance immediately after mint confirmation
+      refreshBalance();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Mint failed");
       setStatus("error");
@@ -123,7 +127,7 @@ export default function NftPage() {
         <ConnectGate action="mint an NFT">
           <div className="max-w-lg w-full space-y-8">
             <div className="text-center space-y-3">
-              <div className="text-4xl">🖼️</div>
+              <AnimatedIcon icon={Image} size={40} className="text-purple-400" />
               <h1 className="text-3xl font-bold tracking-tight">Mint an NFT</h1>
               <p className="text-white/50">Turn any image into a Solana NFT.</p>
             </div>
@@ -240,7 +244,7 @@ export default function NftPage() {
                     </div>
                   ) : (
                     <>
-                      <span className="text-2xl mb-2">📎</span>
+                      <Paperclip size={24} className="mb-2 text-white/40" />
                       <span className="text-white/30 text-sm">Tap to upload an image</span>
                     </>
                   )}
@@ -259,7 +263,7 @@ export default function NftPage() {
                           : "bg-white/5 border-white/10 text-white/60 hover:text-white hover:border-white/20"
                       }`}
                     >
-                      {t === "compressed" ? "⚡ Compressed" : "🪙 Regular"}
+                      {t === "compressed" ? <><Zap size={14} className="inline mr-1" /> Compressed</> : <><Coins size={14} className="inline mr-1" /> Regular</>}
                     </button>
                   ))}
                 </div>

@@ -5,13 +5,14 @@ import { usePathname } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { useState, useCallback } from "react";
+import { Coins, Image, Download, CreditCard, ShieldCheck, FolderOpen, Wallet, Droplets, Zap, ExternalLink, Copy, LogOut } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-const NAV_ITEMS = [
-  { href: "/token", label: "Token", emoji: "🪙" },
-  { href: "/nft", label: "NFT", emoji: "🖼️" },
-  { href: "/pay", label: "Pay", emoji: "💸" },
-  { href: "/multisig", label: "Multisig", emoji: "🏛️" },
-  { href: "/portfolio", label: "Portfolio", emoji: "📂" },
+const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/token", label: "Token", icon: Coins },
+  { href: "/nft", label: "NFT", icon: Image },
+  { href: "/multisig", label: "Multisig", icon: ShieldCheck },
+  { href: "/wallet", label: "Wallet", icon: Wallet },
 ];
 
 export function Navbar() {
@@ -60,7 +61,7 @@ export function Navbar() {
                     : "text-white/40 hover:text-white/70 hover:bg-white/5"
                 }`}
               >
-                <span className="mr-1.5">{item.emoji}</span>
+                <item.icon size={16} className="inline mr-1.5" />
                 {item.label}
               </Link>
             ))}
@@ -101,14 +102,14 @@ export function Navbar() {
                       onClick={() => setShowMenu(false)}
                       className="block px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 hover:text-white transition"
                     >
-                      👛 Wallet details
+                      <Wallet size={14} className="inline mr-1.5" /> Wallet details
                     </Link>
                     <a
                       href={`https://solscan.io/account/${publicKey}${network === "devnet" ? "?cluster=devnet" : ""}`}
                       target="_blank"
                       className="block px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 hover:text-white transition"
                     >
-                      View on Solscan ↗
+                      <ExternalLink size={14} className="inline mr-1.5" /> View on Solscan
                     </a>
                     <button
                       onClick={() => {
@@ -117,7 +118,7 @@ export function Navbar() {
                       }}
                       className="block w-full text-left px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 hover:text-white transition cursor-pointer"
                     >
-                      Copy address
+                      <Copy size={14} className="inline mr-1.5" /> Copy address
                     </button>
                     {network === "devnet" && (
                       <button
@@ -125,7 +126,7 @@ export function Navbar() {
                         disabled={airdropping}
                         className="block w-full text-left px-4 py-2.5 text-sm text-yellow-400 hover:bg-white/5 transition cursor-pointer disabled:opacity-50"
                       >
-                        {airdropping ? "Airdropping..." : "💧 Airdrop 0.1 SOL"}
+                        {airdropping ? "Airdropping..." : <><Droplets size={14} className="inline mr-1" /> Airdrop 0.1 SOL</>}
                       </button>
                     )}
                     <button
@@ -135,7 +136,7 @@ export function Navbar() {
                       }}
                       className="block w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-white/5 transition cursor-pointer"
                     >
-                      Disconnect
+                      <LogOut size={14} className="inline mr-1.5" /> Disconnect
                     </button>
                   </div>
                 </>
@@ -162,20 +163,20 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile nav */}
-      <div className="flex sm:hidden items-center gap-1 px-4 pb-3 overflow-x-auto">
-        {NAV_ITEMS.map((item) => (
+      {/* Mobile bottom nav — fixed */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-black/95 backdrop-blur border-t border-white/10 flex items-center justify-around px-2 py-2 safe-bottom">
+        {[{ href: "/", label: "Home", icon: Zap }, ...NAV_ITEMS].map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition ${
+            className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl min-w-[56px] transition active:scale-95 ${
               pathname === item.href
-                ? "bg-white/10 text-white"
-                : "text-white/40 hover:text-white/70"
+                ? "text-purple-400"
+                : "text-white/40 active:text-white/70"
             }`}
           >
-            <span className="mr-1">{item.emoji}</span>
-            {item.label}
+            <item.icon size={20} className="" />
+            <span className="text-[10px]">{item.label}</span>
           </Link>
         ))}
       </div>

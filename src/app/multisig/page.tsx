@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
+import { ShieldCheck } from "lucide-react";
+import { AnimatedIcon } from "@/components/animated-icon";
 
 export default function DaoPage() {
   const [name, setName] = useState("");
@@ -17,7 +19,7 @@ export default function DaoPage() {
         <ConnectGate action="create a Multisig">
           <div className="max-w-lg w-full space-y-8">
             <div className="text-center space-y-3">
-              <div className="text-4xl">🏛️</div>
+              <AnimatedIcon icon={ShieldCheck} size={40} className="text-purple-400" />
               <h1 className="text-3xl font-bold tracking-tight">Spin up a Multisig</h1>
               <p className="text-white/50">Shared wallet with multiple signers.</p>
             </div>
