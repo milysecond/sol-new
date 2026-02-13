@@ -97,7 +97,7 @@ export default function TokenPage() {
                 <textarea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition resize-none" />
                 
                 <label
-                  onClick={() => fileRef.current?.click()}
+                  htmlFor="token-image-upload"
                   className="flex items-center justify-center w-full bg-white/5 border border-dashed border-white/10 rounded-xl px-4 py-6 cursor-pointer hover:border-white/20 transition overflow-hidden"
                 >
                   {imagePreview ? (
@@ -106,10 +106,10 @@ export default function TokenPage() {
                       <span className="text-white/50 text-sm">{imageFile?.name}</span>
                     </div>
                   ) : (
-                    <span className="text-white/30 text-sm">Upload image (optional)</span>
+                    <span className="text-white/30 text-sm">Tap to upload image (optional)</span>
                   )}
-                  <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
                 </label>
+                <input id="token-image-upload" ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="sr-only" />
 
                 {error && (
                   <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">{error}</div>

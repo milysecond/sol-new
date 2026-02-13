@@ -190,7 +190,7 @@ export default function NftPage() {
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition resize-none"
                 />
                 <label
-                  onClick={() => fileRef.current?.click()}
+                  htmlFor="nft-image-upload"
                   className="flex flex-col items-center justify-center w-full bg-white/5 border border-dashed border-white/10 rounded-xl px-4 py-10 cursor-pointer hover:border-white/20 transition"
                 >
                   {imagePreview ? (
@@ -201,11 +201,11 @@ export default function NftPage() {
                   ) : (
                     <>
                       <span className="text-2xl mb-2">📎</span>
-                      <span className="text-white/30 text-sm">Drop an image or click to upload</span>
+                      <span className="text-white/30 text-sm">Tap to upload an image</span>
                     </>
                   )}
-                  <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
                 </label>
+                <input id="nft-image-upload" ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="sr-only" />
 
                 {/* Mint type toggle */}
                 <div className="flex gap-2">
