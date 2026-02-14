@@ -42,12 +42,12 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
             {/* Header */}
             <div className="sticky top-0 z-30 flex items-center justify-between bg-white/95 dark:bg-black/95 backdrop-blur border border-black/10 dark:border-white/10 rounded-xl px-4 py-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center shrink-0">
-                  <Wallet size={20} className="text-purple-400" />
+                <div className="w-10 h-10 rounded-full bg-fuchsia-500/20 flex items-center justify-center shrink-0">
+                  <Wallet size={20} className="text-fuchsia-400" />
                 </div>
                 <div className="min-w-0">
                   {balance !== null && (
-                    <p className="text-purple-500 dark:text-purple-400 font-mono font-bold text-lg leading-tight">{balance.toFixed(4)} SOL</p>
+                    <p className="text-fuchsia-500 dark:text-fuchsia-400 font-mono font-bold text-lg leading-tight">{balance.toFixed(4)} SOL</p>
                   )}
                   <p className="text-gray-400 dark:text-white/40 text-xs font-mono truncate">
                     {publicKey?.slice(0, 6)}...{publicKey?.slice(-4)}
@@ -79,7 +79,7 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
                   onClick={() => router.push(t.path)}
                   className={`flex-1 flex flex-col items-center gap-1 px-2 py-2 rounded-xl text-[11px] transition cursor-pointer active:scale-95 ${
                     activeTab === t.id
-                      ? "bg-purple-500/20 text-purple-300 border border-purple-400/50"
+                      ? "bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-400/50"
                       : "bg-black/5 dark:bg-white/5 text-gray-500 dark:text-white/50 border border-black/10 dark:border-white/10"
                   }`}
                 >

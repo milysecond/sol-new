@@ -39,16 +39,16 @@ export default function WalletNftPage() {
     <WalletShell>
       <PageTransition>
       {loading ? (
-        <div className="text-center py-12"><Spinner size={24} className="text-purple-400 mx-auto" /></div>
+        <div className="text-center py-12"><Spinner size={24} className="text-fuchsia-400 mx-auto" /></div>
       ) : nfts.length === 0 ? (
         <div className="text-center py-12 space-y-3">
           <p className="text-gray-400 dark:text-white/30">No NFTs yet</p>
-          <a href="/nft" className="text-purple-400 hover:text-purple-300 text-sm transition">Mint your first NFT</a>
+          <a href="/nft" className="text-fuchsia-400 hover:text-fuchsia-300 text-sm transition">Mint your first NFT</a>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:gap-3">
           {nfts.map((nft) => (
-            <div key={nft.id} className="bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl overflow-hidden hover:border-purple-400/30 transition">
+            <div key={nft.id} className="bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl overflow-hidden hover:border-fuchsia-400/30 transition">
               {nft.image_url && <img src={fastIpfsUrl(nft.image_url) || ""} alt={nft.name} className="w-full aspect-square object-cover" />}
               <div className="p-2.5 space-y-1">
                 <div className="flex items-center justify-between gap-1">
@@ -57,7 +57,7 @@ export default function WalletNftPage() {
                 </div>
                 {nft.mint_address && (
                   <div className="flex items-center gap-1">
-                    <p className="text-purple-400/70 text-[10px] font-mono truncate flex-1">{nft.mint_address}</p>
+                    <p className="text-fuchsia-400/70 text-[10px] font-mono truncate flex-1">{nft.mint_address}</p>
                     <button onClick={() => copyNftAddress(nft.mint_address!)} className="p-1 shrink-0">
                       {copiedNft === nft.mint_address ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3 text-gray-400 dark:text-white/30" />}
                     </button>

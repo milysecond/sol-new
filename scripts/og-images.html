@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; }
+  .og {
+    width: 1200px; height: 630px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+  }
+  .logo { width: 80px; height: 80px; border-radius: 16px; margin-bottom: 20px; }
+  .headline { font-size: 56px; font-weight: 700; color: #111; margin-bottom: 12px; }
+  .sub { font-size: 26px; color: #555; margin-bottom: 16px; }
+  .url { font-size: 20px; font-weight: 600; }
+  .bar-top { position: absolute; top: 0; left: 0; right: 0; height: 6px; }
+  .bar-bottom { position: absolute; bottom: 0; left: 0; right: 0; height: 50px; display: flex; align-items: center; justify-content: center; }
+  .bar-bottom span { color: white; font-size: 16px; font-weight: 600; letter-spacing: 0.5px; }
+  .icon-big { width: 64px; height: 64px; margin-bottom: 16px; }
+  /* Decorative circles */
+  .circle { position: absolute; border-radius: 50%; opacity: 0.08; }
+  .circle-1 { width: 300px; height: 300px; top: -80px; right: -60px; }
+  .circle-2 { width: 200px; height: 200px; bottom: 40px; left: -40px; }
+  .circle-3 { width: 150px; height: 150px; top: 60px; left: 80px; }
+  .circle-4 { width: 100px; height: 100px; bottom: 120px; right: 100px; }
+  /* Dots pattern */
+  .dots { position: absolute; opacity: 0.04; }
+  .dots-tr { top: 40px; right: 40px; }
+  .dots-bl { bottom: 80px; left: 40px; }
+
+  /* Page specific */
+  .og-main { background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 50%, #ede9fe 100%); }
+  .og-main .bar-top, .og-main .circle { background: #a855f7; }
+  .og-main .bar-bottom { background: #a855f7; }
+  .og-main .url { color: #a855f7; }
+  .og-main .headline span { color: #a855f7; }
+
+  .og-token { background: linear-gradient(135deg, #fffbeb 0%, #fff7ed 50%, #fef3c7 100%); }
+  .og-token .bar-top, .og-token .circle { background: #f97316; }
+  .og-token .bar-bottom { background: #f97316; }
+  .og-token .url { color: #f97316; }
+  .og-token .icon-big { color: #f97316; }
+
+  .og-nft { background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #dcfce7 100%); }
+  .og-nft .bar-top, .og-nft .circle { background: #22c55e; }
+  .og-nft .bar-bottom { background: #22c55e; }
+  .og-nft .url { color: #22c55e; }
+  .og-nft .icon-big { color: #22c55e; }
+
+  .og-multisig { background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #e0f2fe 100%); }
+  .og-multisig .bar-top, .og-multisig .circle { background: #3b82f6; }
+  .og-multisig .bar-bottom { background: #3b82f6; }
+  .og-multisig .url { color: #3b82f6; }
+  .og-multisig .icon-big { color: #3b82f6; }
+
+  .og-wallet { background: linear-gradient(135deg, #fdf4ff 0%, #fae8ff 50%, #f5d0fe 100%); }
+  .og-wallet .bar-top, .og-wallet .circle { background: #d946ef; }
+  .og-wallet .bar-bottom { background: #d946ef; }
+  .og-wallet .url { color: #d946ef; }
+  .og-wallet .icon-big { color: #d946ef; }
+</style>
+</head>
+<body>
+
+<!-- MAIN -->
+<div id="og-main" class="og og-main">
+  <div class="circle circle-1"></div>
+  <div class="circle circle-2"></div>
+  <div class="circle circle-3"></div>
+  <div class="circle circle-4"></div>
+  <div class="bar-top"></div>
+  <img src="/icon-512.png" class="logo" />
+  <div class="headline">sol<span>.new</span></div>
+  <div class="sub">Create tokens and NFTs on Solana</div>
+  <div class="url">No wallet needed · Low fees · Instant</div>
+  <div class="bar-bottom"><span>sol.new</span></div>
+</div>
+
+<div style="height:40px"></div>
+
+<!-- TOKEN -->
+<div id="og-token" class="og og-token">
+  <div class="circle circle-1"></div>
+  <div class="circle circle-2"></div>
+  <div class="circle circle-3"></div>
+  <div class="circle circle-4"></div>
+  <div class="bar-top"></div>
+  <svg class="icon-big" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>
+  <div class="headline">Create a Token</div>
+  <div class="sub">Launch your token on Solana in seconds</div>
+  <div class="url">sol.new/token</div>
+  <div class="bar-bottom"><span>sol.new</span></div>
+</div>
+
+<div style="height:40px"></div>
+
+<!-- NFT -->
+<div id="og-nft" class="og og-nft">
+  <div class="circle circle-1"></div>
+  <div class="circle circle-2"></div>
+  <div class="circle circle-3"></div>
+  <div class="circle circle-4"></div>
+  <div class="bar-top"></div>
+  <svg class="icon-big" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+  <div class="headline">Mint an NFT</div>
+  <div class="sub">Turn any image into an NFT on Solana</div>
+  <div class="url">sol.new/nft</div>
+  <div class="bar-bottom"><span>sol.new</span></div>
+</div>
+
+<div style="height:40px"></div>
+
+<!-- MULTISIG -->
+<div id="og-multisig" class="og og-multisig">
+  <div class="circle circle-1"></div>
+  <div class="circle circle-2"></div>
+  <div class="circle circle-3"></div>
+  <div class="circle circle-4"></div>
+  <div class="bar-top"></div>
+  <svg class="icon-big" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+  <div class="headline">Create a Multisig</div>
+  <div class="sub">Shared wallets with multiple signers</div>
+  <div class="url">sol.new/multisig</div>
+  <div class="bar-bottom"><span>sol.new</span></div>
+</div>
+
+<div style="height:40px"></div>
+
+<!-- WALLET -->
+<div id="og-wallet" class="og og-wallet">
+  <div class="circle circle-1"></div>
+  <div class="circle circle-2"></div>
+  <div class="circle circle-3"></div>
+  <div class="circle circle-4"></div>
+  <div class="bar-top"></div>
+  <svg class="icon-big" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+  <div class="headline">Your Solana Wallet</div>
+  <div class="sub">No seed phrase. Just a passkey.</div>
+  <div class="url">sol.new/wallet</div>
+  <div class="bar-bottom"><span>sol.new</span></div>
+</div>
+
+</body>
+</html>

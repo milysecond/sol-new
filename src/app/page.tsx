@@ -124,11 +124,11 @@ function Stats() {
   );
 }
 
-const products: { href: string; icon: LucideIcon; title: string; desc: string }[] = [
-  { href: "/token", icon: Coins, title: "Token", desc: "Launch a token in seconds" },
-  { href: "/nft", icon: Image, title: "NFT", desc: "Mint an NFT from any image" },
-  { href: "/multisig", icon: ShieldCheck, title: "Multisig", desc: "Create a multisig" },
-  { href: "/wallet", icon: Wallet, title: "Wallet", desc: "Get SOL, pay, and manage assets" },
+const products: { href: string; icon: LucideIcon; title: string; desc: string; color: string }[] = [
+  { href: "/token", icon: Coins, title: "Token", desc: "Launch a token in seconds", color: "text-orange-400" },
+  { href: "/nft", icon: Image, title: "NFT", desc: "Mint an NFT from any image", color: "text-green-400" },
+  { href: "/multisig", icon: ShieldCheck, title: "Multisig", desc: "Create a multisig", color: "text-blue-400" },
+  { href: "/wallet", icon: Wallet, title: "Wallet", desc: "Get SOL, pay, and manage assets", color: "text-fuchsia-400" },
 ];
 
 export default function Home() {
@@ -162,8 +162,8 @@ export default function Home() {
                 href={p.href}
                 className="group flex flex-col items-center justify-center gap-2 py-6 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-95 active:bg-purple-500/10 border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150"
               >
-                <AnimatedIcon icon={p.icon} size={24} className="text-purple-400" />
-                <div className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-purple-300 transition">{p.title}</div>
+                <AnimatedIcon icon={p.icon} size={24} className={p.color} />
+                <div className="text-sm font-semibold text-gray-900 dark:text-white transition">{p.title}</div>
                 <div className="text-[11px] text-gray-500 dark:text-white/40 px-2 text-center leading-tight">{p.desc}</div>
               </Link>
             ))}

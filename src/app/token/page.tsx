@@ -189,16 +189,16 @@ export default function TokenPage() {
           <PageTransition>
           <div className="w-full sm:max-w-lg space-y-4">
             <div className="text-center space-y-1">
-              <AnimatedIcon icon={Coins} size={32} className="text-purple-400" />
+              <AnimatedIcon icon={Coins} size={32} className="text-orange-400" />
               <h1 className="text-2xl font-bold tracking-tight">Launch a token</h1>
               <p className="text-gray-500 dark:text-white/50 text-sm">Create a Solana token in seconds.</p>
             </div>
 
             {
               <div className="space-y-3">
-                <input type="text" placeholder="Token name" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition" />
-                <input type="text" placeholder="Ticker (e.g. SOL)" value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} maxLength={8} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition font-mono" />
-                <textarea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition resize-none" />
+                <input type="text" placeholder="Token name" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition" />
+                <input type="text" placeholder="Ticker (e.g. SOL)" value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} maxLength={8} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition font-mono" />
+                <textarea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition resize-none" />
                 
                 <label
                   htmlFor="token-image-upload"
@@ -238,7 +238,7 @@ export default function TokenPage() {
                         }}
                         className={`p-2 rounded-lg border transition cursor-pointer ${
                           activeSocials.has(key)
-                            ? "bg-purple-500/20 border-purple-400/50 text-purple-400"
+                            ? "bg-orange-500/20 border-orange-400/50 text-orange-400"
                             : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-400 dark:text-white/40 hover:text-gray-600 dark:hover:text-white/60"
                         }`}
                         title={label}
@@ -249,25 +249,25 @@ export default function TokenPage() {
                   </div>
 
                   {activeSocials.has("website") && (
-                    <input type="url" placeholder="Website URL" value={website} onChange={(e) => setWebsite(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition text-sm" />
+                    <input type="url" placeholder="Website URL" value={website} onChange={(e) => setWebsite(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition text-sm" />
                   )}
                   {activeSocials.has("twitter") && (
-                    <input type="text" placeholder="X handle (e.g. @soldotnew)" value={twitter} onChange={(e) => setTwitter(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition text-sm" />
+                    <input type="text" placeholder="X handle (e.g. @soldotnew)" value={twitter} onChange={(e) => setTwitter(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition text-sm" />
                   )}
                   {activeSocials.has("telegram") && (
-                    <input type="text" placeholder="Telegram link or @handle" value={telegram} onChange={(e) => setTelegram(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition text-sm" />
+                    <input type="text" placeholder="Telegram link or @handle" value={telegram} onChange={(e) => setTelegram(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition text-sm" />
                   )}
                   {activeSocials.has("instagram") && (
-                    <input type="text" placeholder="Instagram handle" value={instagram} onChange={(e) => setInstagram(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition text-sm" />
+                    <input type="text" placeholder="Instagram handle" value={instagram} onChange={(e) => setInstagram(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition text-sm" />
                   )}
                   {activeSocials.has("github") && (
-                    <input type="text" placeholder="GitHub URL or username" value={github} onChange={(e) => setGithub(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition text-sm" />
+                    <input type="text" placeholder="GitHub URL or username" value={github} onChange={(e) => setGithub(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition text-sm" />
                   )}
                   {activeSocials.has("youtube") && (
-                    <input type="text" placeholder="YouTube channel URL" value={youtube} onChange={(e) => setYoutube(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition text-sm" />
+                    <input type="text" placeholder="YouTube channel URL" value={youtube} onChange={(e) => setYoutube(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition text-sm" />
                   )}
                   {activeSocials.has("tiktok") && (
-                    <input type="text" placeholder="TikTok handle" value={tiktok} onChange={(e) => setTiktok(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition text-sm" />
+                    <input type="text" placeholder="TikTok handle" value={tiktok} onChange={(e) => setTiktok(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition text-sm" />
                   )}
                 </div>
 
@@ -315,7 +315,7 @@ export default function TokenPage() {
                           }} />
                         ))}
                         {/* Rocket pointing right */}
-                        <Rocket className="w-7 h-7 text-purple-500 dark:text-purple-400 rotate-45 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
+                        <Rocket className="w-7 h-7 text-orange-500 dark:text-orange-400 rotate-45 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
                       </div>
                     </div>
                     <p className="text-center text-sm text-gray-500 dark:text-white/50">
@@ -329,7 +329,7 @@ export default function TokenPage() {
                   <button
                     onClick={handleLaunch}
                     disabled={!name || !ticker || !imageFile}
-                    className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
+                    className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
                   >
                     Launch token
                   </button>

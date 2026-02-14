@@ -60,7 +60,7 @@ export default function WalletPayPage() {
             <p className="text-gray-900 dark:text-white font-semibold text-lg">{amount} {selected}</p>
             {label && <p className="text-gray-500 dark:text-white/40 text-sm">{label}</p>}
             <div onClick={copyLink} className="w-full bg-black/5 dark:bg-white/5 rounded-lg px-4 py-3 font-mono text-xs text-gray-500 dark:text-white/50 break-all cursor-pointer hover:text-gray-700 dark:hover:text-white/70 transition">{payUrl}</div>
-            <button onClick={copyLink} className="w-full bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-1.5">{copied ? <><Check className="w-4 h-4 inline" /> Copied!</> : "Copy link"}</button>
+            <button onClick={copyLink} className="w-full bg-fuchsia-500 hover:bg-fuchsia-400 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-1.5">{copied ? <><Check className="w-4 h-4 inline" /> Copied!</> : "Copy link"}</button>
           </div>
           <button onClick={() => { setPayUrl(null); setAmount(""); setLabel(""); setCopied(false); }} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition cursor-pointer">Create another</button>
         </div>
@@ -69,15 +69,15 @@ export default function WalletPayPage() {
           <p className="text-center text-gray-500 dark:text-white/50 text-sm">Create a Solana Pay link anyone can pay with.</p>
           <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-white/30 font-mono">{selected === "SOL" ? "◎" : "$"}</span>
-            <input type="text" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl pl-8 pr-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition font-mono text-2xl" />
+            <input type="text" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl pl-8 pr-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-fuchsia-400/50 focus:ring-1 focus:ring-fuchsia-400/25 transition font-mono text-2xl" />
           </div>
-          <input type="text" placeholder="What's it for? (optional)" value={label} onChange={(e) => setLabel(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition" />
+          <input type="text" placeholder="What's it for? (optional)" value={label} onChange={(e) => setLabel(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-fuchsia-400/50 focus:ring-1 focus:ring-fuchsia-400/25 transition" />
           <div className="flex gap-2">
             {PAY_TOKENS.map((token) => (
-              <button key={token} onClick={() => setSelected(token)} className={`flex-1 border rounded-xl px-4 py-2.5 text-sm transition cursor-pointer ${selected === token ? "bg-purple-500/20 border-purple-400/50 text-purple-300" : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60"}`}>{token}</button>
+              <button key={token} onClick={() => setSelected(token)} className={`flex-1 border rounded-xl px-4 py-2.5 text-sm transition cursor-pointer ${selected === token ? "bg-fuchsia-500/20 border-fuchsia-400/50 text-fuchsia-300" : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60"}`}>{token}</button>
             ))}
           </div>
-          <button onClick={handleCreate} disabled={!amount} className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed">Create {selected} link</button>
+          <button onClick={handleCreate} disabled={!amount} className="w-full bg-fuchsia-500 hover:bg-fuchsia-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed">Create {selected} link</button>
         </div>
       )}
       </PageTransition>

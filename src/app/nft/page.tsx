@@ -183,7 +183,7 @@ export default function NftPage() {
           <PageTransition>
           <div className="w-full sm:max-w-lg space-y-4">
             <div className="text-center space-y-1">
-              <AnimatedIcon icon={Image} size={32} className="text-purple-400" />
+              <AnimatedIcon icon={Image} size={32} className="text-green-400" />
               <h1 className="text-2xl font-bold tracking-tight">Mint an NFT</h1>
               <p className="text-gray-500 dark:text-white/50 text-sm">Turn any image into a Solana NFT.</p>
             </div>
@@ -209,7 +209,7 @@ export default function NftPage() {
                       <a
                         href={`${explorerBase}/address/${result.mint}${clusterParam}`}
                         target="_blank"
-                        className="text-purple-400 text-sm break-all hover:text-purple-300"
+                        className="text-green-400 text-sm break-all hover:text-green-300"
                       >
                         {result.mint}
                       </a>
@@ -218,13 +218,13 @@ export default function NftPage() {
                   {result.assetId && result.assetId !== "pending" && (
                     <div>
                       <p className="text-xs text-gray-500 dark:text-white/40">Asset ID</p>
-                      <p className="text-purple-400 text-sm break-all">{result.assetId}</p>
+                      <p className="text-green-400 text-sm break-all">{result.assetId}</p>
                     </div>
                   )}
                   {result.metadataUri && (
                     <div>
                       <p className="text-xs text-gray-500 dark:text-white/40">Metadata</p>
-                      <a href={result.metadataUri} target="_blank" className="text-purple-400 text-sm break-all hover:text-purple-300">
+                      <a href={result.metadataUri} target="_blank" className="text-green-400 text-sm break-all hover:text-green-300">
                         {result.metadataUri}
                       </a>
                     </div>
@@ -236,7 +236,7 @@ export default function NftPage() {
                   <a
                     href={`${explorerBase}/address/${result.mint}${clusterParam}`}
                     target="_blank"
-                    className="flex items-center justify-center gap-1.5 w-full bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-xl px-4 py-3.5 transition text-center"
+                    className="flex items-center justify-center gap-1.5 w-full bg-green-500 hover:bg-green-400 text-white font-semibold rounded-xl px-4 py-3.5 transition text-center"
                   >
                     View your NFT on Orb <ExternalLink className="w-3.5 h-3.5 inline ml-1" />
                   </a>
@@ -276,14 +276,14 @@ export default function NftPage() {
                   placeholder="NFT name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition"
+                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-green-400/50 focus:ring-1 focus:ring-green-400/25 transition"
                 />
                 <textarea
                   placeholder="Description (optional)"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
-                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition resize-none"
+                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-green-400/50 focus:ring-1 focus:ring-green-400/25 transition resize-none"
                 />
 
                 <label
@@ -311,7 +311,7 @@ export default function NftPage() {
                       onClick={() => setMintType(t)}
                       className={`flex-1 border rounded-xl px-4 py-2.5 text-sm transition cursor-pointer ${
                         mintType === t
-                          ? "bg-purple-500/20 border-purple-400/50 text-purple-300"
+                          ? "bg-green-500/20 border-green-400/50 text-green-300"
                           : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:text-white hover:border-black/20 dark:hover:border-white/20"
                       }`}
                     >
@@ -338,7 +338,7 @@ export default function NftPage() {
                 <button
                   onClick={handleMint}
                   disabled={!name || !imageFile || status === "uploading" || status === "minting" || (mintType === "compressed" && !BUBBLEGUM_TREE)}
-                  className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
+                  className="w-full bg-green-500 hover:bg-green-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
                 >
                   {status === "uploading"
                     ? <><Spinner size={16} className="inline mr-2" />Uploading...</>

@@ -68,7 +68,7 @@ function QrModal({ open, onClose, publicKey, onCopy, copied }: {
           <p className="text-gray-500 dark:text-gray-400 text-xs font-mono break-all text-center leading-relaxed">{publicKey}</p>
           <button
             onClick={onCopy}
-            className="w-full flex items-center justify-center gap-1.5 bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-xl px-4 py-3 transition"
+            className="w-full flex items-center justify-center gap-1.5 bg-fuchsia-500 hover:bg-fuchsia-400 text-white font-semibold rounded-xl px-4 py-3 transition"
           >
             {copied ? <><Check size={16} /> Copied</> : <><Copy size={16} /> Copy address</>}
           </button>
@@ -121,7 +121,7 @@ export default function WalletGetPage() {
           </div>
           <div className="flex-1 min-w-0 space-y-2">
             <p className="text-xs text-gray-500 dark:text-white/40">Send SOL to this address</p>
-            <code className="text-xs font-mono text-purple-400 dark:text-purple-300 break-all block leading-relaxed">{publicKey}</code>
+            <code className="text-xs font-mono text-fuchsia-400 dark:text-fuchsia-300 break-all block leading-relaxed">{publicKey}</code>
             <button onClick={copyAddress} className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-white/50 hover:text-gray-700 dark:hover:text-white/70 transition cursor-pointer">
               {copied ? <><Check size={12} className="text-green-400" /> Copied</> : <><Copy size={12} /> Copy address</>}
             </button>

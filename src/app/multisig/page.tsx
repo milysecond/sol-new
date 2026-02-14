@@ -168,7 +168,7 @@ export default function MultisigPage() {
           <PageTransition>
           <div className="w-full sm:max-w-lg space-y-6">
             <div className="text-center space-y-1">
-              <AnimatedIcon icon={ShieldCheck} size={32} className="text-purple-400" />
+              <AnimatedIcon icon={ShieldCheck} size={32} className="text-blue-400" />
               <h1 className="text-2xl font-bold tracking-tight">Multisig</h1>
               <p className="text-gray-500 dark:text-white/50 text-sm">Shared wallet with multiple signers.</p>
             </div>
@@ -189,7 +189,7 @@ export default function MultisigPage() {
                     <div>
                       <p className="text-xs text-gray-400 dark:text-white/30 mb-1">Multisig address</p>
                       <div className="flex items-center gap-2">
-                        <code className="text-xs font-mono text-purple-400 break-all flex-1">{result.multisigPda}</code>
+                        <code className="text-xs font-mono text-blue-400 break-all flex-1">{result.multisigPda}</code>
                         <button onClick={() => copyText(result.multisigPda, "ms")} className="p-1.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 rounded-lg transition shrink-0">
                           {copied === "ms" ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5 text-gray-500 dark:text-white/50" />}
                         </button>
@@ -198,7 +198,7 @@ export default function MultisigPage() {
                     <div>
                       <p className="text-xs text-gray-400 dark:text-white/30 mb-1">Vault address</p>
                       <div className="flex items-center gap-2">
-                        <code className="text-xs font-mono text-purple-400 break-all flex-1">{result.vault}</code>
+                        <code className="text-xs font-mono text-blue-400 break-all flex-1">{result.vault}</code>
                         <button onClick={() => copyText(result.vault, "vault")} className="p-1.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 rounded-lg transition shrink-0">
                           {copied === "vault" ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5 text-gray-500 dark:text-white/50" />}
                         </button>
@@ -209,7 +209,7 @@ export default function MultisigPage() {
                   <a
                     href={`https://app.squads.so/squads/${result.vault}/home`}
                     target="_blank"
-                    className="w-full flex items-center justify-center gap-2 bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-xl px-4 py-3 transition"
+                    className="w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-400 text-white font-semibold rounded-xl px-4 py-3 transition"
                   >
                     <ExternalLink className="w-4 h-4" /> Open in Squads
                   </a>
@@ -229,7 +229,7 @@ export default function MultisigPage() {
                   placeholder="Multisig name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition"
+                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/25 transition"
                 />
 
                 {/* Members */}
@@ -239,7 +239,7 @@ export default function MultisigPage() {
                       <Users className="w-4 h-4" /> Members
                     </label>
                     {publicKey && (
-                      <span className="text-xs text-purple-400">Your wallet is auto-included</span>
+                      <span className="text-xs text-blue-400">Your wallet is auto-included</span>
                     )}
                   </div>
                   {members.map((m, i) => (
@@ -249,7 +249,7 @@ export default function MultisigPage() {
                         placeholder={`Wallet address ${i + 2}`}
                         value={m}
                         onChange={(e) => { const next = [...members]; next[i] = e.target.value; setMembers(next); }}
-                        className="flex-1 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition font-mono text-sm"
+                        className="flex-1 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/25 transition font-mono text-sm"
                       />
                       {members.length > 1 && (
                         <button
@@ -269,7 +269,7 @@ export default function MultisigPage() {
                       const total = (publicKey ? 1 : 0) + next.filter(m => { try { new PublicKey(m); return true; } catch { return false; } }).length;
                       if (total >= 3) setThreshold(Math.ceil(total * 0.6));
                     }}
-                    className="text-sm text-purple-400 hover:text-purple-300 transition cursor-pointer"
+                    className="text-sm text-blue-400 hover:text-blue-300 transition cursor-pointer"
                   >
                     + Add member
                   </button>
@@ -288,7 +288,7 @@ export default function MultisigPage() {
                           onClick={() => setThreshold(n)}
                           className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition cursor-pointer ${
                             n <= threshold
-                              ? "bg-purple-500 text-white shadow-sm"
+                              ? "bg-blue-500 text-white shadow-sm"
                               : "text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/50"
                           }`}
                         >
@@ -301,12 +301,12 @@ export default function MultisigPage() {
                         {threshold} of {allMembers.length}
                       </span>
                       {allMembers.length >= 3 && threshold === Math.ceil(allMembers.length * 0.6) && (
-                        <span className="text-xs text-purple-400">Recommended</span>
+                        <span className="text-xs text-blue-400">Recommended</span>
                       )}
                       {allMembers.length >= 3 && threshold !== Math.ceil(allMembers.length * 0.6) && (
                         <button
                           onClick={() => setThreshold(Math.ceil(allMembers.length * 0.6))}
-                          className="text-xs text-purple-400 hover:text-purple-300 transition cursor-pointer"
+                          className="text-xs text-blue-400 hover:text-blue-300 transition cursor-pointer"
                         >
                           Use recommended ({Math.ceil(allMembers.length * 0.6)} of {allMembers.length})
                         </button>
@@ -339,7 +339,7 @@ export default function MultisigPage() {
                             }} />
                           ))}
                         </div>
-                        <Rocket className="w-7 h-7 text-purple-500 dark:text-purple-400 rotate-45 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
+                        <Rocket className="w-7 h-7 text-blue-500 dark:text-blue-400 rotate-45 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
                       </div>
                     </div>
                     <p className="text-center text-sm text-gray-500 dark:text-white/50">
@@ -352,7 +352,7 @@ export default function MultisigPage() {
                   <button
                     onClick={handleCreate}
                     disabled={!canCreate}
-                    className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
+                    className="w-full bg-blue-500 hover:bg-blue-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
                   >
                     Create Multisig
                   </button>
