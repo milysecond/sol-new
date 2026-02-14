@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "sol.new — Tokens, NFTs, and wallets on Solana",
-  description: "The fastest way to create tokens, NFTs, wallets, payments, and DAOs on Solana. No wallet needed, no seed phrase, low fees. Start in seconds with just a passkey.",
+  description: "The fastest way to create tokens, NFTs, wallets, payments, and DAOs on Solana. Passkey-secured, low fees. Start in seconds.",
   manifest: "/manifest.json",
   themeColor: "#a855f7",
   appleWebApp: {
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "sol.new — Tokens, NFTs, and wallets on Solana",
-    description: "The fastest way to create tokens, NFTs, wallets, payments, and DAOs on Solana. No wallet needed, no seed phrase, low fees. Start in seconds with just a passkey.",
+    description: "The fastest way to create tokens, NFTs, wallets, payments, and DAOs on Solana. Passkey-secured, low fees. Start in seconds.",
     url: "https://sol.new",
     siteName: "sol.new",
     type: "website",
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "sol.new — Tokens, NFTs, and wallets on Solana",
-    description: "The fastest way to create tokens, NFTs, wallets, payments, and DAOs on Solana. No wallet needed, no seed phrase, low fees.",
+    description: "The fastest way to create tokens, NFTs, wallets, payments, and DAOs on Solana. Passkey-secured, low fees.",
     images: ["https://sol.new/og.png"],
     creator: "@soldotnew",
   },

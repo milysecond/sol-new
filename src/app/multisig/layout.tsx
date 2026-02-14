@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Create a Multisig — sol.new",
-  description: "Create shared wallets with multiple signers on Solana. Secure your funds with multisig, no wallet app needed. Set up in seconds with just a passkey.",
+  description: "Create shared wallets with multiple signers on Solana. Secure your funds with multisig. Set up in seconds with passkeys.",
   openGraph: {
     title: "Create a Multisig — sol.new",
     description: "Shared wallets with multiple signers on Solana. Secure and simple.",
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Create a Multisig — sol.new",
-    description: "Shared wallets with multiple signers on Solana. No wallet, low fees.",
+    description: "Shared wallets with multiple signers on Solana. Passkey-secured, low fees.",
     images: ["https://sol.new/og-multisig.png"],
     creator: "@soldotnew",
   },
