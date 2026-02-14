@@ -8,8 +8,8 @@ import { ThemeProvider } from "@/lib/theme-context";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "sol.new — Create anything on Solana",
-  description: "The fastest way to create tokens, NFTs, wallets, payments, and DAOs on Solana. No wallet, low fees, no friction.",
+  title: "sol.new — Tokens, NFTs, and wallets on Solana",
+  description: "The fastest way to create tokens, NFTs, wallets, payments, and DAOs on Solana. No wallet needed, no seed phrase, low fees. Start in seconds with just a passkey.",
   manifest: "/manifest.json",
   themeColor: "#a855f7",
   appleWebApp: {
@@ -26,9 +26,26 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
-    title: "sol.new",
-    description: "Create anything on Solana",
+    title: "sol.new — Tokens, NFTs, and wallets on Solana",
+    description: "The fastest way to create tokens, NFTs, wallets, payments, and DAOs on Solana. No wallet needed, no seed phrase, low fees. Start in seconds with just a passkey.",
     url: "https://sol.new",
+    siteName: "sol.new",
+    type: "website",
+    images: [
+      {
+        url: "https://sol.new/og.png",
+        width: 1200,
+        height: 630,
+        alt: "sol.new — Create anything on Solana",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "sol.new — Tokens, NFTs, and wallets on Solana",
+    description: "The fastest way to create tokens, NFTs, wallets, payments, and DAOs on Solana. No wallet needed, no seed phrase, low fees.",
+    images: ["https://sol.new/og.png"],
+    creator: "@soldotnew",
   },
   other: {
     "mobile-web-app-capable": "yes",

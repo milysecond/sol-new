@@ -301,7 +301,7 @@ export default function NftPage() {
                     </span>
                   )}
                 </label>
-                <input id="nft-image-upload" ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="sr-only" />
+                <input id="nft-image-upload" ref={fileRef} type="file" accept="image/png,image/jpeg" onChange={handleFile} className="sr-only" />
 
                 {/* Mint type toggle */}
                 <div className="flex gap-2">

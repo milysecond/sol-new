@@ -39,15 +39,21 @@ export async function notifyTokenLaunch(data: {
     ],
   };
 
+  // Ensure image URL is HTTP (Telegram can't fetch ipfs:// directly)
+  let photoUrl = data.imageUrl;
+  if (photoUrl?.startsWith('ipfs://')) {
+    photoUrl = photoUrl.replace('ipfs://', 'https://nftstorage.link/ipfs/');
+  }
+
   try {
     // Try sending with photo first
-    if (data.imageUrl) {
+    if (photoUrl) {
       const photoRes = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendPhoto`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: TG_CHANNEL,
-          photo: data.imageUrl,
+          photo: photoUrl,
           caption,
           parse_mode: 'HTML',
           reply_markup,

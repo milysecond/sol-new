@@ -213,7 +213,7 @@ export default function TokenPage() {
                     <span className="text-gray-400 dark:text-white/30 text-sm">Tap to upload token image</span>
                   )}
                 </label>
-                <input id="token-image-upload" ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="sr-only" />
+                <input id="token-image-upload" ref={fileRef} type="file" accept="image/png,image/jpeg" onChange={handleFile} className="sr-only" />
 
                 {/* Social links - icon toggles */}
                 <div className="space-y-3">
