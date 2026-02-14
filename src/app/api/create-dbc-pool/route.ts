@@ -15,15 +15,6 @@ function getConnection(network: string) {
   return new Connection("https://api.devnet.solana.com", "confirmed");
 }
 
-function getFaucetKeypair(): Keypair {
-  const secret = process.env.FAUCET_PRIVATE_KEY!;
-  if (secret.startsWith("[")) {
-    return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secret)));
-  }
-  const bs58 = require("bs58");
-  return Keypair.fromSecretKey(bs58.decode(secret));
-}
-
 function getPartnerConfigKey(): PublicKey {
   const key = process.env.DBC_PARTNER_CONFIG_KEY;
   if (!key) throw new Error("DBC_PARTNER_CONFIG_KEY not set");
@@ -32,16 +23,16 @@ function getPartnerConfigKey(): PublicKey {
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, symbol, description, metadataUri, creatorWallet, network = "devnet" } = await req.json();
+    const { name, symbol, description, metadataUri, creatorWallet, network = "devnet", mutable = false } = await req.json();
 
-    if (!name || !symbol || !metadataUri) {
-      return NextResponse.json({ error: "Missing name, symbol, or metadataUri" }, { status: 400 });
+    if (!name || !symbol || !metadataUri || !creatorWallet) {
+      return NextResponse.json({ error: "Missing name, symbol, metadataUri, or creatorWallet" }, { status: 400 });
     }
 
     const connection = getConnection(network);
-    const faucet = getFaucetKeypair();
     const configKey = getPartnerConfigKey();
     const client = new DynamicBondingCurveClient(connection, "confirmed");
+    const creator = new PublicKey(creatorWallet);
 
     // Generate fresh mint keypair
     const baseMintKeypair = Keypair.generate();
@@ -53,38 +44,39 @@ export async function POST(req: NextRequest) {
       name,
       symbol,
       uri: metadataUri,
-      payer: faucet.publicKey,
-      poolCreator: faucet.publicKey,
+      payer: creator,
+      poolCreator: creator,
+      updateAuthority: mutable ? creator : null,
     });
 
-    // Sign and send
+    // Get blockhash and set fee payer
     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-    tx.feePayer = faucet.publicKey;
+    tx.feePayer = creator;
     tx.recentBlockhash = blockhash;
-    tx.sign(faucet, baseMintKeypair);
-
-    const txId = await connection.sendRawTransaction(tx.serialize(), {
-      skipPreflight: false,
-      maxRetries: 3,
-    });
-    await connection.confirmTransaction(
-      { signature: txId, blockhash, lastValidBlockHeight },
-      "confirmed"
-    );
+    
+    // Partially sign with mint keypair only
+    tx.partialSign(baseMintKeypair);
 
     // Derive pool address
     const poolAddress = deriveDbcPoolAddress(WRAPPED_SOL, baseMintKeypair.publicKey, configKey);
     const mintAddress = baseMintKeypair.publicKey.toBase58();
     const poolAddr = poolAddress.toBase58();
+    
+    // Serialize transaction for frontend to sign and send
+    const serializedTx = tx.serialize({ requireAllSignatures: false }).toString('base64');
 
     return NextResponse.json({
       ok: true,
       pool: poolAddr,
       config: configKey.toBase58(),
       mint: mintAddress,
-      transaction: txId,
+      transaction: serializedTx,
+      blockhash,
+      lastValidBlockHeight,
       meteoraUrl: `https://app.meteora.ag/pools/${poolAddr}`,
-      solscanUrl: `https://solscan.io/token/${mintAddress}${network === "devnet" ? "?cluster=devnet" : ""}`,
+      solscanUrl: network === "devnet" 
+        ? `https://orbmarkets.io/address/${mintAddress}?cluster=devnet&hideSpam=true`
+        : `https://orbmarkets.io/address/${mintAddress}?hideSpam=true`,
     });
   } catch (e: any) {
     console.error("DBC pool creation error:", e);

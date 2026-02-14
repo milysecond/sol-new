@@ -11,10 +11,13 @@ interface WalletState {
   balance: number | null;
   loading: boolean;
   error: string | null;
-  connect: () => Promise<void>;
+  connect: (username?: string) => Promise<void>;
   recover: () => Promise<void>;
   disconnect: () => void;
   refreshBalance: () => Promise<void>;
+  airdropping: boolean;
+  airdropDone: boolean;
+  handleAirdrop: () => Promise<void>;
 }
 
 const WalletContext = createContext<WalletState>({
@@ -22,10 +25,13 @@ const WalletContext = createContext<WalletState>({
   balance: null,
   loading: false,
   error: null,
-  connect: async () => {},
+  connect: async (username?: string) => {},
   recover: async () => {},
   disconnect: () => {},
   refreshBalance: async () => {},
+  airdropping: false,
+  airdropDone: false,
+  handleAirdrop: async () => {},
 });
 
 export function useWallet() {
@@ -67,14 +73,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [publicKey, refreshBalance, network]);
 
-  const connect = async () => {
+  const connect = async (username?: string) => {
     setError(null);
     setLoading(true);
     try {
       if (!window.PublicKeyCredential) {
         throw new Error("Passkeys require HTTPS.");
       }
-      const result = await createPasskeyWallet("sol.new user");
+      const name = username || `sol.new user ${Date.now()}`;
+      const result = await createPasskeyWallet(name);
       setPublicKey(result.publicKey);
       localStorage.setItem("sol.new.wallet", result.publicKey);
       localStorage.setItem("sol.new.credentialId", result.credentialId);
@@ -104,6 +111,30 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const [airdropping, setAirdropping] = useState(false);
+  const [airdropDone, setAirdropDone] = useState(false);
+
+  const handleAirdrop = useCallback(async () => {
+    if (!publicKey || network !== "devnet") return;
+    setAirdropping(true);
+    setAirdropDone(false);
+    try {
+      await fetch("/api/airdrop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: publicKey }),
+      });
+      await new Promise((r) => setTimeout(r, 2000));
+      await refreshBalance();
+      setAirdropDone(true);
+      setTimeout(() => setAirdropDone(false), 3000);
+    } catch {
+      // silently fail
+    } finally {
+      setAirdropping(false);
+    }
+  }, [publicKey, network, refreshBalance]);
+
   const disconnect = () => {
     setPublicKey(null);
     setBalance(null);
@@ -112,7 +143,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <WalletContext.Provider value={{ publicKey, balance, loading, error, connect, recover, disconnect, refreshBalance }}>
+    <WalletContext.Provider value={{ publicKey, balance, loading, error, connect, recover, disconnect, refreshBalance, airdropping, airdropDone, handleAirdrop }}>
       {children}
     </WalletContext.Provider>
   );

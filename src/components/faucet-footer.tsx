@@ -2,6 +2,7 @@
 
 import { useNetwork } from "@/lib/network";
 import { useEffect, useState } from "react";
+import { ExternalLink } from "lucide-react";
 
 export function FaucetFooter() {
   const { network } = useNetwork();
@@ -29,7 +30,7 @@ export function FaucetFooter() {
         target="_blank"
         className="hover:text-yellow-400 transition"
       >
-        ↗
+        <ExternalLink className="w-3 h-3 inline" />
       </a>
     </div>
   );

@@ -7,6 +7,15 @@ export const db = createClient({
 
 export async function initDb() {
   await db.batch([
+    `CREATE TABLE IF NOT EXISTS ground_keys (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      public_key TEXT UNIQUE NOT NULL,
+      secret_key TEXT NOT NULL,
+      prefix TEXT NOT NULL,
+      consumed INTEGER DEFAULT 0,
+      consumed_by TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS wallets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       public_key TEXT UNIQUE NOT NULL,
@@ -37,7 +46,38 @@ export async function initDb() {
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (wallet) REFERENCES wallets(public_key)
     )`,
+    `CREATE TABLE IF NOT EXISTS multisigs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      wallet TEXT NOT NULL,
+      name TEXT NOT NULL,
+      multisig_pda TEXT NOT NULL,
+      vault TEXT NOT NULL,
+      threshold INTEGER NOT NULL,
+      member_count INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (wallet) REFERENCES wallets(public_key)
+    )`,
   ]);
+}
+
+export async function saveMultisig(data: {
+  wallet: string;
+  name: string;
+  multisigPda: string;
+  vault: string;
+  threshold: number;
+  memberCount: number;
+}) {
+  const result = await db.execute({
+    sql: `INSERT INTO multisigs (wallet, name, multisig_pda, vault, threshold, member_count)
+          VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [data.wallet, data.name, data.multisigPda, data.vault, data.threshold, data.memberCount],
+  });
+  return result.lastInsertRowid;
+}
+
+export async function getWalletMultisigs(wallet: string) {
+  return db.execute({ sql: "SELECT * FROM multisigs WHERE wallet = ? ORDER BY created_at DESC", args: [wallet] });
 }
 
 export async function saveWallet(publicKey: string, credentialId?: string) {
@@ -55,11 +95,12 @@ export async function saveToken(data: {
   description?: string;
   imageUrl?: string;
   metadataUri?: string;
+  mintAddress?: string;
 }) {
   const result = await db.execute({
-    sql: `INSERT INTO tokens (wallet, name, symbol, supply, description, image_url, metadata_uri)
-          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    args: [data.wallet, data.name, data.symbol, data.supply || null, data.description || null, data.imageUrl || null, data.metadataUri || null],
+    sql: `INSERT INTO tokens (wallet, name, symbol, supply, description, image_url, metadata_uri, mint_address)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [data.wallet, data.name, data.symbol, data.supply || null, data.description || null, data.imageUrl || null, data.metadataUri || null, data.mintAddress || null],
   });
   return result.lastInsertRowid;
 }
@@ -70,11 +111,12 @@ export async function saveNft(data: {
   description?: string;
   imageUrl?: string;
   metadataUri?: string;
+  mintAddress?: string;
 }) {
   const result = await db.execute({
-    sql: `INSERT INTO nfts (wallet, name, description, image_url, metadata_uri)
-          VALUES (?, ?, ?, ?, ?)`,
-    args: [data.wallet, data.name, data.description || null, data.imageUrl || null, data.metadataUri || null],
+    sql: `INSERT INTO nfts (wallet, name, description, image_url, metadata_uri, mint_address)
+          VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [data.wallet, data.name, data.description || null, data.imageUrl || null, data.metadataUri || null, data.mintAddress || null],
   });
   return result.lastInsertRowid;
 }
@@ -85,6 +127,51 @@ export async function getWalletTokens(wallet: string) {
 
 export async function getWalletNfts(wallet: string) {
   return db.execute({ sql: "SELECT * FROM nfts WHERE wallet = ? ORDER BY created_at DESC", args: [wallet] });
+}
+
+export async function claimGroundKey(prefix: string) {
+  // Atomically claim one unused key
+  const row = await db.execute({
+    sql: `UPDATE ground_keys SET consumed = 1, consumed_by = 'pending'
+          WHERE id = (SELECT id FROM ground_keys WHERE prefix = ? AND consumed = 0 LIMIT 1)
+          RETURNING public_key, secret_key`,
+    args: [prefix],
+  });
+  if (!row.rows.length) return null;
+  return {
+    publicKey: row.rows[0].public_key as string,
+    secretKey: row.rows[0].secret_key as string,
+  };
+}
+
+export async function markGroundKeyUsed(publicKey: string, wallet: string) {
+  await db.execute({
+    sql: "UPDATE ground_keys SET consumed_by = ? WHERE public_key = ?",
+    args: [wallet, publicKey],
+  });
+}
+
+export async function countAvailableKeys(prefix: string) {
+  const result = await db.execute({
+    sql: "SELECT COUNT(*) as count FROM ground_keys WHERE prefix = ? AND consumed = 0",
+    args: [prefix],
+  });
+  return result.rows[0].count as number;
+}
+
+export async function insertGroundKey(publicKey: string, secretKey: string, prefix: string) {
+  await db.execute({
+    sql: "INSERT OR IGNORE INTO ground_keys (public_key, secret_key, prefix) VALUES (?, ?, ?)",
+    args: [publicKey, secretKey, prefix],
+  });
+}
+
+export async function getTokenByMint(mintAddress: string) {
+  const result = await db.execute({
+    sql: "SELECT * FROM tokens WHERE mint_address = ? LIMIT 1",
+    args: [mintAddress],
+  });
+  return result.rows[0] || null;
 }
 
 export async function getStats() {

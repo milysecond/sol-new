@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, saveToken, getWalletTokens } from "@/lib/db";
+import { notifyTokenLaunch } from "@/lib/notify";
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,6 +9,16 @@ export async function POST(req: NextRequest) {
     if (!data.wallet || !data.name || !data.symbol)
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     const id = await saveToken(data);
+
+    // Post to @soldotnew channel
+    notifyTokenLaunch({
+      name: data.name,
+      symbol: data.symbol,
+      description: data.description,
+      imageUrl: data.imageUrl,
+      mintAddress: data.mintAddress,
+    }).catch(() => {});
+
     return NextResponse.json({ ok: true, id: Number(id) });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
