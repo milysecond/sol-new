@@ -57,7 +57,7 @@ async function main() {
   console.log("Config params built");
 
   // Use program.methods directly (skip SDK validation which has a tokenSupply bug)
-  const ps = new PoolService(connection);
+  const ps = new PoolService(connection, "confirmed");
   const tx = await ps.program.methods.createConfig(configParams).accountsPartial({
     config: configKeypair.publicKey,
     feeClaimer: VAULT,
