@@ -112,7 +112,6 @@ export default function TokenPage() {
         uri: metadata.uri,
         payer: userPubkey,
         poolCreator: userPubkey,
-        updateAuthority: mutableMetadata ? userPubkey : null,
       });
 
       // Get fresh blockhash
