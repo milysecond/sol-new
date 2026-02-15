@@ -4,6 +4,7 @@ import "./globals.css";
 import { WalletProvider } from "@/lib/wallet-context";
 import { NetworkProvider } from "@/lib/network";
 import { ThemeProvider } from "@/lib/theme-context";
+import { Analytics } from "@vercel/analytics/react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -68,6 +69,7 @@ export default function RootLayout({
         <ThemeProvider>
         <NetworkProvider><WalletProvider>{children}</WalletProvider></NetworkProvider>
         </ThemeProvider>
+        <Analytics />
         <script
           dangerouslySetInnerHTML={{
             __html: `if("serviceWorker"in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js"))`,

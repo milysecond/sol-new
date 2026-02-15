@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { createPasskeyWallet, recoverPasskeyWallet } from "./passkey-wallet";
 import { useNetwork } from "./network";
+import { analytics } from "./analytics";
 
 interface WalletState {
   publicKey: string | null;
@@ -86,6 +87,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("sol.new.wallet", result.publicKey);
       localStorage.setItem("sol.new.credentialId", result.credentialId);
       fetch("/api/wallet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publicKey: result.publicKey, credentialId: result.credentialId }) }).catch(() => {});
+      analytics.walletCreated();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create passkey");
     } finally {
@@ -104,6 +106,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setPublicKey(result.publicKey);
       localStorage.setItem("sol.new.wallet", result.publicKey);
       fetch("/api/wallet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publicKey: result.publicKey }) }).catch(() => {});
+      analytics.walletRecovered();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to recover wallet");
     } finally {
