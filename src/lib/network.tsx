@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { analytics } from "./analytics";
 
 export type Network = "mainnet" | "devnet";
 
@@ -42,6 +43,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     const next = network === "mainnet" ? "devnet" : "mainnet";
     setNetwork(next);
     localStorage.setItem("sol.new.network", next);
+    analytics.networkSwitched(next);
   };
 
   const explorerUrl = (address: string) =>

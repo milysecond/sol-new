@@ -147,7 +147,7 @@ export default function Home() {
           <div className="text-center space-y-2">
             <img src="/icon-512.png" alt="sol.new" className="w-14 h-14 mx-auto rounded-xl electrify" />
             <p className="text-gray-500 dark:text-white/50 text-sm">
-              Create anything on Solana. No wallet, no seed phrase.
+              Create anything on Solana. Instant and low fees.
             </p>
             {!publicKey && (
               <GetStarted connect={connect} loading={loading} />
@@ -175,7 +175,7 @@ export default function Home() {
           {/* Footer row */}
           <div className="flex items-center justify-center gap-4">
             <div className="flex items-center gap-4 text-[11px] text-gray-400 dark:text-white/30">
-              <span>No wallet needed</span>
+              <span>Passkey-secured</span>
               <span className="w-1 h-1 rounded-full bg-black/20 dark:bg-white/20" />
               <span>Low fees</span>
               <span className="w-1 h-1 rounded-full bg-black/20 dark:bg-white/20" />
