@@ -50,14 +50,15 @@ async function main() {
   console.log("Capacity: 16,384 compressed NFTs");
   console.log("Cost: ~0.33 SOL");
 
-  const result = await createTree(umi, {
+  const builder = await createTree(umi, {
     merkleTree,
     maxDepth: 14,
     maxBufferSize: 64,
     canopyDepth: 8,
     public: true, // Anyone can mint
   });
-  const signature = result?.signature ? Buffer.from(result.signature).toString("base64") : "unknown";
+  const result = await builder.sendAndConfirm(umi);
+  const signature = Buffer.from(result.signature).toString("base64");
 
   console.log("\n✅ Tree created!");
   console.log("Address:", merkleTree.publicKey.toString());

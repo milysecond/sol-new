@@ -141,14 +141,14 @@ export function Navbar() {
           ) : (
             <div className="flex items-center gap-2">
               <button
-                onClick={connect}
+                onClick={() => connect()}
                 disabled={loading}
                 className="bg-purple-500 hover:bg-purple-400 text-white text-sm font-medium rounded-xl px-4 py-2 transition cursor-pointer disabled:opacity-50"
               >
                 {loading ? "..." : "Connect"}
               </button>
               <button
-                onClick={recover}
+                onClick={() => recover()}
                 disabled={loading}
                 className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 text-sm rounded-xl px-3 py-2 hover:text-gray-900 dark:hover:text-white transition cursor-pointer disabled:opacity-50 hidden sm:block"
               >
