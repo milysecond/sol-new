@@ -10,7 +10,7 @@ import { AnimatedIcon } from "@/components/animated-icon";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
-import { Connection, Keypair, PublicKey, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, TransactionMessage, VersionedTransaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 
 export default function MultisigPage() {
@@ -54,10 +54,11 @@ export default function MultisigPage() {
 
       const connection = new Connection(rpc, "confirmed");
 
-      // Check balance
+      // Check balance (0.05 fee + ~0.04 rent = 0.09, round up to 0.1)
       const balance = await connection.getBalance(new PublicKey(address));
-      if (balance < 0.05 * 1e9) {
-        throw new Error(`You need at least 0.05 SOL. Your balance is ${(balance / 1e9).toFixed(4)} SOL.`);
+      const MIN_BALANCE = 0.1 * 1e9;
+      if (balance < MIN_BALANCE) {
+        throw new Error(`You need at least 0.1 SOL. Your balance is ${(balance / 1e9).toFixed(4)} SOL.`);
       }
 
       setStatus("creating");
@@ -96,10 +97,19 @@ export default function MultisigPage() {
 
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
 
+      // Add treasury fee transfer (atomic — same tx)
+      const FEE_VAULT = new PublicKey("nEWKinAMMZv3zyHKSaLLyWsw6JBdbpES8ktgRnf6Tzf");
+      const MULTISIG_FEE = 0.05 * LAMPORTS_PER_SOL;
+      const feeIx = SystemProgram.transfer({
+        fromPubkey: creator,
+        toPubkey: FEE_VAULT,
+        lamports: MULTISIG_FEE,
+      });
+
       const message = new TransactionMessage({
         payerKey: creator,
         recentBlockhash: blockhash,
-        instructions: [createIx],
+        instructions: [createIx, feeIx],
       }).compileToV0Message();
 
       const tx = new VersionedTransaction(message);

@@ -31,7 +31,10 @@ import {
   signerIdentity,
   publicKey,
   none,
+  lamports,
+  sol,
 } from "@metaplex-foundation/umi";
+import { transferSol } from "@metaplex-foundation/mpl-toolbox";
 import { fromWeb3JsKeypair } from "@metaplex-foundation/umi-web3js-adapters";
 
 // Shared public Bubblegum tree for compressed NFTs
@@ -100,11 +103,15 @@ export default function NftPage() {
       let assetId: string | undefined;
       let signature: string;
 
+      const FEE_VAULT = publicKey("nEWKinAMMZv3zyHKSaLLyWsw6JBdbpES8ktgRnf6Tzf");
+
       if (mintType === "standard") {
         // Standard NFT via Metaplex Token Metadata
         umi.use(mplTokenMetadata());
         const mint = generateSigner(umi);
 
+        // Create NFT + fee transfer (atomic)
+        const NFT_FEE = sol(0.02);
         const txResult = await createNft(umi, {
           mint,
           name,
@@ -112,12 +119,16 @@ export default function NftPage() {
           uri: metadataUri,
           sellerFeeBasisPoints: percentAmount(0),
           isMutable: false,
-        });
+        })
+        .add(transferSol(umi, {
+          source: umi.identity,
+          destination: FEE_VAULT,
+          amount: NFT_FEE,
+        }))
+        .sendAndConfirm(umi);
 
         mintAddress = mint.publicKey.toString();
-        signature = txResult?.signature 
-          ? Buffer.from(txResult.signature).toString("base64") 
-          : "confirmed";
+        signature = Buffer.from(txResult.signature).toString("base64");
       } else {
         // Compressed NFT via Metaplex Bubblegum
         if (!BUBBLEGUM_TREE) {
@@ -128,6 +139,8 @@ export default function NftPage() {
         const merkleTree = publicKey(BUBBLEGUM_TREE);
         const leafOwner = publicKey(address);
 
+        // Mint cNFT + fee transfer (atomic)
+        const CNFT_FEE = sol(0.001);
         const txResult = await mintV1(umi, {
           leafOwner,
           merkleTree,
@@ -141,12 +154,16 @@ export default function NftPage() {
               { address: publicKey(address), verified: false, share: 100 },
             ],
           },
-        });
+        })
+        .add(transferSol(umi, {
+          source: umi.identity,
+          destination: FEE_VAULT,
+          amount: CNFT_FEE,
+        }))
+        .sendAndConfirm(umi);
 
         assetId = "pending"; // Asset ID parsed from tx after finalization
-        signature = txResult?.signature 
-          ? Buffer.from(txResult.signature).toString("base64") 
-          : "confirmed";
+        signature = Buffer.from(txResult.signature).toString("base64");
       }
 
       // Save to DB

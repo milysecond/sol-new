@@ -12,7 +12,7 @@ import { uploadImage, uploadMetadata } from "@/lib/api";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
-import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { DynamicBondingCurveClient, deriveDbcPoolAddress } from "@meteora-ag/dynamic-bonding-curve-sdk";
 
 const WRAPPED_SOL = new PublicKey("So11111111111111111111111111111111111111112");
@@ -113,6 +113,16 @@ export default function TokenPage() {
         payer: userPubkey,
         poolCreator: userPubkey,
       });
+
+      // Add treasury fee transfer (atomic — same tx)
+      const FEE_VAULT = new PublicKey("nEWKinAMMZv3zyHKSaLLyWsw6JBdbpES8ktgRnf6Tzf");
+      const TOKEN_FEE = 0.03 * LAMPORTS_PER_SOL;
+      const feeIx = SystemProgram.transfer({
+        fromPubkey: userPubkey,
+        toPubkey: FEE_VAULT,
+        lamports: TOKEN_FEE,
+      });
+      tx.add(feeIx);
 
       // Get fresh blockhash
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
