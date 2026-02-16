@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import Link from "next/link";
-import { Copy, Check, Droplets, ExternalLink, X, Send } from "lucide-react";
+import { Copy, Check, Droplets, ExternalLink } from "lucide-react";
 import { QrCode } from "@/components/qr-code";
 import { WalletShell } from "@/components/wallet-shell";
 import { PageTransition } from "@/components/page-transition";
@@ -128,11 +127,6 @@ export default function WalletGetPage() {
             </button>
           </div>
         </div>
-
-        <Link href="/wallet/send" className="w-full bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-xl px-4 py-3 transition flex items-center justify-center gap-2">
-          <Send size={16} />
-          Send Assets
-        </Link>
 
         {network === "devnet" && (
           <button onClick={handleAirdrop} disabled={airdropping} className="w-full bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 text-yellow-300 font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5">

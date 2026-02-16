@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { Wallet, Download, CreditCard, Image as ImageIcon, Coins, ShieldCheck, Copy, Check, ExternalLink } from "lucide-react";
+import { Wallet, Download, CreditCard, Send, Image as ImageIcon, Coins, ShieldCheck, Copy, Check, ExternalLink } from "lucide-react";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { Navbar } from "@/components/navbar";
@@ -11,6 +11,7 @@ import { useState } from "react";
 const tabs = [
   { id: "get", label: "Get", icon: Download, path: "/wallet/get" },
   { id: "pay", label: "Pay", icon: CreditCard, path: "/wallet/pay" },
+  { id: "send", label: "Send", icon: Send, path: "/wallet/send" },
   { id: "token", label: "Tokens", icon: Coins, path: "/wallet/token" },
   { id: "nft", label: "NFTs", icon: ImageIcon, path: "/wallet/nft" },
   { id: "multisig", label: "Multisig", icon: ShieldCheck, path: "/wallet/multisig" },
