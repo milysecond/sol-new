@@ -60,7 +60,7 @@ export default function SendPage() {
 
       setStatus("sending");
 
-      const userKeypair = await getPasskeyKeypair();
+      const { keypair: userKeypair } = await getPasskeyKeypair();
       const connection = new Connection(rpc, "confirmed");
 
       // Create transfer instruction
