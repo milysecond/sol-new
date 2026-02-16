@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import Link from "next/link";
-import { Copy, Check, Droplets, ExternalLink, X, Send } from "lucide-react";
+import { Copy, Check, Droplets, ExternalLink } from "lucide-react";
 import { QrCode } from "@/components/qr-code";
 import { WalletShell } from "@/components/wallet-shell";
 import { PageTransition } from "@/components/page-transition";
@@ -117,8 +116,11 @@ export default function WalletGetPage() {
       />
       <div className="space-y-3">
         <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-4 flex items-center gap-4">
-          <div className="bg-white rounded-lg p-2 shrink-0 cursor-pointer hover:shadow-md transition" onClick={() => setQrFullscreen(true)}>
-            <QrCode data={`solana:${publicKey}`} size={80} className="w-20 h-20" />
+          <div className="shrink-0 cursor-pointer hover:shadow-md transition flex flex-col items-center" onClick={() => setQrFullscreen(true)}>
+            <div className="bg-white rounded-lg p-2">
+              <QrCode data={`solana:${publicKey}`} size={80} className="w-20 h-20" />
+            </div>
+            <p className="text-[10px] text-gray-400 dark:text-white/30 mt-1">Tap to enlarge</p>
           </div>
           <div className="flex-1 min-w-0 space-y-2">
             <p className="text-xs text-gray-500 dark:text-white/40">Send SOL to this address</p>
@@ -128,11 +130,6 @@ export default function WalletGetPage() {
             </button>
           </div>
         </div>
-
-        <Link href="/wallet/send" className="w-full bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-xl px-4 py-3 transition flex items-center justify-center gap-2">
-          <Send size={16} />
-          Send Assets
-        </Link>
 
         {network === "devnet" && (
           <button onClick={handleAirdrop} disabled={airdropping} className="w-full bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 text-yellow-300 font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5">

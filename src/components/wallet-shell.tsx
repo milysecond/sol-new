@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { Wallet, Download, CreditCard, Image as ImageIcon, Coins, ShieldCheck, Copy, Check, ExternalLink } from "lucide-react";
+import { Wallet, Download, CreditCard, Send, Image as ImageIcon, Coins, ShieldCheck, Copy, Check, ExternalLink } from "lucide-react";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { Navbar } from "@/components/navbar";
@@ -11,6 +11,7 @@ import { useState } from "react";
 const tabs = [
   { id: "get", label: "Get", icon: Download, path: "/wallet/get" },
   { id: "pay", label: "Pay", icon: CreditCard, path: "/wallet/pay" },
+  { id: "send", label: "Send", icon: Send, path: "/wallet/send" },
   { id: "token", label: "Tokens", icon: Coins, path: "/wallet/token" },
   { id: "nft", label: "NFTs", icon: ImageIcon, path: "/wallet/nft" },
   { id: "multisig", label: "Multisig", icon: ShieldCheck, path: "/wallet/multisig" },
@@ -76,7 +77,7 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
               {tabs.map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => router.push(t.path)}
+                  onClick={() => { try { navigator?.vibrate?.(10); } catch {} router.push(t.path); }}
                   className={`flex-1 flex flex-col items-center gap-1 px-2 py-2 rounded-xl text-[11px] transition cursor-pointer active:scale-95 ${
                     activeTab === t.id
                       ? "bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-400/50"
