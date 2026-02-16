@@ -130,8 +130,8 @@ export default function TokenPage() {
       const feeCalc = await connection.getFeeForMessage(tx.compileMessage());
       const txFee = feeCalc.value || 5000;
       
-      // Estimate rent (token mint ~0.0015 SOL + pool accounts ~0.023 SOL)
-      const estimatedRent = 0.025 * LAMPORTS_PER_SOL;
+      // Estimate rent based on devnet testing (token mint + pool accounts ~0.012 SOL)
+      const estimatedRent = 0.012 * LAMPORTS_PER_SOL;
       
       // Platform fee = Total - (tx fee + rent)
       const platformFee = TOTAL_PRICE - txFee - estimatedRent;
@@ -359,7 +359,7 @@ export default function TokenPage() {
                     Launch token
                   </button>
                 )}
-                <p className="text-center text-xs text-gray-400 dark:text-white/30">0.03 SOL</p>
+                <p className="text-center text-xs text-gray-400 dark:text-white/30">~0.03 SOL</p>
               </div>
             }
           </div>
