@@ -12,7 +12,7 @@ import { uploadImage, uploadMetadata } from "@/lib/api";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
-import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { DynamicBondingCurveClient, deriveDbcPoolAddress } from "@meteora-ag/dynamic-bonding-curve-sdk";
 
 const WRAPPED_SOL = new PublicKey("So11111111111111111111111111111111111111112");
@@ -118,6 +118,32 @@ export default function TokenPage() {
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
       tx.feePayer = userPubkey;
       tx.recentBlockhash = blockhash;
+      
+      // Dynamic platform fee calculation
+      // Total price: 0.03 SOL
+      // Estimated rent/tx fees: ~0.025 SOL (varies with accounts created)
+      // Platform fee: remaining amount
+      const TOTAL_PRICE = 0.03 * LAMPORTS_PER_SOL;
+      const FEE_VAULT = new PublicKey("nEWKinAMMZv3zyHKSaLLyWsw6JBdbpES8ktgRnf6Tzf");
+      
+      // Calculate fee for message
+      const feeCalc = await connection.getFeeForMessage(tx.compileMessage());
+      const txFee = feeCalc.value || 5000;
+      
+      // Estimate rent (token mint ~0.0015 SOL + pool accounts ~0.023 SOL)
+      const estimatedRent = 0.025 * LAMPORTS_PER_SOL;
+      
+      // Platform fee = Total - (tx fee + rent)
+      const platformFee = TOTAL_PRICE - txFee - estimatedRent;
+      
+      // Add platform fee transfer (only if positive)
+      if (platformFee > 0) {
+        tx.add(SystemProgram.transfer({
+          fromPubkey: userPubkey,
+          toPubkey: FEE_VAULT,
+          lamports: platformFee,
+        }));
+      }
       
       // Sign with both keypairs (user + mint)
       tx.partialSign(mintKeypair, userKeypair);
