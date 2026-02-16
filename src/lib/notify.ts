@@ -8,7 +8,16 @@ export async function notifyTokenLaunch(data: {
   imageUrl?: string | null;
   mintAddress: string;
 }) {
-  if (!TG_BOT_TOKEN) return;
+  if (!TG_BOT_TOKEN) {
+    console.error('[notify] TG_BOT_TOKEN not configured - skipping notification');
+    return;
+  }
+  
+  console.log('[notify] Sending token launch notification:', {
+    name: data.name,
+    symbol: data.symbol,
+    mintAddress: data.mintAddress,
+  });
 
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -48,6 +57,7 @@ export async function notifyTokenLaunch(data: {
   try {
     // Try sending with photo first
     if (photoUrl) {
+      console.log('[notify] Attempting to send with photo:', photoUrl);
       const photoRes = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendPhoto`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -60,11 +70,17 @@ export async function notifyTokenLaunch(data: {
         }),
       });
       const photoJson = await photoRes.json();
-      if (photoJson.ok) return;
+      if (photoJson.ok) {
+        console.log('[notify] ✓ Token launch posted to', TG_CHANNEL, '(with photo)');
+        return;
+      } else {
+        console.warn('[notify] Photo send failed:', photoJson.description || photoJson);
+      }
     }
 
     // Fallback to text-only
-    await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+    console.log('[notify] Sending text-only notification');
+    const textRes = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -75,7 +91,14 @@ export async function notifyTokenLaunch(data: {
         reply_markup,
       }),
     });
-  } catch {
-    // Silent fail — don't break token creation
+    const textJson = await textRes.json();
+    if (textJson.ok) {
+      console.log('[notify] ✓ Token launch posted to', TG_CHANNEL, '(text-only)');
+    } else {
+      console.error('[notify] Text send also failed:', textJson.description || textJson);
+    }
+  } catch (err) {
+    // Log error but don't break token creation
+    console.error('[notify] Telegram notification failed:', err);
   }
 }
