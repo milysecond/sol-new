@@ -374,7 +374,7 @@ export default function MultisigPage() {
                     Create Multisig
                   </button>
                 )}
-                <p className="text-center text-xs text-gray-400 dark:text-white/30">0.05 SOL</p>
+                <p className="text-center text-xs text-gray-400 dark:text-white/30">~0.05 SOL</p>
               </div>
             )}
           </div>
