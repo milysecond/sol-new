@@ -17,7 +17,9 @@ export async function POST(req: NextRequest) {
       description: data.description,
       imageUrl: data.imageUrl,
       mintAddress: data.mintAddress,
-    }).catch(() => {});
+    }).catch((err) => {
+      console.error('[api/token] Notification failed:', err);
+    });
 
     return NextResponse.json({ ok: true, id: Number(id) });
   } catch (e) {
