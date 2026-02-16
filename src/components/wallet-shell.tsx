@@ -7,6 +7,7 @@ import { useNetwork } from "@/lib/network";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { useState } from "react";
+import { FaucetFooter } from "@/components/faucet-footer";
 
 const tabs = [
   { id: "get", label: "Get", icon: Download, path: "/wallet/get" },
@@ -95,6 +96,7 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
           </div>
         </ConnectGate>
       </main>
+      <FaucetFooter />
     </div>
   );
 }
