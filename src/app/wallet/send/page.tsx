@@ -106,7 +106,7 @@ export default function SendPage() {
   return (
     <PageTransition>
       <Navbar />
-      <ConnectGate>
+      <ConnectGate action="send SOL">
         <div className="min-h-screen bg-gradient-to-br from-white to-gray-50 dark:from-black dark:to-gray-950 px-6 py-12">
           <div className="max-w-2xl mx-auto">
             {/* Header */}
