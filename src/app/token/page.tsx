@@ -26,13 +26,13 @@ export default function TokenPage() {
   const [description, setDescription] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [website, setWebsite] = useState("");
-  const [twitter, setTwitter] = useState("");
-  const [telegram, setTelegram] = useState("");
-  const [instagram, setInstagram] = useState("");
-  const [github, setGithub] = useState("");
-  const [youtube, setYoutube] = useState("");
-  const [tiktok, setTiktok] = useState("");
+  const [website, setWebsite] = useState("https://");
+  const [twitter, setTwitter] = useState("https://x.com/");
+  const [telegram, setTelegram] = useState("https://t.me/");
+  const [instagram, setInstagram] = useState("https://instagram.com/");
+  const [github, setGithub] = useState("https://github.com/");
+  const [youtube, setYoutube] = useState("https://youtube.com/");
+  const [tiktok, setTiktok] = useState("https://tiktok.com/@");
   const [activeSocials, setActiveSocials] = useState<Set<string>>(new Set());
   const [mutableMetadata, setMutableMetadata] = useState(true);
   const [status, setStatus] = useState<"idle" | "auth" | "uploading" | "creating" | "confirming" | "done" | "error">("idle");
@@ -75,13 +75,13 @@ export default function TokenPage() {
         symbol: ticker,
         description,
         image: imageUrl,
-        ...(website && { website }),
-        ...(twitter && { twitter }),
-        ...(telegram && { telegram }),
-        ...(instagram && { instagram }),
-        ...(github && { github }),
-        ...(youtube && { youtube }),
-        ...(tiktok && { tiktok }),
+        ...(website && website !== "https://" && { website }),
+        ...(twitter && twitter !== "https://x.com/" && { twitter }),
+        ...(telegram && telegram !== "https://t.me/" && { telegram }),
+        ...(instagram && instagram !== "https://instagram.com/" && { instagram }),
+        ...(github && github !== "https://github.com/" && { github }),
+        ...(youtube && youtube !== "https://youtube.com/" && { youtube }),
+        ...(tiktok && tiktok !== "https://tiktok.com/@" && { tiktok }),
       });
 
       // Step 3: Create pool on-chain (client-side)
