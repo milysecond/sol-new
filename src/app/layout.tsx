@@ -5,6 +5,7 @@ import { WalletProvider } from "@/lib/wallet-context";
 import { NetworkProvider } from "@/lib/network";
 import { ThemeProvider } from "@/lib/theme-context";
 import { Analytics } from "@vercel/analytics/react";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -69,6 +70,7 @@ export default function RootLayout({
         <ThemeProvider>
         <NetworkProvider><WalletProvider>{children}</WalletProvider></NetworkProvider>
         </ThemeProvider>
+        <Toaster theme="dark" position="top-center" richColors />
         <Analytics />
         <script
           dangerouslySetInnerHTML={{

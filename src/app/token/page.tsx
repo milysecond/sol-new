@@ -38,7 +38,7 @@ export default function TokenPage() {
   const [status, setStatus] = useState<"idle" | "auth" | "uploading" | "creating" | "confirming" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { publicKey } = useWallet();
+  const { publicKey, refreshBalance } = useWallet();
   const { network, rpc } = useNetwork();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -183,11 +183,12 @@ export default function TokenPage() {
         }),
       }).catch(() => {});
 
+      // Update balance and redirect
+      refreshBalance();
+
       // Track token creation
       analytics.tokenCreated(mintAddress, ticker);
       analytics.launchInitiated(mintAddress, 'meteora-dbc');
-
-      // Redirect to the shareable token page
       router.push(`/launch/${mintAddress}`);
       return;
     } catch (e: unknown) {
