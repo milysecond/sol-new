@@ -77,7 +77,7 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
               {tabs.map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => router.push(t.path)}
+                  onClick={() => { try { navigator?.vibrate?.(10); } catch {} router.push(t.path); }}
                   className={`flex-1 flex flex-col items-center gap-1 px-2 py-2 rounded-xl text-[11px] transition cursor-pointer active:scale-95 ${
                     activeTab === t.id
                       ? "bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-400/50"
