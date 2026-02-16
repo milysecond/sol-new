@@ -200,6 +200,7 @@ export default function Home() {
         </div>
         </PageTransition>
       </main>
+      <FaucetFooter />
     </div>
     </WelcomeProvider>
   );
