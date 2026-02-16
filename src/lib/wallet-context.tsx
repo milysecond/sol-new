@@ -87,7 +87,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("sol.new.wallet", result.publicKey);
       localStorage.setItem("sol.new.credentialId", result.credentialId);
       fetch("/api/wallet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publicKey: result.publicKey, credentialId: result.credentialId }) }).catch(() => {});
-      analytics.walletCreated();
+      analytics.walletCreated(result.publicKey);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create passkey");
     } finally {
