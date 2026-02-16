@@ -1,95 +1,75 @@
-# Vercel Analytics Setup
+# Analytics Setup
 
-## Overview
+sol.new uses **dual analytics tracking** with Umami (self-hosted) and Vercel Analytics.
 
-sol.new uses Vercel Analytics for tracking user behavior and custom events.
+## 🎯 Tracking Events
 
-## Installation
+Custom event tracking is handled via `/src/lib/analytics.ts`. Both platforms receive the same events automatically.
 
-Already installed via:
-```bash
-npm install @vercel/analytics
-```
+### Active Events
 
-## Usage
+- `token_created` - Token minted on Meteora DBC
+- `nft_created` - NFT/cNFT created
+- `wallet_created` - Passkey wallet created
+- `multisig_created` - Squads multisig created
+- `payment_link_created` - Payment link generated
+- `dao_created` - DAO/organization created
+- `launch_initiated` - Token launch started
+- `launch_completed` - Launch finalized
+- `network_switched` - Mainnet/devnet toggle
+- `wallet_connected` - Wallet connection
+- `theme_toggled` - Light/dark mode
+- `share_clicked` - Share button clicked
 
-### Automatic Page Views
-
-Page views are automatically tracked via the `<Analytics />` component in the root layout.
-
-### Custom Event Tracking
-
-Use the `analytics` helper from `@/lib/analytics`:
+### Usage
 
 ```typescript
-import { analytics } from "@/lib/analytics";
+import { analytics } from '@/lib/analytics';
 
-// Track wallet events
-analytics.walletCreated();
-analytics.walletRecovered();
-analytics.walletConnected("passkey");
+// Convenience functions
+analytics.tokenCreated(mintAddress, 'TICKER');
+analytics.walletCreated(address);
+analytics.networkSwitched('mainnet');
 
-// Track token creation
-analytics.tokenCreated({
-  hasImage: true,
-  meteora: true,
-  network: "mainnet"
-});
-
-// Track NFT minting
-analytics.nftMinted({
-  compressed: false,
-  hasImage: true,
-  network: "mainnet"
-});
-
-// Track multisig creation
-analytics.multisigCreated({
-  threshold: 2,
-  members: 3,
-  network: "mainnet"
-});
-
-// Track SOL purchases
-analytics.solPurchased({
-  amount: 0.1,
-  provider: "stripe",
-  network: "mainnet"
-});
-
-// Track network switches
-analytics.networkSwitched("devnet");
-
-// Track errors
-analytics.error("token-creation", "Insufficient SOL for fees");
-
-// Track custom features
-analytics.featureUsed("ai_image_generation", { prompt: "..." });
+// Generic tracking
+import { track } from '@/lib/analytics';
+track('custom_event', { key: 'value' });
 ```
 
-## Available Events
+## 📊 Dashboards
 
-- `wallet_created` - New wallet created via passkey
-- `wallet_recovered` - Wallet recovered via passkey
-- `wallet_connected` - Wallet connected (passkey or recovery)
-- `token_created` - Token launched
-- `token_image_generated` - AI image generated for token
-- `nft_minted` - NFT minted
-- `nft_image_generated` - AI image generated for NFT
-- `multisig_created` - Multisig wallet created
-- `sol_purchased` - SOL purchased via Stripe
-- `sol_sent` - SOL sent to another wallet
-- `network_switched` - Switched between mainnet/devnet
-- `error` - Error occurred
-- `feature_*` - Custom feature usage
+- **Umami**: https://stats.sal.fun (website ID: `2fd088a3-f7b5-486c-9b38-6c0f50ec5d9e`)
+- **Vercel**: https://vercel.com/analytics (project dashboard)
 
-## Viewing Analytics
+## 🔧 Configuration
 
-Analytics are available in the Vercel dashboard:
-1. Go to vercel.com
-2. Select the sol.new project
-3. Click "Analytics" in the sidebar
+### Umami (Self-Hosted)
+```tsx
+// In layout.tsx <head>
+<script 
+  defer 
+  src="https://stats.sal.fun/script.js" 
+  data-website-id="2fd088a3-f7b5-486c-9b38-6c0f50ec5d9e" 
+/>
+```
 
-## Privacy
+### Vercel Analytics
+```tsx
+// In layout.tsx <body>
+import { Analytics } from '@vercel/analytics/react';
+<Analytics />
+```
 
-Vercel Analytics respects user privacy and doesn't use cookies. All data is anonymized and aggregated.
+## 🛠️ Adding New Events
+
+1. Add event name to `AnalyticsEvent` type in `/src/lib/analytics.ts`
+2. Optionally create a convenience function in the `analytics` object
+3. Call `track('event_name', { data })` where needed
+4. Both Umami and Vercel will receive the event automatically
+
+## 🚫 Privacy
+
+- No PII is tracked
+- Wallet addresses are pseudonymous identifiers
+- IP addresses are not stored (Umami config)
+- Complies with GDPR/privacy best practices
