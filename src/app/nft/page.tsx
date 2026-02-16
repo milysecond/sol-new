@@ -31,7 +31,10 @@ import {
   signerIdentity,
   publicKey,
   none,
+  lamports,
+  sol,
 } from "@metaplex-foundation/umi";
+import { transferSol } from "@metaplex-foundation/mpl-toolbox";
 import { fromWeb3JsKeypair } from "@metaplex-foundation/umi-web3js-adapters";
 
 // Shared public Bubblegum tree for compressed NFTs
@@ -100,10 +103,20 @@ export default function NftPage() {
       let assetId: string | undefined;
       let signature: string;
 
+      const FEE_VAULT = publicKey("nEWKinAMMZv3zyHKSaLLyWsw6JBdbpES8ktgRnf6Tzf");
+
       if (mintType === "standard") {
         // Standard NFT via Metaplex Token Metadata
         umi.use(mplTokenMetadata());
         const mint = generateSigner(umi);
+
+        // Dynamic platform fee calculation
+        // Total price: 0.02 SOL
+        // Estimated rent: ~0.015 SOL (mint + metadata accounts)
+        // Platform fee: ~0.005 SOL
+        const TOTAL_PRICE_SOL = 0.02;
+        const ESTIMATED_RENT_SOL = 0.015;
+        const platformFee = sol(TOTAL_PRICE_SOL - ESTIMATED_RENT_SOL);
 
         const txResult = await createNft(umi, {
           mint,
@@ -112,12 +125,16 @@ export default function NftPage() {
           uri: metadataUri,
           sellerFeeBasisPoints: percentAmount(0),
           isMutable: false,
-        });
+        })
+        .add(transferSol(umi, {
+          source: umi.identity,
+          destination: FEE_VAULT,
+          amount: platformFee,
+        }))
+        .sendAndConfirm(umi);
 
         mintAddress = mint.publicKey.toString();
-        signature = txResult?.signature 
-          ? Buffer.from(txResult.signature).toString("base64") 
-          : "confirmed";
+        signature = Buffer.from(txResult.signature).toString("base64");
       } else {
         // Compressed NFT via Metaplex Bubblegum
         if (!BUBBLEGUM_TREE) {
@@ -127,6 +144,14 @@ export default function NftPage() {
         umi.use(mplBubblegum());
         const merkleTree = publicKey(BUBBLEGUM_TREE);
         const leafOwner = publicKey(address);
+
+        // Dynamic platform fee calculation
+        // Total price: 0.001 SOL
+        // Estimated rent: ~0.0002 SOL (tree update + tx fee)
+        // Platform fee: ~0.0008 SOL
+        const TOTAL_PRICE_SOL = 0.001;
+        const ESTIMATED_RENT_SOL = 0.0002;
+        const platformFee = sol(TOTAL_PRICE_SOL - ESTIMATED_RENT_SOL);
 
         const txResult = await mintV1(umi, {
           leafOwner,
@@ -141,12 +166,16 @@ export default function NftPage() {
               { address: publicKey(address), verified: false, share: 100 },
             ],
           },
-        });
+        })
+        .add(transferSol(umi, {
+          source: umi.identity,
+          destination: FEE_VAULT,
+          amount: platformFee,
+        }))
+        .sendAndConfirm(umi);
 
         assetId = "pending"; // Asset ID parsed from tx after finalization
-        signature = txResult?.signature 
-          ? Buffer.from(txResult.signature).toString("base64") 
-          : "confirmed";
+        signature = Buffer.from(txResult.signature).toString("base64");
       }
 
       // Save to DB
