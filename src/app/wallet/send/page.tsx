@@ -73,6 +73,10 @@ export default function SendPage() {
 
       setTxId(signature);
       setStatus("done");
+      await refreshBalance();
+      const { toast } = await import("sonner");
+      toast.success("Transfer successful!");
+      try { new Audio("/chaching.mp3").play(); } catch {}
       setRecipient("");
       setAmount("");
       setAddressValid(null);
@@ -108,11 +112,6 @@ export default function SendPage() {
         {/* SOL Send */}
         {tab === "sol" && (
           <div className="space-y-3">
-            <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-4">
-              <p className="text-xs text-gray-500 dark:text-white/40 mb-1">Available Balance</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">{solBalance} SOL</p>
-            </div>
-
             <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-4 space-y-3">
               {/* Recipient */}
               <div>

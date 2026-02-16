@@ -21,7 +21,7 @@ export default function MultisigPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ multisigPda: string; vault: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const { publicKey } = useWallet();
+  const { publicKey, refreshBalance } = useWallet();
   const { network, rpc } = useNetwork();
   const router = useRouter();
 
@@ -137,6 +137,7 @@ export default function MultisigPage() {
       // Derive vault
       const [vaultPda] = multisig.getVaultPda({ multisigPda, index: 0 });
 
+      refreshBalance();
       const resultData = {
         multisigPda: multisigPda.toBase58(),
         vault: vaultPda.toBase58(),

@@ -133,12 +133,15 @@ const products: { href: string; icon: LucideIcon; title: string; desc: string; c
 
 export default function Home() {
   const { publicKey, connect, loading } = useWallet();
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return !sessionStorage.getItem("sol.new.splashed");
+  });
 
   return (
     <WelcomeProvider>
     <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
-      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+      {showSplash && <SplashScreen onDone={() => { setShowSplash(false); sessionStorage.setItem("sol.new.splashed", "1"); }} />}
       <Navbar />
       <main className="flex-1 flex flex-col px-3 sm:px-6 sm:items-center sm:justify-center min-h-0">
         <PageTransition>
