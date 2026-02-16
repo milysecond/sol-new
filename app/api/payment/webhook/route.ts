@@ -4,7 +4,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
 import Stripe from 'stripe';
 
 // Webhook secret (set via Stripe dashboard)
@@ -18,6 +17,13 @@ export async function POST(req: NextRequest) {
     if (!signature) {
       return NextResponse.json({ error: 'No signature' }, { status: 400 });
     }
+
+    // Initialize Stripe (lazy - only at request time)
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) {
+      return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 });
+    }
+    const stripe = new Stripe(key, { apiVersion: '2026-01-28.clover' });
 
     // Verify webhook signature
     const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
