@@ -6,9 +6,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-// Webhook secret (set via Stripe dashboard)
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.text();
@@ -18,11 +15,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No signature' }, { status: 400 });
     }
 
-    // Initialize Stripe (lazy - only at request time)
+    // Initialize Stripe (at request time, not build time)
     const key = process.env.STRIPE_SECRET_KEY;
-    if (!key) {
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    
+    if (!key || !webhookSecret) {
+      console.error('Stripe configuration missing');
       return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 });
     }
+
     const stripe = new Stripe(key, { apiVersion: '2026-01-28.clover' });
 
     // Verify webhook signature
@@ -41,9 +42,6 @@ export async function POST(req: NextRequest) {
 
       // TODO: Trigger SOL transfer to wallet
       // TODO: If tokenParams, trigger token launch via Meteora
-
-      // For now, just log
-      // Next step: integrate with Solana wallet to send SOL
     }
 
     return NextResponse.json({ received: true });

@@ -5,7 +5,7 @@
 
 import Stripe from 'stripe';
 
-// Lazy-load Stripe instance (only when needed, not at build time)
+// Lazy-load Stripe (only initialized at request time, not build time)
 let stripeInstance: Stripe | null = null;
 
 function getStripe(): Stripe {
