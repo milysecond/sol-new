@@ -5,19 +5,21 @@
 
 import Stripe from 'stripe';
 
-// Load Stripe secret key from environment
-function getStripeKey(): string {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) {
-    throw new Error('STRIPE_SECRET_KEY environment variable not set');
-  }
-  return key;
-}
+// Lazy-load Stripe instance (only when needed, not at build time)
+let stripeInstance: Stripe | null = null;
 
-// Initialize Stripe
-export const stripe = new Stripe(getStripeKey(), {
-  apiVersion: '2026-01-28.clover',
-});
+function getStripe(): Stripe {
+  if (!stripeInstance) {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) {
+      throw new Error('STRIPE_SECRET_KEY environment variable not set');
+    }
+    stripeInstance = new Stripe(key, {
+      apiVersion: '2026-01-28.clover',
+    });
+  }
+  return stripeInstance;
+}
 
 /**
  * Create payment intent for SOL purchase
@@ -28,6 +30,7 @@ export async function createPaymentIntent(
   amountUsd: number,
   metadata?: Record<string, string>
 ): Promise<Stripe.PaymentIntent> {
+  const stripe = getStripe();
   return await stripe.paymentIntents.create({
     amount: amountUsd,
     currency: 'usd',
