@@ -7,6 +7,7 @@ import { useNetwork } from "@/lib/network";
 import { useState, useCallback } from "react";
 import { Coins, Image, Download, CreditCard, ShieldCheck, FolderOpen, Wallet, Droplets, Zap, ExternalLink, Copy, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Spinner } from "@/components/spinner";
 import type { LucideIcon } from "lucide-react";
 
 const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
@@ -176,6 +177,19 @@ export function Navbar() {
           </Link>
         ))}
       </div>
+
+      {/* Airdrop spinner overlay */}
+      {airdropping && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-2xl px-8 py-6 flex flex-col items-center gap-4 shadow-2xl">
+            <Spinner size={40} className="text-yellow-400" />
+            <div className="text-center">
+              <p className="text-lg font-medium text-gray-900 dark:text-white">Airdropping SOL</p>
+              <p className="text-sm text-gray-500 dark:text-white/50 mt-1">Please wait...</p>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
