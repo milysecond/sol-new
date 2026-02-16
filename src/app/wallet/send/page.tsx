@@ -24,13 +24,16 @@ export default function SendPage() {
   const { publicKey, balance, refreshBalance } = useWallet();
   const { network, rpc } = useNetwork();
 
-  const handleRecipientChange = (value: string) => {
-    const sanitized = value.trim();
-    setRecipient(sanitized);
-    if (sanitized.length > 0) {
-      try { new PublicKey(sanitized); setAddressValid(true); } catch { setAddressValid(false); }
-    } else {
+  const handleRecipientChange = (value: string, isPaste = false) => {
+    const raw = isPaste ? value.trim() : value;
+    setRecipient(raw);
+    const trimmed = raw.trim();
+    if (trimmed.length === 0) {
       setAddressValid(null);
+    } else if (trimmed.length >= 32) {
+      try { new PublicKey(trimmed); setAddressValid(true); } catch { setAddressValid(false); }
+    } else {
+      setAddressValid(null); // still typing, don't show error
     }
   };
 
@@ -121,7 +124,7 @@ export default function SendPage() {
                     type="text"
                     value={recipient}
                     onChange={(e) => handleRecipientChange(e.target.value)}
-                    onPaste={(e) => { e.preventDefault(); handleRecipientChange(e.clipboardData.getData('text')); }}
+                    onPaste={(e) => { e.preventDefault(); handleRecipientChange(e.clipboardData.getData('text'), true); }}
                     placeholder="Solana address"
                     disabled={status !== "idle" && status !== "error" && status !== "done"}
                     className={`w-full px-3 py-2.5 pr-10 bg-white dark:bg-black border rounded-lg text-sm focus:outline-none focus:ring-2 disabled:opacity-50 ${
