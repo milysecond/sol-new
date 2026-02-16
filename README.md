@@ -21,6 +21,29 @@ sol.new removes the complexity from Solana. No wallet downloads, no seed phrases
 
 ---
 
+## Pricing
+
+### Token Launches
+- **~0.05 SOL** to create token + pool
+- Trading fees: 2.5% → 1% over 24h (goes to creator)
+- Migration fee: 1% at graduation (goes to creator)
+
+### NFTs
+- **Standard NFT:** ~0.01 SOL (network rent)
+- **Compressed NFT:** ~0.0001 SOL (shared tree)
+
+### Multisig
+- **0.05 SOL total** to create
+  - 0.04 SOL: Network rent (Squads program)
+  - 0.01 SOL: Platform fee
+
+### Wallets
+- **Free** passkey creation
+- **Free** first transaction (rent-exempt funding)
+- SOL purchases: Provider fees apply (Moonpay/Ramp)
+
+---
+
 ## Fee Structure
 
 ### Token Launches (Meteora DBC)
@@ -236,8 +259,8 @@ MIT License - see [LICENSE](LICENSE)
 ## Links
 
 - **Website:** https://sol.new
-- **Twitter:** [@solnew](https://twitter.com/solnew)
-- **GitHub:** https://github.com/metasal1/sol-new
+- **Twitter:** [@soldotnew](https://x.com/soldotnew)
+- **GitHub:** https://github.com/milysecond/sol-new
 
 ---
 
