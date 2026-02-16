@@ -21,7 +21,7 @@ export default function SendPage() {
   const [txId, setTxId] = useState<string | null>(null);
   const [addressValid, setAddressValid] = useState<boolean | null>(null);
 
-  const { publicKey, balance } = useWallet();
+  const { publicKey, balance, refreshBalance } = useWallet();
   const { network, rpc } = useNetwork();
 
   const handleRecipientChange = (value: string) => {
