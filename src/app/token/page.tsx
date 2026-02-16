@@ -14,6 +14,7 @@ import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { Connection, Keypair, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { DynamicBondingCurveClient, deriveDbcPoolAddress } from "@meteora-ag/dynamic-bonding-curve-sdk";
+import { analytics } from "@/lib/analytics";
 
 const WRAPPED_SOL = new PublicKey("So11111111111111111111111111111111111111112");
 const DBC_PARTNER_CONFIG = new PublicKey("ptrXeNGhf62Y8V3wF1Z8b1LDP9YGBw2QG3vJ5gsKdzV");
@@ -184,6 +185,10 @@ export default function TokenPage() {
 
       // Update balance and redirect
       refreshBalance();
+
+      // Track token creation
+      analytics.tokenCreated(mintAddress, ticker);
+      analytics.launchInitiated(mintAddress, 'meteora-dbc');
       router.push(`/launch/${mintAddress}`);
       return;
     } catch (e: unknown) {
