@@ -4,17 +4,14 @@
  */
 
 import Stripe from 'stripe';
-import fs from 'fs';
-import path from 'path';
 
-// Load Stripe secret key from credentials
+// Load Stripe secret key from environment
 function getStripeKey(): string {
-  const credPath = path.join(process.env.HOME || '', '.credentials/stripe.txt');
-  try {
-    return fs.readFileSync(credPath, 'utf-8').trim();
-  } catch (err) {
-    throw new Error('Stripe API key not found. Add to ~/.credentials/stripe.txt');
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    throw new Error('STRIPE_SECRET_KEY environment variable not set');
   }
+  return key;
 }
 
 // Initialize Stripe
