@@ -65,6 +65,8 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.classList.add('dark')}catch(e){}})()` }} />
         <script defer src="https://stats.sal.fun/script.js" data-website-id="2fd088a3-f7b5-486c-9b38-6c0f50ec5d9e" />
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-K3RD6HZRBX" />
+        <script dangerouslySetInnerHTML={{ __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','G-K3RD6HZRBX')` }} />
       </head>
       <body className={`${inter.className} antialiased`}>
         <ThemeProvider>
