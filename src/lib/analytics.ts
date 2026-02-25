@@ -1,15 +1,15 @@
 /**
  * Analytics utility for custom event tracking
- * Supports both Umami and Vercel Analytics
+ * Supports both PostHog and Vercel Analytics
  */
 
 import { track as vercelTrack } from '@vercel/analytics';
 
-// Umami tracking (global umami function is injected via script)
+// PostHog tracking (global posthog function is injected via script)
 declare global {
   interface Window {
-    umami?: {
-      track: (eventName: string, eventData?: Record<string, any>) => void;
+    posthog?: {
+      capture: (eventName: string, eventData?: Record<string, any>) => void;
     };
   }
 }
@@ -33,24 +33,24 @@ interface EventData {
 }
 
 /**
- * Track custom event to both Umami and Vercel Analytics
+ * Track custom event to both PostHog and Vercel Analytics
  */
 export function track(event: AnalyticsEvent, data?: EventData): void {
   // Vercel Analytics
   vercelTrack(event, data);
   
-  // Umami Analytics
-  if (typeof window !== 'undefined' && window.umami) {
-    window.umami.track(event, data);
+  // PostHog Analytics
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture(event, data);
   }
 }
 
 /**
- * Track page view (Umami auto-tracks, this is for programmatic tracking)
+ * Track page view (PostHog auto-tracks, this is for programmatic tracking)
  */
 export function trackPageView(path?: string): void {
-  if (typeof window !== 'undefined' && window.umami && path) {
-    window.umami.track('pageview', { path });
+  if (typeof window !== 'undefined' && window.posthog && path) {
+    window.posthog.capture('$pageview', { $current_url: path });
   }
 }
 
