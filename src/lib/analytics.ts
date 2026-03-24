@@ -1,18 +1,9 @@
 /**
  * Analytics utility for custom event tracking
- * Supports both PostHog and Vercel Analytics
+ * Uses Vercel Analytics
  */
 
 import { track as vercelTrack } from '@vercel/analytics';
-
-// PostHog tracking (global posthog function is injected via script)
-declare global {
-  interface Window {
-    posthog?: {
-      capture: (eventName: string, eventData?: Record<string, any>) => void;
-    };
-  }
-}
 
 type AnalyticsEvent = 
   | 'token_created'
@@ -33,32 +24,10 @@ interface EventData {
 }
 
 /**
- * Track custom event to both PostHog and Vercel Analytics
+ * Track custom event via Vercel Analytics
  */
 export function track(event: AnalyticsEvent, data?: EventData): void {
-  // Vercel Analytics
   vercelTrack(event, data);
-  
-  // PostHog Analytics
-  if (typeof window !== 'undefined' && window.posthog) {
-    window.posthog.capture(event, data);
-  }
-}
-
-/**
- * Track page view (PostHog auto-tracks, this is for programmatic tracking)
- */
-export function trackPageView(path?: string): void {
-  if (typeof window !== 'undefined' && window.posthog && path) {
-    window.posthog.capture('$pageview', { $current_url: path });
-  }
-}
-
-/**
- * Track error events
- */
-export function trackError(error: string, context?: EventData): void {
-  track('error' as AnalyticsEvent, { error, ...context });
 }
 
 // Convenience functions for common events
