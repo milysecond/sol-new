@@ -143,11 +143,13 @@ function KillPageInner() {
       }));
 
       // 3. Write abort.so to buffer
-      const writeData = Buffer.alloc(12 + abortBytes.length);
-      writeData.writeUInt32LE(1, 0);
-      writeData.writeUInt32LE(0, 4);
-      writeData.writeUInt32LE(abortBytes.length, 8);
-      writeData.set(abortBytes, 12);
+      // BPF Loader uses bincode: u32 variant + u32 offset + u64 vec_len + bytes
+      const writeData = Buffer.alloc(16 + abortBytes.length);
+      writeData.writeUInt32LE(1, 0);  // Write variant
+      writeData.writeUInt32LE(0, 4);  // offset
+      writeData.writeUInt32LE(abortBytes.length, 8);  // vec length (low 32)
+      writeData.writeUInt32LE(0, 12); // vec length (high 32)
+      writeData.set(abortBytes, 16);
 
       tx.add(new TransactionInstruction({
         keys: [
