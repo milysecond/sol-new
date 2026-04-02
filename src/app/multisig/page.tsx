@@ -36,7 +36,10 @@ export default function MultisigPage() {
     ? [publicKey, ...validMembers]
     : validMembers;
 
-  const canCreate = name && allMembers.length >= 1 && threshold >= 1 && threshold <= allMembers.length;
+  // Total member slots (for threshold UI) = connected wallet + member input fields
+  const totalMemberSlots = (publicKey ? 1 : 0) + members.length;
+
+  const canCreate = name && allMembers.length >= 2 && threshold >= 1 && threshold <= allMembers.length;
 
   const copyText = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -283,8 +286,8 @@ export default function MultisigPage() {
                     onClick={() => {
                       const next = [...members, ""];
                       setMembers(next);
-                      // Auto-adjust threshold to ~60%
-                      const total = (publicKey ? 1 : 0) + next.filter(m => { try { new PublicKey(m); return true; } catch { return false; } }).length;
+                      // Auto-adjust threshold to ~60% of total slots
+                      const total = (publicKey ? 1 : 0) + next.length;
                       if (total >= 3) setThreshold(Math.ceil(total * 0.6));
                     }}
                     className="text-sm text-blue-400 hover:text-blue-300 transition cursor-pointer"
@@ -300,7 +303,7 @@ export default function MultisigPage() {
                   </label>
                   <div className="bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl p-3">
                     <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.max(allMembers.length, 1) }, (_, i) => i + 1).map((n) => (
+                      {Array.from({ length: Math.max(totalMemberSlots, 1) }, (_, i) => i + 1).map((n) => (
                         <button
                           key={n}
                           onClick={() => setThreshold(n)}
@@ -316,17 +319,17 @@ export default function MultisigPage() {
                     </div>
                     <div className="flex justify-between items-center mt-2 pt-2 border-t border-black/5 dark:border-white/5">
                       <span className="text-sm font-medium text-gray-700 dark:text-white/70">
-                        {threshold} of {allMembers.length}
+                        {threshold} of {totalMemberSlots}
                       </span>
-                      {allMembers.length >= 3 && threshold === Math.ceil(allMembers.length * 0.6) && (
+                      {totalMemberSlots >= 3 && threshold === Math.ceil(totalMemberSlots * 0.6) && (
                         <span className="text-xs text-blue-400">Recommended</span>
                       )}
-                      {allMembers.length >= 3 && threshold !== Math.ceil(allMembers.length * 0.6) && (
+                      {totalMemberSlots >= 3 && threshold !== Math.ceil(totalMemberSlots * 0.6) && (
                         <button
-                          onClick={() => setThreshold(Math.ceil(allMembers.length * 0.6))}
+                          onClick={() => setThreshold(Math.ceil(totalMemberSlots * 0.6))}
                           className="text-xs text-blue-400 hover:text-blue-300 transition cursor-pointer"
                         >
-                          Use recommended ({Math.ceil(allMembers.length * 0.6)} of {allMembers.length})
+                          Use recommended ({Math.ceil(totalMemberSlots * 0.6)} of {totalMemberSlots})
                         </button>
                       )}
                     </div>
