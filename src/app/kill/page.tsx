@@ -1,19 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { PageTransition } from "@/components/page-transition";
 import { Navbar } from "@/components/navbar";
-import { Skull, Rocket, Check, Copy, ExternalLink, AlertTriangle, Wallet, LogOut } from "lucide-react";
+import { Skull, Rocket, Check, Copy, ExternalLink, AlertTriangle, LogOut } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { useNetwork } from "@/lib/network";
+import { ConnectorProvider, useConnector, useTransactionSigner } from "@solana/connector/react";
+import { useWalletAdapterCompat } from "@solana/connector/compat";
 import {
   Connection,
   PublicKey,
-  TransactionMessage,
-  VersionedTransaction,
-  LAMPORTS_PER_SOL,
+  Transaction,
   SystemProgram,
-  Keypair,
+  LAMPORTS_PER_SOL,
+  TransactionInstruction,
 } from "@solana/web3.js";
 
 // 352-byte abort program binary (base64)
@@ -25,74 +26,28 @@ const UPGRADEABLE_LOADER = new PublicKey("BPFLoaderUpgradeab1e111111111111111111
 const SYSVAR_RENT = new PublicKey("SysvarRent111111111111111111111111111111111");
 const SYSVAR_CLOCK = new PublicKey("SysvarC1ock11111111111111111111111111111111");
 
-interface PhantomProvider {
-  isPhantom?: boolean;
-  publicKey?: { toBase58(): string; toBytes(): Uint8Array };
-  connect(): Promise<{ publicKey: { toBase58(): string } }>;
-  disconnect(): Promise<void>;
-  signTransaction(tx: VersionedTransaction): Promise<VersionedTransaction>;
-  on(event: string, cb: (...args: unknown[]) => void): void;
-  off(event: string, cb: (...args: unknown[]) => void): void;
-}
-
-function getProvider(): PhantomProvider | null {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as { solana?: PhantomProvider; phantom?: { solana?: PhantomProvider } };
-  return w.phantom?.solana || w.solana || null;
-}
-
-export default function KillPage() {
+function KillPageInner() {
   const [programId, setProgramId] = useState("");
   const [status, setStatus] = useState<"idle" | "deploying" | "confirming" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [txSig, setTxSig] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [hasProvider, setHasProvider] = useState(false);
   const { network, rpc } = useNetwork();
 
+  const {
+    isConnected,
+    isConnecting,
+    account,
+    connector,
+    connectors,
+    connectWallet,
+    disconnectWallet,
+  } = useConnector();
+
+  const { signer } = useTransactionSigner();
+  const walletAdapter = useWalletAdapterCompat(signer, disconnectWallet);
+
   const clusterParam = network === "devnet" ? "?cluster=devnet" : "";
-
-  useEffect(() => {
-    const provider = getProvider();
-    if (provider) {
-      setHasProvider(true);
-      if (provider.publicKey) {
-        setWalletAddress(provider.publicKey.toBase58());
-      }
-      const handleConnect = () => {
-        const p = getProvider();
-        if (p?.publicKey) setWalletAddress(p.publicKey.toBase58());
-      };
-      const handleDisconnect = () => setWalletAddress(null);
-      provider.on("connect", handleConnect);
-      provider.on("disconnect", handleDisconnect);
-      return () => {
-        provider.off("connect", handleConnect);
-        provider.off("disconnect", handleDisconnect);
-      };
-    }
-  }, []);
-
-  const connectWallet = async () => {
-    const provider = getProvider();
-    if (!provider) {
-      window.open("https://phantom.app/", "_blank");
-      return;
-    }
-    try {
-      const resp = await provider.connect();
-      setWalletAddress(resp.publicKey.toBase58());
-    } catch {
-      // user rejected
-    }
-  };
-
-  const disconnectWallet = async () => {
-    const provider = getProvider();
-    if (provider) await provider.disconnect().catch(() => {});
-    setWalletAddress(null);
-  };
 
   let validProgram = false;
   try {
@@ -104,7 +59,7 @@ export default function KillPage() {
     validProgram = false;
   }
 
-  const canKill = validProgram && !!walletAddress;
+  const canKill = validProgram && isConnected && !!account;
 
   const copyText = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -112,24 +67,18 @@ export default function KillPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleKill = async () => {
-    if (!canKill) return;
+  const handleKill = useCallback(async () => {
+    if (!canKill || !walletAdapter.publicKey) return;
     setError(null);
-
-    const provider = getProvider();
-    if (!provider || !provider.publicKey) {
-      setError("Wallet not connected");
-      return;
-    }
 
     try {
       setStatus("deploying");
 
       const connection = new Connection(rpc, "confirmed");
-      const creator = new PublicKey(walletAddress!);
+      const creatorKey = new PublicKey(account!);
       const targetProgram = new PublicKey(programId.trim());
 
-      // Validate program is upgradeable and user is authority
+      // Validate program
       const accountInfo = await connection.getAccountInfo(targetProgram);
       if (!accountInfo) throw new Error("Program account not found. Check the address and network.");
       if (!accountInfo.executable) throw new Error("This address is not an executable program.");
@@ -147,94 +96,92 @@ export default function KillPage() {
       }
 
       const authority = new PublicKey(programdataInfo.data.slice(13, 45));
-      if (!authority.equals(creator)) {
-        throw new Error(`You are not the upgrade authority.\nAuthority: ${authority.toBase58()}\nYour wallet: ${creator.toBase58()}`);
+      if (!authority.equals(creatorKey)) {
+        throw new Error(`You are not the upgrade authority.\nAuthority: ${authority.toBase58()}\nYour wallet: ${creatorKey.toBase58()}`);
       }
 
       // Decode abort binary
       const abortBytes = Uint8Array.from(atob(ABORT_SO_BASE64), (c) => c.charCodeAt(0));
 
-      // Create buffer account
+      // Buffer setup
+      const { Keypair } = await import("@solana/web3.js");
       const bufferKeypair = Keypair.generate();
       const bufferSize = abortBytes.length + 48;
       const bufferRent = await connection.getMinimumBalanceForRentExemption(bufferSize);
 
-      const balance = await connection.getBalance(creator);
+      const balance = await connection.getBalance(creatorKey);
       if (balance < bufferRent + 10000) {
         throw new Error(`Need ~${((bufferRent + 10000) / LAMPORTS_PER_SOL).toFixed(4)} SOL. You have ${(balance / LAMPORTS_PER_SOL).toFixed(4)} SOL.`);
       }
 
-      // Instructions: create buffer → init buffer → write abort.so → upgrade
-      const createBufferIx = SystemProgram.createAccount({
-        fromPubkey: creator,
+      // Build transaction with legacy Transaction (wallet adapter compat)
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+
+      const tx = new Transaction({
+        feePayer: creatorKey,
+        blockhash,
+        lastValidBlockHeight,
+      });
+
+      // 1. Create buffer account
+      tx.add(SystemProgram.createAccount({
+        fromPubkey: creatorKey,
         newAccountPubkey: bufferKeypair.publicKey,
         lamports: bufferRent,
         space: bufferSize,
         programId: UPGRADEABLE_LOADER,
-      });
+      }));
 
-      const initBufferIx = {
+      // 2. Initialize buffer
+      tx.add(new TransactionInstruction({
         keys: [
           { pubkey: bufferKeypair.publicKey, isSigner: false, isWritable: true },
-          { pubkey: creator, isSigner: true, isWritable: false },
+          { pubkey: creatorKey, isSigner: true, isWritable: false },
         ],
         programId: UPGRADEABLE_LOADER,
         data: Buffer.from([0, 0, 0, 0]),
-      };
+      }));
 
+      // 3. Write abort.so to buffer
       const writeData = Buffer.alloc(12 + abortBytes.length);
       writeData.writeUInt32LE(1, 0);
       writeData.writeUInt32LE(0, 4);
       writeData.writeUInt32LE(abortBytes.length, 8);
       writeData.set(abortBytes, 12);
 
-      const writeIx = {
+      tx.add(new TransactionInstruction({
         keys: [
           { pubkey: bufferKeypair.publicKey, isSigner: false, isWritable: true },
-          { pubkey: creator, isSigner: true, isWritable: false },
+          { pubkey: creatorKey, isSigner: true, isWritable: false },
         ],
         programId: UPGRADEABLE_LOADER,
         data: writeData,
-      };
+      }));
 
+      // 4. Upgrade program
       const upgradeData = Buffer.alloc(4);
       upgradeData.writeUInt32LE(3, 0);
 
-      const upgradeIx = {
+      tx.add(new TransactionInstruction({
         keys: [
           { pubkey: programdataAddress, isSigner: false, isWritable: true },
           { pubkey: targetProgram, isSigner: false, isWritable: true },
           { pubkey: bufferKeypair.publicKey, isSigner: false, isWritable: true },
-          { pubkey: creator, isSigner: false, isWritable: true },
+          { pubkey: creatorKey, isSigner: false, isWritable: true },
           { pubkey: SYSVAR_RENT, isSigner: false, isWritable: false },
           { pubkey: SYSVAR_CLOCK, isSigner: false, isWritable: false },
-          { pubkey: creator, isSigner: true, isWritable: false },
+          { pubkey: creatorKey, isSigner: true, isWritable: false },
         ],
         programId: UPGRADEABLE_LOADER,
         data: upgradeData,
-      };
+      }));
 
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+      // Buffer keypair must partial-sign
+      tx.partialSign(bufferKeypair);
 
-      const message = new TransactionMessage({
-        payerKey: creator,
-        recentBlockhash: blockhash,
-        instructions: [createBufferIx, initBufferIx, writeIx, upgradeIx],
-      }).compileToV0Message();
-
-      const tx = new VersionedTransaction(message);
-
-      // Buffer keypair must sign (createAccount requires it)
-      tx.sign([bufferKeypair]);
-
-      // Wallet signs
-      const signed = await provider.signTransaction(tx);
-
+      // Send via wallet adapter (handles wallet signing)
       setStatus("confirming");
-      const sig = await connection.sendRawTransaction(signed.serialize(), {
-        skipPreflight: false,
-        maxRetries: 3,
-      });
+      const sig = await walletAdapter.sendTransaction(tx, connection);
 
       await connection.confirmTransaction(
         { signature: sig, blockhash, lastValidBlockHeight },
@@ -258,7 +205,7 @@ export default function KillPage() {
       setError(msg);
       setStatus("error");
     }
-  };
+  }, [canKill, walletAdapter, rpc, programId, network]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">
@@ -273,25 +220,55 @@ export default function KillPage() {
             </div>
 
             {/* Wallet connection */}
-            {!walletAddress ? (
-              <button
-                onClick={connectWallet}
-                className="w-full flex items-center justify-center gap-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-900 dark:text-white font-semibold rounded-xl px-4 py-3.5 hover:bg-black/10 dark:hover:bg-white/10 transition cursor-pointer"
-              >
-                <Wallet className="w-5 h-5" />
-                {hasProvider ? "Connect Wallet" : "Install Phantom"}
-              </button>
+            {!isConnected ? (
+              <div className="space-y-2">
+                {isConnecting ? (
+                  <div className="w-full flex items-center justify-center gap-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-500 dark:text-white/50">
+                    Connecting...
+                  </div>
+                ) : (
+                  <>
+                    {connectors.filter(c => c.ready).length > 0 ? (
+                      <div className="space-y-2">
+                        {connectors.filter(c => c.ready).map(c => (
+                          <button
+                            key={c.id}
+                            onClick={() => void connectWallet(c.id)}
+                            className="w-full flex items-center gap-3 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 hover:bg-black/10 dark:hover:bg-white/10 transition cursor-pointer"
+                          >
+                            {c.icon && (
+                              <img src={c.icon} alt="" className="w-6 h-6 rounded-md" />
+                            )}
+                            <span className="font-medium">{c.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <a
+                        href="https://phantom.app/"
+                        target="_blank"
+                        className="w-full flex items-center justify-center gap-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-900 dark:text-white font-semibold rounded-xl px-4 py-3.5 hover:bg-black/10 dark:hover:bg-white/10 transition"
+                      >
+                        Install a Solana wallet to continue
+                      </a>
+                    )}
+                  </>
+                )}
+              </div>
             ) : (
               <>
                 {/* Connected indicator */}
                 <div className="flex items-center justify-between bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-2.5">
                   <div className="flex items-center gap-2">
+                    {connector?.icon && (
+                      <img src={connector.icon} alt="" className="w-5 h-5 rounded-md" />
+                    )}
                     <div className="w-2 h-2 rounded-full bg-green-400" />
                     <code className="text-sm font-mono text-gray-700 dark:text-white/70">
-                      {walletAddress.slice(0, 4)}...{walletAddress.slice(-4)}
+                      {account ? `${account.slice(0, 4)}...${account.slice(-4)}` : ""}
                     </code>
                   </div>
-                  <button onClick={disconnectWallet} className="p-1.5 text-gray-400 hover:text-red-400 transition">
+                  <button onClick={() => void disconnectWallet()} className="p-1.5 text-gray-400 hover:text-red-400 transition cursor-pointer">
                     <LogOut className="w-4 h-4" />
                   </button>
                 </div>
@@ -427,5 +404,13 @@ export default function KillPage() {
         </PageTransition>
       </main>
     </div>
+  );
+}
+
+export default function KillPage() {
+  return (
+    <ConnectorProvider>
+      <KillPageInner />
+    </ConnectorProvider>
   );
 }
