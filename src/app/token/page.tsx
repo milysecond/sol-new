@@ -68,7 +68,7 @@ export default function TokenPage() {
       // Step 2: Upload image + metadata
       setStatus("uploading");
       const uploaded = await uploadImage(imageFile);
-      const imageUrl = uploaded.ipfs;
+      const imageUrl = uploaded.url;
       const displayUrl = uploaded.preview;
       const metadata = await uploadMetadata({
         name,

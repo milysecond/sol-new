@@ -57,7 +57,55 @@ export async function initDb() {
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (wallet) REFERENCES wallets(public_key)
     )`,
+    `CREATE TABLE IF NOT EXISTS metadata (
+      id TEXT PRIMARY KEY,
+      json TEXT NOT NULL,
+      wallet TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS images (
+      id TEXT PRIMARY KEY,
+      url TEXT NOT NULL,
+      content_type TEXT,
+      size_bytes INTEGER,
+      wallet TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
   ]);
+}
+
+export async function saveMetadata(id: string, json: string, wallet?: string | null) {
+  await db.execute({
+    sql: "INSERT INTO metadata (id, json, wallet) VALUES (?, ?, ?)",
+    args: [id, json, wallet || null],
+  });
+}
+
+export async function getMetadata(id: string) {
+  const r = await db.execute({
+    sql: "SELECT json FROM metadata WHERE id = ? LIMIT 1",
+    args: [id],
+  });
+  return (r.rows[0]?.json as string) || null;
+}
+
+export async function saveImageRef(id: string, url: string, contentType: string, sizeBytes: number, wallet?: string | null) {
+  await db.execute({
+    sql: "INSERT INTO images (id, url, content_type, size_bytes, wallet) VALUES (?, ?, ?, ?, ?)",
+    args: [id, url, contentType, sizeBytes, wallet || null],
+  });
+}
+
+export async function getImageRef(id: string) {
+  const r = await db.execute({
+    sql: "SELECT url, content_type FROM images WHERE id = ? LIMIT 1",
+    args: [id],
+  });
+  if (!r.rows[0]) return null;
+  return {
+    url: r.rows[0].url as string,
+    contentType: (r.rows[0].content_type as string) || "application/octet-stream",
+  };
 }
 
 export async function saveMultisig(data: {
