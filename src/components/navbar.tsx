@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { useState, useCallback } from "react";
-import { Coins, Image, Download, CreditCard, ShieldCheck, FolderOpen, Wallet, Droplets, Zap, ExternalLink, Copy, LogOut, Skull } from "lucide-react";
+import { Coins, Image, Download, CreditCard, ShieldCheck, FolderOpen, Wallet, Droplets, Zap, ExternalLink, Copy, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Spinner } from "@/components/spinner";
 import type { LucideIcon } from "lucide-react";
@@ -14,7 +14,6 @@ const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/token", label: "Token", icon: Coins },
   { href: "/nft", label: "NFT", icon: Image },
   { href: "/multisig", label: "Multisig", icon: ShieldCheck },
-  { href: "/kill", label: "Kill", icon: Skull },
   { href: "/wallet/get", label: "Wallet", icon: Wallet },
 ];
 
