@@ -37,10 +37,6 @@ import {
 import { transferSol } from "@metaplex-foundation/mpl-toolbox";
 import { fromWeb3JsKeypair } from "@metaplex-foundation/umi-web3js-adapters";
 
-// Shared public Bubblegum tree for compressed NFTs
-// TODO: Create this tree and update the address
-const BUBBLEGUM_TREE = process.env.NEXT_PUBLIC_BUBBLEGUM_TREE || "";
-
 type MintType = "standard" | "compressed";
 
 export default function NftPage() {
@@ -137,46 +133,34 @@ export default function NftPage() {
         mintAddress = mint.publicKey.toString();
         signature = Buffer.from(txResult.signature).toString("base64");
       } else {
-        // Compressed NFT via Metaplex Bubblegum
-        if (!BUBBLEGUM_TREE) {
-          throw new Error("Compressed NFTs not yet available — tree not configured");
-        }
-
-        umi.use(mplBubblegum());
-        const merkleTree = publicKey(BUBBLEGUM_TREE);
-        const leafOwner = publicKey(address);
-
-        // Dynamic platform fee calculation
-        // Total price: 0.001 SOL
-        // Estimated rent: ~0.0002 SOL (tree update + tx fee)
-        // Platform fee: ~0.0008 SOL
-        const TOTAL_PRICE_SOL = 0.001;
-        const ESTIMATED_RENT_SOL = 0.0002;
-        const platformFee = sol(TOTAL_PRICE_SOL - ESTIMATED_RENT_SOL);
-
-        const txResult = await mintV1(umi, {
-          leafOwner,
-          merkleTree,
-          metadata: {
-            name,
-            symbol: "NFT",
-            uri: metadataUri,
-            sellerFeeBasisPoints: 0,
-            collection: none(),
-            creators: [
-              { address: publicKey(address), verified: false, share: 100 },
-            ],
-          },
-        })
-        .add(transferSol(umi, {
+        // Compressed NFT — Helius hosts the Bubblegum tree and pays mint cost.
+        // We still take a 0.001 SOL platform fee on-chain.
+        const platformFee = sol(0.001);
+        const feeTx = await transferSol(umi, {
           source: umi.identity,
           destination: FEE_VAULT,
           amount: platformFee,
-        }))
-        .sendAndConfirm(umi);
+        }).sendAndConfirm(umi);
+        const feeSig = Buffer.from(feeTx.signature).toString("base64");
 
-        assetId = "pending"; // Asset ID parsed from tx after finalization
-        signature = Buffer.from(txResult.signature).toString("base64");
+        const res = await fetch("/api/mint-nft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            compressed: true,
+            owner: address,
+            name,
+            symbol: "NFT",
+            uri: metadataUri,
+            description,
+            network,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || "Compressed mint failed");
+
+        assetId = data.assetId || "pending";
+        signature = data.signature || feeSig;
       }
 
       // Save to DB
@@ -374,7 +358,7 @@ export default function NftPage() {
 
                 <button
                   onClick={handleMint}
-                  disabled={!name || !imageFile || status === "uploading" || status === "minting" || (mintType === "compressed" && !BUBBLEGUM_TREE)}
+                  disabled={!name || !imageFile || status === "uploading" || status === "minting"}
                   className="w-full bg-green-500 hover:bg-green-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
                 >
                   {status === "uploading"
