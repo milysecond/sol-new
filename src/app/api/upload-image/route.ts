@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { notifyEvent } from "@/lib/notify";
 
 // Rate limit: stricter for uploads
 const recentIPs = new Map<string, number[]>();
@@ -51,8 +52,20 @@ export async function POST(req: NextRequest) {
     const base64 = Buffer.from(arrayBuffer).toString("base64");
     const dataUrl = `data:${file.type || "image/png"};base64,${base64}`;
 
+    notifyEvent({
+      kind: 'image_upload',
+      emoji: '📤',
+      title: 'Image uploaded',
+      fields: { type: file.type, sizeKb: Math.round(file.size / 1024), ipfs: ipfsUrl, ip },
+    });
     return NextResponse.json({ ipfs: ipfsUrl, preview: dataUrl });
   } catch (e) {
+    notifyEvent({
+      kind: 'image_upload_error',
+      emoji: '⚠️',
+      title: 'Image upload failed',
+      fields: { ip, error: String(e) },
+    });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

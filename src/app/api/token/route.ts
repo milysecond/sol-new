@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, saveToken, getWalletTokens } from "@/lib/db";
-import { notifyTokenLaunch } from "@/lib/notify";
+import { notifyTokenLaunch, notifyEvent } from "@/lib/notify";
 
 // Rate limit: simple in-memory tracker
 const recentIPs = new Map<string, number[]>();
@@ -49,10 +49,35 @@ export async function POST(req: NextRequest) {
       mintAddress: data.mintAddress,
     }).catch((err) => {
       console.error('[api/token] Notification failed:', err);
+      notifyEvent({
+        kind: 'token_launch_notify_error',
+        emoji: '⚠️',
+        title: 'Public-channel notify failed',
+        fields: { mint: data.mintAddress, error: String(err) },
+      });
+    });
+
+    notifyEvent({
+      kind: 'token_launch',
+      emoji: '🪙',
+      title: 'Token launched',
+      fields: {
+        name: data.name,
+        symbol: data.symbol,
+        mint: data.mintAddress,
+        wallet: data.wallet,
+        ip,
+      },
     });
 
     return NextResponse.json({ ok: true, id: Number(id) });
   } catch (e) {
+    notifyEvent({
+      kind: 'token_launch_error',
+      emoji: '⚠️',
+      title: 'Token save failed',
+      fields: { ip, error: String(e) },
+    });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

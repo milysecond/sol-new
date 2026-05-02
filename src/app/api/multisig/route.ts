@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, saveMultisig, getWalletMultisigs } from "@/lib/db";
+import { notifyEvent } from "@/lib/notify";
 
 // Rate limit
 const recentIPs = new Map<string, number[]>();
@@ -31,8 +32,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid wallet" }, { status: 400 });
     }
     const id = await saveMultisig(data);
+    notifyEvent({
+      kind: 'multisig_create',
+      emoji: '👥',
+      title: 'Multisig created',
+      fields: {
+        name: data.name,
+        wallet: data.wallet,
+        multisigPda: data.multisigPda,
+        vault: data.vault,
+        ip,
+      },
+    });
     return NextResponse.json({ ok: true, id: Number(id) });
   } catch (e) {
+    notifyEvent({
+      kind: 'multisig_create_error',
+      emoji: '⚠️',
+      title: 'Multisig save failed',
+      fields: { ip, error: String(e) },
+    });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
