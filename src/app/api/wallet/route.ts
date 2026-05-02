@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, saveWallet } from "@/lib/db";
+import { notifyEvent } from "@/lib/notify";
 
 // Rate limit: simple in-memory tracker (resets on deploy)
 const recentIPs = new Map<string, number[]>();
@@ -28,8 +29,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid publicKey" }, { status: 400 });
     }
     await saveWallet(publicKey, credentialId);
+    notifyEvent({
+      kind: 'wallet_register',
+      emoji: '🔐',
+      title: 'Wallet registered',
+      fields: { wallet: publicKey, credentialId, ip },
+    });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    notifyEvent({
+      kind: 'wallet_register_error',
+      emoji: '⚠️',
+      title: 'Wallet register failed',
+      fields: { ip, error: String(e) },
+    });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

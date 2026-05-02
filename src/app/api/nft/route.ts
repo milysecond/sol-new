@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, saveNft, getWalletNfts } from "@/lib/db";
+import { notifyEvent } from "@/lib/notify";
 
 // Rate limit
 const recentIPs = new Map<string, number[]>();
@@ -34,8 +35,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid name" }, { status: 400 });
     }
     const id = await saveNft(data);
+    notifyEvent({
+      kind: 'nft_register',
+      emoji: '🖼️',
+      title: 'NFT saved',
+      fields: { name: data.name, wallet: data.wallet, mint: data.mintAddress, ip },
+    });
     return NextResponse.json({ ok: true, id: Number(id) });
   } catch (e) {
+    notifyEvent({
+      kind: 'nft_register_error',
+      emoji: '⚠️',
+      title: 'NFT save failed',
+      fields: { ip, error: String(e) },
+    });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

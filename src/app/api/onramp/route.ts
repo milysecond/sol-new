@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { notifyEvent } from "@/lib/notify";
 
 const KEY_NAME = process.env.CDP_API_KEY_NAME!;
 const KEY_SECRET = process.env.CDP_API_KEY_SECRET!;
@@ -54,8 +55,21 @@ export async function GET(req: NextRequest) {
     const data = await res.json();
     if (!res.ok) return NextResponse.json({ error: data.message || JSON.stringify(data) }, { status: res.status });
 
+    notifyEvent({
+      kind: 'onramp_session',
+      emoji: '🪪',
+      title: 'Onramp session token issued',
+      fields: { address },
+    });
+
     return NextResponse.json({ ok: true, token: data.token });
   } catch (e) {
+    notifyEvent({
+      kind: 'onramp_session_error',
+      emoji: '⚠️',
+      title: 'Onramp session failed',
+      fields: { error: String(e) },
+    });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
@@ -111,6 +125,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: data.message || data.error || JSON.stringify(data) }, { status: res.status });
     }
 
+    notifyEvent({
+      kind: 'onramp_order',
+      emoji: '💳',
+      title: 'Coinbase onramp order',
+      fields: {
+        amount: orderBody.paymentAmount,
+        currency: orderBody.paymentCurrency,
+        destination: address,
+        orderId: data.orderId,
+        partnerUserRef,
+      },
+    });
+
     return NextResponse.json({
       ok: true,
       url: data.paymentLinkUrl,
@@ -118,6 +145,12 @@ export async function POST(req: NextRequest) {
     });
   } catch (e) {
     console.error("Onramp order error:", e);
+    notifyEvent({
+      kind: 'onramp_order_error',
+      emoji: '⚠️',
+      title: 'Coinbase onramp order failed',
+      fields: { error: String(e) },
+    });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

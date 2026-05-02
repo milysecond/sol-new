@@ -5,6 +5,7 @@ import {
   DynamicBondingCurveClient,
   deriveDbcPoolAddress,
 } from "@meteora-ag/dynamic-bonding-curve-sdk";
+import { notifyEvent } from "@/lib/notify";
 
 const WRAPPED_SOL = new PublicKey("So11111111111111111111111111111111111111112");
 
@@ -65,6 +66,13 @@ export async function POST(req: NextRequest) {
     // Serialize transaction for frontend to sign and send
     const serializedTx = tx.serialize({ requireAllSignatures: false }).toString('base64');
 
+    notifyEvent({
+      kind: 'dbc_pool_create',
+      emoji: '📈',
+      title: 'DBC pool created',
+      fields: { name, symbol, network, mint: mintAddress, pool: poolAddr, creator: creatorWallet },
+    });
+
     return NextResponse.json({
       ok: true,
       pool: poolAddr,
@@ -74,12 +82,18 @@ export async function POST(req: NextRequest) {
       blockhash,
       lastValidBlockHeight,
       meteoraUrl: `https://app.meteora.ag/pools/${poolAddr}`,
-      solscanUrl: network === "devnet" 
+      solscanUrl: network === "devnet"
         ? `https://orbmarkets.io/address/${mintAddress}?cluster=devnet&hideSpam=true`
         : `https://orbmarkets.io/address/${mintAddress}?hideSpam=true`,
     });
   } catch (e: any) {
     console.error("DBC pool creation error:", e);
+    notifyEvent({
+      kind: 'dbc_pool_create_error',
+      emoji: '⚠️',
+      title: 'DBC pool create failed',
+      fields: { error: e?.message || String(e) },
+    });
     return NextResponse.json(
       { error: e?.message || String(e), details: e?.logs || undefined },
       { status: 500 }

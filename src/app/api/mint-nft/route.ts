@@ -162,16 +162,34 @@ export async function POST(req: NextRequest) {
     if (compressed) {
       // Compressed NFTs are free via Helius
       const result = await mintCompressedNft(rpcUrl, owner, name, symbol || "NFT", uri, description || "");
+      notifyEvent({
+        kind: 'nft_mint',
+        emoji: '🌳',
+        title: 'Compressed NFT minted',
+        fields: { name, symbol, owner, network: network || 'devnet', assetId: result.assetId, signature: result.signature },
+      });
       return NextResponse.json({ ok: true, type: "compressed", ...result });
     } else {
       // Regular NFT — return unsigned tx for client to sign
       const conn = new Connection(rpcUrl);
       const ownerPk = new PublicKey(owner);
       const result = await buildRegularNftTx(conn, ownerPk, name, symbol || "NFT", uri);
+      notifyEvent({
+        kind: 'nft_mint_build',
+        emoji: '🖼️',
+        title: 'Regular NFT tx built',
+        fields: { name, symbol, owner, network: network || 'devnet' },
+      });
       return NextResponse.json({ ok: true, type: "regular", ...result });
     }
   } catch (e) {
     console.error("Mint error:", e);
+    notifyEvent({
+      kind: 'nft_mint_error',
+      emoji: '⚠️',
+      title: 'NFT mint failed',
+      fields: { error: String(e) },
+    });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

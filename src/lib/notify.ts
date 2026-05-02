@@ -1,6 +1,54 @@
 const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN;
 const TG_CHANNEL = "@soldotnew";
 
+const TG_LOG_BOT_TOKEN = process.env.TG_LOG_BOT_TOKEN;
+const TG_LOG_CHAT_ID = process.env.TG_LOG_CHAT_ID;
+
+const escHtml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+export type LogEvent = {
+  kind: string;
+  emoji?: string;
+  title?: string;
+  fields?: Record<string, string | number | undefined | null>;
+};
+
+export async function notifyEvent(evt: LogEvent): Promise<void> {
+  if (!TG_LOG_BOT_TOKEN || !TG_LOG_CHAT_ID) return;
+
+  const head = `${evt.emoji ?? '•'} <b>${escHtml(evt.title ?? evt.kind)}</b>`;
+  const lines: string[] = [head];
+  if (evt.fields) {
+    for (const [k, v] of Object.entries(evt.fields)) {
+      if (v === undefined || v === null || v === '') continue;
+      lines.push(`<b>${escHtml(k)}:</b> <code>${escHtml(String(v))}</code>`);
+    }
+  }
+
+  try {
+    const res = await fetch(
+      `https://api.telegram.org/bot${TG_LOG_BOT_TOKEN}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: TG_LOG_CHAT_ID,
+          text: lines.join('\n'),
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+        }),
+      }
+    );
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      console.warn('[notifyEvent] failed:', j.description || res.status);
+    }
+  } catch (err) {
+    console.warn('[notifyEvent] error:', err);
+  }
+}
+
 export async function notifyTokenLaunch(data: {
   name: string;
   symbol: string;

@@ -7,6 +7,7 @@ import {
   Transaction,
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
+import { notifyEvent } from "@/lib/notify";
 
 const DEVNET_RPC = "https://api.devnet.solana.com";
 const AIRDROP_AMOUNT = 0.1 * LAMPORTS_PER_SOL;
@@ -58,8 +59,21 @@ export async function POST(req: NextRequest) {
     const sig = await conn.sendTransaction(tx, [faucet]);
     await conn.confirmTransaction(sig);
 
+    notifyEvent({
+      kind: 'airdrop',
+      emoji: '💧',
+      title: 'Devnet airdrop sent',
+      fields: { recipient: address, amount: 0.1, signature: sig },
+    });
+
     return NextResponse.json({ ok: true, signature: sig, amount: 0.1 });
   } catch (e) {
+    notifyEvent({
+      kind: 'airdrop_error',
+      emoji: '⚠️',
+      title: 'Airdrop failed',
+      fields: { error: String(e) },
+    });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
