@@ -59,6 +59,7 @@ export default function NftPage() {
     type?: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { publicKey: walletPk, refreshBalance } = useWallet();
   const { network, rpc } = useNetwork();
@@ -277,11 +278,18 @@ export default function NftPage() {
                     const url = result.mint
                       ? `${explorerBase}/address/${result.mint}${clusterParam}`
                       : "";
+                    if (!url) return;
                     navigator.clipboard.writeText(url);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
                   }}
-                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition cursor-pointer"
+                  className="flex items-center justify-center gap-1.5 w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition cursor-pointer"
                 >
-                  Copy link to share
+                  {copied ? (
+                    <><Check className="w-4 h-4" /> Copied!</>
+                  ) : (
+                    "Copy link to share"
+                  )}
                 </button>
 
                 <button
