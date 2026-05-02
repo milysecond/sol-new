@@ -17,8 +17,17 @@ export async function GET(
   const ref = await getImageRef(id);
   if (!ref) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  return NextResponse.redirect(ref.url, {
-    status: 308,
-    headers: { "cache-control": "public, max-age=31536000, immutable" },
-  });
+  const upstream = await fetch(ref.url);
+  if (!upstream.ok || !upstream.body) {
+    return NextResponse.json({ error: "Upstream fetch failed" }, { status: 502 });
+  }
+
+  const headers = new Headers();
+  headers.set("content-type", ref.contentType);
+  headers.set("cache-control", "public, max-age=31536000, immutable");
+  headers.set("access-control-allow-origin", "*");
+  const len = upstream.headers.get("content-length");
+  if (len) headers.set("content-length", len);
+
+  return new NextResponse(upstream.body, { status: 200, headers });
 }
