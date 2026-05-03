@@ -6,7 +6,7 @@ const JUP = `https://lite-api.jup.ag/price/v3?ids=${SOL_MINT}`;
 const LAMPORT = 1 / 1_000_000_000;
 
 const ACTIONS = [
-  { id: "token_launch",     label: "Token launch (Meteora DBC)", sol: 0.03,    note: "rent ≈ 0.025 + platform ≈ 0.005" },
+  { id: "token_launch",     label: "Token launch (Meteora DBC)", sol: 0.03,    note: "real on-chain rent only — no platform fee" },
   { id: "nft_standard",     label: "NFT — Standard",             sol: 0.02,    note: "rent ≈ 0.015 + platform 0.005" },
   { id: "nft_compressed",   label: "NFT — Compressed",           sol: 0.001,   note: "platform fee only; Helius covers mint" },
   { id: "multisig_create",  label: "Multisig create (Squads)",   sol: 0.05,    note: "rent ≈ 0.04 + platform 0.01" },
