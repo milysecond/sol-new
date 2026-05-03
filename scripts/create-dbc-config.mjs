@@ -56,8 +56,10 @@ const RECIPE = {
   migratedPoolFeeBps: 100,
 };
 
+// sol.new Squads multisig (legacy / smart-account variant where the URL
+// address itself is the funded vault — verified by test transfer).
 const FEE_VAULT = new PublicKey(
-  process.env.FEE_VAULT || "nEWKinAMMZv3zyHKSaLLyWsw6JBdbpES8ktgRnf6Tzf"
+  process.env.FEE_VAULT || "Deqi6CBfo2FR2XVZXxSwmcjELy1JdbAXWDNFPzDAbtxW"
 );
 const NATIVE_SOL = new PublicKey("So11111111111111111111111111111111111111112");
 const RPC_URL =
@@ -94,7 +96,7 @@ const curveParams = buildCurveWithMarketCap({
     tokenQuoteDecimal: TokenDecimal.NINE,
     tokenUpdateAuthority: TokenUpdateAuthorityOption.Immutable,
     totalTokenSupply: RECIPE.totalTokenSupply,
-    leftover: 0,
+    leftover: 10_000, // rounding bucket per Meteora SDK reference tests
   },
   fee: {
     baseFeeParams: {
@@ -170,8 +172,8 @@ const configKey = Keypair.generate();
 
 const balance = await connection.getBalance(partnerKey.publicKey);
 console.log(`partner balance: ${(balance / 1e9).toFixed(4)} SOL`);
-if (balance < 2e9) {
-  console.error("✘ partner wallet needs ~2 SOL minimum to fund config creation");
+if (balance < 0.05e9) {
+  console.error("✘ partner wallet needs ~0.05 SOL minimum (config rent + tx fee)");
   process.exit(1);
 }
 

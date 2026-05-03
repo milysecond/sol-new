@@ -17,7 +17,7 @@ import { DynamicBondingCurveClient, deriveDbcPoolAddress } from "@meteora-ag/dyn
 import { analytics } from "@/lib/analytics";
 
 const WRAPPED_SOL = new PublicKey("So11111111111111111111111111111111111111112");
-const DBC_PARTNER_CONFIG = new PublicKey("ptrXeNGhf62Y8V3wF1Z8b1LDP9YGBw2QG3vJ5gsKdzV");
+const DBC_PARTNER_CONFIG = new PublicKey("8G4yr6Q7wHvpRBGj1u9ZisY9Q95HNAxBQknaqUNanpvA");
 
 export default function TokenPage() {
   const [name, setName] = useState("");
