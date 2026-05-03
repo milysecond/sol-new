@@ -7,6 +7,49 @@ const TG_LOG_CHAT_ID = process.env.TG_LOG_CHAT_ID;
 const escHtml = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+const flagFor = (cc?: string | null) => {
+  if (!cc || cc.length !== 2) return '';
+  const [a, b] = cc.toUpperCase();
+  return String.fromCodePoint(0x1f1e6 + a.charCodeAt(0) - 65, 0x1f1e6 + b.charCodeAt(0) - 65);
+};
+
+const isPrivateIp = (ip: string) =>
+  !ip ||
+  ip === 'unknown' ||
+  ip === '::1' ||
+  ip === '127.0.0.1' ||
+  ip.startsWith('10.') ||
+  ip.startsWith('192.168.') ||
+  /^172\.(1[6-9]|2[0-9]|3[01])\./.test(ip) ||
+  ip.startsWith('fc') ||
+  ip.startsWith('fd');
+
+export type Geo = { country?: string; city?: string; region?: string; flag?: string; line?: string };
+
+export async function geolocateIp(rawIp: string): Promise<Geo> {
+  const ip = (rawIp || '').split(',')[0].trim();
+  if (isPrivateIp(ip)) return {};
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 2500);
+    const res = await fetch(`https://ipapi.co/${encodeURIComponent(ip)}/json/`, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (!res.ok) return {};
+    const j: Record<string, unknown> = await res.json();
+    if (j.error) return {};
+    const country = (j.country_name as string) || (j.country as string) || undefined;
+    const city = (j.city as string) || undefined;
+    const region = (j.region as string) || undefined;
+    const cc = (j.country_code as string) || undefined;
+    const flag = flagFor(cc);
+    const parts = [city, region, country].filter(Boolean) as string[];
+    const line = parts.length ? `${flag ? flag + ' ' : ''}${parts.join(', ')}` : flag || '';
+    return { country, city, region, flag, line };
+  } catch {
+    return {};
+  }
+}
+
 export type LogEvent = {
   kind: string;
   emoji?: string;

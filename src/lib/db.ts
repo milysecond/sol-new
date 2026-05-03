@@ -138,11 +138,12 @@ export async function getWalletMultisigs(wallet: string) {
   return db.execute({ sql: "SELECT * FROM multisigs WHERE wallet = ? ORDER BY created_at DESC", args: [wallet] });
 }
 
-export async function saveWallet(publicKey: string, credentialId?: string) {
-  await db.execute({
+export async function saveWallet(publicKey: string, credentialId?: string): Promise<{ created: boolean }> {
+  const r = await db.execute({
     sql: "INSERT OR IGNORE INTO wallets (public_key, credential_id) VALUES (?, ?)",
     args: [publicKey, credentialId || null],
   });
+  return { created: r.rowsAffected > 0 };
 }
 
 export async function saveToken(data: {
