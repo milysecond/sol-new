@@ -26,7 +26,7 @@ export default function WalletMultisigPage() {
 
   useEffect(() => {
     if (!publicKey) return;
-    fetch(`/api/multisig/on-chain?wallet=${publicKey}`)
+    fetch(`/api/multisig/onchain?wallet=${publicKey}`)
       .then(r => r.json())
       .then(d => setMultisigs(d.multisigs || []))
       .catch(() => {})

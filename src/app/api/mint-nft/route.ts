@@ -16,6 +16,7 @@ import {
   getMintLen,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
+import { notifyEvent } from "@/lib/notify";
 
 const DEVNET_RPC = "https://devnet.helius-rpc.com/?api-key=" + process.env.HELIUS_API_KEY;
 const MAINNET_RPC = "https://mainnet.helius-rpc.com/?api-key=" + process.env.HELIUS_API_KEY;

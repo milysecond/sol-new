@@ -84,7 +84,7 @@ export default function TokenPage() {
         ...(tiktok && tiktok !== "https://tiktok.com/@" && { tiktok }),
       });
 
-      // Step 3: Create pool on-chain (client-side)
+      // Step 3: Create pool onchain (client-side)
       setStatus("creating");
       const connection = new Connection(rpc, "confirmed");
       const client = new DynamicBondingCurveClient(connection, "confirmed");
