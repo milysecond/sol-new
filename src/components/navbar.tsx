@@ -11,11 +11,11 @@ import { Spinner } from "@/components/spinner";
 import type { LucideIcon } from "lucide-react";
 
 const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/whats-new", label: "What's new", icon: Sparkles },
   { href: "/token", label: "Token", icon: Coins },
   { href: "/nft", label: "NFT", icon: Image },
   { href: "/multisig", label: "Multisig", icon: ShieldCheck },
   { href: "/wallet/get", label: "Wallet", icon: Wallet },
+  { href: "/whats-new", label: "What's new", icon: Sparkles },
 ];
 
 export function Navbar() {
