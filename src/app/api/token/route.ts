@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { initDb, saveToken, getWalletTokens } from "@/lib/db";
 import { notifyTokenLaunch, notifyEvent } from "@/lib/notify";
 
@@ -44,33 +45,40 @@ export async function POST(req: NextRequest) {
 
     const id = await saveToken(data);
 
-    notifyTokenLaunch({
-      name: data.name,
-      symbol: data.symbol,
-      description: data.description,
-      imageUrl: data.imageUrl,
-      mintAddress: data.mintAddress,
-    }).catch((err) => {
-      console.error('[api/token] Notification failed:', err);
-      notifyEvent({
-        kind: 'token_launch_notify_error',
-        emoji: '⚠️',
-        title: 'Public-channel notify failed',
-        fields: { mint: data.mintAddress, error: String(err) },
+    // Keep notifications running after the response is sent. Without after(),
+    // the Vercel function terminates as soon as we return — the Telegram
+    // fetches were getting killed mid-flight (see runtime logs: we'd see
+    // '[notify] Sending...' but never the success/error tail).
+    after(async () => {
+      try {
+        await notifyTokenLaunch({
+          name: data.name,
+          symbol: data.symbol,
+          description: data.description,
+          imageUrl: data.imageUrl,
+          mintAddress: data.mintAddress,
+        });
+      } catch (err) {
+        console.error('[api/token] Notification failed:', err);
+        await notifyEvent({
+          kind: 'token_launch_notify_error',
+          emoji: '⚠️',
+          title: 'Public-channel notify failed',
+          fields: { mint: data.mintAddress, error: String(err) },
+        });
+      }
+      await notifyEvent({
+        kind: 'token_launch',
+        emoji: '🪙',
+        title: 'Token launched',
+        fields: {
+          name: data.name,
+          symbol: data.symbol,
+          mint: data.mintAddress,
+          wallet: data.wallet,
+          ip,
+        },
       });
-    });
-
-    notifyEvent({
-      kind: 'token_launch',
-      emoji: '🪙',
-      title: 'Token launched',
-      fields: {
-        name: data.name,
-        symbol: data.symbol,
-        mint: data.mintAddress,
-        wallet: data.wallet,
-        ip,
-      },
     });
 
     return NextResponse.json({ ok: true, id: Number(id) });

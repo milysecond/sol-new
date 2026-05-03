@@ -62,12 +62,18 @@ const FEE_VAULT = new PublicKey(
   process.env.FEE_VAULT || "Deqi6CBfo2FR2XVZXxSwmcjELy1JdbAXWDNFPzDAbtxW"
 );
 const NATIVE_SOL = new PublicKey("So11111111111111111111111111111111111111112");
+// ─── parse args ──────────────────────────────────────────────────────────────
+const argv = process.argv.slice(2);
+const args = new Set(argv);
+const networkArg = (argv.find((a) => a.startsWith("--network=")) || "--network=mainnet").split("=")[1];
+const NETWORK = networkArg === "devnet" ? "devnet" : "mainnet";
+
 const RPC_URL =
   process.env.RPC_URL ||
-  `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
+  (NETWORK === "devnet"
+    ? `https://devnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
+    : `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`);
 
-// ─── parse args ──────────────────────────────────────────────────────────────
-const args = new Set(process.argv.slice(2));
 const DRY = args.has("--dry-run") || !args.has("--send");
 
 if (!process.env.PARTNER_PRIVATE_KEY) {
@@ -82,6 +88,7 @@ if (!process.env.HELIUS_API_KEY && !process.env.RPC_URL) {
 const partnerKey = Keypair.fromSecretKey(
   Uint8Array.from(JSON.parse(process.env.PARTNER_PRIVATE_KEY))
 );
+console.log("network       :", NETWORK);
 console.log("partner wallet:", partnerKey.publicKey.toBase58());
 console.log("fee vault     :", FEE_VAULT.toBase58());
 console.log("rpc           :", RPC_URL.replace(/api-key=[^&]+/, "api-key=***"));
