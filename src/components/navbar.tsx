@@ -5,12 +5,13 @@ import { usePathname } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { useState, useCallback } from "react";
-import { Coins, Image, Download, CreditCard, ShieldCheck, FolderOpen, Wallet, Droplets, Zap, ExternalLink, Copy, LogOut } from "lucide-react";
+import { Coins, Image, Download, CreditCard, ShieldCheck, FolderOpen, Wallet, Droplets, Zap, ExternalLink, Copy, LogOut, Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Spinner } from "@/components/spinner";
 import type { LucideIcon } from "lucide-react";
 
 const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/whats-new", label: "What's new", icon: Sparkles },
   { href: "/token", label: "Token", icon: Coins },
   { href: "/nft", label: "NFT", icon: Image },
   { href: "/multisig", label: "Multisig", icon: ShieldCheck },
@@ -38,11 +39,15 @@ export function Navbar() {
             className="cursor-pointer"
             title={`Switch to ${network === "mainnet" ? "devnet" : "mainnet"}`}
           >
-            {network === "devnet" ? (
-              <span className="text-[10px] font-medium text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-md px-1.5 py-0.5">test mode</span>
-            ) : (
-              <span className="text-[10px] font-medium text-green-600 dark:text-green-400 bg-green-500/10 border border-green-500/20 rounded-md px-1.5 py-0.5">live</span>
-            )}
+            <span
+              className={`inline-flex items-center justify-center w-12 text-[10px] font-medium border rounded-md px-1.5 py-0.5 transition-colors ${
+                network === "devnet"
+                  ? "text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 border-yellow-500/20"
+                  : "text-green-600 dark:text-green-400 bg-green-500/10 border-green-500/20"
+              }`}
+            >
+              {network === "devnet" ? "test" : "live"}
+            </span>
           </button>
           <div className="hidden sm:flex items-center gap-1">
             {NAV_ITEMS.map((item) => (

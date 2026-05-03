@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
           description: data.description,
           imageUrl: data.imageUrl,
           mintAddress: data.mintAddress,
+          network: data.network,
         });
       } catch (err) {
         console.error('[api/token] Notification failed:', err);
@@ -69,13 +70,14 @@ export async function POST(req: NextRequest) {
       }
       await notifyEvent({
         kind: 'token_launch',
-        emoji: '🪙',
-        title: 'Token launched',
+        emoji: data.network === 'devnet' ? '🟡' : '🟢',
+        title: `Token launched (${data.network === 'devnet' ? 'test' : 'live'})`,
         fields: {
           name: data.name,
           symbol: data.symbol,
           mint: data.mintAddress,
           wallet: data.wallet,
+          network: data.network,
           ip,
         },
       });
