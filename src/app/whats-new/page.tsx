@@ -22,9 +22,11 @@ type Token = {
 type Filter = "all" | "mainnet" | "devnet";
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "mainnet", label: "Mainnet" },
-  { id: "devnet", label: "Devnet" },
+  { id: "mainnet", label: "Live" },
+  { id: "devnet", label: "Test" },
 ];
+
+const NETWORK_LABEL: Record<string, string> = { mainnet: "live", devnet: "test" };
 
 type Resp = {
   tokens: Token[];
@@ -123,7 +125,7 @@ export default function WhatsNewPage() {
                         ? "bg-green-500/10 text-green-500"
                         : "bg-yellow-500/10 text-yellow-500"
                     }`}>
-                      {tokens[0].network}
+                      {NETWORK_LABEL[tokens[0].network] ?? tokens[0].network}
                     </span>
                   )}
                 </div>
@@ -160,7 +162,7 @@ export default function WhatsNewPage() {
                           ? "bg-green-500/10 text-green-500"
                           : "bg-yellow-500/10 text-yellow-500"
                       }`}>
-                        {t.network}
+                        {NETWORK_LABEL[t.network] ?? t.network}
                       </span>
                     )}
                   </div>
