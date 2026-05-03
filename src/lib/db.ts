@@ -222,6 +222,23 @@ export async function getTokenByMint(mintAddress: string) {
   return result.rows[0] || null;
 }
 
+export async function getRecentTokens(limit: number, offset: number) {
+  const r = await db.execute({
+    sql: `SELECT id, wallet, name, symbol, description, image_url, metadata_uri, mint_address, created_at
+          FROM tokens
+          WHERE mint_address IS NOT NULL
+          ORDER BY created_at DESC
+          LIMIT ? OFFSET ?`,
+    args: [limit, offset],
+  });
+  return r.rows;
+}
+
+export async function countTokens() {
+  const r = await db.execute("SELECT COUNT(*) as count FROM tokens WHERE mint_address IS NOT NULL");
+  return Number(r.rows[0].count);
+}
+
 export async function getStats() {
   const [wallets, tokens, nfts] = await Promise.all([
     db.execute("SELECT COUNT(*) as count FROM wallets"),
