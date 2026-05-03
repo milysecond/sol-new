@@ -58,7 +58,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const key = publicKey || localStorage.getItem("sol.new.wallet");
     if (!key) return;
     try {
-      const conn = new Connection(rpc);
+      // 'confirmed' is much faster than the default 'finalized' (~12s lag)
+      // and is enough certainty for a UI balance after a confirmed tx.
+      const conn = new Connection(rpc, "confirmed");
       const bal = await conn.getBalance(new PublicKey(key));
       setBalance(bal / LAMPORTS_PER_SOL);
     } catch {

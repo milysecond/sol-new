@@ -195,7 +195,7 @@ export default function NftPage() {
 
       setResult({ imageUrl: displayUrl, metadataUri, mint: mintAddress, assetId, signature, type: mintType });
       setStatus("done");
-      refreshBalance();
+      await refreshBalance();
     } catch (e: any) {
       setError(e instanceof Error ? e.message : "Mint failed");
       setStatus("error");
