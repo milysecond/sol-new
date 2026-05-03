@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Copy, Check, ArrowRight, Sparkles } from 'lucide-react';
+import { Copy, Check, ArrowRight, Sparkles, Pencil } from 'lucide-react';
 import { Navbar } from '@/components/navbar';
 import { Spinner } from '@/components/spinner';
+import { useWallet } from '@/lib/wallet-context';
 import Link from 'next/link';
 
 interface TokenData {
@@ -35,6 +36,7 @@ function ShareCopyButton({ text, icon }: { text: string; icon: 'tiktok' | 'insta
 
 export default function LaunchPage() {
   const { mint } = useParams<{ mint: string }>();
+  const { publicKey } = useWallet();
   const [token, setToken] = useState<TokenData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -171,6 +173,16 @@ export default function LaunchPage() {
               )}
             </button>
           </div>
+
+          {publicKey && publicKey === token.wallet && (
+            <Link
+              href={`/token/${token.mint_address}/edit`}
+              className="flex items-center justify-center gap-2 w-full bg-orange-500/10 hover:bg-orange-500/15 border border-orange-400/30 text-orange-500 dark:text-orange-400 rounded-xl px-4 py-2.5 transition cursor-pointer"
+            >
+              <Pencil className="w-4 h-4" />
+              <span className="text-sm font-medium">Edit metadata</span>
+            </Link>
+          )}
 
           {/* Share links */}
           {(() => {

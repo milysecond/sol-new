@@ -107,6 +107,14 @@ export async function getMetadata(id: string) {
   return (r.rows[0]?.json as string) || null;
 }
 
+export async function updateMetadata(id: string, json: string) {
+  const r = await db.execute({
+    sql: "UPDATE metadata SET json = ? WHERE id = ?",
+    args: [json, id],
+  });
+  return r.rowsAffected > 0;
+}
+
 export async function saveImageRef(id: string, url: string, contentType: string, sizeBytes: number, wallet?: string | null) {
   await db.execute({
     sql: "INSERT INTO images (id, url, content_type, size_bytes, wallet) VALUES (?, ?, ?, ?, ?)",
