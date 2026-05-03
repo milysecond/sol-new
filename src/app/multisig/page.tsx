@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageTransition } from "@/components/page-transition";
 import { Navbar } from "@/components/navbar";
@@ -227,13 +228,12 @@ export default function MultisigPage() {
                     </div>
                   </div>
 
-                  <a
-                    href={`https://app.squads.so/squads/${result.vault}/home`}
-                    target="_blank"
+                  <Link
+                    href={`/multisig/${result.multisigPda}`}
                     className="w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-400 text-white font-semibold rounded-xl px-4 py-3 transition"
                   >
-                    <ExternalLink className="w-4 h-4" /> Open in Squads
-                  </a>
+                    <ShieldCheck className="w-4 h-4" /> View this multisig
+                  </Link>
                 </div>
 
                 <button
