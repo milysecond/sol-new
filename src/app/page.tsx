@@ -6,7 +6,7 @@ import { PageTransition } from "@/components/page-transition";
 import { Navbar } from "@/components/navbar";
 import { useWallet } from "@/lib/wallet-context";
 import { FaucetFooter } from "@/components/faucet-footer";
-import { Coins, Image, Wallet, ShieldCheck, ArrowRight } from "lucide-react";
+import { Coins, Image, Wallet, ShieldCheck, ArrowRight, Sparkles } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
 import { WelcomeProvider, useWelcome } from "@/components/welcome-message";
@@ -110,17 +110,23 @@ function Stats() {
       .catch(() => {});
   }, []);
 
-  if (!stats) return null;
-
-  const total = stats.wallets + stats.tokens + stats.nfts;
-
   return (
-    <div className="flex items-center justify-center gap-2 text-xs text-gray-400 dark:text-white/40">
-      <ShieldCheck className="w-3.5 h-3.5 text-green-500" />
+    <Link
+      href="/whats-new"
+      className="group flex items-center justify-center gap-2 text-xs text-gray-400 dark:text-white/40 hover:text-orange-400 dark:hover:text-orange-400 transition"
+    >
+      <Sparkles className="w-3.5 h-3.5 text-orange-400" />
       <span>
-        <span className="font-semibold text-gray-600 dark:text-white/60">{total.toLocaleString()}</span> created on sol.new
+        {stats ? (
+          <>
+            <span className="font-semibold text-gray-600 dark:text-white/60 group-hover:text-orange-400 transition">{(stats.wallets + stats.tokens + stats.nfts).toLocaleString()}</span> created on sol.new
+          </>
+        ) : (
+          <>See what's new</>
+        )}
       </span>
-    </div>
+      <ArrowRight className="w-3.5 h-3.5 opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-0 transition-all" />
+    </Link>
   );
 }
 
