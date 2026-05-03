@@ -36,7 +36,34 @@ type MultisigView = {
   configAuthority: string;
   timeLock: number;
   rentCollector: string | null;
+  foundOnNetwork: "mainnet" | "devnet";
 };
+
+const PUBLIC_RPC: Record<"mainnet" | "devnet", string> = {
+  mainnet: "https://api.mainnet-beta.solana.com",
+  devnet: "https://api.devnet.solana.com",
+};
+
+async function tryLoadMultisig(
+  rpcUrl: string,
+  networkName: "mainnet" | "devnet",
+  multisigPda: PublicKey
+) {
+  const conn = new Connection(rpcUrl, "confirmed");
+  const info = await conn.getAccountInfo(multisigPda);
+  if (!info) return { ok: false as const, reason: "missing" as const, networkName };
+  if (!info.owner.equals(multisig.PROGRAM_ID)) {
+    return {
+      ok: false as const,
+      reason: "wrong-owner" as const,
+      owner: info.owner.toBase58(),
+      networkName,
+    };
+  }
+  const ms = await multisig.accounts.Multisig.fromAccountAddress(conn, multisigPda);
+  const [vaultPda] = multisig.getVaultPda({ multisigPda, index: 0 });
+  return { ok: true as const, ms, vaultPda, networkName };
+}
 
 const PERM_FLAGS: { mask: number; label: string }[] = [
   { mask: 1, label: "Initiate" },
@@ -92,26 +119,37 @@ export default function MultisigDetailPage() {
           throw new Error("Invalid Solana address");
         }
 
-        const connection = new Connection(rpc, "confirmed");
-
-        // Pre-check: is this account on this network? Is it owned by Squads v4?
-        const info = await connection.getAccountInfo(multisigPda);
-        if (!info) {
-          throw new Error(`No account at this address on ${network}. Try toggling the network or check the address.`);
+        // Try the active network first; if not there, fall back to the other
+        // network. Multisigs created on devnet won't appear under mainnet RPC
+        // and vice-versa, and the user shouldn't have to guess.
+        const otherNetwork = network === "mainnet" ? "devnet" : "mainnet";
+        const primary = await tryLoadMultisig(rpc, network, multisigPda);
+        let result = primary;
+        if (!primary.ok && primary.reason === "missing") {
+          const fallback = await tryLoadMultisig(PUBLIC_RPC[otherNetwork], otherNetwork, multisigPda);
+          if (fallback.ok) result = fallback;
         }
-        if (!info.owner.equals(multisig.PROGRAM_ID)) {
-          const ownerStr = info.owner.toBase58();
-          if (ownerStr === "11111111111111111111111111111111") {
-            throw new Error("This is a Squads v3 / legacy 'Smart Account' (SystemProgram-owned), not a v4 multisig. Open it in app.squads.so to view.");
-          }
-          throw new Error(`Owned by ${ownerStr.slice(0, 6)}…${ownerStr.slice(-4)}, not the Squads v4 program. Not a v4 multisig.`);
-        }
-
-        const ms = await multisig.accounts.Multisig.fromAccountAddress(connection, multisigPda);
-        const [vaultPda] = multisig.getVaultPda({ multisigPda, index: 0 });
 
         if (cancelled) return;
 
+        if (!result.ok) {
+          if (result.reason === "missing") {
+            throw new Error(
+              `No account at this address on mainnet or devnet. Check the address.`
+            );
+          }
+          // wrong-owner
+          if (result.owner === "11111111111111111111111111111111") {
+            throw new Error(
+              "This is a Squads v3 / legacy 'Smart Account' (SystemProgram-owned), not a v4 multisig. Open it in app.squads.so to view."
+            );
+          }
+          throw new Error(
+            `Owned by ${result.owner!.slice(0, 6)}…${result.owner!.slice(-4)}, not the Squads v4 program. Not a v4 multisig.`
+          );
+        }
+
+        const { ms, vaultPda, networkName } = result;
         setView({
           address: multisigPda.toBase58(),
           vault: vaultPda.toBase58(),
@@ -125,6 +163,7 @@ export default function MultisigDetailPage() {
           configAuthority: ms.configAuthority.toBase58(),
           timeLock: ms.timeLock,
           rentCollector: ms.rentCollector ? ms.rentCollector.toBase58() : null,
+          foundOnNetwork: networkName,
         });
       } catch (e: unknown) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load multisig");
@@ -136,11 +175,13 @@ export default function MultisigDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [params.address, rpc]);
+  }, [params.address, rpc, network]);
 
-  const cluster = network === "devnet" ? "?cluster=devnet" : "";
+  const networkOfRecord = view?.foundOnNetwork ?? network;
+  const cluster = networkOfRecord === "devnet" ? "?cluster=devnet" : "";
   const explorer = (a: string) => `https://solscan.io/account/${a}${cluster}`;
   const isMember = view?.members.some((m) => publicKey && m.key === publicKey);
+  const networkMismatch = view && view.foundOnNetwork !== network;
 
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
@@ -178,6 +219,11 @@ export default function MultisigDetailPage() {
 
             {!loading && view && (
               <>
+                {networkMismatch && (
+                  <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-sm text-yellow-600 dark:text-yellow-400">
+                    This multisig lives on <b>{view.foundOnNetwork}</b>. You're currently on <b>{network}</b>. Toggle the network pill in the navbar to interact with it.
+                  </div>
+                )}
                 <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] px-5 py-5 space-y-3">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl bg-fuchsia-500/15 flex items-center justify-center shrink-0">
