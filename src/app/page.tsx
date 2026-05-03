@@ -209,11 +209,11 @@ export default function Home() {
           {/* Footer row */}
           <div className="flex items-center justify-center gap-4">
             <div className="flex items-center gap-4 text-[11px] text-gray-400 dark:text-white/30">
-              <span>Passkey-secured</span>
+              <span>Zero installs</span>
               <span className="w-1 h-1 rounded-full bg-black/20 dark:bg-white/20" />
-              <span>Low fees</span>
+              <span>Zero friction</span>
               <span className="w-1 h-1 rounded-full bg-black/20 dark:bg-white/20" />
-              <span>Instant</span>
+              <span>Zero wait time</span>
             </div>
           </div>
 

@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ mint: str
         openGraph: {
           title,
           description,
-          url: `https://sol.new/launch/${mint}`,
+          url: `https://sol.new/token/${mint}`,
           siteName: "sol.new",
           type: "website",
         },

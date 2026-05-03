@@ -41,7 +41,7 @@ export default function WalletTokenPage() {
       ) : (
         <div className="space-y-2">
           {tokens.map((token) => (
-            <a key={token.id} href={token.mint_address ? `/launch/${token.mint_address}` : undefined} className="flex items-center gap-3 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl px-3 py-2.5 hover:border-fuchsia-400/30 transition cursor-pointer">
+            <a key={token.id} href={token.mint_address ? `/token/${token.mint_address}` : undefined} className="flex items-center gap-3 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl px-3 py-2.5 hover:border-fuchsia-400/30 transition cursor-pointer">
               {token.image_url ? (
                 <img src={fastIpfsUrl(token.image_url) || ""} alt={token.name} className="w-9 h-9 rounded-lg object-cover shrink-0" />
               ) : (

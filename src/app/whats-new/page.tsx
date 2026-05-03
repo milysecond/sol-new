@@ -101,7 +101,7 @@ export default function WhatsNewPage() {
         )}
         {!loading && data && tokens[0] && page === 1 && (
           <Link
-            href={`/launch/${tokens[0].mint_address}`}
+            href={`/token/${tokens[0].mint_address}`}
             className="block rounded-2xl border border-orange-400/30 bg-orange-500/5 hover:bg-orange-500/10 transition px-5 py-5"
           >
             <div className="flex items-center gap-4">
@@ -157,7 +157,7 @@ export default function WhatsNewPage() {
             tokens.slice(page === 1 ? 1 : 0).map((t) => (
               <Link
                 key={t.id}
-                href={`/launch/${t.mint_address}`}
+                href={`/token/${t.mint_address}`}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition"
               >
                 {t.image_url ? (
