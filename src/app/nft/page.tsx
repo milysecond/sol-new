@@ -134,7 +134,7 @@ export default function NftPage() {
         signature = Buffer.from(txResult.signature).toString("base64");
       } else {
         // Compressed NFT — Helius hosts the Bubblegum tree and pays mint cost.
-        // We still take a 0.001 SOL platform fee on-chain.
+        // We still take a 0.001 SOL platform fee onchain.
         const platformFee = sol(0.001);
         const feeTx = await transferSol(umi, {
           source: umi.identity,
@@ -344,10 +344,8 @@ export default function NftPage() {
                 </div>
                 <p className="text-xs text-gray-400 dark:text-white/30 text-center">
                   {mintType === "standard"
-                    ? "Standard — full on-chain metadata"
-                    : BUBBLEGUM_TREE
-                    ? "Compressed — cheaper, great for collections"
-                    : "Compressed NFTs coming soon — tree setup in progress"}
+                    ? "Standard — full onchain metadata"
+                    : "Compressed — cheaper, great for collections"}
                 </p>
 
                 {error && (
@@ -364,7 +362,7 @@ export default function NftPage() {
                   {status === "uploading"
                     ? <><Spinner size={16} className="inline mr-2" />Uploading...</>
                     : status === "minting"
-                    ? <><Spinner size={16} className="inline mr-2" />Minting on-chain...</>
+                    ? <><Spinner size={16} className="inline mr-2" />Minting onchain...</>
                     : `Mint ${mintType} NFT`}
                 </button>
                 <p className="text-center text-xs text-gray-400 dark:text-white/30">{mintType === "standard" ? "0.02 SOL" : "0.001 SOL"}</p>

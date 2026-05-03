@@ -1,7 +1,7 @@
 import { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const routes = ["", "/token", "/nft", "/wallet", "/pay", "/multisig", "/portfolio"];
+  const routes = ["", "/token", "/nft", "/wallet", "/pay", "/multisig", "/portfolio", "/docs"];
   return routes.map((route) => ({
     url: `https://sol.new${route}`,
     lastModified: new Date(),
