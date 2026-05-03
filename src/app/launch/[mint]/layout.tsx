@@ -9,13 +9,13 @@ export async function generateMetadata({ params }: { params: Promise<{ mint: str
     const res = await fetch(`${API_BASE}/api/token/${mint}`, { next: { revalidate: 60 } });
     if (res.ok) {
       const token = await res.json();
-      const title = `${token.name} ($${token.symbol}) — launched on sol.new`;
-      const description = token.description
-        ? `${token.description.slice(0, 140)} — Created on sol.new, the fastest way to launch tokens on Solana.`
-        : `${token.name} ($${token.symbol}) token launched on sol.new. Create your own token on Solana in seconds.`;
-      const image = token.image_url?.startsWith("ipfs://")
-        ? token.image_url.replace("ipfs://", "https://nftstorage.link/ipfs/")
-        : token.image_url;
+      // Title: target 50–60 chars
+      const title = `${token.name} ($${token.symbol}) just launched on sol.new — Solana memecoin`;
+      // Description: target 110–160 chars
+      const baseDesc = token.description ? `${token.description.slice(0, 80)} — ` : "";
+      const description = `${baseDesc}${token.name} ($${token.symbol}) launched instantly on sol.new, the passkey-secured Solana token launchpad with 1% fees.`.slice(0, 160);
+
+      // OG image is auto-discovered from the colocated opengraph-image.tsx (1200×630).
 
       return {
         title,
@@ -25,13 +25,12 @@ export async function generateMetadata({ params }: { params: Promise<{ mint: str
           description,
           url: `https://sol.new/launch/${mint}`,
           siteName: "sol.new",
-          ...(image ? { images: [{ url: image, width: 512, height: 512, alt: token.name }] } : {}),
+          type: "website",
         },
         twitter: {
-          card: "summary",
+          card: "summary_large_image",
           title,
           description,
-          ...(image ? { images: [image] } : {}),
           creator: "@soldotnew",
         },
       };
