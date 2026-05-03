@@ -48,10 +48,9 @@ export default function WalletMultisigPage() {
         <div className="space-y-2">
           <p className="text-xs text-gray-400 dark:text-white/30">{multisigs.length} multisig{multisigs.length !== 1 ? "s" : ""} found</p>
           {multisigs.map((ms) => (
-            <a
+            <Link
               key={ms.address}
-              href={`https://app.squads.so/squads/${ms.vault}/home`}
-              target="_blank"
+              href={`/multisig/${ms.address}`}
               className="flex items-center gap-3 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl px-3 py-2.5 hover:border-fuchsia-400/30 transition cursor-pointer"
             >
               <div className="w-9 h-9 rounded-lg bg-fuchsia-500/20 flex items-center justify-center shrink-0">
@@ -65,7 +64,7 @@ export default function WalletMultisigPage() {
                 <p className="text-fuchsia-400/50 text-[10px] font-mono truncate">{ms.vault}</p>
               </div>
               <ExternalLink className="w-4 h-4 text-gray-300 dark:text-white/20 shrink-0" />
-            </a>
+            </Link>
           ))}
         </div>
       )}
