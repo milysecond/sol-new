@@ -6,6 +6,24 @@ export const contentType = "image/png";
 
 const API_BASE = process.env.NEXT_PUBLIC_BASE_URL || "https://sol.new";
 
+const FONT_CDN = "https://cdn.jsdelivr.net/npm";
+const FONTS = {
+  interRegular:    `${FONT_CDN}/@fontsource/inter@5.0.16/files/inter-latin-400-normal.woff`,
+  interBold:       `${FONT_CDN}/@fontsource/inter@5.0.16/files/inter-latin-700-normal.woff`,
+  interExtraBold:  `${FONT_CDN}/@fontsource/inter@5.0.16/files/inter-latin-800-normal.woff`,
+  mono:            `${FONT_CDN}/@fontsource/jetbrains-mono@5.0.18/files/jetbrains-mono-latin-500-normal.woff`,
+};
+
+async function fetchFont(url: string): Promise<ArrayBuffer | null> {
+  try {
+    const res = await fetch(url, { cache: "force-cache" });
+    if (!res.ok) return null;
+    return await res.arrayBuffer();
+  } catch {
+    return null;
+  }
+}
+
 async function fetchImageDataUrl(url: string | null): Promise<string | null> {
   if (!url) return null;
   let target = url;
@@ -40,8 +58,6 @@ function timeAgo(dateStr: string | null): string {
   return `${Math.floor(diff / 2_592_000)}mo ago`;
 }
 
-const shortMint = (m: string) => (m.length > 12 ? `${m.slice(0, 6)}…${m.slice(-6)}` : m);
-
 export default async function OpengraphImage({ params }: { params: Promise<{ mint: string }> }) {
   const { mint } = await params;
 
@@ -61,10 +77,21 @@ export default async function OpengraphImage({ params }: { params: Promise<{ min
     }
   } catch {}
 
-  const [imageDataUrl, logoDataUrl] = await Promise.all([
+  const [imageDataUrl, logoDataUrl, interReg, interBold, interExtra, mono] = await Promise.all([
     fetchImageDataUrl(rawImage),
     fetchImageDataUrl(`${API_BASE}/icon-512.png`),
+    fetchFont(FONTS.interRegular),
+    fetchFont(FONTS.interBold),
+    fetchFont(FONTS.interExtraBold),
+    fetchFont(FONTS.mono),
   ]);
+
+  const fontList = [
+    interReg && { name: "Inter", data: interReg, weight: 400 as const, style: "normal" as const },
+    interBold && { name: "Inter", data: interBold, weight: 700 as const, style: "normal" as const },
+    interExtra && { name: "Inter", data: interExtra, weight: 800 as const, style: "normal" as const },
+    mono && { name: "JetBrainsMono", data: mono, weight: 500 as const, style: "normal" as const },
+  ].filter(Boolean) as Array<{ name: string; data: ArrayBuffer; weight: 400 | 700 | 800 | 500; style: "normal" }>;
 
   return new ImageResponse(
     (
@@ -77,7 +104,7 @@ export default async function OpengraphImage({ params }: { params: Promise<{ min
           background:
             "linear-gradient(135deg, #0a0a14 0%, #1a0b2e 50%, #2a0e1f 100%)",
           color: "white",
-          fontFamily: "Inter, system-ui, sans-serif",
+          fontFamily: "Inter",
           padding: "48px",
           position: "relative",
         }}
@@ -242,17 +269,19 @@ export default async function OpengraphImage({ params }: { params: Promise<{ min
               style={{
                 display: "flex",
                 marginTop: "20px",
-                padding: "8px 16px",
-                borderRadius: "10px",
+                padding: "10px 18px",
+                borderRadius: "12px",
                 background: "rgba(255,255,255,0.05)",
                 border: "1px solid rgba(255,255,255,0.08)",
-                fontSize: "22px",
-                fontFamily: "monospace",
-                color: "rgba(255,255,255,0.7)",
+                fontSize: "18px",
+                fontFamily: "JetBrainsMono",
+                fontWeight: 500,
+                color: "rgba(255,255,255,0.75)",
                 alignSelf: "flex-start",
+                letterSpacing: "-0.01em",
               }}
             >
-              {shortMint(mint)}
+              {mint}
             </div>
           </div>
         </div>
@@ -293,6 +322,6 @@ export default async function OpengraphImage({ params }: { params: Promise<{ min
         </div>
       </div>
     ),
-    { ...size }
+    { ...size, fonts: fontList }
   );
 }
