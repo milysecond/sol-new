@@ -669,7 +669,7 @@ export default function MultisigDetailPage() {
                     {(["config", "balance"] as const).map((tab) => {
                       const count = proposals[tab].length;
                       const Icon = tab === "config" ? Settings : WalletIcon;
-                      const label = tab === "config" ? "Config" : "Balance";
+                      const label = tab === "config" ? "Config" : "Ledger";
                       const active = activeTab === tab;
                       return (
                         <button
@@ -708,7 +708,7 @@ export default function MultisigDetailPage() {
                       <div className="px-5 py-8 text-center"><Spinner size={18} className="text-fuchsia-400" /></div>
                     ) : proposals[activeTab].length === 0 ? (
                       <div className="px-5 py-8 text-center text-sm text-gray-400 dark:text-white/30">
-                        {activeTab === "config" ? "No config transactions yet" : "No vault transactions yet"}
+                        {activeTab === "config" ? "No config transactions yet" : "No ledger entries yet"}
                       </div>
                     ) : (
                       proposals[activeTab].map((p) => {
