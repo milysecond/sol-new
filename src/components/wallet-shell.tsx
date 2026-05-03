@@ -6,6 +6,7 @@ import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
+import { Spinner } from "@/components/spinner";
 import { useState } from "react";
 import { FaucetFooter } from "@/components/faucet-footer";
 
@@ -48,8 +49,13 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
                   <Wallet size={20} className="text-fuchsia-400" />
                 </div>
                 <div className="min-w-0">
-                  {balance !== null && (
+                  {balance !== null ? (
                     <p className="text-fuchsia-500 dark:text-fuchsia-400 font-mono font-bold text-lg leading-tight">{balance.toFixed(4)} SOL</p>
+                  ) : (
+                    <p className="text-fuchsia-500 dark:text-fuchsia-400 font-mono font-bold text-lg leading-tight flex items-center gap-2">
+                      <Spinner size={16} className="text-fuchsia-400" />
+                      <span className="text-sm font-normal opacity-60">fetching…</span>
+                    </p>
                   )}
                   <p className="text-gray-400 dark:text-white/40 text-xs font-mono truncate">
                     {publicKey?.slice(0, 6)}...{publicKey?.slice(-4)}
