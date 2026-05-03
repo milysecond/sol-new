@@ -50,20 +50,26 @@ export function Navbar() {
             </span>
           </button>
           <div className="hidden sm:flex items-center gap-1">
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`px-3 py-1.5 rounded-lg text-sm transition ${
-                  pathname === item.href || (item.href.startsWith("/wallet") && pathname.startsWith("/wallet"))
-                    ? "bg-black/10 dark:bg-white/10 text-gray-900 dark:text-white"
-                    : "text-gray-500 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/70 hover:bg-black/5 dark:hover:bg-white/5"
-                }`}
-              >
-                <item.icon size={16} className="inline mr-1.5" />
-                {item.label}
-              </Link>
-            ))}
+            {NAV_ITEMS.map((item) => {
+              const active = pathname === item.href || (item.href.startsWith("/wallet") && pathname.startsWith("/wallet"));
+              const isWhatsNew = item.href === "/whats-new";
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`px-3 py-1.5 rounded-lg text-sm transition ${
+                    active
+                      ? "bg-black/10 dark:bg-white/10 text-gray-900 dark:text-white"
+                      : isWhatsNew
+                      ? "text-orange-500 dark:text-orange-400 hover:bg-orange-500/10 animate-[whatsnew-glow_3s_ease-in-out_infinite]"
+                      : "text-gray-500 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/70 hover:bg-black/5 dark:hover:bg-white/5"
+                  }`}
+                >
+                  <item.icon size={16} className="inline mr-1.5" />
+                  {item.label}
+                </Link>
+              );
+            })}
           </div>
         </div>
 
@@ -82,10 +88,14 @@ export function Navbar() {
                 className="flex items-center gap-1.5 sm:gap-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-2 sm:px-3 py-2 text-xs sm:text-sm hover:border-purple-400/30 transition cursor-pointer"
               >
                 <Wallet size={14} className="text-purple-400 sm:hidden" />
-                {balance !== null && (
+                {balance !== null ? (
                   <span className="text-purple-400 font-mono">
                     {balance.toFixed(balance < 1 ? 3 : 2)}
                     <span className="hidden sm:inline"> SOL</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center text-purple-400">
+                    <Spinner size={12} className="text-purple-400" />
                   </span>
                 )}
                 <span className="text-gray-600 dark:text-white/60 font-mono">{shortKey}</span>
@@ -98,8 +108,12 @@ export function Navbar() {
                     <div className="px-4 py-3 border-b border-black/10 dark:border-white/10">
                       <p className="text-xs text-gray-500 dark:text-white/40">Wallet</p>
                       <p className="text-xs font-mono text-gray-600 dark:text-white/60 break-all mt-1">{publicKey}</p>
-                      {balance !== null && (
+                      {balance !== null ? (
                         <p className="text-sm font-mono text-purple-400 mt-2">{balance.toFixed(4)} SOL</p>
+                      ) : (
+                        <p className="text-sm font-mono text-purple-400 mt-2 flex items-center gap-1.5">
+                          <Spinner size={12} className="text-purple-400" /> fetching…
+                        </p>
                       )}
                     </div>
                     <Link

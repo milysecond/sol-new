@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { PageTransition } from "@/components/page-transition";
 import { Navbar } from "@/components/navbar";
 import { useWallet } from "@/lib/wallet-context";
+import { useNetwork } from "@/lib/network";
 import { FaucetFooter } from "@/components/faucet-footer";
 import { Coins, Image, Wallet, ShieldCheck, ArrowRight, Sparkles } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
@@ -101,18 +102,23 @@ function GetStarted({ connect, loading }: { connect: (username?: string) => Prom
 }
 
 function WhatsNewBanner() {
+  const { network } = useNetwork();
   const [latest, setLatest] = useState<{ name: string; symbol: string; mint_address: string; image_url: string | null; created_at: string } | null>(null);
   const [total, setTotal] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch("/api/tokens/recent?limit=1")
+    setLatest(null);
+    setTotal(null);
+    fetch(`/api/tokens/recent?limit=1&network=${network}`)
       .then((r) => r.json())
       .then((d) => {
         setLatest(d?.tokens?.[0] ?? null);
         setTotal(typeof d?.total === "number" ? d.total : null);
       })
       .catch(() => {});
-  }, []);
+  }, [network]);
+
+  const networkLabel = network === "devnet" ? "test" : "live";
 
   return (
     <Link
@@ -137,7 +143,7 @@ function WhatsNewBanner() {
         <div className="flex items-baseline gap-2">
           <span className="text-[10px] uppercase tracking-wider text-orange-400 font-semibold">What's new</span>
           {total != null && (
-            <span className="text-[10px] text-gray-400 dark:text-white/40">{total.toLocaleString()} launched</span>
+            <span className="text-[10px] text-gray-400 dark:text-white/40">{total.toLocaleString()} {networkLabel} launched</span>
           )}
         </div>
         <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
