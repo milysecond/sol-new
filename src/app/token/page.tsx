@@ -139,27 +139,29 @@ export default function TokenPage() {
       const mintAddress = mintKeypair.publicKey.toBase58();
       const poolAddr = poolAddress.toBase58();
 
-      // Save to DB
-      fetch("/api/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          wallet: address,
-          name,
-          symbol: ticker,
-          supply,
-          description,
-          imageUrl,
-          metadataUri: metadata.uri,
-          mintAddress,
-          network,
-        }),
-      }).catch(() => {});
+      // Save to DB — await so /launch/{mint} doesn't 404 from a race
+      try {
+        await fetch("/api/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            wallet: address,
+            name,
+            symbol: ticker,
+            supply,
+            description,
+            imageUrl,
+            metadataUri: metadata.uri,
+            mintAddress,
+            network,
+          }),
+        });
+      } catch {
+        // Save is best-effort; on-chain success is the source of truth
+      }
 
-      // Update balance and redirect
       refreshBalance();
 
-      // Track token creation
       analytics.tokenCreated(mintAddress, ticker);
       analytics.launchInitiated(mintAddress, 'meteora-dbc');
       router.push(`/launch/${mintAddress}`);
