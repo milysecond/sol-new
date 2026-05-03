@@ -152,6 +152,7 @@ export default function TokenPage() {
           imageUrl,
           metadataUri: metadata.uri,
           mintAddress,
+          network,
         }),
       }).catch(() => {});
 

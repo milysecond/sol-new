@@ -38,6 +38,9 @@ export async function POST(req: NextRequest) {
     if (typeof data.symbol !== "string" || data.symbol.length > 20) {
       return NextResponse.json({ error: "Invalid symbol" }, { status: 400 });
     }
+    if (data.network && data.network !== "mainnet" && data.network !== "devnet") {
+      return NextResponse.json({ error: "Invalid network" }, { status: 400 });
+    }
 
     const id = await saveToken(data);
 

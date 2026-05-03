@@ -100,32 +100,57 @@ function GetStarted({ connect, loading }: { connect: (username?: string) => Prom
   );
 }
 
-function Stats() {
-  const [stats, setStats] = useState<{ wallets: number; tokens: number; nfts: number } | null>(null);
+function WhatsNewBanner() {
+  const [latest, setLatest] = useState<{ name: string; symbol: string; mint_address: string; image_url: string | null; created_at: string } | null>(null);
+  const [total, setTotal] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch("/api/stats")
+    fetch("/api/tokens/recent?limit=1")
       .then((r) => r.json())
-      .then((d) => setStats(d))
+      .then((d) => {
+        setLatest(d?.tokens?.[0] ?? null);
+        setTotal(typeof d?.total === "number" ? d.total : null);
+      })
       .catch(() => {});
   }, []);
 
   return (
     <Link
       href="/whats-new"
-      className="group flex items-center justify-center gap-2 text-xs text-gray-400 dark:text-white/40 hover:text-orange-400 dark:hover:text-orange-400 transition"
+      className="group flex items-center gap-3 px-4 py-3 rounded-2xl border border-orange-400/30 bg-gradient-to-r from-orange-500/10 to-amber-500/10 hover:from-orange-500/15 hover:to-amber-500/15 transition-all duration-150 active:scale-[0.99]"
     >
-      <Sparkles className="w-3.5 h-3.5 text-orange-400" />
-      <span>
-        {stats ? (
-          <>
-            <span className="font-semibold text-gray-600 dark:text-white/60 group-hover:text-orange-400 transition">{(stats.wallets + stats.tokens + stats.nfts).toLocaleString()}</span> created on sol.new
-          </>
+      <div className="relative shrink-0">
+        {latest?.image_url ? (
+          <img
+            src={latest.image_url}
+            alt=""
+            className="w-11 h-11 rounded-lg object-cover ring-1 ring-orange-400/40"
+          />
         ) : (
-          <>See what's new</>
+          <div className="w-11 h-11 rounded-lg bg-orange-500/10 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-orange-400" />
+          </div>
         )}
-      </span>
-      <ArrowRight className="w-3.5 h-3.5 opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-0 transition-all" />
+        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-orange-400 ring-2 ring-white dark:ring-black animate-pulse" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[10px] uppercase tracking-wider text-orange-400 font-semibold">What's new</span>
+          {total != null && (
+            <span className="text-[10px] text-gray-400 dark:text-white/40">{total.toLocaleString()} launched</span>
+          )}
+        </div>
+        <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+          {latest ? (
+            <>
+              {latest.name} <span className="text-gray-400 dark:text-white/40 font-mono text-xs">${latest.symbol}</span>
+            </>
+          ) : (
+            "See recent launches"
+          )}
+        </div>
+      </div>
+      <ArrowRight className="w-4 h-4 text-orange-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
     </Link>
   );
 }
@@ -178,8 +203,8 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Stats row */}
-          <Stats />
+          {/* What's new banner */}
+          <WhatsNewBanner />
 
           {/* Footer row */}
           <div className="flex items-center justify-center gap-4">

@@ -11,11 +11,13 @@ export async function GET(req: NextRequest) {
     const limitRaw = parseInt(searchParams.get("limit") || String(DEFAULT_LIMIT), 10) || DEFAULT_LIMIT;
     const limit = Math.min(Math.max(1, limitRaw), MAX_LIMIT);
     const offset = (page - 1) * limit;
+    const networkParam = searchParams.get("network");
+    const network = networkParam === "mainnet" || networkParam === "devnet" ? networkParam : null;
 
     await initDb();
     const [tokens, total] = await Promise.all([
-      getRecentTokens(limit, offset),
-      countTokens(),
+      getRecentTokens(limit, offset, network),
+      countTokens(network),
     ]);
 
     const totalPages = Math.max(1, Math.ceil(total / limit));

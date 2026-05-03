@@ -32,6 +32,7 @@ export async function initDb() {
       image_url TEXT,
       metadata_uri TEXT,
       mint_address TEXT,
+      network TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (wallet) REFERENCES wallets(public_key)
     )`,
@@ -72,6 +73,12 @@ export async function initDb() {
       created_at TEXT DEFAULT (datetime('now'))
     )`,
   ]);
+  // Idempotent migration for the network column on existing deployments
+  try {
+    await db.execute("ALTER TABLE tokens ADD COLUMN network TEXT");
+  } catch {
+    // column already exists
+  }
 }
 
 export async function saveMetadata(id: string, json: string, wallet?: string | null) {
@@ -144,11 +151,12 @@ export async function saveToken(data: {
   imageUrl?: string;
   metadataUri?: string;
   mintAddress?: string;
+  network?: string;
 }) {
   const result = await db.execute({
-    sql: `INSERT INTO tokens (wallet, name, symbol, supply, description, image_url, metadata_uri, mint_address)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [data.wallet, data.name, data.symbol, data.supply || null, data.description || null, data.imageUrl || null, data.metadataUri || null, data.mintAddress || null],
+    sql: `INSERT INTO tokens (wallet, name, symbol, supply, description, image_url, metadata_uri, mint_address, network)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [data.wallet, data.name, data.symbol, data.supply || null, data.description || null, data.imageUrl || null, data.metadataUri || null, data.mintAddress || null, data.network || null],
   });
   return result.lastInsertRowid;
 }
@@ -222,20 +230,36 @@ export async function getTokenByMint(mintAddress: string) {
   return result.rows[0] || null;
 }
 
-export async function getRecentTokens(limit: number, offset: number) {
+export async function getRecentTokens(limit: number, offset: number, network?: string | null) {
+  const where = ["mint_address IS NOT NULL"];
+  const args: (string | number)[] = [];
+  if (network === "mainnet" || network === "devnet") {
+    where.push("network = ?");
+    args.push(network);
+  }
+  args.push(limit, offset);
   const r = await db.execute({
-    sql: `SELECT id, wallet, name, symbol, description, image_url, metadata_uri, mint_address, created_at
+    sql: `SELECT id, wallet, name, symbol, description, image_url, metadata_uri, mint_address, network, created_at
           FROM tokens
-          WHERE mint_address IS NOT NULL
+          WHERE ${where.join(" AND ")}
           ORDER BY created_at DESC
           LIMIT ? OFFSET ?`,
-    args: [limit, offset],
+    args,
   });
   return r.rows;
 }
 
-export async function countTokens() {
-  const r = await db.execute("SELECT COUNT(*) as count FROM tokens WHERE mint_address IS NOT NULL");
+export async function countTokens(network?: string | null) {
+  const where = ["mint_address IS NOT NULL"];
+  const args: string[] = [];
+  if (network === "mainnet" || network === "devnet") {
+    where.push("network = ?");
+    args.push(network);
+  }
+  const r = await db.execute({
+    sql: `SELECT COUNT(*) as count FROM tokens WHERE ${where.join(" AND ")}`,
+    args,
+  });
   return Number(r.rows[0].count);
 }
 

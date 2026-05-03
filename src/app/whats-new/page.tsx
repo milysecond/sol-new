@@ -15,8 +15,16 @@ type Token = {
   image_url: string | null;
   metadata_uri: string | null;
   mint_address: string;
+  network: "mainnet" | "devnet" | null;
   created_at: string;
 };
+
+type Filter = "all" | "mainnet" | "devnet";
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "mainnet", label: "Mainnet" },
+  { id: "devnet", label: "Devnet" },
+];
 
 type Resp = {
   tokens: Token[];
@@ -33,20 +41,24 @@ const short = (s: string) => `${s.slice(0, 4)}…${s.slice(-4)}`;
 
 export default function WhatsNewPage() {
   const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState<Filter>("all");
   const [data, setData] = useState<Resp | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async (p: number) => {
+  const load = useCallback(async (p: number, f: Filter) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/tokens/recent?page=${p}&limit=${LIMIT}`, { cache: "no-store" });
+      const qs = new URLSearchParams({ page: String(p), limit: String(LIMIT) });
+      if (f !== "all") qs.set("network", f);
+      const res = await fetch(`/api/tokens/recent?${qs}`, { cache: "no-store" });
       if (res.ok) setData(await res.json());
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { load(page); }, [page, load]);
+  useEffect(() => { load(page, filter); }, [page, filter, load]);
+  useEffect(() => { setPage(1); }, [filter]);
 
   const tokens = data?.tokens ?? [];
   const totalPages = data?.totalPages ?? 1;
@@ -66,6 +78,23 @@ export default function WhatsNewPage() {
           </p>
         </header>
 
+        <div className="flex items-center gap-2 text-xs">
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFilter(f.id)}
+              className={`px-3 py-1.5 rounded-full border transition cursor-pointer ${
+                filter === f.id
+                  ? "bg-orange-500/15 border-orange-400/40 text-orange-400"
+                  : "bg-black/[0.03] dark:bg-white/[0.03] border-black/10 dark:border-white/10 text-gray-500 dark:text-white/40 hover:text-gray-900 dark:hover:text-white"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
         {data && tokens[0] && page === 1 && (
           <Link
             href={`/launch/${tokens[0].mint_address}`}
@@ -84,8 +113,19 @@ export default function WhatsNewPage() {
                 <div className="font-semibold text-lg truncate">
                   {tokens[0].name} <span className="text-gray-400 dark:text-white/40 font-mono text-sm">${tokens[0].symbol}</span>
                 </div>
-                <div className="text-xs text-gray-500 dark:text-white/40 font-mono mt-0.5">
-                  {short(tokens[0].mint_address)} · {timeAgo(tokens[0].created_at)}
+                <div className="text-xs text-gray-500 dark:text-white/40 font-mono mt-0.5 flex items-center gap-2">
+                  <span>{short(tokens[0].mint_address)}</span>
+                  <span>·</span>
+                  <span>{timeAgo(tokens[0].created_at)}</span>
+                  {tokens[0].network && (
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider not-italic ${
+                      tokens[0].network === "mainnet"
+                        ? "bg-green-500/10 text-green-500"
+                        : "bg-yellow-500/10 text-yellow-500"
+                    }`}>
+                      {tokens[0].network}
+                    </span>
+                  )}
                 </div>
               </div>
               <ExternalLink className="w-4 h-4 text-orange-400/60 shrink-0" />
@@ -114,6 +154,15 @@ export default function WhatsNewPage() {
                   <div className="flex items-baseline gap-2">
                     <span className="font-medium truncate">{t.name}</span>
                     <span className="text-xs font-mono text-gray-400 dark:text-white/40 shrink-0">${t.symbol}</span>
+                    {t.network && (
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider shrink-0 ${
+                        t.network === "mainnet"
+                          ? "bg-green-500/10 text-green-500"
+                          : "bg-yellow-500/10 text-yellow-500"
+                      }`}>
+                        {t.network}
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-gray-400 dark:text-white/30 font-mono truncate">
                     {short(t.mint_address)} · by {short(t.wallet)}
