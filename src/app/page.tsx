@@ -44,7 +44,15 @@ function isTelegramWebView() {
   return ua.includes("TelegramBot") || ua.includes("Telegram") || !!(window as any).TelegramWebviewProxy || !!(window as any).Telegram?.WebApp;
 }
 
-function GetStarted({ connect, loading }: { connect: (username?: string) => Promise<void>; loading: boolean }) {
+function GetStarted({
+  connect,
+  recover,
+  loading,
+}: {
+  connect: (username?: string) => Promise<void>;
+  recover: () => Promise<void>;
+  loading: boolean;
+}) {
   const [label, setLabel] = useState("");
   const [showInput, setShowInput] = useState(false);
   const [isTg, setIsTg] = useState(false);
@@ -84,7 +92,7 @@ function GetStarted({ connect, loading }: { connect: (username?: string) => Prom
     <div className="mt-3 flex flex-col items-center gap-2 w-full max-w-xs mx-auto">
       <input
         type="text"
-        placeholder="Name your wallet (e.g. My Wallet)"
+        placeholder="Name your new wallet (e.g. My Wallet)"
         value={label}
         onChange={(e) => setLabel(e.target.value)}
         autoFocus
@@ -95,7 +103,24 @@ function GetStarted({ connect, loading }: { connect: (username?: string) => Prom
         disabled={loading || !label.trim()}
         className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:cursor-not-allowed"
       >
-        {loading ? <><Spinner size={16} className="inline mr-2" />Authenticating...</> : "Create wallet"}
+        {loading ? (
+          <><Spinner size={16} className="inline mr-2" />Authenticating...</>
+        ) : (
+          "Create new wallet"
+        )}
+      </button>
+      <p className="text-[11px] text-gray-500 dark:text-white/40 text-center px-1">
+        This creates a <b>brand-new</b> wallet via passkey.
+        <br />
+        If you already have a sol.new wallet with a balance, recover it instead.
+      </p>
+      <button
+        type="button"
+        onClick={() => recover()}
+        disabled={loading}
+        className="w-full mt-1 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white text-sm rounded-xl px-4 py-2.5 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        Recover existing wallet
       </button>
     </div>
   );
@@ -169,7 +194,7 @@ const products: { href: string; icon: LucideIcon; title: string; desc: string; c
 ];
 
 export default function Home() {
-  const { publicKey, connect, loading } = useWallet();
+  const { publicKey, connect, recover, loading } = useWallet();
   const [showSplash, setShowSplash] = useState(() => {
     if (typeof window === "undefined") return false;
     return !sessionStorage.getItem("sol.new.splashed");
@@ -190,7 +215,7 @@ export default function Home() {
               Create anything on Solana. Instant and low fees.
             </p>
             {!publicKey && (
-              <GetStarted connect={connect} loading={loading} />
+              <GetStarted connect={connect} recover={recover} loading={loading} />
             )}
           </div>
 
