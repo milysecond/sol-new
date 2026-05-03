@@ -87,7 +87,19 @@ export default function WhatsNewPage() {
           </div>
         </header>
 
-        {data && tokens[0] && page === 1 && (
+        {loading && page === 1 && (
+          <div className="rounded-2xl border border-orange-400/20 bg-orange-500/5 px-5 py-5 animate-pulse">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl bg-orange-400/15" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-24 rounded bg-orange-400/20" />
+                <div className="h-5 w-2/3 rounded bg-orange-400/15" />
+                <div className="h-3 w-1/2 rounded bg-orange-400/10" />
+              </div>
+            </div>
+          </div>
+        )}
+        {!loading && data && tokens[0] && page === 1 && (
           <Link
             href={`/launch/${tokens[0].mint_address}`}
             className="block rounded-2xl border border-orange-400/30 bg-orange-500/5 hover:bg-orange-500/10 transition px-5 py-5"
@@ -126,8 +138,19 @@ export default function WhatsNewPage() {
         )}
 
         <div className="rounded-2xl border border-black/10 dark:border-white/10 divide-y divide-black/5 dark:divide-white/5 overflow-hidden">
-          {loading && !data ? (
-            <div className="px-5 py-8 text-center text-sm text-gray-400 dark:text-white/30">Loading…</div>
+          {loading ? (
+            <>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3 animate-pulse">
+                  <div className="w-10 h-10 rounded-lg bg-black/5 dark:bg-white/10 shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3 w-1/3 rounded bg-black/5 dark:bg-white/10" />
+                    <div className="h-2.5 w-2/3 rounded bg-black/5 dark:bg-white/5" />
+                  </div>
+                  <div className="h-2.5 w-12 rounded bg-black/5 dark:bg-white/5 shrink-0" />
+                </div>
+              ))}
+            </>
           ) : tokens.length === 0 ? (
             <div className="px-5 py-8 text-center text-sm text-gray-400 dark:text-white/30">No tokens yet.</div>
           ) : (

@@ -98,6 +98,7 @@ export async function notifyTokenLaunch(data: {
   description?: string | null;
   imageUrl?: string | null;
   mintAddress: string;
+  network?: string | null;
 }) {
   if (!TG_BOT_TOKEN) {
     console.error('[notify] TG_BOT_TOKEN not configured - skipping notification');
@@ -112,8 +113,11 @@ export async function notifyTokenLaunch(data: {
 
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+  const networkTag =
+    data.network === 'devnet' ? '🟡 <b>TEST</b> · ' : data.network === 'mainnet' ? '🟢 <b>LIVE</b> · ' : '';
+
   const lines = [
-    `<b>${esc(data.name)}</b> ($${esc(data.symbol)}) just launched on sol.new`,
+    `${networkTag}<b>${esc(data.name)}</b> ($${esc(data.symbol)}) just launched on sol.new`,
   ];
   if (data.description) {
     lines.push('', esc(data.description));
