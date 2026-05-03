@@ -17,7 +17,10 @@ import { DynamicBondingCurveClient, deriveDbcPoolAddress } from "@meteora-ag/dyn
 import { analytics } from "@/lib/analytics";
 
 const WRAPPED_SOL = new PublicKey("So11111111111111111111111111111111111111112");
-const DBC_PARTNER_CONFIG = new PublicKey("8G4yr6Q7wHvpRBGj1u9ZisY9Q95HNAxBQknaqUNanpvA");
+const DBC_PARTNER_CONFIG_MAINNET = new PublicKey("8G4yr6Q7wHvpRBGj1u9ZisY9Q95HNAxBQknaqUNanpvA");
+const DBC_PARTNER_CONFIG_DEVNET = new PublicKey("QfakkckSG6L7hkuxiDQRWF7AW26MmrxBqgvMMmMzc3H");
+const dbcPartnerConfig = (network: string) =>
+  network === "devnet" ? DBC_PARTNER_CONFIG_DEVNET : DBC_PARTNER_CONFIG_MAINNET;
 
 export default function TokenPage() {
   const [name, setName] = useState("");
@@ -106,7 +109,7 @@ export default function TokenPage() {
       
       // Build pool creation transaction
       const tx: Transaction = await client.pool.createPool({
-        config: DBC_PARTNER_CONFIG,
+        config: dbcPartnerConfig(network),
         baseMint: mintKeypair.publicKey,
         name,
         symbol: ticker,
@@ -135,7 +138,7 @@ export default function TokenPage() {
       }, "confirmed");
 
       // Derive pool address
-      const poolAddress = deriveDbcPoolAddress(WRAPPED_SOL, mintKeypair.publicKey, DBC_PARTNER_CONFIG);
+      const poolAddress = deriveDbcPoolAddress(WRAPPED_SOL, mintKeypair.publicKey, dbcPartnerConfig(network));
       const mintAddress = mintKeypair.publicKey.toBase58();
       const poolAddr = poolAddress.toBase58();
 
