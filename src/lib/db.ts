@@ -79,6 +79,9 @@ export async function initDb() {
   } catch {
     // column already exists
   }
+  // Backfill historical rows to mainnet (the only network the app ran on
+  // before the column was added). Idempotent — only touches NULL.
+  await db.execute("UPDATE tokens SET network = 'mainnet' WHERE network IS NULL");
 }
 
 export async function saveMetadata(id: string, json: string, wallet?: string | null) {
