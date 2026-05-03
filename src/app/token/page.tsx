@@ -170,7 +170,7 @@ export default function TokenPage() {
         // Save is best-effort; on-chain success is the source of truth
       }
 
-      refreshBalance();
+      await refreshBalance();
 
       analytics.tokenCreated(mintAddress, ticker);
       analytics.launchInitiated(mintAddress, 'meteora-dbc');

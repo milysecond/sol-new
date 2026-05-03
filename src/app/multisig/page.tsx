@@ -140,7 +140,7 @@ export default function MultisigPage() {
       // Derive vault
       const [vaultPda] = multisig.getVaultPda({ multisigPda, index: 0 });
 
-      refreshBalance();
+      await refreshBalance();
       const resultData = {
         multisigPda: multisigPda.toBase58(),
         vault: vaultPda.toBase58(),
