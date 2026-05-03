@@ -18,7 +18,10 @@ import {
   ArrowLeft,
   Users,
   KeyRound,
+  UserPlus,
+  X,
 } from "lucide-react";
+import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 
 type MemberView = {
   key: string;
@@ -102,6 +105,14 @@ export default function MultisigDetailPage() {
   const [view, setView] = useState<MultisigView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // Add-member modal
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [newMemberAddr, setNewMemberAddr] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -173,7 +184,81 @@ export default function MultisigDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [params.address, rpc, network]);
+  }, [params.address, rpc, network, refreshTick]);
+
+  const handleAddMember = async () => {
+    if (!view) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    setSubmitSuccess(null);
+    try {
+      let newMemberPk: PublicKey;
+      try {
+        newMemberPk = new PublicKey(newMemberAddr.trim());
+      } catch {
+        throw new Error("Invalid Solana address");
+      }
+      if (view.members.some((m) => m.key === newMemberPk.toBase58())) {
+        throw new Error("This wallet is already a member");
+      }
+
+      // Use the network the multisig actually lives on, not the navbar toggle
+      const targetNet = view.foundOnNetwork;
+      const targetRpc = targetNet === network ? rpc : PUBLIC_RPC[targetNet];
+      const conn = new Connection(targetRpc, "confirmed");
+
+      const { keypair } = await getPasskeyKeypair();
+      const multisigPda = new PublicKey(view.address);
+      const txIndex = BigInt(view.transactionIndex) + BigInt(1);
+
+      // Step 1: create the config transaction (proposes the AddMember action)
+      await multisig.rpc.configTransactionCreate({
+        connection: conn,
+        feePayer: keypair,
+        creator: keypair.publicKey,
+        multisigPda,
+        transactionIndex: txIndex,
+        actions: [
+          {
+            __kind: "AddMember",
+            newMember: { key: newMemberPk, permissions: { mask: 7 } },
+          },
+        ],
+      });
+
+      // Step 2: turn it into a real proposal so members can vote
+      await multisig.rpc.proposalCreate({
+        connection: conn,
+        feePayer: keypair,
+        creator: keypair,
+        multisigPda,
+        transactionIndex: txIndex,
+      });
+
+      // Step 3: register the creator's approval (no point creating without
+      // your own vote, and saves the creator a separate signing step)
+      await multisig.rpc.proposalApprove({
+        connection: conn,
+        feePayer: keypair,
+        member: keypair,
+        multisigPda,
+        transactionIndex: txIndex,
+      });
+
+      const remaining = Math.max(0, view.threshold - 1);
+      setSubmitSuccess(
+        remaining === 0
+          ? `Proposal submitted and threshold reached. Anyone can now execute.`
+          : `Proposal submitted with your approval. ${remaining} more approval${remaining === 1 ? "" : "s"} needed.`
+      );
+      setNewMemberAddr("");
+      setRefreshTick((n) => n + 1);
+    } catch (e: unknown) {
+      setSubmitError(e instanceof Error ? e.message : "Failed to submit");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const networkOfRecord = view?.foundOnNetwork ?? network;
   const cluster = networkOfRecord === "devnet" ? "?cluster=devnet" : "";
@@ -278,9 +363,23 @@ export default function MultisigDetailPage() {
                     <span className="text-xs uppercase tracking-wider text-gray-500 dark:text-white/40 font-medium">
                       Members
                     </span>
-                    <span className="text-xs text-gray-500 dark:text-white/40">
-                      {view.members.length} · need {view.threshold} to approve
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-500 dark:text-white/40">
+                        {view.members.length} · need {view.threshold} to approve
+                      </span>
+                      {isMember && (
+                        <button
+                          onClick={() => {
+                            setShowAddMember(true);
+                            setSubmitError(null);
+                            setSubmitSuccess(null);
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-fuchsia-500 hover:bg-fuchsia-400 text-white text-xs font-semibold transition cursor-pointer"
+                        >
+                          <UserPlus className="w-3.5 h-3.5" /> Add
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="divide-y divide-black/5 dark:divide-white/5">
                     {view.members.map((m) => (
@@ -336,6 +435,73 @@ export default function MultisigDetailPage() {
           </div>
         </PageTransition>
       </main>
+
+      {showAddMember && view && (
+        <div
+          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
+          onClick={() => !submitting && setShowAddMember(false)}
+        >
+          <div
+            className="w-full sm:max-w-md bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 dark:border-white/10">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-fuchsia-400" />
+                Add a member
+              </h2>
+              <button
+                type="button"
+                onClick={() => !submitting && setShowAddMember(false)}
+                aria-label="Close"
+                className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-5 py-5 space-y-4 text-sm text-gray-700 dark:text-white/70">
+              <p>
+                This proposes adding a new wallet to the multisig. <b>{view.threshold} of {view.members.length}</b> members
+                must approve before it executes — your approval is registered automatically.
+              </p>
+              <input
+                type="text"
+                placeholder="New member wallet address"
+                value={newMemberAddr}
+                onChange={(e) => setNewMemberAddr(e.target.value)}
+                disabled={submitting}
+                className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 font-mono text-xs focus:outline-none focus:border-fuchsia-400/50 focus:ring-1 focus:ring-fuchsia-400/25 transition"
+              />
+              {submitError && (
+                <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-xs text-red-400">
+                  {submitError}
+                </div>
+              )}
+              {submitSuccess && (
+                <div className="rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-2 text-xs text-green-500">
+                  {submitSuccess}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleAddMember}
+                disabled={submitting || !newMemberAddr.trim()}
+                className="w-full bg-fuchsia-500 hover:bg-fuchsia-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {submitting ? (
+                  <><Spinner size={16} className="text-white" /> Submitting…</>
+                ) : (
+                  <>Submit proposal</>
+                )}
+              </button>
+              <p className="text-[11px] text-gray-400 dark:text-white/30 text-center">
+                Three small txs: create the proposal, register it, and record your vote.
+                Costs ~0.005 SOL in account rent + tx fees.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
