@@ -125,6 +125,7 @@ export default function EditTokenMetadataPage() {
   const [token, setToken] = useState<TokenView | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [metaWarning, setMetaWarning] = useState<string | null>(null);
 
   const [name, setName] = useState("");
   const [ticker, setTicker] = useState("");
@@ -160,36 +161,54 @@ export default function EditTokenMetadataPage() {
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
+    setMetaWarning(null);
     (async () => {
+      // Step 1: token row (required) — failure here blocks the form
+      let tok: TokenView;
       try {
         const tokRes = await fetch(`/api/token/${params.mint}`);
         if (!tokRes.ok) throw new Error("Token not found");
-        const tok = (await tokRes.json()) as TokenView;
-        if (cancelled) return;
-        setToken(tok);
-        setName(tok.name || "");
-        setTicker(tok.symbol || "");
+        tok = (await tokRes.json()) as TokenView;
+      } catch (e: unknown) {
+        if (!cancelled) {
+          setLoadError(e instanceof Error ? e.message : "Failed to load token");
+          setLoading(false);
+        }
+        return;
+      }
+      if (cancelled) return;
+      setToken(tok);
+      setName(tok.name || "");
+      setTicker(tok.symbol || "");
+      if (tok.image_url) setImageUrl(tok.image_url);
+
+      // Step 2: metadata JSON (best-effort) — surface as a non-blocking warning
+      try {
         if (!tok.metadata_uri) {
-          throw new Error("This token's metadata isn't hosted on sol.new");
+          throw new Error("Metadata isn't hosted on sol.new for this token");
         }
         const metaRes = await fetch(tok.metadata_uri, { cache: "no-store" });
-        if (metaRes.ok) {
-          const m = (await metaRes.json()) as MetaJson;
-          if (cancelled) return;
-          setDescription(m.description || "");
-          setImageUrl(m.image || tok.image_url || null);
-          const next = new Set<SocialKey>();
-          for (const def of SOCIAL_DEFS) {
-            const v = m[def.key];
-            if (typeof v === "string" && v.length > 0) {
-              next.add(def.key);
-              socialState[def.key][1](v);
-            }
+        if (!metaRes.ok) throw new Error(`Couldn't load existing metadata (HTTP ${metaRes.status})`);
+        const m = (await metaRes.json()) as MetaJson;
+        if (cancelled) return;
+        setDescription(m.description || "");
+        setImageUrl(m.image || tok.image_url || null);
+        const next = new Set<SocialKey>();
+        for (const def of SOCIAL_DEFS) {
+          const v = m[def.key];
+          if (typeof v === "string" && v.length > 0) {
+            next.add(def.key);
+            socialState[def.key][1](v);
           }
-          setActiveSocials(next);
         }
+        setActiveSocials(next);
       } catch (e: unknown) {
-        if (!cancelled) setLoadError(e instanceof Error ? e.message : "Failed to load");
+        if (!cancelled) {
+          setMetaWarning(
+            (e instanceof Error ? e.message : "Couldn't load existing metadata") +
+              " — you can still save new values."
+          );
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -295,15 +314,35 @@ export default function EditTokenMetadataPage() {
                 <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400">{loadError}</div>
               )}
 
-              {!loading && token && (
+              {!loading && token && !isCreator && (
+                <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-5 py-6 text-center space-y-3">
+                  <p className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">
+                    Only the token's creator can edit its metadata.
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-white/40 font-mono break-all">
+                    Creator: {token.wallet}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-white/40">
+                    Connect that wallet (Recover from the homepage if you have it) to make changes.
+                  </p>
+                  <Link
+                    href={`/token/${params.mint}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white transition"
+                  >
+                    Back to token
+                  </Link>
+                </div>
+              )}
+
+              {!loading && token && isCreator && (
                 <>
-                  {!isCreator && (
-                    <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-600 dark:text-yellow-400">
-                      Only the creator wallet (<span className="font-mono">{token.wallet.slice(0, 4)}…{token.wallet.slice(-4)}</span>) can edit. Connect that wallet to make changes.
+                  {metaWarning && (
+                    <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-600 dark:text-yellow-400">
+                      {metaWarning}
                     </div>
                   )}
 
-                  <fieldset disabled={!isCreator || submitting} className="space-y-3 contents">
+                  <fieldset disabled={submitting} className="space-y-4 contents">
                     <div className="relative">
                       <input
                         type="text"
@@ -322,17 +361,19 @@ export default function EditTokenMetadataPage() {
                       />
                       <Lock className="w-3.5 h-3.5 absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-white/30" />
                     </div>
-                    <p className="text-[11px] text-gray-400 dark:text-white/30 -mt-1.5">
+                    <p className="text-[11px] text-gray-400 dark:text-white/30 -mt-2">
                       Name and ticker are locked on-chain.
                     </p>
 
-                    <textarea
-                      placeholder="Description (optional)"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      rows={2}
-                      className={`${inputClass} resize-none`}
-                    />
+                    <div className="pt-2">
+                      <textarea
+                        placeholder="Description (optional)"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        rows={3}
+                        className={`${inputClass} resize-none`}
+                      />
+                    </div>
 
                     <label
                       htmlFor="edit-token-image"
@@ -361,7 +402,7 @@ export default function EditTokenMetadataPage() {
                       className="sr-only"
                     />
 
-                    <div className="space-y-3">
+                    <div className="space-y-3 pt-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs text-gray-400 dark:text-white/30">Add links:</span>
                         {SOCIAL_DEFS.map(({ key, label, icon }) => (
@@ -414,28 +455,30 @@ export default function EditTokenMetadataPage() {
                     </div>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={submit}
-                    disabled={!isCreator || submitting}
-                    className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {submitting ? (
-                      <>
-                        <Spinner size={16} className="text-white" /> Saving…
-                      </>
-                    ) : (
-                      "Save changes"
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/token/${params.mint}`)}
-                    disabled={submitting}
-                    className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition cursor-pointer disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
+                  <div className="space-y-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={submit}
+                      disabled={submitting}
+                      className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {submitting ? (
+                        <>
+                          <Spinner size={16} className="text-white" /> Saving…
+                        </>
+                      ) : (
+                        "Save changes"
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/token/${params.mint}`)}
+                      disabled={submitting}
+                      className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition cursor-pointer disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </>
               )}
             </div>
