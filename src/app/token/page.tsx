@@ -131,11 +131,15 @@ export default function TokenPage() {
       const feeCalc = await connection.getFeeForMessage(tx.compileMessage());
       const txFee = feeCalc.value || 5000;
       
-      // Estimate rent based on devnet testing (token mint + pool accounts ~0.012 SOL)
-      const estimatedRent = 0.012 * LAMPORTS_PER_SOL;
-      
-      // Platform fee = Total - (tx fee + rent)
-      const platformFee = TOTAL_PRICE - txFee - estimatedRent;
+      // Mainnet DBC pool creation creates more accounts than devnet — actual rent ≈ 0.025 SOL
+      const estimatedRent = 0.025 * LAMPORTS_PER_SOL;
+
+      // Platform fee = Total - (tx fee + rent), clamped to wallet headroom so we never
+      // push the on-chain cost above the user's balance.
+      const headroom = balance - estimatedRent - txFee;
+      let platformFee = TOTAL_PRICE - txFee - estimatedRent;
+      if (platformFee > headroom) platformFee = headroom;
+      if (platformFee < 0) platformFee = 0;
       
       // Add platform fee transfer (only if positive)
       if (platformFee > 0) {
