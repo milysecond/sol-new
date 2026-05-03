@@ -93,6 +93,20 @@ export default function MultisigDetailPage() {
         }
 
         const connection = new Connection(rpc, "confirmed");
+
+        // Pre-check: is this account on this network? Is it owned by Squads v4?
+        const info = await connection.getAccountInfo(multisigPda);
+        if (!info) {
+          throw new Error(`No account at this address on ${network}. Try toggling the network or check the address.`);
+        }
+        if (!info.owner.equals(multisig.PROGRAM_ID)) {
+          const ownerStr = info.owner.toBase58();
+          if (ownerStr === "11111111111111111111111111111111") {
+            throw new Error("This is a Squads v3 / legacy 'Smart Account' (SystemProgram-owned), not a v4 multisig. Open it in app.squads.so to view.");
+          }
+          throw new Error(`Owned by ${ownerStr.slice(0, 6)}…${ownerStr.slice(-4)}, not the Squads v4 program. Not a v4 multisig.`);
+        }
+
         const ms = await multisig.accounts.Multisig.fromAccountAddress(connection, multisigPda);
         const [vaultPda] = multisig.getVaultPda({ multisigPda, index: 0 });
 
@@ -148,13 +162,17 @@ export default function MultisigDetailPage() {
             )}
 
             {!loading && error && (
-              <div className="rounded-2xl border border-red-500/20 bg-red-500/5 px-5 py-8 text-center space-y-3">
+              <div className="rounded-2xl border border-red-500/20 bg-red-500/5 px-5 py-8 text-center space-y-4">
                 <p className="text-red-400 font-medium">Couldn't load this multisig</p>
                 <p className="text-xs text-gray-500 dark:text-white/40 break-all font-mono">{params.address}</p>
-                <p className="text-xs text-gray-500 dark:text-white/40">{error}</p>
-                <p className="text-xs text-gray-400 dark:text-white/30">
-                  This address might not be a Squads v4 multisig on {network}.
-                </p>
+                <p className="text-xs text-gray-500 dark:text-white/40 max-w-md mx-auto">{error}</p>
+                <a
+                  href={`https://app.squads.so/squads/${params.address}/home`}
+                  target="_blank"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-fuchsia-500 hover:bg-fuchsia-400 text-white text-sm font-semibold transition"
+                >
+                  Open in Squads app <ExternalLink className="w-3.5 h-3.5" />
+                </a>
               </div>
             )}
 
