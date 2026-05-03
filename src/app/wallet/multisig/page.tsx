@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, ExternalLink, Search, ArrowRight } from "lucide-react";
+import { ShieldCheck, ChevronRight, Search, ArrowRight } from "lucide-react";
 import { WalletShell } from "@/components/wallet-shell";
 import { PageTransition } from "@/components/page-transition";
 import { Spinner } from "@/components/spinner";
@@ -12,14 +12,16 @@ import Link from "next/link";
 
 interface MultisigEntry {
   address: string;
+  name: string | null;
   threshold: number;
   memberCount: number;
   vault: string;
-  name: string | null;
-  image: string | null;
+  network: "mainnet" | "devnet" | null;
 }
 
 const isLikelyAddress = (s: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
+
+const NETWORK_LABEL: Record<string, string> = { mainnet: "live", devnet: "test" };
 
 export default function WalletMultisigPage() {
   const { publicKey } = useWallet();
@@ -32,10 +34,39 @@ export default function WalletMultisigPage() {
   useEffect(() => {
     if (!publicKey) return;
     setLoading(true);
-    fetch(`/api/multisig/onchain?wallet=${publicKey}`)
-      .then((r) => r.json())
-      .then((d) => setMultisigs(d.multisigs || []))
-      .catch(() => {})
+
+    Promise.all([
+      // Multisigs we created via sol.new (any network), keyed off the wallet
+      fetch(`/api/multisig?wallet=${publicKey}`).then((r) => r.json()).catch(() => ({ multisigs: [] })),
+      // Mainnet member-of relations from the Squads index
+      fetch(`/api/multisig/onchain?wallet=${publicKey}`).then((r) => r.json()).catch(() => ({ multisigs: [] })),
+    ])
+      .then(([dbResp, indexedResp]) => {
+        const fromDb: MultisigEntry[] = (dbResp.multisigs || []).map((m: { multisig_pda: string; name: string; threshold: number; member_count: number; vault: string; network: string | null }) => ({
+          address: m.multisig_pda,
+          name: m.name,
+          threshold: m.threshold,
+          memberCount: m.member_count,
+          vault: m.vault,
+          network: (m.network as "mainnet" | "devnet" | null) ?? "mainnet",
+        }));
+        const fromIndex: MultisigEntry[] = (indexedResp.multisigs || []).map((m: { address: string; name: string | null; threshold: number; memberCount: number; vault: string }) => ({
+          address: m.address,
+          name: m.name,
+          threshold: m.threshold,
+          memberCount: m.memberCount,
+          vault: m.vault,
+          network: "mainnet" as const,
+        }));
+        const seen = new Set<string>();
+        const merged: MultisigEntry[] = [];
+        for (const m of [...fromDb, ...fromIndex]) {
+          if (seen.has(m.address)) continue;
+          seen.add(m.address);
+          merged.push(m);
+        }
+        setMultisigs(merged);
+      })
       .finally(() => setLoading(false));
   }, [publicKey, network]);
 
@@ -74,18 +105,21 @@ export default function WalletMultisigPage() {
           </div>
         ) : multisigs.length === 0 ? (
           <div className="text-center py-12 space-y-3">
-            <p className="text-gray-400 dark:text-white/30">No v4 multisigs found for this wallet</p>
+            <p className="text-gray-400 dark:text-white/30">No multisigs yet</p>
             <p className="text-xs text-gray-400 dark:text-white/30 max-w-xs mx-auto">
-              Have a Squads v3 / legacy multisig? Paste its address above to view it.
+              Have one already? Paste the address above to view it.
             </p>
-            <Link href="/multisig" className="text-fuchsia-400 hover:text-fuchsia-300 text-sm transition inline-block">
-              Or create a new multisig
+            <Link
+              href="/multisig"
+              className="text-fuchsia-400 hover:text-fuchsia-300 text-sm transition inline-block"
+            >
+              Or create a new one
             </Link>
           </div>
         ) : (
           <div className="space-y-2">
             <p className="text-xs text-gray-400 dark:text-white/30">
-              {multisigs.length} multisig{multisigs.length !== 1 ? "s" : ""} found
+              {multisigs.length} multisig{multisigs.length !== 1 ? "s" : ""}
             </p>
             {multisigs.map((ms) => (
               <Link
@@ -97,13 +131,26 @@ export default function WalletMultisigPage() {
                   <ShieldCheck size={16} className="text-fuchsia-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-1.5">
+                  <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold truncate">{ms.name || "Squad"}</p>
-                    <p className="text-xs text-gray-400 dark:text-white/30 shrink-0">{ms.threshold}/{ms.memberCount}</p>
+                    <span className="text-xs text-gray-400 dark:text-white/30 shrink-0">
+                      {ms.threshold}/{ms.memberCount}
+                    </span>
+                    {ms.network && (
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider shrink-0 ${
+                          ms.network === "mainnet"
+                            ? "bg-green-500/10 text-green-500"
+                            : "bg-yellow-500/10 text-yellow-500"
+                        }`}
+                      >
+                        {NETWORK_LABEL[ms.network] ?? ms.network}
+                      </span>
+                    )}
                   </div>
-                  <p className="text-fuchsia-400/50 text-[10px] font-mono truncate">{ms.vault}</p>
+                  <p className="text-fuchsia-400/50 text-[10px] font-mono truncate">{ms.address}</p>
                 </div>
-                <ExternalLink className="w-4 h-4 text-gray-300 dark:text-white/20 shrink-0" />
+                <ChevronRight className="w-4 h-4 text-gray-300 dark:text-white/20 shrink-0" />
               </Link>
             ))}
           </div>
