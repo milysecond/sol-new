@@ -27,12 +27,28 @@ async function fetchImageDataUrl(url: string | null): Promise<string | null> {
   }
 }
 
+function timeAgo(dateStr: string | null): string {
+  if (!dateStr) return "just now";
+  const then = new Date(dateStr.includes("Z") ? dateStr : dateStr + "Z").getTime();
+  if (Number.isNaN(then)) return "just now";
+  const diff = Math.floor((Date.now() - then) / 1000);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  if (diff < 2_592_000) return `${Math.floor(diff / 604800)}w ago`;
+  return `${Math.floor(diff / 2_592_000)}mo ago`;
+}
+
+const shortMint = (m: string) => (m.length > 12 ? `${m.slice(0, 6)}…${m.slice(-6)}` : m);
+
 export default async function OpengraphImage({ params }: { params: Promise<{ mint: string }> }) {
   const { mint } = await params;
 
   let name = "Token";
   let symbol = "";
   let rawImage: string | null = null;
+  let createdAt: string | null = null;
 
   try {
     const res = await fetch(`${API_BASE}/api/token/${mint}`, { cache: "no-store" });
@@ -41,10 +57,14 @@ export default async function OpengraphImage({ params }: { params: Promise<{ min
       name = token.name || name;
       symbol = token.symbol || "";
       rawImage = token.image_url ?? null;
+      createdAt = token.created_at ?? null;
     }
   } catch {}
 
-  const imageDataUrl = await fetchImageDataUrl(rawImage);
+  const [imageDataUrl, logoDataUrl] = await Promise.all([
+    fetchImageDataUrl(rawImage),
+    fetchImageDataUrl(`${API_BASE}/icon-512.png`),
+  ]);
 
   return new ImageResponse(
     (
@@ -91,23 +111,57 @@ export default async function OpengraphImage({ params }: { params: Promise<{ min
           style={{
             display: "flex",
             alignItems: "center",
-            fontSize: "32px",
-            fontWeight: 700,
-            letterSpacing: "-0.02em",
+            justifyContent: "space-between",
           }}
         >
-          <span>sol</span>
-          <span style={{ color: "#a855f7" }}>.new</span>
-          <span
+          <div
             style={{
-              marginLeft: "16px",
-              fontSize: "20px",
-              fontWeight: 500,
-              color: "rgba(255,255,255,0.5)",
+              display: "flex",
+              alignItems: "center",
+              gap: "16px",
+              fontSize: "32px",
+              fontWeight: 700,
+              letterSpacing: "-0.02em",
             }}
           >
-            · new launch
-          </span>
+            {logoDataUrl && (
+              <img
+                src={logoDataUrl}
+                alt=""
+                width={48}
+                height={48}
+                style={{ borderRadius: "12px" }}
+              />
+            )}
+            <div style={{ display: "flex" }}>
+              <span>sol</span>
+              <span style={{ color: "#a855f7" }}>.new</span>
+            </div>
+            <span
+              style={{
+                fontSize: "20px",
+                fontWeight: 500,
+                color: "rgba(255,255,255,0.5)",
+              }}
+            >
+              · new launch
+            </span>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              padding: "10px 18px",
+              borderRadius: "999px",
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              fontSize: "20px",
+              fontWeight: 500,
+              color: "rgba(255,255,255,0.75)",
+            }}
+          >
+            {timeAgo(createdAt)}
+          </div>
         </div>
 
         <div
@@ -187,13 +241,18 @@ export default async function OpengraphImage({ params }: { params: Promise<{ min
             <div
               style={{
                 display: "flex",
-                fontSize: "26px",
-                color: "rgba(255,255,255,0.6)",
                 marginTop: "20px",
-                lineHeight: 1.3,
+                padding: "8px 16px",
+                borderRadius: "10px",
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                fontSize: "22px",
+                fontFamily: "monospace",
+                color: "rgba(255,255,255,0.7)",
+                alignSelf: "flex-start",
               }}
             >
-              just launched on sol.new
+              {shortMint(mint)}
             </div>
           </div>
         </div>
