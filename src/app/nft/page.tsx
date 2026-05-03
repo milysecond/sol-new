@@ -275,15 +275,18 @@ export default function NftPage() {
                 {/* Copy link */}
                 <button
                   onClick={() => {
-                    const url = result.mint
-                      ? `${explorerBase}/address/${result.mint}${clusterParam}`
-                      : "";
-                    if (!url) return;
+                    const id = result.mint || (result.assetId && result.assetId !== "pending" ? result.assetId : "");
+                    if (!id) return;
+                    const url = `${explorerBase}/address/${id}${clusterParam}`;
                     navigator.clipboard.writeText(url);
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                   }}
-                  className="flex items-center justify-center gap-1.5 w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition cursor-pointer"
+                  className={`flex items-center justify-center gap-1.5 w-full border rounded-xl px-4 py-3 transition cursor-pointer ${
+                    copied
+                      ? "bg-green-500/15 border-green-400/40 text-green-500 dark:text-green-400"
+                      : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white"
+                  }`}
                 >
                   {copied ? (
                     <><Check className="w-4 h-4" /> Copied!</>
