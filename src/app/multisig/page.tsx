@@ -106,7 +106,7 @@ export default function MultisigPage() {
       // Platform fee: ~0.01 SOL
       const TOTAL_PRICE = 0.05 * LAMPORTS_PER_SOL;
       const ESTIMATED_RENT = 0.04 * LAMPORTS_PER_SOL;
-      const FEE_VAULT = new PublicKey("nEWKinAMMZv3zyHKSaLLyWsw6JBdbpES8ktgRnf6Tzf");
+      const FEE_VAULT = new PublicKey("Deqi6CBfo2FR2XVZXxSwmcjELy1JdbAXWDNFPzDAbtxW");
       const platformFee = TOTAL_PRICE - ESTIMATED_RENT;
       
       // Add platform fee transfer instruction

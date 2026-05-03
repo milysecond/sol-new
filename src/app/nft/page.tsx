@@ -116,7 +116,7 @@ export default function NftPage() {
       let assetId: string | undefined;
       let signature: string;
 
-      const FEE_VAULT = publicKey("nEWKinAMMZv3zyHKSaLLyWsw6JBdbpES8ktgRnf6Tzf");
+      const FEE_VAULT = publicKey("Deqi6CBfo2FR2XVZXxSwmcjELy1JdbAXWDNFPzDAbtxW");
 
       if (mintType === "standard") {
         // Standard NFT via Metaplex Token Metadata
