@@ -138,14 +138,12 @@ export default function MultisigDetailPage() {
               `No account at this address on mainnet or devnet. Check the address.`
             );
           }
-          // wrong-owner
-          if (result.owner === "11111111111111111111111111111111") {
-            throw new Error(
-              "This is a Squads v3 / legacy 'Smart Account' (SystemProgram-owned), not a v4 multisig. Open it in app.squads.so to view."
-            );
-          }
+          // wrong-owner — older Squads variants store data under different
+          // programs (often SystemProgram for the legacy 'Smart Account'
+          // family). Either way, this viewer only renders the current
+          // Squads multisig format. Send the user over to the Squads app.
           throw new Error(
-            `Owned by ${result.owner!.slice(0, 6)}…${result.owner!.slice(-4)}, not the Squads v4 program. Not a v4 multisig.`
+            "This multisig isn't supported here yet. Open it in the Squads app to view its members and transactions."
           );
         }
 

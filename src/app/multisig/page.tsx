@@ -149,7 +149,7 @@ export default function MultisigPage() {
       setResult(resultData);
 
       // Save to DB
-      fetch("/api/multisig", {
+      await fetch("/api/multisig", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -159,6 +159,7 @@ export default function MultisigPage() {
           vault: resultData.vault,
           threshold,
           memberCount: allMembers.length,
+          network,
         }),
       }).catch(() => {});
 

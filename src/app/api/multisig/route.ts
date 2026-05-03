@@ -31,6 +31,9 @@ export async function POST(req: NextRequest) {
     if (typeof data.wallet !== "string" || data.wallet.length > 64) {
       return NextResponse.json({ error: "Invalid wallet" }, { status: 400 });
     }
+    if (data.network && data.network !== "mainnet" && data.network !== "devnet") {
+      return NextResponse.json({ error: "Invalid network" }, { status: 400 });
+    }
     const id = await saveMultisig(data);
     notifyEvent({
       kind: 'multisig_create',

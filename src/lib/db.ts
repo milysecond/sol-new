@@ -55,6 +55,7 @@ export async function initDb() {
       vault TEXT NOT NULL,
       threshold INTEGER NOT NULL,
       member_count INTEGER NOT NULL,
+      network TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (wallet) REFERENCES wallets(public_key)
     )`,
@@ -79,9 +80,15 @@ export async function initDb() {
   } catch {
     // column already exists
   }
+  try {
+    await db.execute("ALTER TABLE multisigs ADD COLUMN network TEXT");
+  } catch {
+    // column already exists
+  }
   // Backfill historical rows to mainnet (the only network the app ran on
   // before the column was added). Idempotent — only touches NULL.
   await db.execute("UPDATE tokens SET network = 'mainnet' WHERE network IS NULL");
+  await db.execute("UPDATE multisigs SET network = 'mainnet' WHERE network IS NULL");
 }
 
 export async function saveMetadata(id: string, json: string, wallet?: string | null) {
@@ -125,11 +132,12 @@ export async function saveMultisig(data: {
   vault: string;
   threshold: number;
   memberCount: number;
+  network?: string;
 }) {
   const result = await db.execute({
-    sql: `INSERT INTO multisigs (wallet, name, multisig_pda, vault, threshold, member_count)
-          VALUES (?, ?, ?, ?, ?, ?)`,
-    args: [data.wallet, data.name, data.multisigPda, data.vault, data.threshold, data.memberCount],
+    sql: `INSERT INTO multisigs (wallet, name, multisig_pda, vault, threshold, member_count, network)
+          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    args: [data.wallet, data.name, data.multisigPda, data.vault, data.threshold, data.memberCount, data.network || null],
   });
   return result.lastInsertRowid;
 }
