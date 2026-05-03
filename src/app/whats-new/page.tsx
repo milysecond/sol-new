@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Navbar } from "@/components/navbar";
 import { ChevronLeft, ChevronRight, Sparkles, ExternalLink } from "lucide-react";
 import { timeAgo } from "@/lib/time";
+import { useNetwork } from "@/lib/network";
 
 type Token = {
   id: number;
@@ -18,13 +19,6 @@ type Token = {
   network: "mainnet" | "devnet" | null;
   created_at: string;
 };
-
-type Filter = "all" | "mainnet" | "devnet";
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "mainnet", label: "Live" },
-  { id: "devnet", label: "Test" },
-];
 
 const NETWORK_LABEL: Record<string, string> = { mainnet: "live", devnet: "test" };
 
@@ -42,16 +36,15 @@ const LIMIT = 20;
 const short = (s: string) => `${s.slice(0, 4)}…${s.slice(-4)}`;
 
 export default function WhatsNewPage() {
+  const { network, toggle } = useNetwork();
   const [page, setPage] = useState(1);
-  const [filter, setFilter] = useState<Filter>("all");
   const [data, setData] = useState<Resp | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async (p: number, f: Filter) => {
+  const load = useCallback(async (p: number, n: string) => {
     setLoading(true);
     try {
-      const qs = new URLSearchParams({ page: String(p), limit: String(LIMIT) });
-      if (f !== "all") qs.set("network", f);
+      const qs = new URLSearchParams({ page: String(p), limit: String(LIMIT), network: n });
       const res = await fetch(`/api/tokens/recent?${qs}`, { cache: "no-store" });
       if (res.ok) setData(await res.json());
     } finally {
@@ -59,8 +52,8 @@ export default function WhatsNewPage() {
     }
   }, []);
 
-  useEffect(() => { load(page, filter); }, [page, filter, load]);
-  useEffect(() => { setPage(1); }, [filter]);
+  useEffect(() => { load(page, network); }, [page, network, load]);
+  useEffect(() => { setPage(1); }, [network]);
 
   const tokens = data?.tokens ?? [];
   const totalPages = data?.totalPages ?? 1;
@@ -73,29 +66,26 @@ export default function WhatsNewPage() {
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <Sparkles className="w-7 h-7 text-orange-400" /> What's new
           </h1>
-          <p className="text-sm text-gray-500 dark:text-white/40">
-            {data
-              ? `${data.total.toLocaleString()} token${data.total === 1 ? "" : "s"} launched on sol.new`
-              : "Loading…"}
-          </p>
-        </header>
-
-        <div className="flex items-center gap-2 text-xs">
-          {FILTERS.map((f) => (
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-white/40">
+            <span>
+              {data
+                ? `${data.total.toLocaleString()} ${network === "mainnet" ? "live" : "test"} launch${data.total === 1 ? "" : "es"}`
+                : "Loading…"}
+            </span>
             <button
-              key={f.id}
               type="button"
-              onClick={() => setFilter(f.id)}
-              className={`px-3 py-1.5 rounded-full border transition cursor-pointer ${
-                filter === f.id
-                  ? "bg-orange-500/15 border-orange-400/40 text-orange-400"
-                  : "bg-black/[0.03] dark:bg-white/[0.03] border-black/10 dark:border-white/10 text-gray-500 dark:text-white/40 hover:text-gray-900 dark:hover:text-white"
+              onClick={toggle}
+              title={`Switch to ${network === "mainnet" ? "test" : "live"}`}
+              className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider cursor-pointer transition ${
+                network === "mainnet"
+                  ? "bg-green-500/10 text-green-500 hover:bg-green-500/20"
+                  : "bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20"
               }`}
             >
-              {f.label}
+              {network === "mainnet" ? "live" : "test"}
             </button>
-          ))}
-        </div>
+          </div>
+        </header>
 
         {data && tokens[0] && page === 1 && (
           <Link
