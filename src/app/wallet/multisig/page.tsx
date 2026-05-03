@@ -35,20 +35,19 @@ export default function WalletMultisigPage() {
     if (!publicKey) return;
     setLoading(true);
 
-    Promise.all([
-      // Multisigs we created via sol.new (any network), keyed off the wallet
-      fetch(`/api/multisig?wallet=${publicKey}`).then((r) => r.json()).catch(() => ({ multisigs: [] })),
-      // Mainnet member-of relations from the Squads index
-      fetch(`/api/multisig/onchain?wallet=${publicKey}`).then((r) => r.json()).catch(() => ({ multisigs: [] })),
-    ])
-      .then(([dbResp, indexedResp]) => {
+    (async () => {
+      try {
+        const [dbResp, indexedResp] = await Promise.all([
+          fetch(`/api/multisig?wallet=${publicKey}`).then((r) => r.json()).catch(() => ({ multisigs: [] })),
+          fetch(`/api/multisig/onchain?wallet=${publicKey}`).then((r) => r.json()).catch(() => ({ multisigs: [] })),
+        ]);
         const fromDb: MultisigEntry[] = (dbResp.multisigs || []).map((m: { multisig_pda: string; name: string; threshold: number; member_count: number; vault: string; network: string | null }) => ({
           address: m.multisig_pda,
           name: m.name,
           threshold: m.threshold,
           memberCount: m.member_count,
           vault: m.vault,
-          network: (m.network as "mainnet" | "devnet" | null) ?? "mainnet",
+          network: (m.network as "mainnet" | "devnet" | null) ?? null,
         }));
         const fromIndex: MultisigEntry[] = (indexedResp.multisigs || []).map((m: { address: string; name: string | null; threshold: number; memberCount: number; vault: string }) => ({
           address: m.address,
@@ -56,7 +55,7 @@ export default function WalletMultisigPage() {
           threshold: m.threshold,
           memberCount: m.memberCount,
           vault: m.vault,
-          network: "mainnet" as const,
+          network: null,
         }));
         const seen = new Set<string>();
         const merged: MultisigEntry[] = [];
@@ -66,8 +65,27 @@ export default function WalletMultisigPage() {
           merged.push(m);
         }
         setMultisigs(merged);
-      })
-      .finally(() => setLoading(false));
+
+        // Verify each address against actual on-chain presence so labels
+        // reflect reality (DB values can be wrong for older rows).
+        if (merged.length === 0) return;
+        const verifyRes = await fetch("/api/multisig/verify-network", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ addresses: merged.map((m) => m.address) }),
+        });
+        if (!verifyRes.ok) return;
+        const { results } = await verifyRes.json();
+        setMultisigs((prev) =>
+          prev.map((m) => {
+            const verified = results?.[m.address];
+            return verified ? { ...m, network: verified } : m;
+          })
+        );
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [publicKey, network]);
 
   const submitSearch = (e: React.FormEvent) => {

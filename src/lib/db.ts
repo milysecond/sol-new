@@ -85,10 +85,11 @@ export async function initDb() {
   } catch {
     // column already exists
   }
-  // Backfill historical rows to mainnet (the only network the app ran on
-  // before the column was added). Idempotent — only touches NULL.
+  // Token rows pre-column are all from the mainnet-only era — safe to
+  // backfill. Multisigs are NOT, because the create flow has been used on
+  // both networks before the column shipped, so we leave nulls alone and
+  // verify on display instead (see /wallet/multisig).
   await db.execute("UPDATE tokens SET network = 'mainnet' WHERE network IS NULL");
-  await db.execute("UPDATE multisigs SET network = 'mainnet' WHERE network IS NULL");
 }
 
 export async function saveMetadata(id: string, json: string, wallet?: string | null) {
