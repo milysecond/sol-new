@@ -182,26 +182,30 @@ export default function EditTokenMetadataPage() {
       setTicker(tok.symbol || "");
       if (tok.image_url) setImageUrl(tok.image_url);
 
-      // Step 2: metadata JSON (best-effort) — surface as a non-blocking warning
+      // Step 2: metadata JSON read straight from our DB — no public URL fetch
       try {
-        if (!tok.metadata_uri) {
-          throw new Error("Metadata isn't hosted on sol.new for this token");
-        }
-        const metaRes = await fetch(tok.metadata_uri, { cache: "no-store" });
-        if (!metaRes.ok) throw new Error(`Couldn't load existing metadata (HTTP ${metaRes.status})`);
-        const m = (await metaRes.json()) as MetaJson;
+        const metaRes = await fetch(`/api/token/${params.mint}/metadata`, { cache: "no-store" });
+        if (!metaRes.ok) throw new Error(`HTTP ${metaRes.status}`);
+        const payload = (await metaRes.json()) as { metadata: MetaJson | null; hostedExternally?: boolean };
         if (cancelled) return;
-        setDescription(m.description || "");
-        setImageUrl(m.image || tok.image_url || null);
-        const next = new Set<SocialKey>();
-        for (const def of SOCIAL_DEFS) {
-          const v = m[def.key];
-          if (typeof v === "string" && v.length > 0) {
-            next.add(def.key);
-            socialState[def.key][1](v);
+        if (payload.hostedExternally) {
+          setMetaWarning(
+            "This token's metadata is hosted off sol.new — you can still save new values, but they'll only show up if you re-point the on-chain URI."
+          );
+        } else if (payload.metadata) {
+          const m = payload.metadata;
+          setDescription(m.description || "");
+          setImageUrl(m.image || tok.image_url || null);
+          const next = new Set<SocialKey>();
+          for (const def of SOCIAL_DEFS) {
+            const v = m[def.key];
+            if (typeof v === "string" && v.length > 0) {
+              next.add(def.key);
+              socialState[def.key][1](v);
+            }
           }
+          setActiveSocials(next);
         }
-        setActiveSocials(next);
       } catch (e: unknown) {
         if (!cancelled) {
           setMetaWarning(

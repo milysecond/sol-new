@@ -20,6 +20,37 @@ const EDITABLE_KEYS = new Set([
 
 const MAX_AGE_MS = 5 * 60 * 1000;
 
+// Reads the current metadata JSON for this token straight from Turso so the
+// edit page doesn't need to hit the public /metadata/{id}.json URL (which can
+// fail if the stored URI is unreachable from the browser, e.g. mismatched
+// host between dev and prod).
+export async function GET(
+  _req: NextRequest,
+  ctx: { params: Promise<{ mint: string }> }
+) {
+  try {
+    const { mint } = await ctx.params;
+    await initDb();
+    const tokenRow = await getTokenByMint(mint);
+    if (!tokenRow) return NextResponse.json({ error: "Token not found" }, { status: 404 });
+    const token = tokenRow as unknown as { wallet: string; metadata_uri: string | null };
+    if (!token.metadata_uri) {
+      return NextResponse.json({ wallet: token.wallet, metadata: null });
+    }
+    const idMatch = token.metadata_uri.match(/\/metadata\/([a-f0-9]{16})\.json$/);
+    if (!idMatch) {
+      return NextResponse.json({ wallet: token.wallet, metadata: null, hostedExternally: true });
+    }
+    const raw = await getMetadata(idMatch[1]);
+    return NextResponse.json({
+      wallet: token.wallet,
+      metadata: raw ? JSON.parse(raw) : null,
+    });
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}
+
 export async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ mint: string }> }
