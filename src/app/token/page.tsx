@@ -1,5 +1,5 @@
 "use client";
-import { Coins, Rocket } from "lucide-react";
+import { Coins, Rocket, Info, X } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
 import { PageTransition } from "@/components/page-transition";
@@ -37,6 +37,7 @@ export default function TokenPage() {
   const [youtube, setYoutube] = useState("https://youtube.com/");
   const [tiktok, setTiktok] = useState("https://tiktok.com/@");
   const [activeSocials, setActiveSocials] = useState<Set<string>>(new Set());
+  const [showInfo, setShowInfo] = useState(false);
   const [mutableMetadata, setMutableMetadata] = useState(true);
   const [status, setStatus] = useState<"idle" | "auth" | "uploading" | "creating" | "confirming" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -148,7 +149,7 @@ export default function TokenPage() {
       const mintAddress = mintKeypair.publicKey.toBase58();
       const poolAddr = poolAddress.toBase58();
 
-      // Save to DB — await so /launch/{mint} doesn't 404 from a race
+      // Save to DB — await so /token/{mint} doesn't 404 from a race
       try {
         await fetch("/api/token", {
           method: "POST",
@@ -173,7 +174,7 @@ export default function TokenPage() {
 
       analytics.tokenCreated(mintAddress, ticker);
       analytics.launchInitiated(mintAddress, 'meteora-dbc');
-      router.push(`/launch/${mintAddress}`);
+      router.push(`/token/${mintAddress}`);
       return;
     } catch (e: unknown) {
       let msg = "Something went wrong. Please try again.";
@@ -203,9 +204,19 @@ export default function TokenPage() {
         <ConnectGate action="launch a token">
           <PageTransition>
           <div className="w-full sm:max-w-lg space-y-4">
-            <div className="text-center space-y-1">
+            <div className="text-center space-y-1 relative">
               <AnimatedIcon icon={Coins} size={32} className="text-orange-400" />
-              <h1 className="text-2xl font-bold tracking-tight">Launch a token</h1>
+              <h1 className="text-2xl font-bold tracking-tight inline-flex items-center gap-2">
+                Launch a token
+                <button
+                  type="button"
+                  onClick={() => setShowInfo(true)}
+                  aria-label="What is this?"
+                  className="text-gray-400 dark:text-white/30 hover:text-orange-400 transition cursor-pointer"
+                >
+                  <Info className="w-4 h-4" />
+                </button>
+              </h1>
               <p className="text-gray-500 dark:text-white/50 text-sm">Create a Solana token in seconds.</p>
             </div>
 
@@ -356,6 +367,76 @@ export default function TokenPage() {
           </PageTransition>
         </ConnectGate>
       </main>
+
+      {showInfo && (
+        <div
+          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
+          onClick={() => setShowInfo(false)}
+        >
+          <div
+            className="w-full sm:max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 flex items-center justify-between px-5 py-4 bg-white/90 dark:bg-black/90 backdrop-blur border-b border-black/10 dark:border-white/10">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Info className="w-5 h-5 text-orange-400" />
+                How a token launch works
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowInfo(false)}
+                aria-label="Close"
+                className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-5 py-5 space-y-5 text-sm text-gray-700 dark:text-white/70">
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">What you're creating</h3>
+                <p>A Solana token (1 billion supply, fixed). Anyone can buy or sell it from minute one — no listing process, no waiting.</p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">How people buy and sell it</h3>
+                <p>Your token starts in a <b>bonding curve</b> — think of it as a price that goes up automatically as people buy, and down when they sell. No order book, no liquidity to provide. The math takes care of pricing.</p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">What it costs you</h3>
+                <ul className="space-y-1.5 list-disc pl-5">
+                  <li><b>~0.04 SOL</b> from your wallet — covers the on-chain rent for the token's accounts. No platform fee.</li>
+                  <li>Buyers pay a <b>1% trading fee</b> on every swap, which goes to the sol.new treasury.</li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Your creator allocation</h3>
+                <p>You get <b>69 million tokens (6.9%)</b> set aside for you. They unlock <b>linearly over 69 days</b> — about 1 million per day, no upfront cliff. This stops you from dumping on day 1 (and signals to buyers that you're sticking around).</p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Graduation</h3>
+                <p>When the curve has collected about <b>69 SOL</b> of buy pressure, the token "graduates" — its liquidity moves to a real DEX (DAMM v2) automatically. From that point it trades like any other Solana token. There's a one-time <b>0.69 SOL</b> migration fee at graduation.</p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Live vs Test mode</h3>
+                <p>The pill in the header switches between <b className="text-green-500">live</b> (mainnet — real SOL, real money) and <b className="text-yellow-500">test</b> (devnet — fake SOL for practice). Devnet SOL is free to claim from the Get page. Always start on test if you're learning.</p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Heads up</h3>
+                <ul className="space-y-1.5 list-disc pl-5">
+                  <li>Tokens are <b>immutable</b> once launched — you can't change the name, ticker, or image after.</li>
+                  <li>If the curve never reaches 69 SOL, the token simply doesn't graduate. The early buyers are still holders, but liquidity stays in the curve.</li>
+                  <li>You can't "unlaunch" or refund buyers. Don't promise things you can't deliver.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

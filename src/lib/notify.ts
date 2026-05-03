@@ -126,7 +126,7 @@ export async function notifyTokenLaunch(data: {
     '',
     `<code>${data.mintAddress}</code>`,
     '',
-    `<a href="https://sol.new/launch/${data.mintAddress}">View token</a>  ·  <a href="https://jup.ag/tokens/${data.mintAddress}?refId=yfgv2ibxy07v">Buy on Jup</a>  ·  <a href="https://sol.new">Launch yours</a>`,
+    `<a href="https://sol.new/token/${data.mintAddress}">View token</a>  ·  <a href="https://jup.ag/tokens/${data.mintAddress}?refId=yfgv2ibxy07v">Buy on Jup</a>  ·  <a href="https://sol.new">Launch yours</a>`,
   );
 
   const caption = lines.join('\n');
@@ -134,7 +134,7 @@ export async function notifyTokenLaunch(data: {
   const reply_markup = {
     inline_keyboard: [
       [
-        { text: "View token", url: `https://sol.new/launch/${data.mintAddress}` },
+        { text: "View token", url: `https://sol.new/token/${data.mintAddress}` },
         { text: "Buy on Jup", url: `https://jup.ag/tokens/${data.mintAddress}?refId=yfgv2ibxy07v` },
       ],
       [

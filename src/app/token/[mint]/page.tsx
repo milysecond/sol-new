@@ -174,7 +174,7 @@ export default function LaunchPage() {
 
           {/* Share links */}
           {(() => {
-            const url = `https://sol.new/launch/${token.mint_address}`;
+            const url = `https://sol.new/token/${token.mint_address}`;
             const text = `${token.name} ($${token.symbol}) just launched on sol.new`;
             return (
               <div className="space-y-2">
