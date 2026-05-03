@@ -40,10 +40,33 @@ export default function LaunchPage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/token/${mint}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { setToken(data); setLoading(false); })
-      .catch(() => setLoading(false));
+    let cancelled = false;
+    const start = Date.now();
+    const RETRY_MS = 1500;
+    const TIMEOUT_MS = 12000;
+
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/token/${mint}`);
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.mint_address) {
+            setToken(data);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch {}
+      if (cancelled) return;
+      if (Date.now() - start >= TIMEOUT_MS) {
+        setLoading(false);
+        return;
+      }
+      setTimeout(tick, RETRY_MS);
+    };
+    tick();
+    return () => { cancelled = true; };
   }, [mint]);
 
   function copyMint() {

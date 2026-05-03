@@ -26,7 +26,7 @@ export function Navbar() {
   const shortKey = publicKey ? `${publicKey.slice(0, 4)}...${publicKey.slice(-4)}` : null;
 
   return (
-    <nav className="border-b border-black/10 dark:border-white/10">
+    <nav className="sticky top-0 z-30 border-b border-black/10 dark:border-white/10 bg-white/80 dark:bg-black/80 backdrop-blur-md">
       <div className="flex items-center justify-between px-6 py-3">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2 shrink-0">
@@ -78,7 +78,10 @@ export function Navbar() {
               >
                 <Wallet size={14} className="text-purple-400 sm:hidden" />
                 {balance !== null && (
-                  <span className="text-purple-400 font-mono hidden sm:inline">{balance.toFixed(4)} SOL</span>
+                  <span className="text-purple-400 font-mono">
+                    {balance.toFixed(balance < 1 ? 3 : 2)}
+                    <span className="hidden sm:inline"> SOL</span>
+                  </span>
                 )}
                 <span className="text-gray-600 dark:text-white/60 font-mono">{shortKey}</span>
               </button>
