@@ -76,6 +76,20 @@ export default function NftPage() {
       setStatus("minting");
       const { address, keypair: userKeypair } = await getPasskeyKeypair();
 
+      // Step 1b: Check balance BEFORE uploads so we don't burn storage on a
+      // doomed mint. Standard NFT ≈ 0.02 SOL (rent + 0.005 platform fee);
+      // compressed ≈ 0.001 SOL platform fee + tx fee (Helius covers mint).
+      const balanceCheckConn = new Connection(rpc, "confirmed");
+      const userBalance = await balanceCheckConn.getBalance(new PublicKey(address));
+      const minBalance = (mintType === "standard" ? 0.025 : 0.002) * 1e9;
+      if (userBalance < minBalance) {
+        const need = mintType === "standard" ? "0.025" : "0.002";
+        const where = network === "devnet"
+          ? "Claim devnet SOL from the Get page."
+          : "Add funds from the Get page.";
+        throw new Error(`You need at least ${need} SOL to mint a ${mintType} NFT. Your balance is ${(userBalance / 1e9).toFixed(4)} SOL. ${where}`);
+      }
+
       // Step 2: Upload image + metadata
       setStatus("uploading");
       const uploaded = await uploadImage(imageFile);

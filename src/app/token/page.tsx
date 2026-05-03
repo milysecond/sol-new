@@ -60,12 +60,18 @@ export default function TokenPage() {
       setStatus("auth");
       const { address, keypair: userKeypair } = await getPasskeyKeypair();
       
-      // Check balance before proceeding
+      // Check balance BEFORE uploads so we don't burn storage on a doomed launch.
+      // Real on-chain cost is ~0.025 SOL (rent + tx fee, no platform fee). 0.04 SOL
+      // gives ~0.015 SOL margin against DBC rent variance — earlier 0.03 was failing
+      // mid-tx with insufficient lamports.
       const connection0 = new Connection(rpc, "confirmed");
       const balance = await connection0.getBalance(new PublicKey(address));
-      const MIN_BALANCE = 0.03 * 1e9;
+      const MIN_BALANCE = 0.04 * 1e9;
       if (balance < MIN_BALANCE) {
-        throw new Error(`You need at least 0.03 SOL to launch a token. Your balance is ${(balance / 1e9).toFixed(4)} SOL. Add funds from the Get page.`);
+        const where = network === "devnet"
+          ? "Claim devnet SOL from the Get page."
+          : "Add funds from the Get page.";
+        throw new Error(`You need at least 0.04 SOL to launch a token. Your balance is ${(balance / 1e9).toFixed(4)} SOL. ${where}`);
       }
 
       // Step 2: Upload image + metadata
@@ -343,7 +349,7 @@ export default function TokenPage() {
                     Launch token
                   </button>
                 )}
-                <p className="text-center text-xs text-gray-400 dark:text-white/30">~0.03 SOL</p>
+                <p className="text-center text-xs text-gray-400 dark:text-white/30">~0.04 SOL</p>
               </div>
             }
           </div>
