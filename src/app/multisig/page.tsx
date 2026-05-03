@@ -244,7 +244,7 @@ export default function MultisigPage() {
                 </button>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <input
                   type="text"
                   placeholder="Multisig name"
@@ -254,9 +254,9 @@ export default function MultisigPage() {
                 />
 
                 {/* Members */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm text-gray-500 dark:text-white/40 flex items-center gap-1.5">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <label className="text-sm text-gray-500 dark:text-white/40 flex items-center gap-2">
                       <Users className="w-4 h-4" /> Members
                     </label>
                     {publicKey && (
@@ -290,7 +290,7 @@ export default function MultisigPage() {
                       const total = (publicKey ? 1 : 0) + next.length;
                       if (total >= 3) setThreshold(Math.ceil(total * 0.6));
                     }}
-                    className="text-sm text-blue-400 hover:text-blue-300 transition cursor-pointer"
+                    className="mt-1 text-sm text-blue-400 hover:text-blue-300 transition cursor-pointer"
                   >
                     + Add member
                   </button>
@@ -298,7 +298,7 @@ export default function MultisigPage() {
 
                 {/* Threshold */}
                 <div className="space-y-3">
-                  <label className="text-sm text-gray-500 dark:text-white/40">
+                  <label className="text-sm text-gray-500 dark:text-white/40 flex items-center gap-2">
                     Approvals needed to sign
                   </label>
                   <div className="bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl p-3">
