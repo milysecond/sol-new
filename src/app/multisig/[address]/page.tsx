@@ -176,9 +176,10 @@ export default function MultisigDetailPage() {
   const [loading, setLoading] = useState(true);
   const [refreshTick, setRefreshTick] = useState(0);
 
-  // Add-member modal
-  const [showAddMember, setShowAddMember] = useState(false);
+  // Modal state — shared by Add Member and Change Threshold proposal flows
+  const [modal, setModal] = useState<null | "add-member" | "change-threshold">(null);
   const [newMemberAddr, setNewMemberAddr] = useState("");
+  const [newThreshold, setNewThreshold] = useState<number>(1);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
@@ -396,47 +397,32 @@ export default function MultisigDetailPage() {
     }
   };
 
-  const handleAddMember = async () => {
+  const submitProposal = async (
+    actions: Array<{ __kind: string } & Record<string, unknown>>
+  ) => {
     if (!view) return;
     setSubmitting(true);
     setSubmitError(null);
     setSubmitSuccess(null);
     try {
-      let newMemberPk: PublicKey;
-      try {
-        newMemberPk = new PublicKey(newMemberAddr.trim());
-      } catch {
-        throw new Error("Invalid Solana address");
-      }
-      if (view.members.some((m) => m.key === newMemberPk.toBase58())) {
-        throw new Error("This wallet is already a member");
-      }
-
-      // Use the network the multisig actually lives on, not the navbar toggle
       const targetNet = view.foundOnNetwork;
       const targetRpc = targetNet === network ? rpc : PUBLIC_RPC[targetNet];
       const conn = new Connection(targetRpc, "confirmed");
-
       const { keypair } = await getPasskeyKeypair();
       const multisigPda = new PublicKey(view.address);
       const txIndex = BigInt(view.transactionIndex) + BigInt(1);
 
-      // Step 1: create the config transaction (proposes the AddMember action)
+      // 1. config transaction with the proposed action
       await multisig.rpc.configTransactionCreate({
         connection: conn,
         feePayer: keypair,
         creator: keypair.publicKey,
         multisigPda,
         transactionIndex: txIndex,
-        actions: [
-          {
-            __kind: "AddMember",
-            newMember: { key: newMemberPk, permissions: { mask: 7 } },
-          },
-        ],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        actions: actions as any,
       });
-
-      // Step 2: turn it into a real proposal so members can vote
+      // 2. real proposal so members can vote
       await multisig.rpc.proposalCreate({
         connection: conn,
         feePayer: keypair,
@@ -444,9 +430,7 @@ export default function MultisigDetailPage() {
         multisigPda,
         transactionIndex: txIndex,
       });
-
-      // Step 3: register the creator's approval (no point creating without
-      // your own vote, and saves the creator a separate signing step)
+      // 3. creator's auto-approval
       await multisig.rpc.proposalApprove({
         connection: conn,
         feePayer: keypair,
@@ -458,16 +442,52 @@ export default function MultisigDetailPage() {
       const remaining = Math.max(0, view.threshold - 1);
       setSubmitSuccess(
         remaining === 0
-          ? `Proposal submitted and threshold reached. Anyone can now execute.`
+          ? "Proposal submitted and threshold reached. Anyone can now execute."
           : `Proposal submitted with your approval. ${remaining} more approval${remaining === 1 ? "" : "s"} needed.`
       );
-      setNewMemberAddr("");
       setRefreshTick((n) => n + 1);
     } catch (e: unknown) {
       setSubmitError(e instanceof Error ? e.message : "Failed to submit");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleAddMember = async () => {
+    if (!view) return;
+    let newMemberPk: PublicKey;
+    try {
+      newMemberPk = new PublicKey(newMemberAddr.trim());
+    } catch {
+      setSubmitError("Invalid Solana address");
+      return;
+    }
+    if (view.members.some((m) => m.key === newMemberPk.toBase58())) {
+      setSubmitError("This wallet is already a member");
+      return;
+    }
+    await submitProposal([
+      {
+        __kind: "AddMember",
+        newMember: { key: newMemberPk, permissions: { mask: 7 } },
+      },
+    ]);
+    setNewMemberAddr("");
+  };
+
+  const handleChangeThreshold = async () => {
+    if (!view) return;
+    if (newThreshold < 1 || newThreshold > view.members.length) {
+      setSubmitError(`Threshold must be between 1 and ${view.members.length}`);
+      return;
+    }
+    if (newThreshold === view.threshold) {
+      setSubmitError("That's already the current threshold");
+      return;
+    }
+    await submitProposal([
+      { __kind: "ChangeThreshold", newThreshold },
+    ]);
   };
 
   const networkOfRecord = view?.foundOnNetwork ?? network;
@@ -537,11 +557,30 @@ export default function MultisigDetailPage() {
                   </div>
 
                   <div className="grid grid-cols-3 gap-3 pt-2">
-                    <Stat
-                      icon={<Users className="w-3.5 h-3.5" />}
-                      label="Threshold"
-                      value={`${view.threshold} of ${view.members.length}`}
-                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isMember) return;
+                        setNewThreshold(view.threshold);
+                        setSubmitError(null);
+                        setSubmitSuccess(null);
+                        setModal("change-threshold");
+                      }}
+                      disabled={!isMember}
+                      className={`text-left rounded-xl bg-black/[0.03] dark:bg-white/[0.03] px-3 py-2 transition ${
+                        isMember
+                          ? "hover:bg-fuchsia-500/10 cursor-pointer"
+                          : "cursor-default"
+                      }`}
+                      title={isMember ? "Change threshold" : "Only members can propose changes"}
+                    >
+                      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-gray-400 dark:text-white/30">
+                        <Users className="w-3.5 h-3.5" /> Threshold
+                      </div>
+                      <div className="text-lg font-semibold mt-0.5 tabular-nums">
+                        {view.threshold} of {view.members.length}
+                      </div>
+                    </button>
                     <Stat
                       icon={<KeyRound className="w-3.5 h-3.5" />}
                       label="Members"
@@ -580,7 +619,7 @@ export default function MultisigDetailPage() {
                       {isMember && (
                         <button
                           onClick={() => {
-                            setShowAddMember(true);
+                            setModal("add-member");
                             setSubmitError(null);
                             setSubmitSuccess(null);
                           }}
@@ -746,10 +785,10 @@ export default function MultisigDetailPage() {
         </PageTransition>
       </main>
 
-      {showAddMember && view && (
+      {modal && view && (
         <div
           className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
-          onClick={() => !submitting && setShowAddMember(false)}
+          onClick={() => !submitting && setModal(null)}
         >
           <div
             className="w-full sm:max-w-md bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl"
@@ -757,12 +796,15 @@ export default function MultisigDetailPage() {
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 dark:border-white/10">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-fuchsia-400" />
-                Add a member
+                {modal === "add-member" ? (
+                  <><UserPlus className="w-5 h-5 text-fuchsia-400" /> Add a member</>
+                ) : (
+                  <><Users className="w-5 h-5 text-fuchsia-400" /> Change threshold</>
+                )}
               </h2>
               <button
                 type="button"
-                onClick={() => !submitting && setShowAddMember(false)}
+                onClick={() => !submitting && setModal(null)}
                 aria-label="Close"
                 className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer"
               >
@@ -770,18 +812,49 @@ export default function MultisigDetailPage() {
               </button>
             </div>
             <div className="px-5 py-5 space-y-4 text-sm text-gray-700 dark:text-white/70">
-              <p>
-                This proposes adding a new wallet to the multisig. <b>{view.threshold} of {view.members.length}</b> members
-                must approve before it executes — your approval is registered automatically.
-              </p>
-              <input
-                type="text"
-                placeholder="New member wallet address"
-                value={newMemberAddr}
-                onChange={(e) => setNewMemberAddr(e.target.value)}
-                disabled={submitting}
-                className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 font-mono text-xs focus:outline-none focus:border-fuchsia-400/50 focus:ring-1 focus:ring-fuchsia-400/25 transition"
-              />
+              {modal === "add-member" ? (
+                <>
+                  <p>
+                    This proposes adding a new wallet to the multisig. <b>{view.threshold} of {view.members.length}</b> members
+                    must approve before it executes — your approval is registered automatically.
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="New member wallet address"
+                    value={newMemberAddr}
+                    onChange={(e) => setNewMemberAddr(e.target.value)}
+                    disabled={submitting}
+                    className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 font-mono text-xs focus:outline-none focus:border-fuchsia-400/50 focus:ring-1 focus:ring-fuchsia-400/25 transition"
+                  />
+                </>
+              ) : (
+                <>
+                  <p>
+                    Change how many members must approve a proposal. Currently <b>{view.threshold} of {view.members.length}</b>.
+                    The change itself needs <b>{view.threshold}</b> approval{view.threshold === 1 ? "" : "s"} to execute.
+                  </p>
+                  <div className="flex items-center gap-1 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl p-2">
+                    {Array.from({ length: view.members.length }, (_, i) => i + 1).map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setNewThreshold(n)}
+                        disabled={submitting}
+                        className={`flex-1 py-2 rounded-lg text-sm font-semibold transition cursor-pointer ${
+                          n <= newThreshold
+                            ? "bg-fuchsia-500 text-white"
+                            : "text-gray-500 dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5"
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-white/40 text-center">
+                    {newThreshold} of {view.members.length}
+                  </p>
+                </>
+              )}
               {submitError && (
                 <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-xs text-red-400">
                   {submitError}
@@ -794,8 +867,12 @@ export default function MultisigDetailPage() {
               )}
               <button
                 type="button"
-                onClick={handleAddMember}
-                disabled={submitting || !newMemberAddr.trim()}
+                onClick={modal === "add-member" ? handleAddMember : handleChangeThreshold}
+                disabled={
+                  submitting ||
+                  (modal === "add-member" && !newMemberAddr.trim()) ||
+                  (modal === "change-threshold" && newThreshold === view.threshold)
+                }
                 className="w-full bg-fuchsia-500 hover:bg-fuchsia-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {submitting ? (
