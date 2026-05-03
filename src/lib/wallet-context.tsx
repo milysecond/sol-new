@@ -66,9 +66,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [publicKey, rpc]);
 
-  // Fetch balance when publicKey or network changes, auto-refresh every 15s
+  // Fetch balance when publicKey or network changes, auto-refresh every 15s.
+  // Clear the stale balance immediately on network toggle so the pill doesn't
+  // show e.g. mainnet 0.1 SOL while the user is now on devnet.
   useEffect(() => {
     if (!publicKey) return;
+    setBalance(null);
     refreshBalance();
     const interval = setInterval(refreshBalance, 15000);
     return () => clearInterval(interval);

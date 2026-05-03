@@ -88,7 +88,8 @@ export default function NftPage() {
         const where = network === "devnet"
           ? "Claim devnet SOL from the Get page."
           : "Add funds from the Get page.";
-        throw new Error(`You need at least ${need} SOL to mint a ${mintType} NFT. Your balance is ${(userBalance / 1e9).toFixed(4)} SOL. ${where}`);
+        const shortAddr = `${address.slice(0, 4)}...${address.slice(-4)}`;
+        throw new Error(`You need at least ${need} SOL to mint a ${mintType} NFT. Wallet ${shortAddr} has ${(userBalance / 1e9).toFixed(4)} SOL on ${network}. ${where}`);
       }
 
       // Step 2: Upload image + metadata
