@@ -20,6 +20,10 @@ import {
   KeyRound,
   UserPlus,
   X,
+  Settings,
+  Wallet as WalletIcon,
+  Play,
+  ThumbsUp,
 } from "lucide-react";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 
@@ -28,6 +32,26 @@ type MemberView = {
   mask: number;
   permissions: string[];
 };
+
+type ProposalStatusKind =
+  | "Draft"
+  | "Active"
+  | "Approved"
+  | "Executing"
+  | "Executed"
+  | "Cancelled"
+  | "Rejected";
+
+type ProposalRow = {
+  idx: number;
+  status: ProposalStatusKind;
+  approved: string[];
+  rejected: string[];
+  cancelled: string[];
+  description: string;
+};
+
+type Proposals = { config: ProposalRow[]; balance: ProposalRow[] };
 
 type MultisigView = {
   address: string;
@@ -46,6 +70,51 @@ const PUBLIC_RPC: Record<"mainnet" | "devnet", string> = {
   mainnet: "https://api.mainnet-beta.solana.com",
   devnet: "https://api.devnet.solana.com",
 };
+
+function describeConfigAction(action: { __kind?: string } & Record<string, unknown> | undefined): string {
+  if (!action || !action.__kind) return "Config change";
+  const a = action as { __kind: string } & Record<string, unknown>;
+  switch (a.__kind) {
+    case "AddMember": {
+      const m = a.newMember as { key: PublicKey } | undefined;
+      const k = m?.key?.toBase58?.();
+      return k ? `Add member ${k.slice(0, 4)}…${k.slice(-4)}` : "Add member";
+    }
+    case "RemoveMember": {
+      const k = (a.oldMember as PublicKey | undefined)?.toBase58?.();
+      return k ? `Remove member ${k.slice(0, 4)}…${k.slice(-4)}` : "Remove member";
+    }
+    case "ChangeThreshold":
+      return `Change threshold to ${a.newThreshold ?? "?"}`;
+    case "SetTimeLock":
+      return `Set time lock to ${a.newTimeLock ?? "?"}s`;
+    case "SetRentCollector":
+      return "Update rent collector";
+    case "AddSpendingLimit":
+      return "Add spending limit";
+    case "RemoveSpendingLimit":
+      return "Remove spending limit";
+    default:
+      return a.__kind;
+  }
+}
+
+function StatusBadge({ status }: { status: ProposalStatusKind }) {
+  const map: Record<ProposalStatusKind, string> = {
+    Draft: "bg-gray-500/15 text-gray-500",
+    Active: "bg-blue-500/15 text-blue-500",
+    Approved: "bg-green-500/15 text-green-500",
+    Executing: "bg-yellow-500/15 text-yellow-500",
+    Executed: "bg-emerald-500/15 text-emerald-500",
+    Cancelled: "bg-gray-500/15 text-gray-500",
+    Rejected: "bg-red-500/15 text-red-500",
+  };
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider ${map[status] || "bg-gray-500/15 text-gray-500"}`}>
+      {status}
+    </span>
+  );
+}
 
 async function tryLoadMultisig(
   rpcUrl: string,
@@ -113,6 +182,13 @@ export default function MultisigDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+
+  // Transactions tabs
+  const [proposals, setProposals] = useState<Proposals>({ config: [], balance: [] });
+  const [proposalsLoading, setProposalsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"config" | "balance">("config");
+  const [txAction, setTxAction] = useState<{ idx: number; kind: "approve" | "execute" } | null>(null);
+  const [txError, setTxError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -185,6 +261,140 @@ export default function MultisigDetailPage() {
       cancelled = true;
     };
   }, [params.address, rpc, network, refreshTick]);
+
+  // Load proposals + actions for this multisig
+  useEffect(() => {
+    if (!view) return;
+    let cancelled = false;
+    setProposalsLoading(true);
+    (async () => {
+      const targetNet = view.foundOnNetwork;
+      const targetRpc = targetNet === network ? rpc : PUBLIC_RPC[targetNet];
+      const conn = new Connection(targetRpc, "confirmed");
+      const multisigPda = new PublicKey(view.address);
+
+      const start = Math.max(1, view.staleTransactionIndex + 1);
+      const end = view.transactionIndex;
+      const indexes: number[] = [];
+      for (let i = end; i >= start && i > end - 25; i--) indexes.push(i);
+
+      const config: ProposalRow[] = [];
+      const balance: ProposalRow[] = [];
+
+      await Promise.all(
+        indexes.map(async (idx) => {
+          const txIdx = BigInt(idx);
+          try {
+            const [proposalPda] = multisig.getProposalPda({ multisigPda, transactionIndex: txIdx });
+            const proposal = await multisig.accounts.Proposal.fromAccountAddress(conn, proposalPda).catch(() => null);
+            if (!proposal) return;
+
+            const [txPda] = multisig.getTransactionPda({ multisigPda, index: txIdx });
+
+            const status = (proposal.status as { __kind: ProposalStatusKind }).__kind;
+            const approved = proposal.approved.map((p) => p.toBase58());
+            const rejected = proposal.rejected.map((p) => p.toBase58());
+            const cancelled = proposal.cancelled.map((p) => p.toBase58());
+
+            // Try config transaction first
+            const cfg = await multisig.accounts.ConfigTransaction.fromAccountAddress(conn, txPda).catch(() => null);
+            if (cfg) {
+              const action = cfg.actions[0] as { __kind?: string } | undefined;
+              const description = describeConfigAction(action);
+              config.push({ idx, status, approved, rejected, cancelled, description });
+              return;
+            }
+
+            // Otherwise try vault transaction
+            const vault = await multisig.accounts.VaultTransaction.fromAccountAddress(conn, txPda).catch(() => null);
+            if (vault) {
+              balance.push({
+                idx,
+                status,
+                approved,
+                rejected,
+                cancelled,
+                description: `Vault transaction #${idx}`,
+              });
+            }
+          } catch {
+            // ignore — row likely missing or unreadable
+          }
+        })
+      );
+
+      if (cancelled) return;
+      config.sort((a, b) => b.idx - a.idx);
+      balance.sort((a, b) => b.idx - a.idx);
+      setProposals({ config, balance });
+      setProposalsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [view, refreshTick, rpc, network]);
+
+  const approveProposal = async (idx: number) => {
+    if (!view) return;
+    setTxError(null);
+    setTxAction({ idx, kind: "approve" });
+    try {
+      const targetNet = view.foundOnNetwork;
+      const targetRpc = targetNet === network ? rpc : PUBLIC_RPC[targetNet];
+      const conn = new Connection(targetRpc, "confirmed");
+      const { keypair } = await getPasskeyKeypair();
+      await multisig.rpc.proposalApprove({
+        connection: conn,
+        feePayer: keypair,
+        member: keypair,
+        multisigPda: new PublicKey(view.address),
+        transactionIndex: BigInt(idx),
+      });
+      setRefreshTick((n) => n + 1);
+    } catch (e: unknown) {
+      setTxError(e instanceof Error ? e.message : "Approve failed");
+    } finally {
+      setTxAction(null);
+    }
+  };
+
+  const executeProposal = async (idx: number, kind: "config" | "balance") => {
+    if (!view) return;
+    setTxError(null);
+    setTxAction({ idx, kind: "execute" });
+    try {
+      const targetNet = view.foundOnNetwork;
+      const targetRpc = targetNet === network ? rpc : PUBLIC_RPC[targetNet];
+      const conn = new Connection(targetRpc, "confirmed");
+      const { keypair } = await getPasskeyKeypair();
+      const multisigPda = new PublicKey(view.address);
+      const transactionIndex = BigInt(idx);
+      if (kind === "config") {
+        await multisig.rpc.configTransactionExecute({
+          connection: conn,
+          feePayer: keypair,
+          multisigPda,
+          transactionIndex,
+          member: keypair,
+          rentPayer: keypair,
+        });
+      } else {
+        await multisig.rpc.vaultTransactionExecute({
+          connection: conn,
+          feePayer: keypair,
+          multisigPda,
+          transactionIndex,
+          member: keypair.publicKey,
+          signers: [keypair],
+        });
+      }
+      setRefreshTick((n) => n + 1);
+    } catch (e: unknown) {
+      setTxError(e instanceof Error ? e.message : "Execute failed");
+    } finally {
+      setTxAction(null);
+    }
+  };
 
   const handleAddMember = async () => {
     if (!view) return;
@@ -411,6 +621,106 @@ export default function MultisigDetailPage() {
                         </a>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                {/* Transactions tabs */}
+                <div className="rounded-2xl border border-black/10 dark:border-white/10 overflow-hidden">
+                  <div className="flex bg-black/[0.03] dark:bg-white/[0.03] border-b border-black/10 dark:border-white/10">
+                    {(["config", "balance"] as const).map((tab) => {
+                      const count = proposals[tab].length;
+                      const Icon = tab === "config" ? Settings : WalletIcon;
+                      const label = tab === "config" ? "Config" : "Balance";
+                      const active = activeTab === tab;
+                      return (
+                        <button
+                          key={tab}
+                          onClick={() => setActiveTab(tab)}
+                          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition cursor-pointer ${
+                            active
+                              ? "bg-fuchsia-500/10 text-fuchsia-500 dark:text-fuchsia-400"
+                              : "text-gray-500 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/70"
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          {label}
+                          {count > 0 && (
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] tabular-nums ${
+                                active
+                                  ? "bg-fuchsia-500/20 text-fuchsia-500 dark:text-fuchsia-400"
+                                  : "bg-black/5 dark:bg-white/10"
+                              }`}
+                            >
+                              {count}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {txError && (
+                    <div className="px-5 py-2 text-xs text-red-400 bg-red-500/5 border-b border-red-500/10">{txError}</div>
+                  )}
+
+                  <div className="divide-y divide-black/5 dark:divide-white/5">
+                    {proposalsLoading ? (
+                      <div className="px-5 py-8 text-center"><Spinner size={18} className="text-fuchsia-400" /></div>
+                    ) : proposals[activeTab].length === 0 ? (
+                      <div className="px-5 py-8 text-center text-sm text-gray-400 dark:text-white/30">
+                        {activeTab === "config" ? "No config transactions yet" : "No vault transactions yet"}
+                      </div>
+                    ) : (
+                      proposals[activeTab].map((p) => {
+                        const myKey = publicKey;
+                        const youApproved = !!myKey && p.approved.includes(myKey);
+                        const isActive = p.status === "Active" || p.status === "Draft";
+                        const isApproved = p.status === "Approved";
+                        const canApprove = isActive && isMember && !youApproved;
+                        const canExecute = isApproved && isMember;
+                        const busyApprove = txAction?.idx === p.idx && txAction.kind === "approve";
+                        const busyExecute = txAction?.idx === p.idx && txAction.kind === "execute";
+                        return (
+                          <div key={p.idx} className="px-5 py-3 flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-mono text-gray-400 dark:text-white/30">#{p.idx}</span>
+                                <span className="text-sm font-medium truncate">{p.description}</span>
+                                <StatusBadge status={p.status} />
+                              </div>
+                              <div className="text-xs text-gray-400 dark:text-white/30 mt-0.5">
+                                Approved {p.approved.length}/{view.threshold}
+                                {p.rejected.length > 0 && ` · Rejected ${p.rejected.length}`}
+                                {youApproved && " · you voted"}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {canApprove && (
+                                <button
+                                  onClick={() => approveProposal(p.idx)}
+                                  disabled={!!txAction}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-400 disabled:opacity-50 text-white text-xs font-semibold transition cursor-pointer"
+                                >
+                                  {busyApprove ? <Spinner size={12} className="text-white" /> : <ThumbsUp className="w-3.5 h-3.5" />}
+                                  Approve
+                                </button>
+                              )}
+                              {canExecute && (
+                                <button
+                                  onClick={() => executeProposal(p.idx, activeTab)}
+                                  disabled={!!txAction}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white text-xs font-semibold transition cursor-pointer"
+                                >
+                                  {busyExecute ? <Spinner size={12} className="text-white" /> : <Play className="w-3.5 h-3.5" />}
+                                  Execute
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
 
