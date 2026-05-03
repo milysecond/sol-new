@@ -118,7 +118,6 @@ export default function DocsPage() {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Endpoints</h2>
           <ul className="space-y-1 text-xs">
             <li><code>GET /api/costs</code> — live action costs (this page consumes it).</li>
-            <li><code>GET /api/treasury-balance</code> — storage treasury SOL + Irys balance.</li>
             <li><code>GET /api/stats</code> — wallets, tokens, nfts counts.</li>
           </ul>
           <p className="text-xs text-gray-400 dark:text-white/30 flex items-center gap-1">
