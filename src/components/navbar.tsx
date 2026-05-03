@@ -26,8 +26,8 @@ export function Navbar() {
   const shortKey = publicKey ? `${publicKey.slice(0, 4)}...${publicKey.slice(-4)}` : null;
 
   return (
-    <nav className="sticky top-0 z-30 border-b border-black/10 dark:border-white/10 bg-white/80 dark:bg-black/80 backdrop-blur-md">
-      <div className="flex items-center justify-between px-6 py-3">
+    <nav>
+      <div className="sticky top-0 z-30 border-b border-black/10 dark:border-white/10 bg-white/80 dark:bg-black/80 backdrop-blur-md flex items-center justify-between px-6 py-3">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <img src="/icon-192.png" alt="sol.new" className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg" />
