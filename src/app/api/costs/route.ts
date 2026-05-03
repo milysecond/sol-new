@@ -9,7 +9,7 @@ const ACTIONS = [
   { id: "token_launch",     label: "Token launch (Meteora DBC)", sol: 0.03,    note: "rent ≈ 0.025 + platform ≈ 0.005" },
   { id: "nft_standard",     label: "NFT — Standard",             sol: 0.02,    note: "rent ≈ 0.015 + platform 0.005" },
   { id: "nft_compressed",   label: "NFT — Compressed",           sol: 0.001,   note: "platform fee only; Helius covers mint" },
-  { id: "multisig_create",  label: "Multisig create (Squads)",   sol: 0.013,   note: "Squads v4 program rent (approx)" },
+  { id: "multisig_create",  label: "Multisig create (Squads)",   sol: 0.05,    note: "rent ≈ 0.04 + platform 0.01" },
   { id: "tx_fee",           label: "Solana base tx fee",         sol: 5000 * LAMPORT, note: "5000 lamports per signature" },
   { id: "metadata_upload",  label: "Metadata upload",            sol: 0,       note: "Turso — free, $0 onchain" },
   { id: "image_upload",     label: "Image upload",               sol: 0,       note: "Vercel Blob — free, $0 onchain" },
