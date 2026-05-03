@@ -9,6 +9,7 @@ import { uploadImage, uploadMetadata } from "@/lib/api";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { Image, Paperclip, Zap, Coins, Check, ExternalLink, ArrowRight } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
