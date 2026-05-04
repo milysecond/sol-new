@@ -6,6 +6,7 @@ import { NetworkProvider } from "@/lib/network";
 import { ThemeProvider } from "@/lib/theme-context";
 import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "sonner";
+import { InstallPrompt } from "@/components/install-prompt";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -77,6 +78,7 @@ export default function RootLayout({
         <NetworkProvider><WalletProvider>{children}</WalletProvider></NetworkProvider>
         </ThemeProvider>
         <Toaster theme="dark" position="top-center" richColors />
+        <InstallPrompt />
         <Analytics />
         <script
           dangerouslySetInnerHTML={{
