@@ -41,3 +41,13 @@ yarn-error.log*
 next-env.d.ts
 .env.local
 .env*.local
+
+# dApp store build artifacts (APK + media + bubblewrap output)
+dapp-store/media/
+dapp-store/*.apk
+dapp-store/*.aab
+dapp-store/*.keystore
+dapp-store/.bubblewrap/
+dapp-store/app/
+dapp-store/build/
+dapp-store/android.keystore
