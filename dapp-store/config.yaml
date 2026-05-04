@@ -1,0 +1,50 @@
+publisher:
+  address: NEWZxFbNkjP3GuFTbd4ZSWABw83FiD14ompYVpoDGiT
+  name: sol.new
+  website: https://sol.new
+  email: gm@metasal.xyz
+
+app:
+  address: ~ # filled in by `npx dapp-store create app` on first run
+  name: sol.new
+  android_package: xyz.solnew.app
+  urls:
+    license_url: https://sol.new/terms
+    copyright_url: https://sol.new/terms
+    privacy_policy_url: https://sol.new/privacy
+    website: https://sol.new
+
+release:
+  address: ~ # filled in by `npx dapp-store create release`
+  media:
+    - purpose: icon
+      uri: icon.png
+    - purpose: banner
+      uri: banner.png
+    - purpose: screenshot
+      uri: screenshot-home.png
+    - purpose: screenshot
+      uri: screenshot-token.png
+    - purpose: screenshot
+      uri: screenshot-multisig.png
+  files:
+    - purpose: install
+      uri: solnew.apk
+  catalog:
+    en-US:
+      name: sol.new
+      short_description: Tokens, NFTs, and wallets on Solana
+      long_description: >
+        sol.new is the fastest way to create tokens, NFTs, multisig wallets,
+        and payments on Solana. Passkey-secured, low fees, no extensions.
+        Launch a token in seconds, mint NFTs, run multisigs, and manage
+        wallets — all from one app.
+      new_in_version: Initial release on the Solana dApp Store.
+      saga_features: ""
+      sagaFeaturesLocalized: ""
+  solana_mobile_dapp_publisher_portal:
+    google_store_package: "" # leave empty if not also on Play Store
+    testing_instructions: >
+      No login required. From the home screen tap "Get started" to create a
+      passkey-secured wallet. To exercise a token launch flow on devnet, use
+      the network toggle in the top-right and switch to "test".
