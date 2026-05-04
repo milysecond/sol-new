@@ -9,6 +9,7 @@ import { uploadImage, uploadMetadata } from "@/lib/api";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
+import { useImagePaste } from "@/lib/use-image-paste";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { Image, Paperclip, Zap, Coins, Check, ExternalLink, ArrowRight } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
@@ -61,12 +62,15 @@ export default function NftPage() {
   const { publicKey: walletPk, refreshBalance } = useWallet();
   const { network, rpc } = useNetwork();
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const acceptImage = (file: File) => {
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
   };
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) acceptImage(file);
+  };
+  useImagePaste(acceptImage);
 
   const handleMint = async () => {
     if (!name || !imageFile || !walletPk) return;
@@ -337,7 +341,7 @@ export default function NftPage() {
                     </div>
                   ) : (
                     <span className="text-gray-400 dark:text-white/30 text-sm">
-                      <Paperclip size={14} className="inline mr-1" /> Tap to upload image
+                      <Paperclip size={14} className="inline mr-1" /> Tap to upload or paste an image
                     </span>
                   )}
                 </label>
