@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Connection, PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
@@ -169,6 +169,9 @@ function CopyButton({ value }: { value: string }) {
 
 export default function MultisigDetailPage() {
   const params = useParams<{ address: string }>();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { rpc, network } = useNetwork();
   const { publicKey } = useWallet();
   const [view, setView] = useState<MultisigView | null>(null);
@@ -184,10 +187,19 @@ export default function MultisigDetailPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
 
-  // Transactions tabs
+  // Transactions tabs — tab state is mirrored to ?tab=ledger so the URL is
+  // shareable / refresh-stable
   const [proposals, setProposals] = useState<Proposals>({ config: [], balance: [] });
   const [proposalsLoading, setProposalsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"config" | "balance">("config");
+  const tabParam = searchParams.get("tab");
+  const activeTab: "config" | "balance" = tabParam === "ledger" ? "balance" : "config";
+  const setActiveTab = (next: "config" | "balance") => {
+    const qp = new URLSearchParams(searchParams);
+    if (next === "config") qp.delete("tab");
+    else qp.set("tab", "ledger");
+    const qs = qp.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
   const [txAction, setTxAction] = useState<{ idx: number; kind: "approve" | "execute" } | null>(null);
   const [txError, setTxError] = useState<string | null>(null);
 
@@ -277,7 +289,7 @@ export default function MultisigDetailPage() {
       const start = Math.max(1, view.staleTransactionIndex + 1);
       const end = view.transactionIndex;
       const indexes: number[] = [];
-      for (let i = end; i >= start && i > end - 25; i--) indexes.push(i);
+      for (let i = end; i >= start && i > end - 50; i--) indexes.push(i);
 
       const config: ProposalRow[] = [];
       const balance: ProposalRow[] = [];
@@ -315,7 +327,22 @@ export default function MultisigDetailPage() {
                 approved,
                 rejected,
                 cancelled,
-                description: `Vault transaction #${idx}`,
+                description: `Vault transaction · ${vault.message.instructions.length} instruction${vault.message.instructions.length === 1 ? "" : "s"}`,
+              });
+              return;
+            }
+
+            // Unknown type (e.g. Batch) — surface in Ledger so it's not silently
+            // hidden. Better to show 'Other transaction' than to lose it.
+            const info = await conn.getAccountInfo(txPda).catch(() => null);
+            if (info) {
+              balance.push({
+                idx,
+                status,
+                approved,
+                rejected,
+                cancelled,
+                description: `Other transaction (${info.data.length} bytes)`,
               });
             }
           } catch {
@@ -603,8 +630,8 @@ export default function MultisigDetailPage() {
                   {view.rentCollector && (
                     <Field label="Rent collector" value={view.rentCollector} explorer={explorer(view.rentCollector)} />
                   )}
-                  <Field label="Time lock (s)" value={view.timeLock.toString()} />
-                  <Field label="Stale tx index" value={view.staleTransactionIndex.toString()} />
+                  <Field label="Time lock (s)" value={view.timeLock.toString()} copyable={false} />
+                  <Field label="Stale tx index" value={view.staleTransactionIndex.toString()} copyable={false} />
                 </div>
 
                 <div className="rounded-2xl border border-black/10 dark:border-white/10 overflow-hidden">
@@ -904,13 +931,23 @@ function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; va
   );
 }
 
-function Field({ label, value, explorer }: { label: string; value: string; explorer?: string }) {
+function Field({
+  label,
+  value,
+  explorer,
+  copyable = true,
+}: {
+  label: string;
+  value: string;
+  explorer?: string;
+  copyable?: boolean;
+}) {
   return (
     <div className="flex items-center gap-3 px-5 py-3 border-t border-black/5 dark:border-white/5 first:border-t-0">
       <div className="text-xs text-gray-500 dark:text-white/40 w-32 shrink-0">{label}</div>
       <div className="flex-1 min-w-0 flex items-center gap-2">
         <span className="font-mono text-xs sm:text-sm truncate">{value}</span>
-        <CopyButton value={value} />
+        {copyable && <CopyButton value={value} />}
       </div>
       {explorer && (
         <a
