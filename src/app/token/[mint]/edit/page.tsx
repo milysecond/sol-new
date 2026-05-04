@@ -12,6 +12,7 @@ import { AnimatedIcon } from "@/components/animated-icon";
 import { useWallet } from "@/lib/wallet-context";
 import { uploadImage } from "@/lib/api";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
+import { useImagePaste } from "@/lib/use-image-paste";
 import { ed25519 } from "@noble/curves/ed25519";
 import bs58 from "bs58";
 
@@ -223,12 +224,15 @@ export default function EditTokenMetadataPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.mint]);
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const acceptImage = (file: File) => {
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
   };
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) acceptImage(file);
+  };
+  useImagePaste(acceptImage);
 
   const isCreator = !!token && !!publicKey && token.wallet === publicKey;
 
@@ -391,10 +395,10 @@ export default function EditTokenMetadataPage() {
                       ) : imageUrl ? (
                         <div className="flex items-center gap-3">
                           <img src={imageUrl} alt="" className="w-12 h-12 rounded-lg object-cover" />
-                          <span className="text-gray-400 dark:text-white/30 text-sm">Tap to replace image</span>
+                          <span className="text-gray-400 dark:text-white/30 text-sm">Tap to replace or paste an image</span>
                         </div>
                       ) : (
-                        <span className="text-gray-400 dark:text-white/30 text-sm">Tap to upload token image</span>
+                        <span className="text-gray-400 dark:text-white/30 text-sm">Tap to upload or paste an image</span>
                       )}
                     </label>
                     <input
