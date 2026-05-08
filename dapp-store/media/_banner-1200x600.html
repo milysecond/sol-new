@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>sol.new banner 1200x600</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1200px; height: 600px; overflow: hidden; }
+  @font-face {
+    font-family: "Inter";
+    src: local("Inter"), local("Helvetica Neue"), local("Arial");
+  }
+  body {
+    background:
+      radial-gradient(circle at 80% 20%, rgba(168, 85, 247, 0.55), transparent 55%),
+      radial-gradient(circle at 15% 80%, rgba(251, 146, 60, 0.45), transparent 50%),
+      linear-gradient(135deg, #0b0014 0%, #14021f 45%, #1a0a26 100%);
+    color: #fff;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    padding: 0 75px;
+    position: relative;
+  }
+  .grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+  .copy { z-index: 1; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-size: 14px; font-weight: 500; letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.65);
+    margin-bottom: 18px;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 999px; background: #fb923c; box-shadow: 0 0 9px #fb923c; }
+  h1 {
+    font-size: 84px; font-weight: 800; line-height: 0.95;
+    letter-spacing: -0.045em;
+    margin-bottom: 22px;
+  }
+  h1 .dotnew {
+    background: linear-gradient(135deg, #c084fc 0%, #fb923c 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .tagline {
+    font-size: 28px; font-weight: 500; line-height: 1.2;
+    color: rgba(255,255,255,0.85);
+    max-width: 460px;
+    margin-bottom: 32px;
+  }
+  .features {
+    display: flex; gap: 28px;
+    font-size: 14px; font-weight: 600;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 0.04em;
+  }
+  .features span { display: inline-flex; align-items: center; gap: 8px; }
+  .features svg { width: 12px; height: 12px; }
+  .art {
+    z-index: 1;
+    display: grid; place-items: center; position: relative;
+  }
+  .icon-wrap {
+    width: 340px; height: 340px;
+    border-radius: 76px;
+    background: linear-gradient(135deg, rgba(192, 132, 252, 0.18), rgba(251, 146, 60, 0.18));
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08);
+    display: grid; place-items: center;
+    box-shadow:
+      0 50px 120px rgba(168, 85, 247, 0.35),
+      inset 0 1px 0 rgba(255,255,255,0.1);
+  }
+  .icon-wrap img {
+    width: 240px; height: 240px;
+    border-radius: 56px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+  }
+  .glow {
+    position: absolute; width: 460px; height: 460px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(168, 85, 247, 0.3) 0%, transparent 60%);
+    filter: blur(30px);
+    z-index: -1;
+  }
+</style>
+</head>
+<body>
+  <div class="grid"></div>
+  <div class="copy">
+    <div class="eyebrow"><span class="dot"></span>Solana dApp</div>
+    <h1>sol<span class="dotnew">.new</span></h1>
+    <div class="tagline">Tokens, NFTs, and wallets on Solana — passkey-secured, low fees.</div>
+    <div class="features">
+      <span><svg viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="2" fill="#a855f7"/></svg>Launch tokens</span>
+      <span><svg viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="2" fill="#fb923c"/></svg>Mint NFTs</span>
+      <span><svg viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="2" fill="#c084fc"/></svg>Multisigs</span>
+    </div>
+  </div>
+  <div class="art">
+    <div class="glow"></div>
+    <div class="icon-wrap"><img src="../../public/icon-512.png" alt="sol.new icon" /></div>
+  </div>
+</body>
+</html>

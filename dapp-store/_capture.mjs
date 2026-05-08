@@ -50,19 +50,23 @@ for (const shot of SHOTS) {
   await page.close();
 }
 
-// Banner: render the local HTML file at 1920x1080.
-{
+// Banners: render local HTML files at their declared dimensions.
+const BANNERS = [
+  { html: "_banner.html",          out: "banner.png",          w: 1920, h: 1080 },
+  { html: "_banner-1200x600.html", out: "banner-1200x600.png", w: 1200, h: 600  },
+];
+for (const b of BANNERS) {
   const page = await ctx.newPage();
-  await page.setViewportSize({ width: 1920, height: 1080 });
-  const bannerUrl = "file://" + path.join(MEDIA, "_banner.html");
+  await page.setViewportSize({ width: b.w, height: b.h });
+  const bannerUrl = "file://" + path.join(MEDIA, b.html);
   console.log("→", bannerUrl);
   await page.goto(bannerUrl, { waitUntil: "networkidle" });
   await page.waitForTimeout(400);
-  const out = path.join(MEDIA, "banner.png");
+  const out = path.join(MEDIA, b.out);
   await page.screenshot({
     path: out,
     fullPage: false,
-    clip: { x: 0, y: 0, width: 1920, height: 1080 },
+    clip: { x: 0, y: 0, width: b.w, height: b.h },
   });
   console.log("  ✓", out);
   await page.close();
