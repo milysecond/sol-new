@@ -43,7 +43,10 @@ next-env.d.ts
 .env*.local
 
 # dApp store build artifacts (APK + media + bubblewrap output)
-dapp-store/media/
+# Ignore generated media but keep the banner HTML templates so the
+# capture script (`_capture.mjs`) can be re-run after a fresh clone.
+dapp-store/media/*
+!dapp-store/media/_banner*.html
 dapp-store/*.apk
 dapp-store/*.apk.idsig
 dapp-store/*.aab
