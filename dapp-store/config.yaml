@@ -24,9 +24,9 @@ release:
     - purpose: screenshot
       uri: screenshot-home.png
     - purpose: screenshot
-      uri: screenshot-token.png
+      uri: screenshot-launches.png
     - purpose: screenshot
-      uri: screenshot-multisig.png
+      uri: screenshot-docs.png
   files:
     - purpose: install
       uri: solnew.apk
