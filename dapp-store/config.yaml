@@ -5,7 +5,7 @@ publisher:
   email: gm@metasal.xyz
 
 app:
-  address: ~ # filled in by `npx dapp-store create app` on first run
+  address: "" # filled in by `dapp-store create app` on first run
   name: sol.new
   android_package: xyz.solnew.app
   urls:
@@ -13,27 +13,34 @@ app:
     copyright_url: https://sol.new/terms
     privacy_policy_url: https://sol.new/privacy
     website: https://sol.new
-
-release:
-  address: ~ # filled in by `npx dapp-store create release`
   media:
     - purpose: icon
-      uri: icon.png
+      uri: media/icon.png
+
+release:
+  address: "" # filled in by `dapp-store create release`
+  media:
+    - purpose: icon
+      uri: media/icon.png
     - purpose: banner
-      uri: banner.png
+      uri: media/banner-1200x600.png
     - purpose: screenshot
-      uri: screenshot-home.png
+      uri: media/screenshot-home.png
     - purpose: screenshot
-      uri: screenshot-launches.png
+      uri: media/screenshot-launches.png
     - purpose: screenshot
-      uri: screenshot-docs.png
+      uri: media/screenshot-docs.png
+    - purpose: screenshot
+      uri: media/screenshot-token.png
   files:
     - purpose: install
-      uri: solnew.apk
+      uri: media/solnew.apk
+  android_details:
+    locales: ["en-US"]
   catalog:
     en-US:
       name: sol.new
-      short_description: Tokens, NFTs, and wallets on Solana
+      short_description: Create anything on Solana
       long_description: >
         sol.new is the fastest way to create tokens, NFTs, multisig wallets,
         and payments on Solana. Passkey-secured, low fees, no extensions.
@@ -42,9 +49,10 @@ release:
       new_in_version: Initial release on the Solana dApp Store.
       saga_features: ""
       sagaFeaturesLocalized: ""
-  solana_mobile_dapp_publisher_portal:
-    google_store_package: "" # leave empty if not also on Play Store
-    testing_instructions: >
-      No login required. From the home screen tap "Get started" to create a
-      passkey-secured wallet. To exercise a token launch flow on devnet, use
-      the network toggle in the top-right and switch to "test".
+
+solana_mobile_dapp_publisher_portal:
+  google_store_package: "" # leave empty if not also on Play Store
+  testing_instructions: >
+    No login required. From the home screen tap "Get started" to create a
+    passkey-secured wallet. To exercise a token launch flow on devnet, use
+    the network toggle in the top-right and switch to "test".

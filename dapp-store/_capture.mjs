@@ -9,6 +9,7 @@ const SHOTS = [
   { name: "screenshot-home.png", url: "https://sol.new/" },
   { name: "screenshot-launches.png", url: "https://sol.new/whats-new" },
   { name: "screenshot-docs.png", url: "https://sol.new/docs" },
+  { name: "screenshot-token.png", url: "https://sol.new/token/5XQcCrVy57V4iP2u8PateCGk3a1DHfEKMSPagPJMYniG" },
 ];
 
 const VIEWPORT = { width: 1080, height: 1920 };
