@@ -3,9 +3,8 @@ publisher:
   name: sol.new
   website: https://sol.new
   email: gm@metasal.xyz
-
 app:
-  address: "" # filled in by `dapp-store create app` on first run
+  address: FerupdBu6qEoV5QeRBBeyRR33pPPZLEFcjaP9kZiWzhB
   name: sol.new
   android_package: xyz.solnew.app
   urls:
@@ -16,9 +15,8 @@ app:
   media:
     - purpose: icon
       uri: media/icon.png
-
 release:
-  address: "" # filled in by `dapp-store create release`
+  address: DFerwxXJPHVxgoY7brmLrBHpBZbGnqoSGXJB4PjJ6P8u
   media:
     - purpose: icon
       uri: media/icon.png
@@ -36,23 +34,28 @@ release:
     - purpose: install
       uri: media/solnew.apk
   android_details:
-    locales: ["en-US"]
+    cert_fingerprint: 61773d28fbf56b10a447233ef495c3f4e427ddd51238b14a3e89cbd44fdfd288
+    min_sdk: 23
+    version: 1.0.0
+    version_code: 1
+    locales:
+      - en-US
   catalog:
     en-US:
       name: sol.new
       short_description: Create anything on Solana
-      long_description: >
-        sol.new is the fastest way to create tokens, NFTs, multisig wallets,
-        and payments on Solana. Passkey-secured, low fees, no extensions.
-        Launch a token in seconds, mint NFTs, run multisigs, and manage
-        wallets — all from one app.
+      long_description: |
+        sol.new is the fastest way to create tokens, NFTs, multisig wallets, and payments on Solana. Passkey-secured, low fees, no extensions. Launch a token in seconds, mint NFTs, run multisigs, and manage wallets — all from one app.
       new_in_version: Initial release on the Solana dApp Store.
-      saga_features: ""
-      sagaFeaturesLocalized: ""
-
+      saga_features: ''
+      sagaFeaturesLocalized: ''
 solana_mobile_dapp_publisher_portal:
-  google_store_package: "" # leave empty if not also on Play Store
-  testing_instructions: >
-    No login required. From the home screen tap "Get started" to create a
-    passkey-secured wallet. To exercise a token launch flow on devnet, use
-    the network toggle in the top-right and switch to "test".
+  google_store_package: ''
+  testing_instructions: |
+    No login required. From the home screen tap "Get started" to create a passkey-secured wallet. To exercise a token launch flow on devnet, use the network toggle in the top-right and switch to "test".
+lastSubmittedVersionOnChain:
+  address: DFerwxXJPHVxgoY7brmLrBHpBZbGnqoSGXJB4PjJ6P8u
+  version_code: 1
+  apk_hash: uh8/Z5PKhvgg1rqvCGFIJAPh8/OtNOmV+XGSeSVmj5w=
+lastUpdatedVersionOnStore:
+  address: DFerwxXJPHVxgoY7brmLrBHpBZbGnqoSGXJB4PjJ6P8u
