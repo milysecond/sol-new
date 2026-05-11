@@ -34,6 +34,7 @@ export function InstallPrompt() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (isStandalone()) return;
+    if ((window as unknown as Record<string, unknown>).__SOLNEW_NATIVE__ || localStorage.getItem("solnew_native")) return;
 
     const dismissedAt = Number(localStorage.getItem(DISMISS_KEY) || 0);
     if (dismissedAt && Date.now() - dismissedAt < DISMISS_DAYS * 86400000) return;
