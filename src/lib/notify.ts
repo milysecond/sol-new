@@ -1,3 +1,17 @@
+async function sendWebPush(payload: { title: string; body: string; url?: string; tag?: string; topic: string }) {
+  const secret = process.env.PUSH_SECRET;
+  const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
+  try {
+    await fetch(`${base}/api/push/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(secret ? { "x-push-secret": secret } : {}) },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // non-fatal
+  }
+}
+
 const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN;
 const TG_CHANNEL = "@soldotnew";
 
@@ -196,4 +210,13 @@ export async function notifyTokenLaunch(data: {
     // Log error but don't break token creation
     console.error('[notify] Telegram notification failed:', err);
   }
+
+  // Push notification to subscribed users
+  await sendWebPush({
+    title: `${data.name} ($${data.symbol}) just launched`,
+    body: data.description?.slice(0, 100) || "New token live on sol.new",
+    url: `/token/${data.mintAddress}`,
+    tag: `launch-${data.mintAddress}`,
+    topic: "launch",
+  });
 }
