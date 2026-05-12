@@ -4,8 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { useState, useCallback } from "react";
-import { Coins, Image, Download, CreditCard, ShieldCheck, FolderOpen, Wallet, Droplets, Zap, ExternalLink, Copy, LogOut, Sparkles } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Coins, Image, Download, CreditCard, ShieldCheck, FolderOpen, Wallet, Droplets, Zap, ExternalLink, Copy, LogOut, Sparkles, Bell, BellOff } from "lucide-react";
+import { getPushPermission, subscribePush, unsubscribePush, type PushPermission } from "@/lib/push-client";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Spinner } from "@/components/spinner";
 import type { LucideIcon } from "lucide-react";
@@ -22,7 +23,13 @@ export function Navbar() {
   const { publicKey, balance, connect, recover, disconnect, loading, airdropping, airdropDone, handleAirdrop } = useWallet();
   const { network, rpc, toggle } = useNetwork();
   const [showMenu, setShowMenu] = useState(false);
+  const [pushPermission, setPushPermission] = useState<PushPermission>("default");
+  const [pushLoading, setPushLoading] = useState(false);
   const pathname = usePathname();
+
+  useEffect(() => {
+    setPushPermission(getPushPermission());
+  }, [showMenu]);
 
   const shortKey = publicKey ? `${publicKey.slice(0, 4)}...${publicKey.slice(-4)}` : null;
 
@@ -146,6 +153,29 @@ export function Navbar() {
                         className="block w-full text-left px-4 py-2.5 text-sm text-yellow-400 hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer disabled:opacity-50"
                       >
                         {airdropping ? "Airdropping..." : airdropDone ? <><Zap size={14} className="inline mr-1" /> 0.1 SOL sent!</> : <><Droplets size={14} className="inline mr-1" /> Airdrop 0.1 SOL</>}
+                      </button>
+                    )}
+                    {pushPermission !== "unsupported" && (
+                      <button
+                        onClick={async () => {
+                          setPushLoading(true);
+                          if (pushPermission === "granted") {
+                            await unsubscribePush();
+                            setPushPermission("default");
+                          } else {
+                            await subscribePush(publicKey ?? undefined);
+                            setPushPermission(getPushPermission());
+                          }
+                          setPushLoading(false);
+                        }}
+                        disabled={pushLoading || pushPermission === "denied"}
+                        className="block w-full text-left px-4 py-2.5 text-sm text-gray-600 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white transition cursor-pointer disabled:opacity-40"
+                        title={pushPermission === "denied" ? "Blocked in browser settings" : undefined}
+                      >
+                        {pushPermission === "granted"
+                          ? <><BellOff size={14} className="inline mr-1.5" />Turn off notifications</>
+                          : <><Bell size={14} className="inline mr-1.5" />{pushLoading ? "Enabling…" : "Enable notifications"}</>
+                        }
                       </button>
                     )}
                     <button

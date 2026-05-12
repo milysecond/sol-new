@@ -2,7 +2,8 @@
 "use client";
 
 import { fastIpfsUrl } from "@/lib/ipfs";
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
+import { PromoInput } from "@/components/promo-input";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { uploadImage, uploadMetadata } from "@/lib/api";
@@ -58,6 +59,7 @@ export default function NftPage() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [promoCode, setPromoCode] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { publicKey: walletPk, refreshBalance } = useWallet();
   const { network, rpc } = useNetwork();
@@ -81,19 +83,33 @@ export default function NftPage() {
       setStatus("minting");
       const { address, keypair: userKeypair } = await getPasskeyKeypair();
 
-      // Step 1b: Check balance BEFORE uploads so we don't burn storage on a
-      // doomed mint. Standard NFT ≈ 0.02 SOL (rent + 0.005 platform fee);
-      // compressed ≈ 0.001 SOL platform fee + tx fee (Helius covers mint).
-      const balanceCheckConn = new Connection(rpc, "confirmed");
-      const userBalance = await balanceCheckConn.getBalance(new PublicKey(address));
-      const minBalance = (mintType === "standard" ? 0.025 : 0.002) * 1e9;
-      if (userBalance < minBalance) {
-        const need = mintType === "standard" ? "0.025" : "0.002";
-        const where = network === "devnet"
-          ? "Claim devnet SOL from the Get page."
-          : "Add funds from the Get page.";
-        const shortAddr = `${address.slice(0, 4)}...${address.slice(-4)}`;
-        throw new Error(`You need at least ${need} SOL to mint a ${mintType} NFT. Wallet ${shortAddr} has ${(userBalance / 1e9).toFixed(4)} SOL on ${network}. ${where}`);
+      // Fund user's wallet via treasury when a promo code is active
+      if (promoCode) {
+        const fundKind = mintType === "standard" ? "nft_standard" : "nft_compressed";
+        const fundRes = await fetch("/api/promo/fund", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: promoCode, wallet: address, kind: fundKind }),
+        });
+        if (!fundRes.ok) {
+          const err = await fundRes.json().catch(() => ({}));
+          throw new Error(err.error ?? "Promo funding failed — please try again.");
+        }
+      }
+
+      // Check balance BEFORE uploads so we don't burn storage on a doomed mint.
+      if (!promoCode) {
+        const balanceCheckConn = new Connection(rpc, "confirmed");
+        const userBalance = await balanceCheckConn.getBalance(new PublicKey(address));
+        const minBalance = (mintType === "standard" ? 0.025 : 0.002) * 1e9;
+        if (userBalance < minBalance) {
+          const need = mintType === "standard" ? "0.025" : "0.002";
+          const where = network === "devnet"
+            ? "Claim devnet SOL from the Get page."
+            : "Add funds from the Get page.";
+          const shortAddr = `${address.slice(0, 4)}...${address.slice(-4)}`;
+          throw new Error(`You need at least ${need} SOL to mint a ${mintType} NFT. Wallet ${shortAddr} has ${(userBalance / 1e9).toFixed(4)} SOL on ${network}. ${where}`);
+        }
       }
 
       // Step 2: Upload image + metadata
@@ -135,33 +151,32 @@ export default function NftPage() {
         const ESTIMATED_RENT_SOL = 0.015;
         const platformFee = sol(TOTAL_PRICE_SOL - ESTIMATED_RENT_SOL);
 
-        const txResult = await createNft(umi, {
+        const nftBuilder = createNft(umi, {
           mint,
           name,
           symbol: "NFT",
           uri: metadataUri,
           sellerFeeBasisPoints: percentAmount(0),
           isMutable: false,
-        })
-        .add(transferSol(umi, {
-          source: umi.identity,
-          destination: FEE_VAULT,
-          amount: platformFee,
-        }))
-        .sendAndConfirm(umi);
+        });
+        if (!promoCode) nftBuilder.add(transferSol(umi, { source: umi.identity, destination: FEE_VAULT, amount: platformFee }));
+        const txResult = await nftBuilder.sendAndConfirm(umi);
 
         mintAddress = mint.publicKey.toString();
         signature = Buffer.from(txResult.signature).toString("base64");
       } else {
         // Compressed NFT — Helius hosts the Bubblegum tree and pays mint cost.
-        // We still take a 0.001 SOL platform fee onchain.
-        const platformFee = sol(0.001);
-        const feeTx = await transferSol(umi, {
-          source: umi.identity,
-          destination: FEE_VAULT,
-          amount: platformFee,
-        }).sendAndConfirm(umi);
-        const feeSig = Buffer.from(feeTx.signature).toString("base64");
+        // We still take a 0.001 SOL platform fee onchain (waived with promo).
+        let feeSig = "";
+        if (!promoCode) {
+          const platformFee = sol(0.001);
+          const feeTx = await transferSol(umi, {
+            source: umi.identity,
+            destination: FEE_VAULT,
+            amount: platformFee,
+          }).sendAndConfirm(umi);
+          feeSig = Buffer.from(feeTx.signature).toString("base64");
+        }
 
         const res = await fetch("/api/mint-nft", {
           method: "POST",
@@ -196,6 +211,14 @@ export default function NftPage() {
           mintAddress: mintAddress || assetId,
         }),
       }).catch(() => {});
+
+      if (promoCode) {
+        fetch("/api/promo/redeem", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: promoCode, wallet: address, kind: `nft_${mintType}` }),
+        }).catch(() => {});
+      }
 
       setResult({ imageUrl: displayUrl, metadataUri, mint: mintAddress, assetId, signature, type: mintType });
       setStatus("done");
@@ -377,6 +400,11 @@ export default function NftPage() {
                   </div>
                 )}
 
+                <PromoInput
+                  onValidCode={setPromoCode}
+                  onClear={() => setPromoCode(null)}
+                />
+
                 <button
                   onClick={handleMint}
                   disabled={!name || !imageFile || status === "uploading" || status === "minting"}
@@ -388,7 +416,9 @@ export default function NftPage() {
                     ? <><Spinner size={16} className="inline mr-2" />Minting onchain...</>
                     : `Mint ${mintType} NFT`}
                 </button>
-                <p className="text-center text-xs text-gray-400 dark:text-white/30">{mintType === "standard" ? "0.02 SOL" : "0.001 SOL"}</p>
+                <p className="text-center text-xs text-gray-400 dark:text-white/30">
+                  {promoCode ? <span className="text-green-400">Free with promo code</span> : mintType === "standard" ? "0.02 SOL" : "0.001 SOL"}
+                </p>
               </div>
             )}
           </div>

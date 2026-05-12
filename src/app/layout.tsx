@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/lib/theme-context";
 import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "sonner";
 import { InstallPrompt } from "@/components/install-prompt";
+import { PushPrompt } from "@/components/push-prompt";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -79,6 +80,7 @@ export default function RootLayout({
         </ThemeProvider>
         <Toaster theme="dark" position="top-center" richColors />
         <InstallPrompt />
+        <PushPrompt />
         <Analytics />
         <script
           dangerouslySetInnerHTML={{

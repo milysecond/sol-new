@@ -73,6 +73,32 @@ export async function initDb() {
       wallet TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      wallet TEXT,
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT,
+      auth TEXT,
+      type TEXT NOT NULL DEFAULT 'web',
+      topics TEXT NOT NULL DEFAULT 'tx,launch',
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS promo_codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT UNIQUE NOT NULL,
+      uses_remaining INTEGER NOT NULL DEFAULT 1,
+      uses_total INTEGER NOT NULL DEFAULT 1,
+      description TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS promo_redemptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL,
+      wallet TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      redeemed_at TEXT DEFAULT (datetime('now'))
+    )`,
   ]);
   // Idempotent migration for the network column on existing deployments
   try {
@@ -282,6 +308,84 @@ export async function countTokens(network?: string | null) {
     args,
   });
   return Number(r.rows[0].count);
+}
+
+export async function savePushSubscription(data: {
+  endpoint: string;
+  p256dh?: string | null;
+  auth?: string | null;
+  type?: string;
+  wallet?: string | null;
+  topics?: string;
+}) {
+  await db.execute({
+    sql: `INSERT INTO push_subscriptions (endpoint, p256dh, auth, type, wallet, topics)
+          VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(endpoint) DO UPDATE SET
+            p256dh = excluded.p256dh,
+            auth = excluded.auth,
+            wallet = COALESCE(excluded.wallet, push_subscriptions.wallet),
+            topics = excluded.topics`,
+    args: [data.endpoint, data.p256dh || null, data.auth || null, data.type || "web", data.wallet || null, data.topics || "tx,launch"],
+  });
+}
+
+export async function deletePushSubscription(endpoint: string) {
+  await db.execute({ sql: "DELETE FROM push_subscriptions WHERE endpoint = ?", args: [endpoint] });
+}
+
+export async function getPushSubscriptionsByTopic(topic: string) {
+  const r = await db.execute({
+    sql: `SELECT * FROM push_subscriptions WHERE topics LIKE ?`,
+    args: [`%${topic}%`],
+  });
+  return r.rows as unknown as Array<{ id: number; wallet: string | null; endpoint: string; p256dh: string | null; auth: string | null; type: string; topics: string }>;
+}
+
+// ─── Promo codes ─────────────────────────────────────────────────────────────
+
+export async function validatePromoCode(code: string): Promise<{ valid: boolean; usesRemaining: number; description: string | null }> {
+  const r = await db.execute({
+    sql: `SELECT uses_remaining, description FROM promo_codes
+          WHERE code = ? AND uses_remaining > 0
+            AND (expires_at IS NULL OR expires_at > datetime('now'))`,
+    args: [code.toUpperCase()],
+  });
+  if (!r.rows[0]) return { valid: false, usesRemaining: 0, description: null };
+  return {
+    valid: true,
+    usesRemaining: r.rows[0].uses_remaining as number,
+    description: r.rows[0].description as string | null,
+  };
+}
+
+export async function redeemPromoCode(code: string, wallet: string, kind: string): Promise<boolean> {
+  const updated = await db.execute({
+    sql: `UPDATE promo_codes SET uses_remaining = uses_remaining - 1
+          WHERE code = ? AND uses_remaining > 0
+            AND (expires_at IS NULL OR expires_at > datetime('now'))`,
+    args: [code.toUpperCase()],
+  });
+  if (!updated.rowsAffected) return false;
+  await db.execute({
+    sql: `INSERT INTO promo_redemptions (code, wallet, kind) VALUES (?, ?, ?)`,
+    args: [code.toUpperCase(), wallet, kind],
+  });
+  return true;
+}
+
+export async function createPromoCode(opts: { code?: string; uses?: number; description?: string; expiresAt?: string }): Promise<string> {
+  const code = (opts.code ?? randomCode()).toUpperCase();
+  await db.execute({
+    sql: `INSERT INTO promo_codes (code, uses_remaining, uses_total, description, expires_at) VALUES (?, ?, ?, ?, ?)`,
+    args: [code, opts.uses ?? 1, opts.uses ?? 1, opts.description ?? null, opts.expiresAt ?? null],
+  });
+  return code;
+}
+
+function randomCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
 export async function getStats() {

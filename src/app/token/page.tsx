@@ -13,7 +13,8 @@ import { useImagePaste } from "@/lib/use-image-paste";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
-import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { PromoInput } from "@/components/promo-input";
 import { DynamicBondingCurveClient, deriveDbcPoolAddress } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { analytics } from "@/lib/analytics";
 
@@ -38,6 +39,7 @@ export default function TokenPage() {
   const [youtube, setYoutube] = useState("https://youtube.com/");
   const [tiktok, setTiktok] = useState("https://tiktok.com/@");
   const [activeSocials, setActiveSocials] = useState<Set<string>>(new Set());
+  const [promoCode, setPromoCode] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
   const [mutableMetadata, setMutableMetadata] = useState(true);
   const [status, setStatus] = useState<"idle" | "auth" | "uploading" | "creating" | "confirming" | "done" | "error">("idle");
@@ -65,18 +67,32 @@ export default function TokenPage() {
       setStatus("auth");
       const { address, keypair: userKeypair } = await getPasskeyKeypair();
       
+      // Fund user's wallet via treasury when a promo code is active
+      if (promoCode) {
+        const fundRes = await fetch("/api/promo/fund", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: promoCode, wallet: address, kind: "token_launch" }),
+        });
+        if (!fundRes.ok) {
+          const err = await fundRes.json().catch(() => ({}));
+          throw new Error(err.error ?? "Promo funding failed — please try again.");
+        }
+      }
+
       // Check balance BEFORE uploads so we don't burn storage on a doomed launch.
       // Real on-chain cost is ~0.025 SOL (rent + tx fee, no platform fee). 0.04 SOL
       // gives ~0.015 SOL margin against DBC rent variance — earlier 0.03 was failing
       // mid-tx with insufficient lamports.
-      const connection0 = new Connection(rpc, "confirmed");
-      const balance = await connection0.getBalance(new PublicKey(address));
-      const MIN_BALANCE = 0.04 * 1e9;
-      if (balance < MIN_BALANCE) {
-        const where = network === "devnet"
-          ? "Claim devnet SOL from the Get page."
-          : "Add funds from the Get page.";
-        throw new Error(`You need at least 0.04 SOL to launch a token. Your balance is ${(balance / 1e9).toFixed(4)} SOL. ${where}`);
+      if (!promoCode) {
+        const connection0 = new Connection(rpc, "confirmed");
+        const balance = await connection0.getBalance(new PublicKey(address));
+        if (balance < 0.045 * 1e9) {
+          const where = network === "devnet"
+            ? "Claim devnet SOL from the Get page."
+            : "Add funds from the Get page.";
+          throw new Error(`You need at least 0.045 SOL to launch a token. Your balance is ${(balance / 1e9).toFixed(4)} SOL. ${where}`);
+        }
       }
 
       // Step 2: Upload image + metadata
@@ -133,6 +149,16 @@ export default function TokenPage() {
       tx.feePayer = userPubkey;
       tx.recentBlockhash = blockhash;
 
+      // Add 0.005 SOL platform fee unless waived by promo code
+      const FEE_VAULT = new PublicKey("Deqi6CBfo2FR2XVZXxSwmcjELy1JdbAXWDNFPzDAbtxW");
+      if (!promoCode) {
+        tx.add(SystemProgram.transfer({
+          fromPubkey: userPubkey,
+          toPubkey: FEE_VAULT,
+          lamports: Math.round(0.005 * LAMPORTS_PER_SOL),
+        }));
+      }
+
       tx.partialSign(mintKeypair, userKeypair);
 
       // Send transaction
@@ -175,6 +201,14 @@ export default function TokenPage() {
       }
 
       await refreshBalance();
+
+      if (promoCode) {
+        fetch("/api/promo/redeem", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: promoCode, wallet: address, kind: "token_launch" }),
+        }).catch(() => {});
+      }
 
       analytics.tokenCreated(mintAddress, ticker);
       analytics.launchInitiated(mintAddress, 'meteora-dbc');
@@ -356,15 +390,20 @@ export default function TokenPage() {
                     </p>
                   </div>
                 ) : (
-                  <button
-                    onClick={handleLaunch}
-                    disabled={!name || !ticker || !imageFile}
-                    className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
-                  >
-                    Launch token
-                  </button>
+                  <>
+                    <PromoInput onValidCode={setPromoCode} onClear={() => setPromoCode(null)} />
+                    <button
+                      onClick={handleLaunch}
+                      disabled={!name || !ticker || !imageFile}
+                      className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      Launch token
+                    </button>
+                  </>
                 )}
-                <p className="text-center text-xs text-gray-400 dark:text-white/30">~0.04 SOL</p>
+                <p className="text-center text-xs text-gray-400 dark:text-white/30">
+                  {promoCode ? <span className="text-green-400">Free with promo code</span> : "~0.045 SOL"}
+                </p>
               </div>
             }
           </div>
@@ -409,7 +448,7 @@ export default function TokenPage() {
               <div>
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-1">What it costs you</h3>
                 <ul className="space-y-1.5 list-disc pl-5">
-                  <li><b>~0.04 SOL</b> from your wallet — covers the on-chain rent for the token's accounts. No platform fee.</li>
+                  <li><b>~0.045 SOL</b> from your wallet — on-chain rent (~0.04 SOL) + 0.005 SOL platform fee (waived with a promo code).</li>
                   <li>Buyers pay a <b>1% trading fee</b> on every swap, which goes to the sol.new treasury.</li>
                 </ul>
               </div>
