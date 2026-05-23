@@ -1,5 +1,5 @@
 // @ts-nocheck — WebAuthn PRF extension types are incomplete
-import { Keypair, Transaction, Connection } from "@solana/web3.js";
+import { Keypair, Transaction, VersionedTransaction, Connection } from "@solana/web3.js";
 
 const CHALLENGE = new TextEncoder().encode("sol.new-wallet-creation");
 
@@ -245,5 +245,52 @@ export async function signAndSendTransaction(
     lastValidBlockHeight,
   }, "confirmed");
   
+  return sig;
+}
+
+/**
+ * Sign a server-built, fee-payer-pre-signed VersionedTransaction with the
+ * user's passkey-derived keypair and submit it. Preserves existing signatures
+ * (i.e. the fee payer's) — does NOT re-fetch a blockhash, since changing the
+ * blockhash here would invalidate the fee payer's signature.
+ */
+export async function signVersionedAndSend(
+  serializedTx: string,
+  rpc: string,
+  expectedPublicKey?: string,
+): Promise<string> {
+  const storedCredId = localStorage.getItem("sol.new.credentialId");
+  const allowCredentials = storedCredId
+    ? [{ id: Uint8Array.from(atob(storedCredId), (c) => c.charCodeAt(0)), type: "public-key" as const }]
+    : undefined;
+
+  const credential = (await navigator.credentials.get({
+    publicKey: {
+      challenge: CHALLENGE,
+      userVerification: "required",
+      ...(allowCredentials && { allowCredentials }),
+      extensions: { prf: { eval: { first: CHALLENGE } } },
+    },
+  })) as PublicKeyCredential;
+  if (!credential) throw new Error("Passkey authentication cancelled");
+
+  const prfResult = credential.getClientExtensionResults()?.prf?.results?.first;
+  const seed = prfResult
+    ? await sha256(new Uint8Array(prfResult))
+    : await sha256(new Uint8Array(credential.rawId));
+
+  const keypair = Keypair.fromSeed(seed.slice(0, 32));
+  if (expectedPublicKey && keypair.publicKey.toBase58() !== expectedPublicKey) {
+    throw new Error(`Passkey mismatch: expected ${expectedPublicKey}, got ${keypair.publicKey.toBase58()}`);
+  }
+
+  const tx = VersionedTransaction.deserialize(Buffer.from(serializedTx, "base64"));
+  // VersionedTransaction.sign() only writes to the slots whose pubkey matches
+  // a provided signer — fee payer's existing signature is preserved.
+  tx.sign([keypair]);
+
+  const conn = new Connection(rpc, "confirmed");
+  const sig = await conn.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
+  await conn.confirmTransaction(sig, "confirmed");
   return sig;
 }
