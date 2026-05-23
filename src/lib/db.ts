@@ -1,8 +1,21 @@
-import { createClient } from "@libsql/client";
+import { createClient, type Client } from "@libsql/client";
 
-export const db = createClient({
-  url: process.env.TURSO_URL!,
-  authToken: process.env.TURSO_AUTH_TOKEN!,
+// Lazy init — under OpenNext build, route modules are loaded for page-data
+// collection without env vars, and createClient throws on undefined URL.
+let _db: Client | null = null;
+function getDb(): Client {
+  if (_db) return _db;
+  _db = createClient({
+    url: process.env.TURSO_URL!,
+    authToken: process.env.TURSO_AUTH_TOKEN!,
+  });
+  return _db;
+}
+export const db = new Proxy({} as Client, {
+  get(_target, prop) {
+    const c = getDb() as unknown as Record<string | symbol, unknown>;
+    return c[prop];
+  },
 });
 
 export async function initDb() {

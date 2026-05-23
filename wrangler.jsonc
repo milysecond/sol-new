@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "sol-new",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-05-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "4e8d1e0f981ddd5939a1e74aa536d38b",
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "r2_buckets": [
+    {
+      "binding": "IMAGES_BUCKET",
+      "bucket_name": "sol-new-images"
+    }
+  ]
+  // TODO: re-add `"triggers": { "crons": ["0 17 * * *"] }` once we have a
+  // custom worker entry that wraps OpenNext and adds a `scheduled` handler
+  // for /api/cron/reengage. OpenNext's default worker.js only exports fetch.
+}

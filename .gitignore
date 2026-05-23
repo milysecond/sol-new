@@ -24,6 +24,15 @@
 .DS_Store
 *.pem
 
+# cloudflare / opennext build + local state
+.open-next/
+.wrangler/
+
+# Solana keypairs — never commit
+fee*.json
+*-keypair.json
+*solana-keypair.json
+
 # debug
 npm-debug.log*
 yarn-debug.log*
