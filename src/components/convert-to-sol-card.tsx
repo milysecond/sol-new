@@ -7,6 +7,10 @@ import { useNetwork } from "@/lib/network";
 import { signVersionedAndSend } from "@/lib/passkey-wallet";
 import { friendlyError } from "@/lib/friendly-errors";
 
+const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+const JUP = "https://lite-api.jup.ag/swap/v1";
+
 export function ConvertToSolCard() {
   const { publicKey, usdcBalance, balance, refreshBalance } = useWallet();
   const { rpc } = useNetwork();
@@ -14,9 +18,6 @@ export function ConvertToSolCard() {
   const [done, setDone] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Show only when there's USDC to convert and the wallet has little/no SOL.
-  // Threshold of 0.01 SOL = ~$2 of buffer so we don't nag users who already
-  // have some SOL.
   if (!publicKey) return null;
   if (usdcBalance === null || usdcBalance < 0.5) return null;
   if (balance !== null && balance > 0.01) return null;
@@ -26,20 +27,45 @@ export function ConvertToSolCard() {
     setErr(null);
     setBusy(true);
     try {
-      const qRes = await fetch("/api/swap/quote", {
+      // Convert 95% of USDC, leaving a buffer for ATA rent + slippage.
+      const swapAmount = Math.floor(usdcBalance * 0.95 * 1_000_000);
+      if (swapAmount < 100_000) throw new Error("USDC amount too small to swap");
+
+      // Quote — direct browser → Jupiter (avoids CF→CF routing issues).
+      const quoteParams = new URLSearchParams({
+        inputMint: USDC_MINT,
+        outputMint: SOL_MINT,
+        amount: String(swapAmount),
+        slippageBps: "100",
+        swapMode: "ExactIn",
+      });
+      const qRes = await fetch(`${JUP}/quote?${quoteParams.toString()}`);
+      const quote = await qRes.json();
+      if (!qRes.ok) throw new Error("Quote failed");
+
+      // Swap-instructions — also direct from browser.
+      const sRes = await fetch(`${JUP}/swap-instructions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ usdcAmount: usdcBalance }),
+        body: JSON.stringify({
+          quoteResponse: quote,
+          userPublicKey: publicKey,
+          wrapAndUnwrapSol: true,
+          useSharedAccounts: true,
+          dynamicComputeUnitLimit: true,
+          prioritizationFeeLamports: "auto",
+        }),
       });
-      const qData = await qRes.json();
-      if (!qRes.ok || !qData.quote) throw new Error(qData.error || "Quote failed");
+      const swapIxs = await sRes.json();
+      if (!sRes.ok) throw new Error("Swap instructions failed");
 
+      // Server assembles + signs as fee payer.
       const bRes = await fetch("/api/swap/build", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userPublicKey: publicKey, quoteResponse: qData.quote }),
+        body: JSON.stringify({ swapInstructionsResponse: swapIxs }),
       });
-      const bData = await bRes.json();
+      const bData = (await bRes.json()) as { ok?: boolean; tx?: string; error?: string };
       if (!bRes.ok || !bData.tx) throw new Error(bData.error || "Build failed");
 
       await signVersionedAndSend(bData.tx, rpc, publicKey);

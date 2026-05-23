@@ -1,9 +1,10 @@
-/**
- * Analytics utility for custom event tracking
- * Uses Vercel Analytics
- */
-
-import { track as vercelTrack } from '@vercel/analytics';
+// No-op on Cloudflare; rewire to a real provider (CF Web Analytics, PostHog, etc.) if/when needed.
+function vercelTrack(event: string, data?: Record<string, unknown>): void {
+  if (typeof window === "undefined") return;
+  if (process.env.NODE_ENV !== "production") {
+    console.debug("[analytics]", event, data);
+  }
+}
 
 type AnalyticsEvent = 
   | 'token_created'
