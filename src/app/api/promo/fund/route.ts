@@ -13,16 +13,18 @@ const FUND_AMOUNTS: Record<string, number> = {
 };
 
 export async function POST(req: NextRequest) {
-  const { code, wallet, kind } = await req.json().catch(() => ({}));
+  const { code, wallet, kind, quantity = 1 } = await req.json().catch(() => ({}));
 
   if (!code || !wallet || !kind) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  const amount = FUND_AMOUNTS[kind];
-  if (!amount) {
+  const perUnit = FUND_AMOUNTS[kind];
+  if (!perUnit) {
     return NextResponse.json({ error: "Unknown kind" }, { status: 400 });
   }
+  const qty = Math.max(1, Math.min(100, Number(quantity) || 1));
+  const amount = perUnit * qty;
 
   const TREASURY_KEY = process.env.TREASURY_PRIVATE_KEY?.trim();
   if (!TREASURY_KEY) {

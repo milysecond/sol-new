@@ -10,7 +10,7 @@ import { FaucetFooter } from "@/components/faucet-footer";
 import { Coins, Image, Wallet, ShieldCheck, ArrowRight, Sparkles } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
-import { WelcomeProvider, useWelcome } from "@/components/welcome-message";
+import { WelcomeProvider } from "@/components/welcome-message";
 import type { LucideIcon } from "lucide-react";
 
 function SplashScreen({ onDone }: { onDone: () => void }) {
@@ -53,10 +53,7 @@ function GetStarted({
   recover: () => Promise<void>;
   loading: boolean;
 }) {
-  const [label, setLabel] = useState("");
-  const [showInput, setShowInput] = useState(false);
   const [isTg, setIsTg] = useState(false);
-  const { show: showWelcome } = useWelcome();
 
   useEffect(() => { setIsTg(isTelegramWebView()); }, []);
 
@@ -77,50 +74,30 @@ function GetStarted({
     );
   }
 
-  if (!showInput) {
-    return (
-      <button
-        onClick={() => { showWelcome(); setShowInput(true); }}
-        className="mt-2 bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-xl px-8 py-3 transition cursor-pointer"
-      >
-        Get started
-      </button>
-    );
-  }
-
   return (
     <div className="mt-3 flex flex-col items-center gap-2 w-full max-w-xs mx-auto">
-      <input
-        type="text"
-        placeholder="Name your new wallet (e.g. My Wallet)"
-        value={label}
-        onChange={(e) => setLabel(e.target.value)}
-        autoFocus
-        className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition text-sm text-center"
-      />
       <button
-        onClick={() => label.trim() && connect(label.trim())}
-        disabled={loading || !label.trim()}
-        className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:cursor-not-allowed"
+        onClick={() => connect("My Wallet")}
+        disabled={loading}
+        className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-purple-400/60 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed text-base"
       >
         {loading ? (
-          <><Spinner size={16} className="inline mr-2" />Authenticating...</>
+          <><Spinner size={16} className="inline mr-2" />Setting up…</>
         ) : (
-          "Create new wallet"
+          "Create my wallet"
         )}
       </button>
-      <p className="text-[11px] text-gray-500 dark:text-white/40 text-center px-1">
-        This creates a <b>brand-new</b> wallet via passkey.
-        <br />
-        If you already have a sol.new wallet with a balance, recover it instead.
+      <p className="text-[11px] text-gray-500 dark:text-white/40 text-center px-1 flex items-center gap-1 justify-center">
+        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        Secured by Face ID — no seed phrases
       </p>
       <button
         type="button"
         onClick={() => recover()}
         disabled={loading}
-        className="w-full mt-1 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white text-sm rounded-xl px-4 py-2.5 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        className="text-xs text-gray-400 dark:text-white/30 hover:text-purple-500 dark:hover:text-purple-400 transition cursor-pointer disabled:opacity-40 mt-2"
       >
-        Recover existing wallet
+        I already have a wallet →
       </button>
     </div>
   );
@@ -187,11 +164,33 @@ function WhatsNewBanner() {
 }
 
 const products: { href: string; icon: LucideIcon; title: string; desc: string; color: string }[] = [
-  { href: "/token", icon: Coins, title: "Token", desc: "Launch a token in seconds", color: "text-orange-400" },
-  { href: "/nft", icon: Image, title: "NFT", desc: "Mint an NFT from any image", color: "text-green-400" },
-  { href: "/multisig", icon: ShieldCheck, title: "Multisig", desc: "Create a multisig", color: "text-blue-400" },
-  { href: "/wallet", icon: Wallet, title: "Wallet", desc: "Get SOL, pay, and manage assets", color: "text-fuchsia-400" },
+  { href: "/token", icon: Coins, title: "Token", desc: "Launch your own coin", color: "text-orange-400" },
+  { href: "/nft", icon: Image, title: "NFT", desc: "Turn an image into an NFT", color: "text-green-400" },
+  { href: "/multisig", icon: ShieldCheck, title: "Multisig", desc: "Shared wallet for couples & teams", color: "text-blue-400" },
+  { href: "/wallet", icon: Wallet, title: "Wallet", desc: "Get SOL, send, manage", color: "text-fuchsia-400" },
 ];
+
+function NextStepBanner() {
+  const { balance } = useWallet();
+  // Show only when wallet is connected but unfunded
+  if (balance === null || balance > 0.001) return null;
+  return (
+    <Link
+      href="/get"
+      className="group flex items-center gap-3 px-4 py-4 rounded-2xl border-2 border-purple-400/50 bg-gradient-to-r from-purple-500/15 to-fuchsia-500/15 hover:from-purple-500/25 hover:to-fuchsia-500/25 transition-all duration-150 active:scale-[0.99] animate-pulse-soft"
+    >
+      <div className="w-11 h-11 rounded-lg bg-purple-500/20 flex items-center justify-center shrink-0">
+        <span className="text-xl">👋</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[10px] uppercase tracking-wider text-purple-500 dark:text-purple-300 font-semibold">Next step</div>
+        <div className="text-sm font-semibold text-gray-900 dark:text-white">Add SOL to start creating</div>
+        <div className="text-[11px] text-gray-500 dark:text-white/50">Use Apple Pay, Google Pay, or a friend</div>
+      </div>
+      <ArrowRight className="w-5 h-5 text-purple-500 dark:text-purple-300 group-hover:translate-x-0.5 transition-transform shrink-0" />
+    </Link>
+  );
+}
 
 export default function Home() {
   const { publicKey, connect, recover, loading } = useWallet();
@@ -207,7 +206,7 @@ export default function Home() {
       <Navbar />
       <main className="flex-1 flex flex-col px-3 sm:px-6 sm:items-center sm:justify-center min-h-0">
         <PageTransition>
-        <div className="w-full sm:max-w-lg flex flex-col gap-3 py-3">
+        <div className="w-full sm:max-w-lg md:max-w-2xl lg:max-w-3xl flex flex-col gap-3 sm:gap-4 md:gap-5 py-3">
           {/* Header */}
           <div className="text-center space-y-2">
             <img src="/icon-512.png" alt="sol.new" className="w-14 h-14 mx-auto rounded-xl electrify" />
@@ -219,17 +218,24 @@ export default function Home() {
             )}
           </div>
 
-          {/* Product grid — 2x2 */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Next-step nudge for funded-zero wallets */}
+          {publicKey && <NextStepBanner />}
+
+          {/* Product grid — 2x2, scales up with viewport */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-5">
             {products.map((p) => (
               <Link
                 key={p.href}
                 href={p.href}
-                className="group flex flex-col items-center justify-center gap-2 py-6 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-95 active:bg-purple-500/10 border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150"
+                className="group flex flex-col items-center justify-center gap-2 sm:gap-3 md:gap-4 py-6 sm:py-10 md:py-14 lg:py-16 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-95 active:bg-purple-500/10 border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150"
               >
-                <AnimatedIcon icon={p.icon} size={24} className={p.color} />
-                <div className="text-sm font-semibold text-gray-900 dark:text-white transition">{p.title}</div>
-                <div className="text-[11px] text-gray-500 dark:text-white/40 px-2 text-center leading-tight">{p.desc}</div>
+                <AnimatedIcon
+                  icon={p.icon}
+                  size={24}
+                  className={`${p.color} [&_svg]:w-7 [&_svg]:h-7 sm:[&_svg]:w-10 sm:[&_svg]:h-10 md:[&_svg]:w-12 md:[&_svg]:h-12 lg:[&_svg]:w-14 lg:[&_svg]:h-14`}
+                />
+                <div className="text-sm sm:text-lg md:text-xl font-semibold text-gray-900 dark:text-white transition">{p.title}</div>
+                <div className="text-[11px] sm:text-sm md:text-base text-gray-500 dark:text-white/40 px-2 text-center leading-tight">{p.desc}</div>
               </Link>
             ))}
           </div>

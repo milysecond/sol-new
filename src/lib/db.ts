@@ -111,6 +111,11 @@ export async function initDb() {
   } catch {
     // column already exists
   }
+  try {
+    await db.execute("ALTER TABLE push_subscriptions ADD COLUMN last_seen TEXT DEFAULT (datetime('now'))");
+  } catch {
+    // column already exists
+  }
   // Token rows pre-column are all from the mainnet-only era — safe to
   // backfill. Multisigs are NOT, because the create flow has been used on
   // both networks before the column shipped, so we leave nulls alone and
@@ -340,6 +345,25 @@ export async function getPushSubscriptionsByTopic(topic: string) {
     args: [`%${topic}%`],
   });
   return r.rows as unknown as Array<{ id: number; wallet: string | null; endpoint: string; p256dh: string | null; auth: string | null; type: string; topics: string }>;
+}
+
+export async function touchPushSubscription(endpoint: string) {
+  await db.execute({
+    sql: "UPDATE push_subscriptions SET last_seen = datetime('now') WHERE endpoint = ?",
+    args: [endpoint],
+  });
+}
+
+// Returns subs idle >= minHours but < maxHours (avoid spamming long-dead users)
+export async function getInactivePushSubscriptions(minHours: number, maxHours: number) {
+  const r = await db.execute({
+    sql: `SELECT * FROM push_subscriptions
+          WHERE last_seen IS NOT NULL
+            AND last_seen <= datetime('now', '-' || ? || ' hours')
+            AND last_seen >  datetime('now', '-' || ? || ' hours')`,
+    args: [minHours, maxHours],
+  });
+  return r.rows as unknown as Array<{ id: number; wallet: string | null; endpoint: string; p256dh: string | null; auth: string | null; type: string; topics: string; last_seen: string }>;
 }
 
 // ─── Promo codes ─────────────────────────────────────────────────────────────

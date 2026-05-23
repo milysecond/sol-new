@@ -94,7 +94,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       fetch("/api/wallet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publicKey: result.publicKey, credentialId: result.credentialId }) }).catch(() => {});
       analytics.walletCreated(result.publicKey);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create passkey");
+      const { friendlyError } = await import("./friendly-errors");
+      setError(friendlyError(e, "We couldn't set up your wallet. Try again."));
     } finally {
       setLoading(false);
     }
@@ -113,7 +114,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       fetch("/api/wallet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publicKey: result.publicKey }) }).catch(() => {});
       analytics.walletRecovered();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to recover wallet");
+      const { friendlyError } = await import("./friendly-errors");
+      setError(friendlyError(e, "We couldn't find your wallet. Try creating a new one."));
     } finally {
       setLoading(false);
     }

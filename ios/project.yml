@@ -1,0 +1,70 @@
+name: sol-new
+options:
+  bundleIdPrefix: xyz.solnew
+  deploymentTarget:
+    iOS: "16.0"
+  developmentLanguage: en
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: "4CK2SMVS2Y"
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: "YES"
+
+targets:
+  sol-new:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: sol-new
+    info:
+      path: sol-new/Info.plist
+      properties:
+        CFBundleDisplayName: sol.new
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchStorybard: LaunchScreen
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default Configuration
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
+        UIRequiresFullScreen: false
+        UIStatusBarStyle: UIStatusBarStyleLightContent
+        UIViewControllerBasedStatusBarAppearance: true
+        ITSAppUsesNonExemptEncryption: false
+        NSFaceIDUsageDescription: sol.new uses Face ID to authenticate your passkey-secured wallet.
+        NSPhotoLibraryUsageDescription: sol.new uses photos so you can pick an image for your token, NFT, or profile.
+        NSPhotoLibraryAddUsageDescription: sol.new can save QR codes and receipts to your photo library.
+        LSApplicationQueriesSchemes:
+          - solana
+          - phantom
+          - solflare
+          - mailto
+          - tel
+          - sms
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: xyz.solnew.app
+        PRODUCT_NAME: sol-new
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
+        SUPPORTS_MACCATALYST: "NO"
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: "NO"

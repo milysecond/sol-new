@@ -1,12 +1,16 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Copy, Check, Droplets, ExternalLink } from "lucide-react";
+import { Copy, Check, Droplets, ExternalLink, Apple } from "lucide-react";
 import { QrCode } from "@/components/qr-code";
 import { WalletShell } from "@/components/wallet-shell";
 import { PageTransition } from "@/components/page-transition";
+import { BuySolModal } from "@/components/buy-sol-modal";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
+
+const BUY_MODAL_SEEN_KEY = "sol.new.buy_modal_seen";
+const ONRAMP_ENABLED = process.env.NEXT_PUBLIC_ONRAMP_ENABLED === "1";
 
 function QrModal({ open, onClose, publicKey, onCopy, copied }: {
   open: boolean; onClose: () => void; publicKey: string; onCopy: () => void; copied: boolean;
@@ -79,12 +83,25 @@ function QrModal({ open, onClose, publicKey, onCopy, copied }: {
 }
 
 export default function WalletGetPage() {
-  const { publicKey, airdropping, airdropDone, handleAirdrop } = useWallet();
+  const { publicKey, balance, airdropping, airdropDone, handleAirdrop } = useWallet();
   const { network } = useNetwork();
   const [copied, setCopied] = useState(false);
 
   const clusterParam = network === "devnet" ? "?cluster=devnet&hideSpam=true" : "?hideSpam=true";
   const [qrFullscreen, setQrFullscreen] = useState(false);
+  const [buyOpen, setBuyOpen] = useState(false);
+
+  // Auto-prompt the buy modal once when a mainnet wallet has zero balance.
+  // Why: empty new wallets can't actually use the app; surface Apple Pay
+  // funding the first time we observe a 0 balance, then never re-trigger.
+  useEffect(() => {
+    if (!ONRAMP_ENABLED) return;
+    if (network !== "mainnet" || !publicKey || balance === null || balance > 0) return;
+    if (typeof window === "undefined") return;
+    if (localStorage.getItem(BUY_MODAL_SEEN_KEY)) return;
+    localStorage.setItem(BUY_MODAL_SEEN_KEY, "1");
+    queueMicrotask(() => setBuyOpen(true));
+  }, [network, publicKey, balance]);
 
   // Max brightness when fullscreen QR is shown
   useEffect(() => {
@@ -114,6 +131,7 @@ export default function WalletGetPage() {
         onCopy={copyAddress}
         copied={copied}
       />
+      <BuySolModal open={buyOpen} onClose={() => setBuyOpen(false)} publicKey={publicKey} />
       <div className="space-y-3">
         <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-4 flex items-center gap-4">
           <div className="shrink-0 cursor-pointer hover:shadow-md transition flex flex-col items-center" onClick={() => setQrFullscreen(true)}>
@@ -135,6 +153,13 @@ export default function WalletGetPage() {
           <button onClick={handleAirdrop} disabled={airdropping} className="w-full bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 text-yellow-300 font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5">
             <Droplets size={14} className="inline mr-1" />
             {airdropping ? "Sending..." : airdropDone ? <><Check className="w-4 h-4 inline" /> 0.1 SOL sent!</> : "Airdrop 0.1 SOL"}
+          </button>
+        )}
+
+        {ONRAMP_ENABLED && network === "mainnet" && (
+          <button onClick={() => setBuyOpen(true)} className="w-full bg-black dark:bg-white text-white dark:text-black font-semibold rounded-xl px-4 py-3 transition cursor-pointer hover:bg-black/85 dark:hover:bg-white/85 active:scale-[0.98] flex items-center justify-center gap-1.5">
+            <Apple size={14} className="inline" />
+            Buy SOL with Apple Pay
           </button>
         )}
 

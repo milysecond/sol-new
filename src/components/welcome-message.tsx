@@ -35,15 +35,8 @@ export function WelcomeProvider({ children }: { children: React.ReactNode }) {
   const [visible, setVisible] = useState(false);
 
   const show = () => setVisible(true);
-
-  // Auto-show for first timers (after splash)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (localStorage.getItem(WELCOME_KEY)) return;
-    // Small delay to let splash finish
-    const t = setTimeout(() => setVisible(true), 1800);
-    return () => clearTimeout(t);
-  }, []);
+  // Welcome modal is now manual-only — triggered by GetStarted, not auto-popped.
+  // First-time users see a single clear CTA instead of an autopopping modal.
 
   return (
     <WelcomeContext.Provider value={{ show }}>
