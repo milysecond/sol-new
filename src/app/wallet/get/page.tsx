@@ -6,6 +6,7 @@ import { QrCode } from "@/components/qr-code";
 import { WalletShell } from "@/components/wallet-shell";
 import { PageTransition } from "@/components/page-transition";
 import { BuySolModal } from "@/components/buy-sol-modal";
+import { ConvertToSolCard } from "@/components/convert-to-sol-card";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 
@@ -132,6 +133,7 @@ export default function WalletGetPage() {
         copied={copied}
       />
       <BuySolModal open={buyOpen} onClose={() => setBuyOpen(false)} publicKey={publicKey} />
+      {ONRAMP_ENABLED && network === "mainnet" && <ConvertToSolCard />}
       <div className="space-y-3">
         <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-4 flex items-center gap-4">
           <div className="shrink-0 cursor-pointer hover:shadow-md transition flex flex-col items-center" onClick={() => setQrFullscreen(true)}>

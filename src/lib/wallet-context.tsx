@@ -6,10 +6,12 @@ import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { createPasskeyWallet, recoverPasskeyWallet } from "./passkey-wallet";
 import { useNetwork } from "./network";
 import { analytics } from "./analytics";
+import { getUsdcBalance } from "./usdc";
 
 interface WalletState {
   publicKey: string | null;
   balance: number | null;
+  usdcBalance: number | null;
   loading: boolean;
   error: string | null;
   connect: (username?: string) => Promise<void>;
@@ -24,6 +26,7 @@ interface WalletState {
 const WalletContext = createContext<WalletState>({
   publicKey: null,
   balance: null,
+  usdcBalance: null,
   loading: false,
   error: null,
   connect: async (username?: string) => {},
@@ -42,6 +45,7 @@ export function useWallet() {
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
+  const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { rpc, network } = useNetwork();
@@ -61,12 +65,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       // 'confirmed' is much faster than the default 'finalized' (~12s lag)
       // and is enough certainty for a UI balance after a confirmed tx.
       const conn = new Connection(rpc, "confirmed");
-      const bal = await conn.getBalance(new PublicKey(key));
-      setBalance(bal / LAMPORTS_PER_SOL);
+      const pubkey = new PublicKey(key);
+      const [solLamports, usdc] = await Promise.all([
+        conn.getBalance(pubkey),
+        getUsdcBalance(conn, pubkey, network as "mainnet" | "devnet"),
+      ]);
+      setBalance(solLamports / LAMPORTS_PER_SOL);
+      setUsdcBalance(usdc);
     } catch {
       setBalance(null);
+      setUsdcBalance(null);
     }
-  }, [publicKey, rpc]);
+  }, [publicKey, rpc, network]);
 
   // Fetch balance when publicKey or network changes, auto-refresh every 15s.
   // Clear the stale balance immediately on network toggle so the pill doesn't
@@ -74,6 +84,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!publicKey) return;
     setBalance(null);
+    setUsdcBalance(null);
     refreshBalance();
     const interval = setInterval(refreshBalance, 15000);
     return () => clearInterval(interval);
@@ -152,12 +163,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const disconnect = () => {
     setPublicKey(null);
     setBalance(null);
+    setUsdcBalance(null);
     localStorage.removeItem("sol.new.wallet");
     localStorage.removeItem("sol.new.credentialId");
   };
 
   return (
-    <WalletContext.Provider value={{ publicKey, balance, loading, error, connect, recover, disconnect, refreshBalance, airdropping, airdropDone, handleAirdrop }}>
+    <WalletContext.Provider value={{ publicKey, balance, usdcBalance, loading, error, connect, recover, disconnect, refreshBalance, airdropping, airdropDone, handleAirdrop }}>
       {children}
     </WalletContext.Provider>
   );
