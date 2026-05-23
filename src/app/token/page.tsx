@@ -17,6 +17,7 @@ import { Connection, Keypair, PublicKey, Transaction, SystemProgram, LAMPORTS_PE
 import { PromoInput } from "@/components/promo-input";
 import { DynamicBondingCurveClient, deriveDbcPoolAddress } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { analytics } from "@/lib/analytics";
+import { friendlyError } from "@/lib/friendly-errors";
 
 const WRAPPED_SOL = new PublicKey("So11111111111111111111111111111111111111112");
 const DBC_PARTNER_CONFIG_MAINNET = new PublicKey("8G4yr6Q7wHvpRBGj1u9ZisY9Q95HNAxBQknaqUNanpvA");
@@ -215,22 +216,7 @@ export default function TokenPage() {
       router.push(`/token/${mintAddress}`);
       return;
     } catch (e: unknown) {
-      let msg = "Something went wrong. Please try again.";
-      if (e instanceof Error) {
-        const m = e.message;
-        if (m.includes("insufficient lamports") || m.includes("0x1")) {
-          msg = "Not enough SOL in your wallet. Add funds from the Get page and try again.";
-        } else if (m.includes("blockhash") || m.includes("expired")) {
-          msg = "Transaction timed out. Please try again.";
-        } else if (m.includes("User cancelled") || m.includes("NotAllowedError")) {
-          msg = "Sign-in was cancelled.";
-        } else if (m.startsWith("You need at least")) {
-          msg = m;
-        } else {
-          msg = m.length > 120 ? "Something went wrong. Please try again." : m;
-        }
-      }
-      setError(msg);
+      setError(friendlyError(e, "We couldn't launch your token. Please try again."));
       setStatus("error");
     }
   };

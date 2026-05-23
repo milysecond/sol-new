@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bell, BellOff, X } from "lucide-react";
-import { getPushPermission, subscribePush, unsubscribePush, type PushPermission } from "@/lib/push-client";
+import { getPushPermission, subscribePush, unsubscribePush, touchPushSubscription, type PushPermission } from "@/lib/push-client";
 
 const DISMISS_KEY = "sol.new.push-dismissed";
 
@@ -14,7 +14,12 @@ export function PushPrompt({ wallet }: { wallet?: string }) {
   useEffect(() => {
     const p = getPushPermission();
     setPermission(p);
-    if (p === "unsupported" || p === "denied" || p === "granted") return;
+    if (p === "granted") {
+      // Heartbeat — tells the re-engagement cron we were active today
+      touchPushSubscription();
+      return;
+    }
+    if (p === "unsupported" || p === "denied") return;
     if (localStorage.getItem(DISMISS_KEY)) return;
     // Show after a short delay so it doesn't compete with page load
     const t = setTimeout(() => setShow(true), 3000);

@@ -6,8 +6,11 @@ import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { Download, Copy, Check, Droplets, ExternalLink } from "lucide-react";
+import { Download, Copy, Check, Droplets, ExternalLink, Apple } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
+import { friendlyError } from "@/lib/friendly-errors";
+
+const ONRAMP_ENABLED = process.env.NEXT_PUBLIC_ONRAMP_ENABLED === "1";
 
 export default function GetPage() {
   const { publicKey, refreshBalance } = useWallet();
@@ -15,6 +18,11 @@ export default function GetPage() {
   const [copied, setCopied] = useState(false);
   const [airdropping, setAirdropping] = useState(false);
   const [airdropDone, setAirdropDone] = useState(false);
+
+  // Apple Pay form — kept under $150 to stay in MoonPay's no-KYC tier
+  const [amount, setAmount] = useState(25);
+  const [buying, setBuying] = useState(false);
+  const [buyError, setBuyError] = useState<string | null>(null);
 
   const copyAddress = useCallback(() => {
     if (!publicKey) return;
@@ -46,6 +54,23 @@ export default function GetPage() {
       setAirdropping(false);
     }
   }, [publicKey, network, refreshBalance]);
+
+  const buyWithApplePay = async () => {
+    if (!publicKey) return;
+    setBuyError(null);
+    setBuying(true);
+    try {
+      const res = await fetch(`/api/onramp?address=${publicKey}&amount=${amount}`);
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "Failed to start payment");
+      window.location.href = data.url;
+    } catch (e) {
+      setBuyError(friendlyError(e, "Couldn't start payment. Try again."));
+      setBuying(false);
+    }
+  };
+
+  const isValid = amount >= 20 && amount <= 150;
 
   const solscanUrl = publicKey
     ? `https://orbmarkets.io/address/${publicKey}${network === "devnet" ? "?cluster=devnet&hideSpam=true" : "?hideSpam=true"}`
@@ -112,30 +137,61 @@ export default function GetPage() {
               </div>
             )}
 
-            {/* Mainnet on-ramp */}
-            {network === "mainnet" && (
-              <div className="space-y-3">
-                <p className="text-xs text-gray-500 dark:text-white/40 uppercase tracking-wider text-center">Buy SOL</p>
-                <button
-                  onClick={async () => {
-                    const res = await fetch(`/api/onramp?address=${publicKey}`);
-                    const data = await res.json();
-                    if (data.token) {
-                      window.open(
-                        `https://pay.coinbase.com/buy/select-asset?sessionToken=${data.token}&defaultAsset=SOL&defaultNetwork=solana&destinationWallets=[{"address":"${publicKey}","blockchains":["solana"]}]`,
-                        "_blank"
-                      );
-                    }
-                  }}
-                  className="w-full flex items-center justify-between bg-purple-500/10 border border-purple-400/30 rounded-xl px-5 py-4 hover:bg-purple-500/20 transition active:scale-[0.98] cursor-pointer text-left"
-                >
-                  <div>
-                    <span className="font-medium block text-purple-300">Buy SOL</span>
-                    <span className="text-xs text-gray-500 dark:text-white/40">Card or Apple Pay</span>
+            {/* Mainnet on-ramp — direct Apple Pay */}
+            {ONRAMP_ENABLED && network === "mainnet" && (
+              <div className="bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
+                    <Apple size={16} className="inline" /> Buy with Apple Pay
+                  </p>
+                  <span className="text-xs text-gray-400 dark:text-white/30">no signup</span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-white/40 mb-1.5 block">Amount</label>
+                  <div className="grid grid-cols-4 gap-2 mb-2">
+                    {[20, 50, 100, 150].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setAmount(n)}
+                        className={`rounded-lg py-2 text-sm font-medium transition cursor-pointer ${
+                          amount === n
+                            ? "bg-purple-500/20 border border-purple-400/50 text-purple-400"
+                            : "bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-500 dark:text-white/40 hover:text-gray-900 dark:hover:text-white"
+                        }`}
+                      >
+                        ${n}
+                      </button>
+                    ))}
                   </div>
-                  <ExternalLink size={16} className="text-purple-400/50" />
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-white/30">$</span>
+                    <input
+                      type="number"
+                      min={20}
+                      max={150}
+                      value={amount}
+                      onChange={(e) => setAmount(Math.max(20, Math.min(150, parseInt(e.target.value) || 20)))}
+                      className="w-full pl-7 pr-3 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-900 dark:text-white focus:outline-none focus:border-purple-400/50 text-sm tabular-nums"
+                    />
+                  </div>
+                </div>
+
+                {buyError && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs">{buyError}</div>
+                )}
+
+                <button
+                  onClick={buyWithApplePay}
+                  disabled={!isValid || buying}
+                  className="w-full flex items-center justify-center gap-2 bg-black dark:bg-white text-white dark:text-black font-semibold rounded-xl px-5 py-3 hover:bg-black/85 dark:hover:bg-white/85 transition active:scale-[0.98] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {buying ? "Starting…" : <><Apple size={18} className="inline" /> Pay ${amount}</>}
                 </button>
-                <p className="text-xs text-gray-400 dark:text-white/30 text-center">Powered by Coinbase</p>
+                <p className="text-[10px] text-gray-400 dark:text-white/30 text-center leading-snug">
+                  Processed by MoonPay. No signup required up to $150. SOL arrives within minutes.
+                </p>
               </div>
             )}
 

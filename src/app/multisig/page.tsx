@@ -14,6 +14,7 @@ import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { Connection, Keypair, PublicKey, TransactionMessage, VersionedTransaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 import { PromoInput } from "@/components/promo-input";
+import { friendlyError } from "@/lib/friendly-errors";
 
 export default function MultisigPage() {
   const [name, setName] = useState("");
@@ -190,20 +191,7 @@ export default function MultisigPage() {
 
       setStatus("done");
     } catch (e: unknown) {
-      let msg = "Something went wrong. Please try again.";
-      if (e instanceof Error) {
-        const m = e.message;
-        if (m.includes("insufficient lamports") || m.includes("0x1")) {
-          msg = "Not enough SOL in your wallet.";
-        } else if (m.includes("User cancelled") || m.includes("NotAllowedError")) {
-          msg = "Sign-in was cancelled.";
-        } else if (m.startsWith("You need at least")) {
-          msg = m;
-        } else {
-          msg = m.length > 120 ? "Something went wrong. Please try again." : m;
-        }
-      }
-      setError(msg);
+      setError(friendlyError(e, "We couldn't create your multisig. Please try again."));
       setStatus("error");
     }
   };

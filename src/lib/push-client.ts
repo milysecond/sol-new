@@ -74,6 +74,7 @@ export async function subscribePush(wallet?: string): Promise<boolean> {
 
 async function registerApnsToken(token: string, wallet?: string) {
   try {
+    localStorage.setItem("solnew_apns_token", token);
     await fetch("/api/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -100,6 +101,35 @@ export async function unsubscribePush(): Promise<void> {
     body: JSON.stringify({ endpoint: sub.endpoint }),
   });
   await sub.unsubscribe();
+}
+
+// ─── Heartbeat — pings the server so the re-engagement cron knows you were here today
+export async function touchPushSubscription(): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    if (isNative()) {
+      const token = localStorage.getItem("solnew_apns_token");
+      if (token) {
+        await fetch("/api/push/touch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpoint: token }),
+        });
+      }
+      return;
+    }
+    if (!("serviceWorker" in navigator)) return;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return;
+    await fetch("/api/push/touch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: sub.endpoint }),
+    });
+  } catch {
+    // silent — heartbeat is best-effort
+  }
 }
 
 // ─── Local notification (no server needed) ─────────────────────────────────
