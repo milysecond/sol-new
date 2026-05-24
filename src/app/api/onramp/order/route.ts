@@ -29,7 +29,10 @@ export async function POST(req: NextRequest) {
     const orderBody = {
       recipient: { walletAddress: address },
       payment: {
-        method: "checkoutcom-apple-pay",
+        // "card" is Crossmint's umbrella for fiat-via-card; Apple Pay surfaces
+        // inside the hosted checkout when the device supports it and the
+        // merchant domain (sol.new) is verified in the Crossmint console.
+        method: "card",
         receiptEmail: email || undefined,
       },
       lineItems: [
