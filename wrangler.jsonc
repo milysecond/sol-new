@@ -5,6 +5,7 @@
   "compatibility_date": "2026-05-23",
   "compatibility_flags": ["nodejs_compat"],
   "account_id": "4e8d1e0f981ddd5939a1e74aa536d38b",
+  "workers_dev": true,
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -12,6 +13,10 @@
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
+  },
+  "vars": {
+    "NEXT_PUBLIC_ONRAMP_ENABLED": "1",
+    "CROSSMINT_PROJECT_ID": "659bb4f5-36d6-49a6-aee0-acedfd4eabf0"
   },
   "r2_buckets": [
     {
