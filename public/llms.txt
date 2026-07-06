@@ -1,0 +1,31 @@
+# sol.new
+
+> sol.new is the fastest way for everyday people to create tokens, NFTs, wallets, payments, and DAOs on Solana. Wallets are secured by passkeys (Face ID / Touch ID) — no seed phrases, no installs, no signup. It runs entirely in the browser as a progressive web app.
+
+## What you can do on sol.new
+
+- [Create a Token](https://sol.new/token): Launch your own SPL token / Solana memecoin in seconds. Upload an image, pick a name and symbol, and go live instantly. Low fees.
+- [Mint an NFT](https://sol.new/nft): Turn any image into an NFT on Solana — standard or compressed (cNFT).
+- [Multisig](https://sol.new/multisig): Create shared wallets with multiple required signers for couples, teams, and DAOs.
+- [Wallet](https://sol.new/wallet): A passkey-secured Solana wallet. Get SOL, send payments, and manage tokens and NFTs.
+- [Get SOL](https://sol.new/get): Fund a wallet with Apple Pay, Google Pay, or a card — no exchange account needed.
+- [Payment Links](https://sol.new/pay): Create a Solana Pay link or QR anyone can pay with, in SOL or USDC.
+- [Split a Bill](https://sol.new/split): Split a bill or invoice between friends and get paid in SOL or USDC. Add a tip, set the number of people, and share a link or QR per person with paid-tracking.
+- [Track a Wallet](https://sol.new/track): Paste any Solana address to view its tokens, NFTs, and balances.
+- [Portfolio](https://sol.new/portfolio): See your Solana tokens, NFTs, and balances in one place.
+
+## Content
+
+- [What's New](https://sol.new/whats-new): The newest tokens launched on sol.new, in real time.
+- [News](https://sol.new/news): Latest Solana and crypto headlines, aggregated from top sources.
+- [Podcasts](https://sol.new/pods): Hand-picked Solana and crypto podcasts.
+- [Docs & Guides](https://sol.new/docs): How to create tokens, mint NFTs, set up multisig, and accept payments.
+- [Compare](https://sol.new/compare): How sol.new compares to pump.fun, Bags, and Bonk.
+
+## Key facts
+
+- Network: Solana (mainnet and devnet).
+- Security: passkey-based (WebAuthn) wallets — no seed phrases to lose.
+- Access: no install and no signup required; works in any modern browser and installs as a PWA.
+- Token launch fee: 1%.
+- Links: X/Twitter https://x.com/soldotnew · Telegram https://t.me/soldotnew

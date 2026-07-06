@@ -184,6 +184,17 @@ export default function LaunchPage() {
             </Link>
           )}
 
+          {/* MetaDAO governance */}
+          <a
+            href={`https://metadao.fi`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full bg-green-500/5 hover:bg-green-500/10 border border-green-400/20 hover:border-green-400/40 text-green-500 dark:text-green-400 rounded-xl px-4 py-2.5 transition"
+          >
+            <ArrowRight className="w-4 h-4" />
+            <span className="text-sm font-medium">Govern on MetaDAO</span>
+          </a>
+
           {/* Share links */}
           {(() => {
             const url = `https://sol.new/token/${token.mint_address}`;

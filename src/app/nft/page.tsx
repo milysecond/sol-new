@@ -496,6 +496,28 @@ export default function NftPage() {
           </div>
           </PageTransition>
         </ConnectGate>
+
+        <div className="w-full sm:max-w-lg pt-6 pb-2 space-y-2">
+          <p className="text-center text-xs text-gray-400 dark:text-white/30">Looking to buy NFTs instead?</p>
+          <div className="grid grid-cols-2 gap-3">
+            <a
+              href="https://magiceden.io/solana"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-medium text-gray-600 dark:text-white/60 hover:text-pink-500 dark:hover:text-pink-400 hover:border-pink-400/40 transition"
+            >
+              Magic Eden <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+            <a
+              href="https://www.tensor.trade"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-medium text-gray-600 dark:text-white/60 hover:text-sky-500 dark:hover:text-sky-400 hover:border-sky-400/40 transition"
+            >
+              Tensor <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
       </main>
     </div>
   );

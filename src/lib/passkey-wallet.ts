@@ -3,6 +3,47 @@ import { Keypair, Transaction, VersionedTransaction, Connection } from "@solana/
 
 const CHALLENGE = new TextEncoder().encode("sol.new-wallet-creation");
 
+/**
+ * Resolve which credential to allow for auth prompts. Prefers the active
+ * credentialId; falls back to the saved wallet list keyed by the connected
+ * address (heals sessions from before credentialId tracking existed, where
+ * the browser would otherwise list every sol.new passkey on the device).
+ */
+function getAllowCredentials() {
+  let credId = localStorage.getItem("sol.new.credentialId");
+  if (!credId) {
+    try {
+      const pubkey = localStorage.getItem("sol.new.wallet");
+      const wallets = JSON.parse(localStorage.getItem("sol.new.wallets") || "[]");
+      credId = wallets.find((w) => w.pubkey === pubkey)?.credentialId || null;
+    } catch {}
+  }
+  return credId
+    ? [{ id: Uint8Array.from(atob(credId), (c) => c.charCodeAt(0)), type: "public-key" as const }]
+    : undefined;
+}
+
+/**
+ * Persist the (address ↔ credential) pairing learned from a successful auth,
+ * so the next prompt can pin to the right passkey instead of listing them all.
+ */
+function rememberCredential(address: string, rawId: ArrayBuffer) {
+  try {
+    const credentialId = btoa(String.fromCharCode(...new Uint8Array(rawId)));
+    const wallets = JSON.parse(localStorage.getItem("sol.new.wallets") || "[]");
+    const idx = wallets.findIndex((w) => w.pubkey === address);
+    if (idx >= 0) {
+      if (!wallets[idx].credentialId) wallets[idx].credentialId = credentialId;
+    } else {
+      wallets.push({ pubkey: address, credentialId, label: `Wallet ${address.slice(0, 4)}…${address.slice(-4)}` });
+    }
+    localStorage.setItem("sol.new.wallets", JSON.stringify(wallets));
+    if (localStorage.getItem("sol.new.wallet") === address && !localStorage.getItem("sol.new.credentialId")) {
+      localStorage.setItem("sol.new.credentialId", credentialId);
+    }
+  } catch {}
+}
+
 async function sha256(data: Uint8Array): Promise<Uint8Array> {
   const hash = await crypto.subtle.digest("SHA-256", new Uint8Array(data) as unknown as BufferSource);
   return new Uint8Array(hash);
@@ -65,13 +106,14 @@ export async function createPasskeyWallet(username: string): Promise<{
 
 export async function recoverPasskeyWallet(): Promise<{
   publicKey: string;
+  credentialId: string;
 }> {
   const credential = (await navigator.credentials.get({
     publicKey: {
       challenge: CHALLENGE,
       userVerification: "required",
       extensions: {
-        
+
         prf: {
           eval: {
             first: CHALLENGE,
@@ -83,7 +125,7 @@ export async function recoverPasskeyWallet(): Promise<{
 
   if (!credential) throw new Error("Passkey authentication cancelled");
 
-  
+  const credentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
   const prfResult = credential.getClientExtensionResults()?.prf?.results?.first;
 
   let seed: Uint8Array;
@@ -98,6 +140,7 @@ export async function recoverPasskeyWallet(): Promise<{
 
   return {
     publicKey: keypair.publicKey.toBase58(),
+    credentialId,
   };
 }
 
@@ -107,10 +150,7 @@ export async function recoverPasskeyWallet(): Promise<{
  * Returns both to avoid double authentication.
  */
 export async function getPasskeyKeypair(): Promise<{address: string, keypair: Keypair}> {
-  const storedCredId = localStorage.getItem("sol.new.credentialId");
-  const allowCredentials = storedCredId 
-    ? [{ id: Uint8Array.from(atob(storedCredId), c => c.charCodeAt(0)), type: "public-key" as const }]
-    : undefined;
+  const allowCredentials = getAllowCredentials();
 
   const credential = (await navigator.credentials.get({
     publicKey: {
@@ -138,8 +178,10 @@ export async function getPasskeyKeypair(): Promise<{address: string, keypair: Ke
   }
 
   const keypair = Keypair.fromSeed(seed.slice(0, 32));
+  const address = keypair.publicKey.toBase58();
+  rememberCredential(address, credential.rawId);
   return {
-    address: keypair.publicKey.toBase58(),
+    address,
     keypair,
   };
 }
@@ -186,11 +228,8 @@ export async function signAndSendTransaction(
   rpc: string,
   expectedPublicKey?: string
 ): Promise<string> {
-  // Get stored credentialId to ensure we use the right passkey
-  const storedCredId = localStorage.getItem("sol.new.credentialId");
-  const allowCredentials = storedCredId 
-    ? [{ id: Uint8Array.from(atob(storedCredId), c => c.charCodeAt(0)), type: "public-key" as const }]
-    : undefined;
+  // Pin the prompt to the right passkey for the connected wallet
+  const allowCredentials = getAllowCredentials();
 
   const credential = (await navigator.credentials.get({
     publicKey: {
@@ -219,7 +258,8 @@ export async function signAndSendTransaction(
   }
 
   const keypair = Keypair.fromSeed(seed.slice(0, 32));
-  
+  rememberCredential(keypair.publicKey.toBase58(), credential.rawId);
+
   // Verify the derived wallet matches expected
   if (expectedPublicKey && keypair.publicKey.toBase58() !== expectedPublicKey) {
     throw new Error(`Passkey mismatch: expected ${expectedPublicKey} but got ${keypair.publicKey.toBase58()}`);
@@ -259,10 +299,7 @@ export async function signVersionedAndSend(
   rpc: string,
   expectedPublicKey?: string,
 ): Promise<string> {
-  const storedCredId = localStorage.getItem("sol.new.credentialId");
-  const allowCredentials = storedCredId
-    ? [{ id: Uint8Array.from(atob(storedCredId), (c) => c.charCodeAt(0)), type: "public-key" as const }]
-    : undefined;
+  const allowCredentials = getAllowCredentials();
 
   const credential = (await navigator.credentials.get({
     publicKey: {
@@ -280,6 +317,7 @@ export async function signVersionedAndSend(
     : await sha256(new Uint8Array(credential.rawId));
 
   const keypair = Keypair.fromSeed(seed.slice(0, 32));
+  rememberCredential(keypair.publicKey.toBase58(), credential.rawId);
   if (expectedPublicKey && keypair.publicKey.toBase58() !== expectedPublicKey) {
     throw new Error(`Passkey mismatch: expected ${expectedPublicKey}, got ${keypair.publicKey.toBase58()}`);
   }

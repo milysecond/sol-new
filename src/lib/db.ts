@@ -1,20 +1,50 @@
 import { createClient, type Client } from "@libsql/client";
 
+// libsql's HTTP client builds requests with `cross-fetch` and calls them with a
+// default `fetch`/`Request` from `@libsql/isomorphic-fetch`. Under OpenNext's
+// Cloudflare bundle (Node resolution conditions) those resolve to node-fetch,
+// which runs through workerd's buggy `node:http` shim and throws deep in
+// processHeader ("Cannot read properties of null (reading 'has')"). We sidestep
+// it by handing libsql an adapter that re-issues every request through workerd's
+// native `fetch` (returning a native, WHATWG-compatible Response).
+const edgeFetch = async (input: unknown, init?: RequestInit): Promise<Response> => {
+  if (typeof input === "string") return fetch(input, init);
+  const req = input as {
+    url: string;
+    method?: string;
+    headers: { forEach: (cb: (v: string, k: string) => void) => void };
+    text: () => Promise<string>;
+  };
+  const headers: Record<string, string> = {};
+  req.headers.forEach((v, k) => { headers[k] = v; });
+  const method = req.method || "GET";
+  const body = method === "GET" || method === "HEAD" ? undefined : await req.text();
+  return fetch(req.url, { method, headers, body });
+};
+
 // Lazy init — under OpenNext build, route modules are loaded for page-data
 // collection without env vars, and createClient throws on undefined URL.
 let _db: Client | null = null;
 function getDb(): Client {
   if (_db) return _db;
+  // Map Turso's `libsql://` scheme to `https://` so libsql uses the stateless
+  // HTTP client (where our native-fetch adapter applies) rather than the
+  // WebSocket transport, which relies on node:ws and also breaks on workerd.
+  const url = (process.env.TURSO_URL || "").replace(/^libsql:\/\//, "https://");
   _db = createClient({
-    url: process.env.TURSO_URL!,
+    url,
     authToken: process.env.TURSO_AUTH_TOKEN!,
+    fetch: edgeFetch,
   });
   return _db;
 }
 export const db = new Proxy({} as Client, {
   get(_target, prop) {
     const c = getDb() as unknown as Record<string | symbol, unknown>;
-    return c[prop];
+    const v = c[prop];
+    // @libsql/client methods read private fields off `this`; the proxy isn't a
+    // real client instance, so unbound methods throw. Bind them to the client.
+    return typeof v === "function" ? (v as (...a: unknown[]) => unknown).bind(c) : v;
   },
 });
 
@@ -112,6 +142,32 @@ export async function initDb() {
       kind TEXT NOT NULL,
       redeemed_at TEXT DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS claim_links (
+      public_key TEXT PRIMARY KEY,
+      sender TEXT,
+      amount_lamports INTEGER,
+      network TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      claimed_by TEXT,
+      claimed_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS punt_picks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      wallet TEXT NOT NULL,
+      fixture_id INTEGER NOT NULL,
+      pick TEXT NOT NULL,
+      pick_label TEXT,
+      price INTEGER,
+      home TEXT,
+      away TEXT,
+      start_time INTEGER,
+      result TEXT,
+      points INTEGER NOT NULL DEFAULT 0,
+      settled INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(wallet, fixture_id)
+    )`,
   ]);
   // Idempotent migration for the network column on existing deployments
   try {
@@ -129,11 +185,59 @@ export async function initDb() {
   } catch {
     // column already exists
   }
+  try {
+    await db.execute("ALTER TABLE claim_links ADD COLUMN token TEXT DEFAULT 'SOL'");
+  } catch {
+    // column already exists
+  }
   // Token rows pre-column are all from the mainnet-only era — safe to
   // backfill. Multisigs are NOT, because the create flow has been used on
   // both networks before the column shipped, so we leave nulls alone and
   // verify on display instead (see /wallet/multisig).
   await db.execute("UPDATE tokens SET network = 'mainnet' WHERE network IS NULL");
+
+  // Launch platform tables (pump.fun launchpad)
+  await db.batch([
+    `CREATE TABLE IF NOT EXISTS creator_profiles (
+      wallet TEXT PRIMARY KEY,
+      bio TEXT,
+      avatar_url TEXT,
+      twitter TEXT,
+      website TEXT,
+      updated_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS follows (
+      follower TEXT NOT NULL,
+      creator TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (follower, creator)
+    )`,
+    `CREATE TABLE IF NOT EXISTS comments (
+      id TEXT PRIMARY KEY,
+      mint TEXT NOT NULL,
+      wallet TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS proposals (
+      id TEXT PRIMARY KEY,
+      mint TEXT NOT NULL,
+      creator TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      status TEXT DEFAULT 'open',
+      expires_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS votes (
+      id TEXT PRIMARY KEY,
+      proposal_id TEXT NOT NULL,
+      wallet TEXT NOT NULL,
+      choice TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(proposal_id, wallet)
+    )`,
+  ]);
 }
 
 export async function saveMetadata(id: string, json: string, wallet?: string | null) {
@@ -379,6 +483,108 @@ export async function getInactivePushSubscriptions(minHours: number, maxHours: n
   return r.rows as unknown as Array<{ id: number; wallet: string | null; endpoint: string; p256dh: string | null; auth: string | null; type: string; topics: string; last_seen: string }>;
 }
 
+// ─── Claim links (gifts) ─────────────────────────────────────────────────────
+// Status bookkeeping only — the claim secret never touches the server; funds
+// move on-chain regardless of what this table says.
+
+export async function saveClaimLink(data: {
+  publicKey: string;
+  sender: string;
+  amountLamports: number; // base units of the gifted token
+  network: string;
+  token?: string;
+}) {
+  await db.execute({
+    sql: `INSERT OR IGNORE INTO claim_links (public_key, sender, amount_lamports, network, token) VALUES (?, ?, ?, ?, ?)`,
+    args: [data.publicKey, data.sender, data.amountLamports, data.network, data.token || "SOL"],
+  });
+}
+
+export async function getClaimLink(publicKey: string) {
+  const r = await db.execute({
+    sql: "SELECT public_key, sender, amount_lamports, network, status, claimed_at, created_at FROM claim_links WHERE public_key = ? LIMIT 1",
+    args: [publicKey],
+  });
+  return r.rows[0] ?? null;
+}
+
+export async function markClaimLinkClaimed(publicKey: string, claimedBy: string, status: "claimed" | "reclaimed") {
+  const r = await db.execute({
+    sql: `UPDATE claim_links SET status = ?, claimed_by = ?, claimed_at = datetime('now')
+          WHERE public_key = ? AND status = 'pending'`,
+    args: [status, claimedBy, publicKey],
+  });
+  return r.rowsAffected > 0;
+}
+
+// ─── Punt picks (free-to-play) ───────────────────────────────────────────────
+// No stakes, no payouts — points only. Points = decimal odds ×10 at pick time.
+
+export async function savePuntPick(data: {
+  wallet: string;
+  fixtureId: number;
+  pick: string;
+  pickLabel: string;
+  price: number | null; // decimal odds ×1000
+  home: string;
+  away: string;
+  startTime: number;
+}) {
+  await db.execute({
+    sql: `INSERT INTO punt_picks (wallet, fixture_id, pick, pick_label, price, home, away, start_time)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(wallet, fixture_id) DO UPDATE SET
+            pick = excluded.pick,
+            pick_label = excluded.pick_label,
+            price = excluded.price
+          WHERE punt_picks.settled = 0`,
+    args: [data.wallet, data.fixtureId, data.pick, data.pickLabel, data.price, data.home, data.away, data.startTime],
+  });
+}
+
+export async function getWalletPuntPicks(wallet: string) {
+  const r = await db.execute({
+    sql: "SELECT * FROM punt_picks WHERE wallet = ? ORDER BY start_time DESC LIMIT 100",
+    args: [wallet],
+  });
+  return r.rows;
+}
+
+export async function getUnsettledFixtures(startedBeforeMs: number): Promise<number[]> {
+  const r = await db.execute({
+    sql: "SELECT DISTINCT fixture_id FROM punt_picks WHERE settled = 0 AND start_time < ?",
+    args: [startedBeforeMs],
+  });
+  return r.rows.map((row) => Number(row.fixture_id));
+}
+
+export async function settleFixturePicks(fixtureId: number, result: string) {
+  await db.execute({
+    sql: `UPDATE punt_picks
+          SET settled = 1,
+              result = ?,
+              points = CASE WHEN pick = ? THEN COALESCE(ROUND(price / 100.0), 10) ELSE 0 END
+          WHERE fixture_id = ? AND settled = 0`,
+    args: [result, result, fixtureId],
+  });
+}
+
+export async function getPuntLeaderboard(limit = 20) {
+  const r = await db.execute({
+    sql: `SELECT wallet,
+                 SUM(points) AS points,
+                 COUNT(*) AS picks,
+                 SUM(CASE WHEN settled = 1 AND pick = result THEN 1 ELSE 0 END) AS wins,
+                 SUM(settled) AS settled
+          FROM punt_picks
+          GROUP BY wallet
+          ORDER BY points DESC, wins DESC, picks ASC
+          LIMIT ?`,
+    args: [limit],
+  });
+  return r.rows;
+}
+
 // ─── Promo codes ─────────────────────────────────────────────────────────────
 
 export async function validatePromoCode(code: string): Promise<{ valid: boolean; usesRemaining: number; description: string | null }> {
@@ -436,4 +642,99 @@ export async function getStats() {
     tokens: tokens.rows[0].count,
     nfts: nfts.rows[0].count,
   };
+}
+
+// ─── Creator profiles ─────────────────────────────────────────────────────────
+
+export async function upsertCreatorProfile(data: {
+  wallet: string;
+  bio?: string | null;
+  avatarUrl?: string | null;
+  twitter?: string | null;
+  website?: string | null;
+}) {
+  await db.execute({
+    sql: `INSERT INTO creator_profiles (wallet, bio, avatar_url, twitter, website)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(wallet) DO UPDATE SET
+            bio = excluded.bio,
+            avatar_url = excluded.avatar_url,
+            twitter = excluded.twitter,
+            website = excluded.website,
+            updated_at = datetime('now')`,
+    args: [data.wallet, data.bio ?? null, data.avatarUrl ?? null, data.twitter ?? null, data.website ?? null],
+  });
+}
+
+export async function getCreatorProfile(wallet: string) {
+  const r = await db.execute({ sql: "SELECT * FROM creator_profiles WHERE wallet = ? LIMIT 1", args: [wallet] });
+  return r.rows[0] ?? null;
+}
+
+export async function followCreator(follower: string, creator: string) {
+  await db.execute({
+    sql: "INSERT OR IGNORE INTO follows (follower, creator) VALUES (?, ?)",
+    args: [follower, creator],
+  });
+}
+
+export async function unfollowCreator(follower: string, creator: string) {
+  await db.execute({ sql: "DELETE FROM follows WHERE follower = ? AND creator = ?", args: [follower, creator] });
+}
+
+export async function getFollowerCount(creator: string): Promise<number> {
+  const r = await db.execute({ sql: "SELECT COUNT(*) as count FROM follows WHERE creator = ?", args: [creator] });
+  return Number(r.rows[0].count);
+}
+
+export async function isFollowing(follower: string, creator: string): Promise<boolean> {
+  const r = await db.execute({ sql: "SELECT 1 FROM follows WHERE follower = ? AND creator = ? LIMIT 1", args: [follower, creator] });
+  return r.rows.length > 0;
+}
+
+// ─── Comments ────────────────────────────────────────────────────────────────
+
+export async function saveComment(data: { id: string; mint: string; wallet: string; body: string }) {
+  await db.execute({
+    sql: "INSERT INTO comments (id, mint, wallet, body) VALUES (?, ?, ?, ?)",
+    args: [data.id, data.mint, data.wallet, data.body],
+  });
+}
+
+export async function getComments(mint: string, limit = 50, before?: string) {
+  const args: (string | number)[] = [mint];
+  let sql = "SELECT * FROM comments WHERE mint = ?";
+  if (before) { sql += " AND created_at < ?"; args.push(before); }
+  sql += " ORDER BY created_at DESC LIMIT ?";
+  args.push(limit);
+  const r = await db.execute({ sql, args });
+  return r.rows;
+}
+
+// ─── Proposals ────────────────────────────────────────────────────────────────
+
+export async function saveProposal(data: {
+  id: string; mint: string; creator: string; title: string; description?: string | null; expiresAt?: string | null;
+}) {
+  await db.execute({
+    sql: "INSERT INTO proposals (id, mint, creator, title, description, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
+    args: [data.id, data.mint, data.creator, data.title, data.description ?? null, data.expiresAt ?? null],
+  });
+}
+
+export async function getProposals(mint: string) {
+  const r = await db.execute({ sql: "SELECT * FROM proposals WHERE mint = ? ORDER BY created_at DESC", args: [mint] });
+  return r.rows;
+}
+
+export async function saveVote(data: { id: string; proposalId: string; wallet: string; choice: string }) {
+  await db.execute({
+    sql: "INSERT OR REPLACE INTO votes (id, proposal_id, wallet, choice) VALUES (?, ?, ?, ?)",
+    args: [data.id, data.proposalId, data.wallet, data.choice],
+  });
+}
+
+export async function getVotes(proposalId: string) {
+  const r = await db.execute({ sql: "SELECT * FROM votes WHERE proposal_id = ?", args: [proposalId] });
+  return r.rows;
 }

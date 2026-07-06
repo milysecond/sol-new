@@ -15,6 +15,18 @@ const nextConfig: NextConfig = {
         destination: "/token/:mint",
         permanent: true,
       },
+      // /dev aliases the staging Pages deployment.
+      {
+        source: "/dev",
+        destination: "https://dev.sol.new",
+        permanent: false,
+      },
+      // /learn aliases the learn subdomain.
+      {
+        source: "/learn",
+        destination: "https://learn.sol.new",
+        permanent: false,
+      },
     ];
   },
 };

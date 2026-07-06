@@ -5,8 +5,8 @@ import { analytics } from "./analytics";
 
 export type Network = "mainnet" | "devnet";
 
-const RPC: Record<Network, string> = {
-  mainnet: "https://viviyan-bkj12u-fast-mainnet.helius-rpc.com",
+export const RPC: Record<Network, string> = {
+  mainnet: "https://eu.fluxrpc.com?key=04a32b3f-cf44-48fb-8c13-faace267ee5d",
   devnet: "https://api.devnet.solana.com",
 };
 
