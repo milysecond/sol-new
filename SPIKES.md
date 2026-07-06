@@ -46,3 +46,15 @@ v2.0.1 has **no `vaultPda`** — the user-facing address is `smartWalletPubkey` 
 ## Program identity — IMPORTANT ⚠️ (found during runtime spikes)
 
 `@lazorkit/wallet@2.0.1` targets program `Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh` ("lazorkit" v0.1.0 IDL) + `BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7` ("default_policy"). Both are deployed executable on **devnet AND mainnet** (verified via getAccountInfo 2026-07-06). The Accretion-audited program-v2 (`Lazorj…FAKi`, mainnet-only) is served by `@lazorkit/sdk-legacy` instead. **LAUNCH GATE: confirm audit coverage of the Gsuz program (ask LazorKit), or switch to sdk-legacy + audited program.** SDK defaults: rpc `api.devnet.solana.com`, portal `portal.lazor.sh`, paymaster `kora.devnet.lazorkit.com` (a hosted Kora node — protocol match confirmed).
+
+## SPIKE-7: Genesis/UMI noop-signer extraction — CONFIRMED ✅ (runtime proof)
+
+`claimLaunchPoolV2(umi-with-noop-identity, accounts).getInstructions().map(toWeb3JsInstruction)` → 1 instruction whose only signer is the smart-wallet address. Requires `umi.use(mplToolbox())` for the splAssociatedToken program registry. Deposit builder needs exact arg plumbing (BigInt field) but is the same codegen — mechanism proven. `src/lib/umi-smart.ts` design is viable.
+
+## SPIKE-4 (static half): Squads instruction builders — PRESENT ✅
+
+`@sqds/multisig` exposes `instructions.proposalApprove / vaultTransactionExecute / configTransactionCreate` etc. — so routing through LazorKit CPI is *constructible*. Whether the Squads program accepts a CPI-signed member remains an on-chain test (M0 browser session / devnet). Default remains: legacy-gate multisig.
+
+## Browser click-through (needs a human — see /dev/lazor)
+
+Harness at `src/app/dev/lazor/page.tsx` (devnet, their portal + Kora paymaster). Buttons map to: connect (SPIKE-6), balance, signMessage capture (SPIKE-5), small memo tx (SPIKE-3a end-to-end), oversized ix set (SPIKE-3b chunking), disconnect. Desktop: any localhost dev server (WebAuthn OK on localhost). iOS PWA test needs HTTPS → `npx wrangler versions upload` preview URL (does NOT touch prod traffic).
