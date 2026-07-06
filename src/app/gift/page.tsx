@@ -8,7 +8,6 @@ import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import {
   CLAIM_FEE_LAMPORTS,
   USDC_GIFT_FUND_LAMPORTS,
@@ -25,7 +24,7 @@ import {
   type GiftToken,
 } from "@/lib/gift-link";
 import { analytics } from "@/lib/analytics";
-import { Connection, PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Connection, PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import QRCode from "qrcode";
 
 type Status = "idle" | "auth" | "sending" | "confirming" | "done" | "error";
@@ -52,7 +51,7 @@ export default function GiftPage() {
   const [reclaiming, setReclaiming] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { publicKey, walletLabel, balance, usdcBalance, refreshBalance } = useWallet();
+  const { publicKey, balance, usdcBalance, refreshBalance, signer } = useWallet();
   const { network, rpc } = useNetwork();
 
   const refreshLinks = useCallback(() => setLinks(loadGiftLinks()), []);
@@ -114,38 +113,25 @@ export default function GiftPage() {
       }
 
       setStatus("auth");
-      const { keypair: sender } = await getPasskeyKeypair();
-      if (sender.publicKey.toBase58() !== publicKey) {
-        throw new Error(
-          `That passkey belongs to a different wallet. Pick the passkey for ${walletLabel || `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`}, or switch wallets in the menu.`,
-        );
-      }
+      const s = await signer();
 
       setStatus("sending");
       const { keypair: gift, secret } = createGiftKeypair();
-      const connection = new Connection(rpc, "confirmed");
       const senderPk = new PublicKey(publicKey);
 
-      const tx = new Transaction();
-      if (token === "SOL") {
-        tx.add(
-          SystemProgram.transfer({
-            fromPubkey: senderPk,
-            toPubkey: gift.publicKey,
-            lamports: amountBase + CLAIM_FEE_LAMPORTS,
-          })
-        );
-      } else {
-        tx.add(...buildUsdcGiftInstructions(senderPk, gift.publicKey, amountBase, network));
-      }
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = senderPk;
-      tx.sign(sender);
+      const ixs =
+        token === "SOL"
+          ? [
+              SystemProgram.transfer({
+                fromPubkey: senderPk,
+                toPubkey: gift.publicKey,
+                lamports: amountBase + CLAIM_FEE_LAMPORTS,
+              }),
+            ]
+          : buildUsdcGiftInstructions(senderPk, gift.publicKey, amountBase, network);
 
-      const signature = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
       setStatus("confirming");
-      await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
+      await s.signAndSend(ixs);
 
       const url = buildGiftUrl(secret, network, message);
       const entry: GiftLinkEntry = {
@@ -188,7 +174,7 @@ export default function GiftPage() {
   const shareLink = async () => {
     if (!giftUrl) return;
     try {
-      await navigator.share({ title: "You've been sent crypto 🎁", url: giftUrl });
+      await navigator.share({ title: "You've been sent crypto", url: giftUrl });
     } catch {
       copyLink();
     }

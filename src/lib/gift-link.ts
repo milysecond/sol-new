@@ -98,7 +98,7 @@ export function buildUsdcGiftInstructions(
   network: Network
 ): TransactionInstruction[] {
   const mint = usdcMint(network);
-  const senderAta = getAssociatedTokenAddressSync(mint, sender, false, TOKEN_PROGRAM_ID);
+  const senderAta = getAssociatedTokenAddressSync(mint, sender, true, TOKEN_PROGRAM_ID); // sender may be an off-curve smart wallet
   const giftAta = getAssociatedTokenAddressSync(mint, giftPubkey, false, TOKEN_PROGRAM_ID);
   return [
     createAssociatedTokenAccountIdempotentInstruction(sender, giftAta, giftPubkey, mint, TOKEN_PROGRAM_ID),
@@ -126,7 +126,7 @@ export async function sweepGift(
   if (contents.usdcBase > 0) {
     const mint = usdcMint(network);
     const giftAta = getAssociatedTokenAddressSync(mint, gift.publicKey, false, TOKEN_PROGRAM_ID);
-    const destAta = getAssociatedTokenAddressSync(mint, destination, false, TOKEN_PROGRAM_ID);
+    const destAta = getAssociatedTokenAddressSync(mint, destination, true, TOKEN_PROGRAM_ID); // claimer may be an off-curve smart wallet
     ixs.push(
       createAssociatedTokenAccountIdempotentInstruction(gift.publicKey, destAta, destination, mint, TOKEN_PROGRAM_ID),
       createTransferCheckedInstruction(giftAta, mint, destAta, gift.publicKey, contents.usdcBase, USDC_DECIMALS, [], TOKEN_PROGRAM_ID),

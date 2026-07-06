@@ -7,8 +7,7 @@ import { Send, Coins, Image as ImageIcon, ArrowRight, Check, ExternalLink } from
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { getPasskeyKeypair } from "@/lib/passkey-wallet";
-import { Connection, PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 type Tab = "sol" | "token" | "nft";
 
@@ -21,8 +20,8 @@ export default function SendPage() {
   const [txId, setTxId] = useState<string | null>(null);
   const [addressValid, setAddressValid] = useState<boolean | null>(null);
 
-  const { publicKey, balance, refreshBalance } = useWallet();
-  const { network, rpc } = useNetwork();
+  const { publicKey, balance, refreshBalance, signer } = useWallet();
+  const { network } = useNetwork();
 
   const handleRecipientChange = (value: string, isPaste = false) => {
     const raw = isPaste ? value.trim() : value;
@@ -58,21 +57,11 @@ export default function SendPage() {
       }
 
       setStatus("sending");
-      const { keypair: userKeypair } = await getPasskeyKeypair();
-      const connection = new Connection(rpc, "confirmed");
-
-      const tx = new Transaction().add(
-        SystemProgram.transfer({ fromPubkey: new PublicKey(publicKey), toPubkey: recipientPubkey, lamports: amountLamports })
-      );
-
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = new PublicKey(publicKey);
-      tx.sign(userKeypair);
-
-      const signature = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
+      const s = await signer();
+      const signature = await s.signAndSend([
+        SystemProgram.transfer({ fromPubkey: new PublicKey(publicKey), toPubkey: recipientPubkey, lamports: amountLamports }),
+      ]);
       setStatus("confirming");
-      await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
 
       setTxId(signature);
       setStatus("done");

@@ -9,8 +9,7 @@ import { Spinner } from "@/components/spinner";
 import { PenLine, Check, Copy, ShieldCheck, ShieldX, Link2, ExternalLink } from "lucide-react";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { getPasskeyKeypair } from "@/lib/passkey-wallet";
-import { Connection, PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import nacl from "tweetnacl";
 import bs58 from "bs58";
 import { friendlyError } from "@/lib/friendly-errors";
@@ -48,10 +47,10 @@ function SignSection({ onSigned }: { onSigned: (r: { message: string; signature:
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ message: string; signature: string; address: string } | null>(null);
+  const [result, setResult] = useState<{ message: string; signature: string; address: string; webauthn?: boolean } | null>(null);
   const [onchain, setOnchain] = useState<{ status: "idle" | "sending" | "done"; signature?: string }>({ status: "idle" });
-  const { publicKey } = useWallet();
-  const { network, rpc } = useNetwork();
+  const { publicKey, signer } = useWallet();
+  const { network } = useNetwork();
 
   const handleSign = async () => {
     if (!message) return;
@@ -59,11 +58,18 @@ function SignSection({ onSigned }: { onSigned: (r: { message: string; signature:
     setOnchain({ status: "idle" });
     setBusy(true);
     try {
-      const { address, keypair } = await getPasskeyKeypair();
-      const sig = nacl.sign.detached(new TextEncoder().encode(message), keypair.secretKey);
-      const r = { message, signature: bs58.encode(sig), address };
+      const s = await signer();
+      const signed = await s.signMessage(message);
+      // The checker below verifies ed25519 signatures; webauthn (smart wallet)
+      // signatures verify server-side instead (M5) — still shown and copyable.
+      const r = {
+        message,
+        signature: signed.signature,
+        address: signed.signer,
+        webauthn: signed.type === "webauthn",
+      };
       setResult(r);
-      onSigned(r);
+      if (!r.webauthn) onSigned(r);
     } catch (e) {
       setError(friendlyError(e, "We couldn't sign that. Please try again."));
     } finally {
@@ -72,25 +78,18 @@ function SignSection({ onSigned }: { onSigned: (r: { message: string; signature:
   };
 
   const handleOnchain = async () => {
-    if (!result) return;
+    if (!result || !publicKey) return;
     setError(null);
     setOnchain({ status: "sending" });
     try {
-      const { keypair } = await getPasskeyKeypair();
-      const connection = new Connection(rpc, "confirmed");
-      const tx = new Transaction().add(
+      const s = await signer();
+      const sig = await s.signAndSend([
         new TransactionInstruction({
-          keys: [{ pubkey: keypair.publicKey, isSigner: true, isWritable: false }],
+          keys: [{ pubkey: new PublicKey(publicKey), isSigner: true, isWritable: false }],
           programId: MEMO_PROGRAM_ID,
           data: Buffer.from(result.message, "utf8"),
         }),
-      );
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-      tx.feePayer = keypair.publicKey;
-      tx.recentBlockhash = blockhash;
-      tx.sign(keypair);
-      const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
-      await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+      ]);
       setOnchain({ status: "done", signature: sig });
     } catch (e) {
       setOnchain({ status: "idle" });
@@ -125,10 +124,12 @@ function SignSection({ onSigned }: { onSigned: (r: { message: string; signature:
       </button>
       {result && (
         <div className="space-y-3 pt-1">
-          <CopyField label="Signature (base58)" value={result.signature} />
+          <CopyField label={result.webauthn ? "Signature (passkey)" : "Signature (base58)"} value={result.signature} />
           <CopyField label="Signed by" value={result.address} />
           <p className="text-xs text-gray-400 dark:text-white/30 text-center">
-            Filled into the checker below — hit Verify to test the round trip.
+            {result.webauthn
+              ? "Passkey signatures are verified by sol.new when you post — the checker below is for classic wallet signatures."
+              : "Filled into the checker below — hit Verify to test the round trip."}
           </p>
 
           <div className="border-t border-black/10 dark:border-white/10 pt-3 space-y-2">
