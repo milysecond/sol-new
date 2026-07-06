@@ -9,7 +9,8 @@
     "lint": "eslint",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "predeploy": "node -e \"const b=require('child_process').execSync('git branch --show-current').toString().trim(); if(b!=='main'){console.error('REFUSING to deploy from branch: '+b);process.exit(1)}\""
   },
   "dependencies": {
     "@bonfida/spl-name-service": "^3.0.23",
