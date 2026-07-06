@@ -188,7 +188,7 @@ export default function GiftPage() {
   const shareLink = async () => {
     if (!giftUrl) return;
     try {
-      await navigator.share({ title: "You've been sent crypto 🎁", url: giftUrl });
+      await navigator.share({ title: "You've been sent crypto", url: giftUrl });
     } catch {
       copyLink();
     }

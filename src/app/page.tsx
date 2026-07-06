@@ -7,7 +7,7 @@ import { Navbar } from "@/components/navbar";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { FaucetFooter } from "@/components/faucet-footer";
-import { Coins, Image, Wallet, ShieldCheck, ArrowRight, Sparkles, Users, Newspaper, Headphones, ChevronDown, X, ExternalLink } from "lucide-react";
+import { Coins, Image, Wallet, ShieldCheck, ArrowRight, Sparkles, Users, Newspaper, Headphones, ChevronDown, X, ExternalLink, HandCoins } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
 import { WelcomeProvider } from "@/components/welcome-message";
@@ -182,7 +182,7 @@ function NextStepBanner() {
       className="group flex items-center gap-3 px-4 py-4 rounded-2xl border-2 border-purple-400/50 bg-gradient-to-r from-purple-500/15 to-fuchsia-500/15 hover:from-purple-500/25 hover:to-fuchsia-500/25 transition-all duration-150 active:scale-[0.99] animate-pulse-soft"
     >
       <div className="w-11 h-11 rounded-lg bg-purple-500/20 flex items-center justify-center shrink-0">
-        <span className="text-xl">👋</span>
+        <HandCoins className="w-6 h-6 text-purple-500 dark:text-purple-300" />
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-[10px] uppercase tracking-wider text-purple-500 dark:text-purple-300 font-semibold">Next step</div>
