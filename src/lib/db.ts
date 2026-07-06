@@ -237,6 +237,25 @@ export async function initDb() {
       created_at TEXT DEFAULT (datetime('now')),
       UNIQUE(proposal_id, wallet)
     )`,
+    `CREATE TABLE IF NOT EXISTS smart_wallets (
+      address TEXT PRIMARY KEY,
+      passkey_pubkey TEXT NOT NULL,
+      credential_id TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS relay_usage (
+      wallet TEXT NOT NULL,
+      day TEXT NOT NULL,
+      tx_count INTEGER DEFAULT 0,
+      lamports_spent INTEGER DEFAULT 0,
+      PRIMARY KEY (wallet, day)
+    )`,
+    `CREATE TABLE IF NOT EXISTS wallet_upgrades (
+      legacy_address TEXT PRIMARY KEY,
+      smart_address TEXT NOT NULL,
+      signatures TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
   ]);
 }
 
