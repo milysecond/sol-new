@@ -24,7 +24,12 @@ export async function POST(req: NextRequest) {
 
   try {
     await initDb();
-    const { publicKey, credentialId, walletType, passkeyPubkey } = await req.json();
+    const { publicKey, credentialId, walletType, passkeyPubkey } = (await req.json()) as {
+      publicKey?: string;
+      credentialId?: string;
+      walletType?: string;
+      passkeyPubkey?: string;
+    };
     if (!publicKey || typeof publicKey !== "string" || publicKey.length > 64) {
       return NextResponse.json({ error: "Invalid publicKey" }, { status: 400 });
     }
