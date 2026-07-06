@@ -58,3 +58,7 @@ v2.0.1 has **no `vaultPda`** — the user-facing address is `smartWalletPubkey` 
 ## Browser click-through (needs a human — see /dev/lazor)
 
 Harness at `src/app/dev/lazor/page.tsx` (devnet, their portal + Kora paymaster). Buttons map to: connect (SPIKE-6), balance, signMessage capture (SPIKE-5), small memo tx (SPIKE-3a end-to-end), oversized ix set (SPIKE-3b chunking), disconnect. Desktop: any localhost dev server (WebAuthn OK on localhost). iOS PWA test needs HTTPS → `npx wrangler versions upload` preview URL (does NOT touch prod traffic).
+
+## Decision 2026-07-06: proceed on @lazorkit/wallet@2.0.1 / Gsuz program
+
+Owner accepted the audit-coverage risk ("worth the risk since we have no users on it yet") — build on the new program. Revisit audit status before promoting smart wallets to default for real balances.
