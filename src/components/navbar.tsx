@@ -204,12 +204,12 @@ export function Navbar() {
                         <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-white/30 px-4 pt-2.5 pb-1">Switch wallet</p>
                         {wallets.map((w) => (
                           <button
-                            key={w.pubkey}
-                            onClick={() => { switchWallet(w.pubkey); setShowMenu(false); }}
-                            className={`flex items-center justify-between w-full px-4 py-2 text-sm transition cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 ${w.pubkey === publicKey ? "text-purple-400" : "text-gray-600 dark:text-white/60"}`}
+                            key={w.address}
+                            onClick={() => { switchWallet(w.address); setShowMenu(false); }}
+                            className={`flex items-center justify-between w-full px-4 py-2 text-sm transition cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 ${w.address === publicKey ? "text-purple-400" : "text-gray-600 dark:text-white/60"}`}
                           >
                             <span className="truncate max-w-[130px]">{w.label}</span>
-                            <span className="text-[10px] font-mono text-gray-400 dark:text-white/30 ml-2 shrink-0">{w.pubkey.slice(0, 4)}…{w.pubkey.slice(-4)}</span>
+                            <span className="text-[10px] font-mono text-gray-400 dark:text-white/30 ml-2 shrink-0">{w.address.slice(0, 4)}…{w.address.slice(-4)}</span>
                           </button>
                         ))}
                       </div>
