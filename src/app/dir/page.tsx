@@ -66,6 +66,11 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
       { label: "meteora", href: "https://meteora.ag" },
       { label: "metadao", href: "https://metadao.fi" },
       { label: "bonk.fun", href: "https://letsbonk.fun" },
+      { label: "star.fun", href: "https://star.fun" },
+      { label: "daos.fun", href: "https://daos.fun" },
+      { label: "boop.fun", href: "https://boop.fun" },
+      { label: "believe", href: "https://believe.app" },
+      { label: "jup studio", href: "https://jup.ag/studio" },
     ],
   },
   {
