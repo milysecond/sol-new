@@ -61,8 +61,19 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    const sig = await conn.sendTransaction(tx, [faucet]);
-    await conn.confirmTransaction(sig);
+    const { blockhash } = await conn.getLatestBlockhash("confirmed");
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = faucet.publicKey;
+    tx.sign(faucet);
+    const sig = await conn.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
+    // WebSocket confirmTransaction hangs in Workers — poll instead.
+    for (let i = 0; i < 20; i++) {
+      const st = await conn.getSignatureStatuses([sig]);
+      const v = st.value[0];
+      if (v?.err) throw new Error(`airdrop tx failed: ${JSON.stringify(v.err)}`);
+      if (v?.confirmationStatus === "confirmed" || v?.confirmationStatus === "finalized") break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
 
     notifyEvent({
       kind: 'airdrop',
