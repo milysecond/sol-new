@@ -1,97 +1,78 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { notifyEvent } from "@/lib/notify";
-import { USDC_MAINNET_MINT } from "@/lib/usdc";
 
-const API_KEY = process.env.CROSSMINT_API_KEY!;
-const PROJECT_ID = process.env.CROSSMINT_PROJECT_ID;
+const BANXA_API_KEY = process.env.BANXA_API_KEY ?? "";
+const BANXA_API_SECRET = process.env.BANXA_API_SECRET ?? "";
+const BANXA_SANDBOX = process.env.BANXA_SANDBOX !== "0"; // default sandbox=true until explicitly disabled
+const BANXA_BASE = BANXA_SANDBOX
+  ? "https://itez.banxa-sandbox.com"
+  : "https://itez.banxa.com";
 
-function crossmintBase() {
-  // Detect staging vs production from the key prefix
-  return API_KEY?.startsWith("sk_staging_")
-    ? "https://staging.crossmint.com"
-    : "https://www.crossmint.com";
+function banxaAuth(method: string, path: string, body: string): string {
+  const nonce = crypto.randomUUID().replace(/-/g, "");
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const payload = `${method}\n${path}\n${timestamp}\n${nonce}\n${body}`;
+  const signature = crypto
+    .createHmac("sha256", BANXA_API_SECRET)
+    .update(payload)
+    .digest("hex");
+  return `Token ${BANXA_API_KEY}:${nonce}:${timestamp}:${signature}`;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    if (!API_KEY) {
-      return NextResponse.json({ error: "CROSSMINT_API_KEY not configured" }, { status: 500 });
-    }
-
-    const { address, amount, email } = await req.json();
+    const { address, amount } = await req.json() as { address?: string; amount?: number };
     if (!address) return NextResponse.json({ error: "Missing address" }, { status: 400 });
 
-    const usd = String(Math.max(20, Math.min(150, Number(amount) || 25)));
+    const fiatAmount = String(Math.max(20, Math.min(500, Number(amount) || 50)));
+    const returnUrl = `${req.headers.get("origin") ?? "https://sol.new"}/get?onramp=done`;
 
-    // Build order: pay with fiat (Apple Pay surfaces inside Crossmint's
-    // hosted checkout when the device + verified domain support it), receive
-    // USDC on Solana delivered to the user's wallet.
-    const orderBody = {
-      recipient: { walletAddress: address },
-      payment: {
-        // "card" is Crossmint's umbrella for fiat-via-card; Apple Pay surfaces
-        // inside the hosted checkout when the device supports it and the
-        // merchant domain (sol.new) is verified in the Crossmint console.
-        method: "card",
-        receiptEmail: email || undefined,
-      },
-      lineItems: [
-        {
-          tokenLocator: `solana:${USDC_MAINNET_MINT}`,
-          executionParameters: {
-            mode: "exact-in",
-            amount: usd,
-            currency: "usd",
-          },
-        },
-      ],
-      metadata: { source: "sol.new", projectId: PROJECT_ID },
-    };
+    const body = JSON.stringify({
+      account_reference: address,
+      source: "USD",
+      source_amount: fiatAmount,
+      target: "SOL",
+      wallet_address: address,
+      blockchain: "SOLANA",
+      return_url_on_success: returnUrl,
+      return_url_on_failure: `${req.headers.get("origin") ?? "https://sol.new"}/get?onramp=failed`,
+    });
 
-    const res = await fetch(`${crossmintBase()}/api/2022-06-09/orders`, {
+    const path = "/api/orders";
+    const res = await fetch(`${BANXA_BASE}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": API_KEY,
+        Authorization: banxaAuth("POST", path, body),
       },
-      body: JSON.stringify(orderBody),
+      body,
     });
 
-    const data = await res.json();
+    const data = await res.json() as { data?: { order?: { id?: string; checkout_url?: string } }; errors?: unknown };
     if (!res.ok) {
-      console.error("Crossmint order error:", res.status, data);
-      return NextResponse.json(
-        { error: data?.message || data?.error || JSON.stringify(data) },
-        { status: res.status },
-      );
+      console.error("Banxa order error:", res.status, data);
+      return NextResponse.json({ error: JSON.stringify(data?.errors ?? data) }, { status: res.status });
     }
 
-    // The shape varies between Crossmint API versions. Try a couple known
-    // paths to find the hosted-checkout URL.
-    const order = data.order ?? data;
-    const hostedUrl =
-      order?.payment?.preparation?.checkoutUrl ??
-      order?.payment?.preparation?.payinUrl ??
-      data?.checkoutUrl ??
-      data?.url ??
-      null;
-    const orderId = order?.orderId ?? order?.id ?? data?.orderId ?? null;
-    const clientSecret = order?.clientSecret ?? data?.clientSecret ?? null;
+    const order = data?.data?.order;
+    const url = order?.checkout_url ?? null;
+    const orderId = order?.id ?? null;
 
     notifyEvent({
       kind: "onramp_order",
       emoji: "💳",
-      title: "Crossmint order created",
-      fields: { address, amount: usd, orderId },
+      title: "Banxa order created",
+      fields: { address, amount: fiatAmount, orderId: orderId ?? "?" },
     });
 
-    return NextResponse.json({ ok: true, orderId, url: hostedUrl, clientSecret, raw: order });
+    return NextResponse.json({ ok: true, orderId, url });
   } catch (e) {
-    console.error("Crossmint order exception:", e);
+    console.error("Banxa order exception:", e);
     notifyEvent({
       kind: "onramp_order_error",
       emoji: "⚠️",
-      title: "Crossmint order failed",
+      title: "Banxa order failed",
       fields: { error: String(e) },
     });
     return NextResponse.json({ error: String(e) }, { status: 500 });

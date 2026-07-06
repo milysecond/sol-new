@@ -8,14 +8,23 @@ import { useNetwork } from "./network";
 import { analytics } from "./analytics";
 import { getUsdcBalance } from "./usdc";
 
+export interface WalletEntry {
+  pubkey: string;
+  credentialId: string;
+  label: string;
+}
+
 interface WalletState {
   publicKey: string | null;
+  walletLabel: string | null;
+  wallets: WalletEntry[];
   balance: number | null;
   usdcBalance: number | null;
   loading: boolean;
   error: string | null;
   connect: (username?: string) => Promise<void>;
   recover: () => Promise<void>;
+  switchWallet: (pubkey: string) => void;
   disconnect: () => void;
   refreshBalance: () => Promise<void>;
   airdropping: boolean;
@@ -25,12 +34,15 @@ interface WalletState {
 
 const WalletContext = createContext<WalletState>({
   publicKey: null,
+  walletLabel: null,
+  wallets: [],
   balance: null,
   usdcBalance: null,
   loading: false,
   error: null,
-  connect: async (username?: string) => {},
+  connect: async () => {},
   recover: async () => {},
+  switchWallet: () => {},
   disconnect: () => {},
   refreshBalance: async () => {},
   airdropping: false,
@@ -42,8 +54,31 @@ export function useWallet() {
   return useContext(WalletContext);
 }
 
+function loadWallets(): WalletEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem("sol.new.wallets") || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveWallets(wallets: WalletEntry[]) {
+  localStorage.setItem("sol.new.wallets", JSON.stringify(wallets));
+}
+
+function upsertWallet(entry: WalletEntry): WalletEntry[] {
+  const wallets = loadWallets();
+  const idx = wallets.findIndex((w) => w.pubkey === entry.pubkey);
+  if (idx >= 0) wallets[idx] = entry;
+  else wallets.push(entry);
+  saveWallets(wallets);
+  return wallets;
+}
+
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [publicKey, setPublicKey] = useState<string | null>(null);
+  const [walletLabel, setWalletLabel] = useState<string | null>(null);
+  const [wallets, setWallets] = useState<WalletEntry[]>([]);
   const [balance, setBalance] = useState<number | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -53,17 +88,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   // Restore from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem("sol.new.wallet");
+    const savedLabel = localStorage.getItem("sol.new.walletLabel");
+    const savedWallets = loadWallets();
     if (saved) {
       setPublicKey(saved);
+      setWalletLabel(savedLabel || null);
     }
+    setWallets(savedWallets);
   }, []);
 
   const refreshBalance = useCallback(async () => {
     const key = publicKey || localStorage.getItem("sol.new.wallet");
     if (!key) return;
     try {
-      // 'confirmed' is much faster than the default 'finalized' (~12s lag)
-      // and is enough certainty for a UI balance after a confirmed tx.
       const conn = new Connection(rpc, "confirmed");
       const pubkey = new PublicKey(key);
       const [solLamports, usdc] = await Promise.all([
@@ -78,9 +115,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [publicKey, rpc, network]);
 
-  // Fetch balance when publicKey or network changes, auto-refresh every 15s.
-  // Clear the stale balance immediately on network toggle so the pill doesn't
-  // show e.g. mainnet 0.1 SOL while the user is now on devnet.
   useEffect(() => {
     if (!publicKey) return;
     setBalance(null);
@@ -97,11 +131,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       if (!window.PublicKeyCredential) {
         throw new Error("Passkeys require HTTPS.");
       }
-      const name = username || `sol.new user ${Date.now()}`;
-      const result = await createPasskeyWallet(name);
+      const label = username?.trim() || `Wallet ${Date.now()}`;
+      const result = await createPasskeyWallet(label);
+      const entry: WalletEntry = { pubkey: result.publicKey, credentialId: result.credentialId, label };
+      const updated = upsertWallet(entry);
       setPublicKey(result.publicKey);
+      setWalletLabel(label);
+      setWallets(updated);
       localStorage.setItem("sol.new.wallet", result.publicKey);
       localStorage.setItem("sol.new.credentialId", result.credentialId);
+      localStorage.setItem("sol.new.walletLabel", label);
       fetch("/api/wallet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publicKey: result.publicKey, credentialId: result.credentialId }) }).catch(() => {});
       analytics.walletCreated(result.publicKey);
     } catch (e) {
@@ -120,8 +159,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         throw new Error("Passkeys require HTTPS.");
       }
       const result = await recoverPasskeyWallet();
+      const existing = loadWallets().find((w) => w.credentialId === result.credentialId || w.pubkey === result.publicKey);
+      const label = existing?.label || `Wallet ${result.publicKey.slice(0, 4)}…${result.publicKey.slice(-4)}`;
+      const entry: WalletEntry = { pubkey: result.publicKey, credentialId: result.credentialId, label };
+      const updated = upsertWallet(entry);
       setPublicKey(result.publicKey);
+      setWalletLabel(label);
+      setWallets(updated);
       localStorage.setItem("sol.new.wallet", result.publicKey);
+      localStorage.setItem("sol.new.credentialId", result.credentialId);
+      localStorage.setItem("sol.new.walletLabel", label);
       fetch("/api/wallet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publicKey: result.publicKey }) }).catch(() => {});
       analytics.walletRecovered();
     } catch (e) {
@@ -130,6 +177,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const switchWallet = (pubkey: string) => {
+    const entry = loadWallets().find((w) => w.pubkey === pubkey);
+    if (!entry) return;
+    setPublicKey(entry.pubkey);
+    setWalletLabel(entry.label);
+    setBalance(null);
+    setUsdcBalance(null);
+    localStorage.setItem("sol.new.wallet", entry.pubkey);
+    localStorage.setItem("sol.new.credentialId", entry.credentialId);
+    localStorage.setItem("sol.new.walletLabel", entry.label);
   };
 
   const [airdropping, setAirdropping] = useState(false);
@@ -162,14 +221,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const disconnect = () => {
     setPublicKey(null);
+    setWalletLabel(null);
     setBalance(null);
     setUsdcBalance(null);
     localStorage.removeItem("sol.new.wallet");
     localStorage.removeItem("sol.new.credentialId");
+    localStorage.removeItem("sol.new.walletLabel");
+    // Keep sol.new.wallets so user can switch back later
   };
 
   return (
-    <WalletContext.Provider value={{ publicKey, balance, usdcBalance, loading, error, connect, recover, disconnect, refreshBalance, airdropping, airdropDone, handleAirdrop }}>
+    <WalletContext.Provider value={{ publicKey, walletLabel, wallets, balance, usdcBalance, loading, error, connect, recover, switchWallet, disconnect, refreshBalance, airdropping, airdropDone, handleAirdrop }}>
       {children}
     </WalletContext.Provider>
   );

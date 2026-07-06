@@ -47,7 +47,7 @@ export default function PayPage() {
     QRCode.toCanvas(canvasRef.current, payUrl, {
       width: 256,
       margin: 2,
-      color: { dark: "#ffffffee", light: "#00000000" },
+      color: { dark: "#000000", light: "#ffffff" },
     });
   }, [payUrl]);
 

@@ -194,7 +194,7 @@ export default function GetPage() {
                   {buying ? "Starting…" : <><Apple size={18} className="inline" /> Pay ${amount}</>}
                 </button>
                 <p className="text-[10px] text-gray-400 dark:text-white/30 text-center leading-snug">
-                  Processed by MoonPay. No signup required up to $150. SOL arrives within minutes.
+                  Processed by Banxa. Card, Apple Pay &amp; more. SOL arrives within minutes.
                 </p>
               </div>
             )}

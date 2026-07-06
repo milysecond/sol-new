@@ -1,0 +1,364 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<!--
+3    Copyright 2019 Google Inc. All Rights Reserved.
+4
+5     Licensed under the Apache License, Version 2.0 (the "License");
+6     you may not use this file except in compliance with the License.
+7     You may obtain a copy of the License at
+8
+9         http://www.apache.org/licenses/LICENSE-2.0
+10
+11     Unless required by applicable law or agreed to in writing, software
+12     distributed under the License is distributed on an "AS IS" BASIS,
+13     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+14     See the License for the specific language governing permissions and
+15     limitations under the License.
+16-->
+17<!--
+18 The "package" attribute is rewritten by the Gradle build with the value of applicationId.
+19     It is still required here, as it is used to derive paths, for instance when referring
+20     to an Activity by ".MyActivity" instead of the full name. If more Activities are added to the
+21     application, the package attribute will need to reflect the correct path in order to use
+22     the abbreviated format.
+23-->
+24<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+25    package="xyz.solnew.app"
+26    android:versionCode="1"
+27    android:versionName="1.0.0" >
+28
+29    <uses-sdk
+30        android:minSdkVersion="23"
+31        android:targetSdkVersion="35" />
+32
+33    <queries>
+33-->[com.google.androidbrowserhelper:androidbrowserhelper:2.6.2] /Users/metaclaw/.gradle/caches/8.11.1/transforms/5053e02be90783e54992393be394bb70/transformed/androidbrowserhelper-2.6.2/AndroidManifest.xml:22:5-30:15
+34        <intent>
+34-->[com.google.androidbrowserhelper:androidbrowserhelper:2.6.2] /Users/metaclaw/.gradle/caches/8.11.1/transforms/5053e02be90783e54992393be394bb70/transformed/androidbrowserhelper-2.6.2/AndroidManifest.xml:23:9-29:18
+35            <action android:name="android.intent.action.VIEW" />
+35-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:142:17-68
+35-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:142:25-66
+36
+37            <category android:name="android.intent.category.BROWSABLE" />
+37-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:144:17-77
+37-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:144:27-75
+38
+39            <data android:scheme="https" />
+39-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:145:17-148:19
+39-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:145:23-45
+40        </intent>
+41    </queries>
+42
+43    <permission
+43-->[androidx.core:core:1.13.0] /Users/metaclaw/.gradle/caches/8.11.1/transforms/a5429f7b20c607b890f08b5283ad4ec0/transformed/core-1.13.0/AndroidManifest.xml:22:5-24:47
+44        android:name="xyz.solnew.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+44-->[androidx.core:core:1.13.0] /Users/metaclaw/.gradle/caches/8.11.1/transforms/a5429f7b20c607b890f08b5283ad4ec0/transformed/core-1.13.0/AndroidManifest.xml:23:9-81
+45        android:protectionLevel="signature" />
+45-->[androidx.core:core:1.13.0] /Users/metaclaw/.gradle/caches/8.11.1/transforms/a5429f7b20c607b890f08b5283ad4ec0/transformed/core-1.13.0/AndroidManifest.xml:24:9-44
+46
+47    <uses-permission android:name="xyz.solnew.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+47-->[androidx.core:core:1.13.0] /Users/metaclaw/.gradle/caches/8.11.1/transforms/a5429f7b20c607b890f08b5283ad4ec0/transformed/core-1.13.0/AndroidManifest.xml:26:5-97
+47-->[androidx.core:core:1.13.0] /Users/metaclaw/.gradle/caches/8.11.1/transforms/a5429f7b20c607b890f08b5283ad4ec0/transformed/core-1.13.0/AndroidManifest.xml:26:22-94
+48
+49    <application
+49-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:33:5-187:19
+50        android:name="xyz.solnew.app.Application"
+50-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:34:9-35
+51        android:allowBackup="true"
+51-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:35:9-35
+52        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+52-->[androidx.core:core:1.13.0] /Users/metaclaw/.gradle/caches/8.11.1/transforms/a5429f7b20c607b890f08b5283ad4ec0/transformed/core-1.13.0/AndroidManifest.xml:28:18-86
+53        android:extractNativeLibs="false"
+54        android:icon="@mipmap/ic_launcher"
+54-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:36:9-43
+55        android:label="@string/appName"
+55-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:37:9-40
+56        android:manageSpaceActivity="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
+56-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:39:9-105
+57        android:supportsRtl="true"
+57-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:41:9-35
+58        android:theme="@android:style/Theme.Translucent.NoTitleBar" >
+58-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:42:9-68
+59        <meta-data
+59-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:44:9-46:58
+60            android:name="asset_statements"
+60-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:45:13-44
+61            android:resource="@string/assetStatements" />
+61-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:46:13-55
+62        <meta-data
+62-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:50:9-52:52
+63            android:name="twa_generator"
+63-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:51:13-41
+64            android:value="@string/generatorApp" />
+64-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:52:13-49
+65
+66        <activity
+66-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:59:13-70:24
+67            android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
+67-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:59:23-104
+68            android:enabled="true"
+68-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:61:17-39
+69            android:excludeFromRecents="true"
+69-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:62:17-50
+70            android:exported="false" >
+70-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:60:17-41
+71            <meta-data
+71-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:63:17-65:57
+72                android:name="android.support.customtabs.trusted.MANAGE_SPACE_URL"
+72-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:64:21-87
+73                android:value="@string/launchUrl" />
+73-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:65:21-54
+74
+75            <intent-filter>
+75-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:66:17-69:33
+76                <action android:name="android.intent.action.APPLICATION_PREFERENCES" />
+76-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:67:21-92
+76-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:67:29-89
+77
+78                <category android:name="android.intent.category.DEFAULT" />
+78-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:68:21-80
+78-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:68:31-77
+79            </intent-filter>
+80        </activity>
+81        <activity
+81-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:73:9-154:20
+82            android:name="xyz.solnew.app.LauncherActivity"
+82-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:73:19-50
+83            android:alwaysRetainTaskState="true"
+83-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:74:13-49
+84            android:exported="true"
+84-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:76:13-36
+85            android:label="@string/launcherName" >
+85-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:75:13-49
+86            <meta-data
+86-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:77:13-78:53
+87                android:name="android.support.customtabs.trusted.DEFAULT_URL"
+87-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:77:24-85
+88                android:value="@string/launchUrl" />
+88-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:78:17-50
+89            <meta-data
+89-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:80:13-82:58
+90                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
+90-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:81:17-83
+91                android:resource="@color/colorPrimary" />
+91-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:82:17-55
+92            <meta-data
+92-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:86:13-88:62
+93                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR_DARK"
+93-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:87:17-88
+94                android:resource="@color/colorPrimaryDark" />
+94-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:88:17-59
+95            <meta-data
+95-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:90:13-92:61
+96                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
+96-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:91:17-87
+97                android:resource="@color/navigationColor" />
+97-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:92:17-58
+98            <meta-data
+98-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:94:13-96:65
+99                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR_DARK"
+99-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:95:17-92
+100                android:resource="@color/navigationColorDark" />
+100-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:96:17-62
+101            <meta-data
+101-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:98:13-100:68
+102                android:name="androix.browser.trusted.NAVIGATION_BAR_DIVIDER_COLOR"
+102-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:99:17-84
+103                android:resource="@color/navigationDividerColor" />
+103-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:100:17-65
+104            <meta-data
+104-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:102:13-104:72
+105                android:name="androix.browser.trusted.NAVIGATION_BAR_DIVIDER_COLOR_DARK"
+105-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:103:17-89
+106                android:resource="@color/navigationDividerColorDark" />
+106-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:104:17-69
+107            <meta-data
+107-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:106:13-107:54
+108                android:name="android.support.customtabs.trusted.SPLASH_IMAGE_DRAWABLE"
+108-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:106:24-95
+109                android:resource="@drawable/splash" />
+109-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:107:17-52
+110            <meta-data
+110-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:109:13-110:60
+111                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
+111-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:109:24-104
+112                android:resource="@color/backgroundColor" />
+112-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:110:17-58
+113            <meta-data
+113-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:112:13-113:71
+114                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
+114-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:112:24-105
+115                android:value="@integer/splashScreenFadeOutDuration" />
+115-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:113:17-69
+116            <meta-data
+116-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:115:13-116:60
+117                android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
+117-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:115:24-97
+118                android:value="@string/providerAuthority" />
+118-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:116:17-58
+119            <meta-data
+119-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:118:13-97
+120                android:name="android.app.shortcuts"
+120-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:118:24-60
+121                android:resource="@xml/shortcuts" />
+121-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:118:61-94
+122            <meta-data
+122-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:120:13-121:56
+123                android:name="android.support.customtabs.trusted.FALLBACK_STRATEGY"
+123-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:120:24-91
+124                android:value="@string/fallbackType" />
+124-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:121:17-53
+125            <meta-data
+125-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:127:13-128:54
+126                android:name="android.support.customtabs.trusted.SCREEN_ORIENTATION"
+126-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:127:24-92
+127                android:value="@string/orientation" />
+127-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:128:17-52
+128
+129            <intent-filter>
+129-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:136:13-139:29
+130                <action android:name="android.intent.action.MAIN" />
+130-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:137:17-69
+130-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:137:25-66
+131
+132                <category android:name="android.intent.category.LAUNCHER" />
+132-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:138:17-77
+132-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:138:27-74
+133            </intent-filter>
+134            <intent-filter android:autoVerify="true" >
+134-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:141:13-149:29
+134-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:141:28-53
+135                <action android:name="android.intent.action.VIEW" />
+135-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:142:17-68
+135-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:142:25-66
+136
+137                <category android:name="android.intent.category.DEFAULT" />
+137-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:68:21-80
+137-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:68:31-77
+138                <category android:name="android.intent.category.BROWSABLE" />
+138-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:144:17-77
+138-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:144:27-75
+139
+140                <data
+140-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:145:17-148:19
+141                    android:host="@string/hostName"
+141-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:146:21-52
+142                    android:scheme="https" />
+142-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:145:23-45
+143            </intent-filter>
+144        </activity>
+145        <activity android:name="com.google.androidbrowserhelper.trusted.FocusActivity" />
+145-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:156:9-90
+145-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:156:19-87
+146        <activity
+146-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:158:9-159:62
+147            android:name="com.google.androidbrowserhelper.trusted.WebViewFallbackActivity"
+147-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:158:19-97
+148            android:configChanges="orientation|screenSize" />
+148-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:159:13-59
+149
+150        <provider
+150-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:161:9-169:20
+151            android:name="androidx.core.content.FileProvider"
+151-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:162:13-62
+152            android:authorities="@string/providerAuthority"
+152-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:163:13-60
+153            android:exported="false"
+153-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:165:13-37
+154            android:grantUriPermissions="true" >
+154-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:164:13-47
+155            <meta-data
+155-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:166:13-168:53
+156                android:name="android.support.FILE_PROVIDER_PATHS"
+156-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:167:17-67
+157                android:resource="@xml/filepaths" />
+157-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:168:17-50
+158        </provider>
+159
+160        <service
+160-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:171:9-182:19
+161            android:name="xyz.solnew.app.DelegationService"
+161-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:172:13-46
+162            android:enabled="@bool/enableNotification"
+162-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:173:13-55
+163            android:exported="@bool/enableNotification" >
+163-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:174:13-56
+164            <intent-filter>
+164-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:178:13-181:29
+165                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
+165-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:179:17-105
+165-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:179:25-103
+166
+167                <category android:name="android.intent.category.DEFAULT" />
+167-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:68:21-80
+167-->/Volumes/PRO-G40/solnew/sol-new/dapp-store/app/src/main/AndroidManifest.xml:68:31-77
+168            </intent-filter>
+169        </service>
+170
+171        <provider
+171-->[androidx.emoji2:emoji2:1.3.0] /Users/metaclaw/.gradle/caches/8.11.1/transforms/5cb7738f5242d8c4e38c8ffa2b265b31/transformed/emoji2-1.3.0/AndroidManifest.xml:24:9-32:20
+172            android:name="androidx.startup.InitializationProvider"
+172-->[androidx.emoji2:emoji2:1.3.0] /Users/metaclaw/.gradle/caches/8.11.1/transforms/5cb7738f5242d8c4e38c8ffa2b265b31/transformed/emoji2-1.3.0/AndroidManifest.xml:25:13-67
+173            android:authorities="xyz.solnew.app.androidx-startup"
+173-->[androidx.emoji2:emoji2:1.3.0] /Users/metaclaw/.gradle/caches/8.11.1/transforms/5cb7738f5242d8c4e38c8ffa2b265b31/transformed/emoji2-1.3.0/AndroidManifest.xml:26:13-68
+174            android:exported="false" >
+174-->[androidx.emoji2:emoji2:1.3.0] /Users/metaclaw/.gradle/caches/8.11.1/transforms/5cb7738f5242d8c4e38c8ffa2b265b31/transformed/emoji2-1.3.0/AndroidManifest.xml:27:13-37
+175            <meta-data
+175-->[androidx.emoji2:emoji2:1.3.0] /Users/metaclaw/.gradle/caches/8.11.1/transforms/5cb7738f5242d8c4e38c8ffa2b265b31/transformed/emoji2-1.3.0/AndroidManifest.xml:29:13-31:52
+176                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+176-->[androidx.emoji2:emoji2:1.3.0] /Users/metaclaw/.gradle/caches/8.11.1/transforms/5cb7738f5242d8c4e38c8ffa2b265b31/transformed/emoji2-1.3.0/AndroidManifest.xml:30:17-75
+177                android:value="androidx.startup" />
+177-->[androidx.emoji2:emoji2:1.3.0] /Users/metaclaw/.gradle/caches/8.11.1/transforms/5cb7738f5242d8c4e38c8ffa2b265b31/transformed/emoji2-1.3.0/AndroidManifest.xml:31:17-49
+178            <meta-data
+178-->[androidx.lifecycle:lifecycle-process:2.6.2] /Users/metaclaw/.gradle/caches/8.11.1/transforms/4bc52031417e9743197e36b704fe409f/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:29:13-31:52
+179                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+179-->[androidx.lifecycle:lifecycle-process:2.6.2] /Users/metaclaw/.gradle/caches/8.11.1/transforms/4bc52031417e9743197e36b704fe409f/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:30:17-78
+180                android:value="androidx.startup" />
+180-->[androidx.lifecycle:lifecycle-process:2.6.2] /Users/metaclaw/.gradle/caches/8.11.1/transforms/4bc52031417e9743197e36b704fe409f/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:31:17-49
+181            <meta-data
+181-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:29:13-31:52
+182                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+182-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:30:17-85
+183                android:value="androidx.startup" />
+183-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:31:17-49
+184        </provider>
+185
+186        <receiver
+186-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:34:9-52:20
+187            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+187-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:35:13-76
+188            android:directBootAware="false"
+188-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:36:13-44
+189            android:enabled="true"
+189-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:37:13-35
+190            android:exported="true"
+190-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:38:13-36
+191            android:permission="android.permission.DUMP" >
+191-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:39:13-57
+192            <intent-filter>
+192-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:40:13-42:29
+193                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+193-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:41:17-91
+193-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:41:25-88
+194            </intent-filter>
+195            <intent-filter>
+195-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:43:13-45:29
+196                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+196-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:44:17-85
+196-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:44:25-82
+197            </intent-filter>
+198            <intent-filter>
+198-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:46:13-48:29
+199                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+199-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:47:17-88
+199-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:47:25-85
+200            </intent-filter>
+201            <intent-filter>
+201-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:49:13-51:29
+202                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+202-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:17-95
+202-->[androidx.profileinstaller:profileinstaller:1.3.1] /Users/metaclaw/.gradle/caches/8.11.1/transforms/bb4a0d32d1b17a1dcea0cf71d2bde5e0/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:25-92
+203            </intent-filter>
+204        </receiver>
+205    </application>
+206
+207</manifest>

@@ -150,7 +150,7 @@ export function BuySolModal({
           </button>
 
           <p className="text-[10px] text-gray-400 dark:text-white/30 text-center leading-snug">
-            Processed by MoonPay. SOL arrives in your wallet within minutes.
+            Processed by Banxa. Card, Apple Pay &amp; more. SOL arrives within minutes.
           </p>
         </div>
       </div>

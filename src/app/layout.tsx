@@ -1,20 +1,25 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { WalletProvider } from "@/lib/wallet-context";
 import { NetworkProvider } from "@/lib/network";
 import { ThemeProvider } from "@/lib/theme-context";
+import { PodPlayerProvider } from "@/lib/pod-player";
 import { Toaster } from "sonner";
 import { InstallPrompt } from "@/components/install-prompt";
 import { PushPrompt } from "@/components/push-prompt";
 
 const inter = Inter({ subsets: ["latin"] });
 
+export const viewport: Viewport = {
+  themeColor: "#a855f7",
+};
+
 export const metadata: Metadata = {
+  metadataBase: new URL("https://sol.new"),
   title: "sol.new — Tokens, NFTs, and wallets on Solana",
   description: "The fastest way to create tokens, NFTs, wallets, payments, and DAOs on Solana. Passkey-secured, low fees. Start in seconds.",
   manifest: "/manifest.json",
-  themeColor: "#a855f7",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -64,7 +69,46 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.classList.add('dark')}catch(e){}})()` }} />
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.classList.add('dark')}catch(e){}})()` }} />
+
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "Organization",
+                  "@id": "https://sol.new/#organization",
+                  name: "sol.new",
+                  url: "https://sol.new",
+                  logo: "https://sol.new/icon-512.png",
+                  sameAs: ["https://x.com/soldotnew", "https://t.me/soldotnew"],
+                },
+                {
+                  "@type": "WebSite",
+                  "@id": "https://sol.new/#website",
+                  url: "https://sol.new",
+                  name: "sol.new",
+                  description:
+                    "The fastest way to create tokens, NFTs, wallets, payments, and DAOs on Solana. Passkey-secured, no installs.",
+                  publisher: { "@id": "https://sol.new/#organization" },
+                },
+                {
+                  "@type": "SoftwareApplication",
+                  name: "sol.new",
+                  url: "https://sol.new",
+                  applicationCategory: "FinanceApplication",
+                  operatingSystem: "Web",
+                  description:
+                    "Create Solana tokens, NFTs, multisig wallets, and payment links in seconds. Passkey-secured (Face ID / Touch ID) — no seed phrases, no installs, no signup.",
+                  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+                  publisher: { "@id": "https://sol.new/#organization" },
+                },
+              ],
+            }),
+          }}
+        />
 
         {process.env.NEXT_PUBLIC_GA_ID && (
           <>
@@ -75,9 +119,9 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} antialiased`}>
         <ThemeProvider>
-        <NetworkProvider><WalletProvider>{children}</WalletProvider></NetworkProvider>
+        <NetworkProvider><WalletProvider><PodPlayerProvider>{children}</PodPlayerProvider></WalletProvider></NetworkProvider>
         </ThemeProvider>
-        <Toaster theme="dark" position="top-center" richColors />
+        <Toaster theme="light" position="top-center" richColors />
         <InstallPrompt />
         <PushPrompt />
         <script

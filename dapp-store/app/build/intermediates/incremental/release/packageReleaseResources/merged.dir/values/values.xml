@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <bool name="enableNotification">false</bool>
+    <bool name="enableSiteSettingsShortcut">true</bool>
+    <color name="backgroundColor">#000000</color>
+    <color name="colorPrimary">#A855F7</color>
+    <color name="colorPrimaryDark">#000000</color>
+    <color name="navigationColor">#000000</color>
+    <color name="navigationColorDark">#000000</color>
+    <color name="navigationDividerColor">#000000</color>
+    <color name="navigationDividerColorDark">#000000</color>
+    <color name="shortcut_background">#F5F5F5</color>
+    <integer name="splashScreenFadeOutDuration">300</integer>
+    <string name="appName" translatable="false">sol.new</string>
+    <string name="assetStatements">
+    [{
+        \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+        \"target\": {
+            \"namespace\": \"web\",
+            \"site\": \"https://sol.new\"
+        }
+    }]
+    
+  </string>
+    <string name="fallbackType" translatable="false">customtabs</string>
+    <string name="fullScopeUrl" translatable="false">https://sol.new/</string>
+    <string name="generatorApp" translatable="false">bubblewrap-cli</string>
+    <string name="hostName" translatable="false">sol.new</string>
+    <string name="launchUrl" translatable="false">https://sol.new/</string>
+    <string name="launcherName" translatable="false">sol.new</string>
+    <string name="orientation" translatable="false">any</string>
+    <string name="providerAuthority" translatable="false">xyz.solnew.app.fileprovider</string>
+    <string name="shortcut_name_0" translatable="false">Token</string>
+    <string name="shortcut_name_1" translatable="false">NFT</string>
+    <string name="shortcut_name_2" translatable="false">Wallet</string>
+    <string name="shortcut_short_name_0" translatable="false">Token</string>
+    <string name="shortcut_short_name_1" translatable="false">NFT</string>
+    <string name="shortcut_short_name_2" translatable="false">Wallet</string>
+</resources>

@@ -7,10 +7,11 @@ import { Navbar } from "@/components/navbar";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { FaucetFooter } from "@/components/faucet-footer";
-import { Coins, Image, Wallet, ShieldCheck, ArrowRight, Sparkles } from "lucide-react";
+import { Coins, Image, Wallet, ShieldCheck, ArrowRight, Sparkles, Users, Newspaper, Headphones, ChevronDown, X, ExternalLink } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
 import { WelcomeProvider } from "@/components/welcome-message";
+import { StatsBar } from "@/components/stats-bar";
 import type { LucideIcon } from "lucide-react";
 
 function SplashScreen({ onDone }: { onDone: () => void }) {
@@ -114,8 +115,9 @@ function WhatsNewBanner() {
     fetch(`/api/tokens/recent?limit=1&network=${network}`)
       .then((r) => r.json())
       .then((d) => {
-        setLatest(d?.tokens?.[0] ?? null);
-        setTotal(typeof d?.total === "number" ? d.total : null);
+        const data = d as { tokens?: typeof latest[]; total?: number };
+        setLatest(data?.tokens?.[0] ?? null);
+        setTotal(typeof data?.total === "number" ? data.total : null);
       })
       .catch(() => {});
   }, [network]);
@@ -192,6 +194,121 @@ function NextStepBanner() {
   );
 }
 
+type NewsItem = {
+  title: string;
+  link: string;
+  source: string;
+  pubDate: string;
+  image: string | null;
+};
+
+const SOURCE_COLOR: Record<string, string> = {
+  Cointelegraph: "text-yellow-500 bg-yellow-500/10",
+  Decrypt: "text-sky-500 bg-sky-500/10",
+  "The Defiant": "text-fuchsia-500 bg-fuchsia-500/10",
+};
+
+function newsAgo(iso: string): string {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function NewsWidget() {
+  const [minimized, setMinimized] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("sol.new.news.dismissed") === "1";
+  });
+  const [items, setItems] = useState<NewsItem[] | null>(null);
+
+  useEffect(() => {
+    if (dismissed) return;
+    fetch("/api/news")
+      .then((r) => r.json())
+      .then((d) => setItems(((d as { items?: NewsItem[] }).items ?? []).slice(0, 5)))
+      .catch(() => setItems([]));
+  }, [dismissed]);
+
+  if (dismissed) return null;
+
+  return (
+    <div className="rounded-2xl border border-black/10 dark:border-white/10 overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-sky-500/5 border-b border-black/[0.06] dark:border-white/[0.06]">
+        <Newspaper className="w-4 h-4 text-sky-500 shrink-0" />
+        <span className="text-sm font-semibold flex-1 text-gray-900 dark:text-white">News</span>
+        <a
+          href="/news"
+          className="text-[11px] text-sky-500 hover:text-sky-600 dark:hover:text-sky-400 transition mr-1"
+        >
+          See all
+        </a>
+        <button
+          onClick={() => setMinimized((m) => !m)}
+          className="p-0.5 rounded text-gray-400 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/70 transition"
+          aria-label={minimized ? "Expand" : "Collapse"}
+        >
+          <ChevronDown className={`w-4 h-4 transition-transform ${minimized ? "" : "rotate-180"}`} />
+        </button>
+        <button
+          onClick={() => { setDismissed(true); localStorage.setItem("sol.new.news.dismissed", "1"); }}
+          className="p-0.5 rounded text-gray-400 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/70 transition"
+          aria-label="Dismiss"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {!minimized && (
+        <div className="divide-y divide-black/5 dark:divide-white/5">
+          {items === null
+            ? Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-2.5 animate-pulse">
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3 rounded bg-black/5 dark:bg-white/10 w-3/4" />
+                    <div className="h-2.5 rounded bg-black/5 dark:bg-white/5 w-1/3" />
+                  </div>
+                </div>
+              ))
+            : items.length === 0
+            ? (
+                <div className="px-4 py-4 text-xs text-gray-400 dark:text-white/30 text-center">
+                  Couldn&apos;t load news right now.
+                </div>
+              )
+            : items.map((n, i) => (
+                <a
+                  key={`${n.link}-${i}`}
+                  href={n.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-start gap-3 px-4 py-2.5 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-sky-600 dark:group-hover:text-sky-300 transition text-gray-900 dark:text-white">
+                      {n.title}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${SOURCE_COLOR[n.source] ?? "text-gray-500 bg-black/5 dark:bg-white/10"}`}>
+                        {n.source}
+                      </span>
+                      {n.pubDate && <span className="text-[11px] text-gray-400 dark:text-white/30">{newsAgo(n.pubDate)}</span>}
+                    </div>
+                  </div>
+                  <ExternalLink className="w-3.5 h-3.5 text-gray-300 dark:text-white/20 group-hover:text-sky-400 transition shrink-0 mt-0.5" />
+                </a>
+              ))
+          }
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const { publicKey, connect, recover, loading } = useWallet();
   const [showSplash, setShowSplash] = useState(() => {
@@ -213,6 +330,7 @@ export default function Home() {
             <p className="text-gray-500 dark:text-white/50 text-sm">
               Create anything on Solana. Instant and low fees.
             </p>
+            <StatsBar />
             {!publicKey && (
               <GetStarted connect={connect} recover={recover} loading={loading} />
             )}
@@ -239,6 +357,28 @@ export default function Home() {
               </Link>
             ))}
           </div>
+
+          {/* Secondary tools — reachable on every device */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            {[
+              { href: "/split", icon: Users, label: "Split", desc: "Split a bill", color: "text-purple-400" },
+              { href: "/news", icon: Newspaper, label: "News", desc: "Latest headlines", color: "text-sky-400" },
+              { href: "/pods", icon: Headphones, label: "Pods", desc: "Crypto podcasts", color: "text-fuchsia-400" },
+            ].map((t) => (
+              <Link
+                key={t.href}
+                href={t.href}
+                className="group flex flex-col items-center justify-center gap-1.5 py-4 sm:py-5 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-95 border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150"
+              >
+                <t.icon className={`w-5 h-5 sm:w-6 sm:h-6 ${t.color}`} />
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">{t.label}</div>
+                <div className="text-[10px] sm:text-[11px] text-gray-500 dark:text-white/40 leading-tight text-center px-1">{t.desc}</div>
+              </Link>
+            ))}
+          </div>
+
+          {/* Inline news feed */}
+          <NewsWidget />
 
           {/* What's new banner */}
           <WhatsNewBanner />
