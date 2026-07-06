@@ -9,7 +9,12 @@ import {
 } from "@solana/web3.js";
 import { notifyEvent } from "@/lib/notify";
 
-const DEVNET_RPC = "https://api.devnet.solana.com";
+// api.devnet.solana.com 403s from Cloudflare Workers — prefer Helius devnet.
+const DEVNET_RPC =
+  process.env.DEVNET_RPC ||
+  (process.env.HELIUS_API_KEY
+    ? `https://devnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
+    : "https://api.devnet.solana.com");
 const AIRDROP_AMOUNT = 0.1 * LAMPORTS_PER_SOL;
 
 function getFaucetKeypair(): Keypair {
