@@ -42,3 +42,7 @@ v2.0.1 has **no `vaultPda`** — the user-facing address is `smartWalletPubkey` 
 - SPIKE-5 runtime: capture signedPayload bytes.
 - SPIKE-6: portal popup on iOS PWA (launch gate) + devnet/mainnet program IDs & portal duality; `clusterSimulation: 'devnet' | 'mainnet'` option exists which is promising.
 - SPIKE-7: Genesis/UMI builders emit instructions with noop signer (static analysis of @metaplex-foundation/genesis next).
+
+## Program identity — IMPORTANT ⚠️ (found during runtime spikes)
+
+`@lazorkit/wallet@2.0.1` targets program `Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh` ("lazorkit" v0.1.0 IDL) + `BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7` ("default_policy"). Both are deployed executable on **devnet AND mainnet** (verified via getAccountInfo 2026-07-06). The Accretion-audited program-v2 (`Lazorj…FAKi`, mainnet-only) is served by `@lazorkit/sdk-legacy` instead. **LAUNCH GATE: confirm audit coverage of the Gsuz program (ask LazorKit), or switch to sdk-legacy + audited program.** SDK defaults: rpc `api.devnet.solana.com`, portal `portal.lazor.sh`, paymaster `kora.devnet.lazorkit.com` (a hosted Kora node — protocol match confirmed).
