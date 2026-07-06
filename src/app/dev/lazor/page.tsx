@@ -65,9 +65,20 @@ function Harness() {
 
   const refreshBalance = run("balance", async () => {
     if (!address) throw new Error("connect first");
-    const b = await new Connection(DEVNET_RPC).getBalance(new PublicKey(address));
+    let b = await new Connection(DEVNET_RPC).getBalance(new PublicKey(address));
+    if (b === 0) {
+      // Fund from our own faucet wallet via /api/airdrop (same origin).
+      const r = await fetch("/api/airdrop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(`faucet: ${j.error || "failed"}`);
+      b = await new Connection(DEVNET_RPC).getBalance(new PublicKey(address));
+    }
     setBalance((b / LAMPORTS_PER_SOL).toFixed(4));
-    return `${b} lamports — fund via faucet.circle.com (native drip) or any devnet faucet if 0`;
+    return `${b} lamports${b === 0 ? "" : " (funded from sol.new faucet)"}`;
   });
 
   const spike5SignMessage = run("SPIKE-5 signMessage", async () => {
