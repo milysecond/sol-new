@@ -7,7 +7,7 @@ import { Navbar } from "@/components/navbar";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { FaucetFooter } from "@/components/faucet-footer";
-import { Coins, Image, Wallet, ShieldCheck, ArrowRight, Sparkles, Users, Newspaper, Headphones, ChevronDown, X, ExternalLink, HandCoins } from "lucide-react";
+import { Coins, Image, Wallet, ShieldCheck, ArrowRight, Sparkles, Users, Newspaper, Headphones, ChevronDown, X, ExternalLink, HandCoins, Gift, Trophy } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
 import { WelcomeProvider } from "@/components/welcome-message";
@@ -165,11 +165,12 @@ function WhatsNewBanner() {
   );
 }
 
+// Same order as the mobile nav: your money, make things, share it, play.
 const products: { href: string; icon: LucideIcon; title: string; desc: string; color: string }[] = [
-  { href: "/token", icon: Coins, title: "Token", desc: "Launch your own coin", color: "text-orange-400" },
-  { href: "/nft", icon: Image, title: "NFT", desc: "Turn an image into an NFT", color: "text-green-400" },
-  { href: "/multisig", icon: ShieldCheck, title: "Multisig", desc: "Shared wallet for couples & teams", color: "text-blue-400" },
   { href: "/wallet", icon: Wallet, title: "Wallet", desc: "Get SOL, send, manage", color: "text-fuchsia-400" },
+  { href: "/token", icon: Coins, title: "Token", desc: "Launch your own coin", color: "text-orange-400" },
+  { href: "/gift", icon: Gift, title: "Gift", desc: "Send crypto with a link", color: "text-amber-400" },
+  { href: "/punt", icon: Trophy, title: "Punt", desc: "World Cup odds & picks", color: "text-green-400" },
 ];
 
 function NextStepBanner() {
@@ -361,6 +362,9 @@ export default function Home() {
           {/* Secondary tools — reachable on every device */}
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {[
+              { href: "/nft", icon: Image, label: "NFT", desc: "Image to NFT", color: "text-green-400" },
+              { href: "/multisig", icon: ShieldCheck, label: "Multisig", desc: "Shared wallet", color: "text-blue-400" },
+              { href: "/pay", icon: HandCoins, label: "Pay", desc: "Request money", color: "text-teal-400" },
               { href: "/split", icon: Users, label: "Split", desc: "Split a bill", color: "text-purple-400" },
               { href: "/news", icon: Newspaper, label: "News", desc: "Latest headlines", color: "text-sky-400" },
               { href: "/pods", icon: Headphones, label: "Pods", desc: "Crypto podcasts", color: "text-fuchsia-400" },
