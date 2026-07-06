@@ -61,7 +61,8 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    const { blockhash } = await conn.getLatestBlockhash("confirmed");
+    // "finalized" so the hash is visible to whichever node simulates the tx
+    const { blockhash } = await conn.getLatestBlockhash("finalized");
     tx.recentBlockhash = blockhash;
     tx.feePayer = faucet.publicKey;
     tx.sign(faucet);
