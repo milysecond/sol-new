@@ -8,7 +8,7 @@ import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { Connection, Transaction } from "@solana/web3.js";
-import { ExternalLink, Copy, CheckCheck, ArrowLeft, MessageSquare, Vote, TrendingUp } from "lucide-react";
+import { ExternalLink, Copy, CheckCheck, ArrowLeft, MessageSquare, Vote, TrendingUp, GraduationCap } from "lucide-react";
 
 type TokenData = {
   mint: string;
@@ -425,7 +425,7 @@ export default function LaunchTokenPage() {
             )}
             {token.complete && (
               <div className="border border-green-500/20 bg-green-500/5 rounded-xl p-4 text-center">
-                <p className="text-green-500 font-medium">🎓 Graduated to Raydium</p>
+                <p className="text-green-500 font-medium flex items-center justify-center gap-1.5"><GraduationCap className="w-4 h-4" /> Graduated to Raydium</p>
               </div>
             )}
 
