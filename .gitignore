@@ -5,3 +5,7 @@ node_modules/
 *.tsbuildinfo
 .DS_Store
 feeUzA98vep5UvxQhwdQVBGsSFADqcYM7Dt4sLrpiyE.json
+.env
+.env.*
+!.env.example
+dapp-store/.env
