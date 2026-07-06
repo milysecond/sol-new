@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { useState, useEffect } from "react";
-import { Coins, Image, ShieldCheck, Wallet, Droplets, Zap, ExternalLink, Copy, LogOut, Sparkles, Bell, BellOff, Activity, AtSign, MoreHorizontal, X, Gift, Trophy } from "lucide-react";
+import { Coins, Image, ShieldCheck, Wallet, Droplets, Zap, ExternalLink, Copy, LogOut, Sparkles, Bell, BellOff, Activity, AtSign, MoreHorizontal, X, Gift, Trophy, HandCoins, Newspaper } from "lucide-react";
 import { getPushPermission, subscribePush, unsubscribePush, type PushPermission } from "@/lib/push-client";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Spinner } from "@/components/spinner";
@@ -37,18 +37,22 @@ export function Navbar() {
   const shortKey = publicKey ? `${publicKey.slice(0, 4)}...${publicKey.slice(-4)}` : null;
   const [showMore, setShowMore] = useState(false);
 
+  // Bar: one slot per mental category, in usage order — start, your money,
+  // make things, play. Tray rows group money, creation, then tools & info.
   const MOBILE_PRIMARY = [
     { href: "/", label: "Home", icon: Zap },
-    { href: "/token", label: "Token", icon: Coins },
-    { href: "/id", label: "Identity", icon: AtSign },
     { href: "/wallet/get", label: "Wallet", icon: Wallet },
+    { href: "/token", label: "Token", icon: Coins },
+    { href: "/punt", label: "Punt", icon: Trophy },
   ];
   const MOBILE_MORE = [
-    { href: "/nft", label: "NFT", icon: Image },
     { href: "/gift", label: "Gift", icon: Gift },
-    { href: "/punt", label: "Punt", icon: Trophy },
+    { href: "/pay", label: "Pay", icon: HandCoins },
+    { href: "/nft", label: "NFT", icon: Image },
+    { href: "/id", label: "Identity", icon: AtSign },
     { href: "/multisig", label: "Multisig", icon: ShieldCheck },
     { href: "/scan", label: "Scan", icon: Activity },
+    { href: "/news", label: "News", icon: Newspaper },
     { href: "/whats-new", label: "What's new", icon: Sparkles },
   ];
 
