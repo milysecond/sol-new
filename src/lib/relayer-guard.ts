@@ -17,7 +17,7 @@ const SECP256R1_PRECOMPILE = "Secp256r1SigVerify1111111111111111111111111";
 const ATA_PROGRAM = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
-const MEMO_PROGRAM = "MemoSq4gqABAXKb96qnH8TySNcWxMyWCqXgDLGmfcHr";
+const MEMO_PROGRAM = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr";
 
 export const PAYMASTER_ALLOWED_PROGRAMS = new Set([
   ComputeBudgetProgram.programId.toBase58(),

@@ -12,7 +12,7 @@ import {
 } from "@lazorkit/wallet";
 import { Connection, PublicKey, TransactionInstruction, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-const MEMO_PROGRAM_ID = new PublicKey("MemoSq4gqABAXKb96qnH8TySNcWxMyWCqXgDLGmfcHr");
+const MEMO_PROGRAM_ID = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
 const DEVNET_RPC = "https://api.devnet.solana.com";
 
 function Btn({ onClick, children, disabled }: { onClick: () => void; children: React.ReactNode; disabled?: boolean }) {
