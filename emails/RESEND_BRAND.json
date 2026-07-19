@@ -1,0 +1,37 @@
+{
+  "product": "sol.new",
+  "domain": "sol.new",
+  "from": "sol.new <noreply@sol.new>",
+  "logo_url": "https://sol.new/icon-192.png",
+  "mailing_list": {
+    "segment_id": "483bc3e7-ddd2-4ca4-8b05-82dcd0ff6996",
+    "segment_name": "General",
+    "note": "Plan limit is 3 segments; General is the sol.new mailing list.",
+    "topics": {
+      "product_updates": "6375d8d7-abd5-409d-8bc9-e7cb2c449cb4",
+      "launch_highlights": "76a07e10-b2da-46d9-86c0-f88b2cb15b68"
+    },
+    "subscribe_api": "POST /api/subscribe",
+    "preferences": "https://sol.new/unsubscribe"
+  },
+  "unsubscribe_page_dashboard": {
+    "title": "Email preferences",
+    "description": "Choose what you hear from sol.new — product news and launch highlights.",
+    "logo": "https://sol.new/icon-192.png",
+    "background_color": "#0a0a14",
+    "text_color": "#ffffff",
+    "accent_color": "#a855f7"
+  },
+  "hosted_preferences": "https://sol.new/unsubscribe",
+  "templates": {
+    "broadcast": "emails/broadcast.html",
+    "welcome": "emails/welcome.html"
+  },
+  "notes": [
+    "Paste HTML into Resend Broadcasts; keep {{{RESEND_UNSUBSCRIBE_URL}}}.",
+    "Send broadcasts to segment General (or filter by topic).",
+    "Dashboard: Settings → Unsubscribe Page → background #0a0a14, text #fff, accent #a855f7.",
+    "Secondary accent for marketing: #fb923c (orange).",
+    "Env overrides: RESEND_SEGMENT_ID, RESEND_TOPIC_PRODUCT, RESEND_TOPIC_LAUNCHES, RESEND_FROM."
+  ]
+}

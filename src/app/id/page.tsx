@@ -38,7 +38,7 @@ export default function IdPage() {
       setResult(null);
       try {
         const res = await fetch(`/api/id/check?name=${encodeURIComponent(normalized)}`);
-        const data = await res.json();
+        const data = (await res.json()) as CheckResult;
         setResult(data);
       } catch {
         setResult(null);

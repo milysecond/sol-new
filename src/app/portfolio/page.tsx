@@ -42,8 +42,8 @@ export default function PortfolioPage() {
     if (!publicKey) return;
     setLoading(true);
     Promise.all([
-      fetch(`/api/token?wallet=${publicKey}`).then((r) => r.json()),
-      fetch(`/api/nft?wallet=${publicKey}`).then((r) => r.json()),
+      fetch(`/api/token?wallet=${publicKey}`).then((r) => r.json() as Promise<{ tokens?: Token[] }>),
+      fetch(`/api/nft?wallet=${publicKey}`).then((r) => r.json() as Promise<{ nfts?: Nft[] }>),
     ])
       .then(([tokenData, nftData]) => {
         setTokens(tokenData.tokens || []);

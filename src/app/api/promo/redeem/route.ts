@@ -4,7 +4,7 @@ import { initDb, redeemPromoCode } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const { code, wallet, kind } = await req.json();
+  const { code, wallet, kind } = (await req.json()) as { code?: string; wallet?: string; kind?: string };
   if (!code || !wallet || !kind) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }

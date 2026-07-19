@@ -26,7 +26,7 @@ async function existsOn(rpcUrl: string, addr: PublicKey): Promise<{ exists: bool
 //   network is the cluster where the account exists; null if neither.
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = (await req.json()) as { addresses?: unknown };
     const addresses: string[] = Array.isArray(body?.addresses) ? body.addresses.slice(0, 50) : [];
     const results: Record<string, "mainnet" | "devnet" | null> = {};
 

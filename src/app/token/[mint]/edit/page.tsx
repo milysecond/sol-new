@@ -272,7 +272,7 @@ export default function EditTokenMetadataPage() {
           updates,
         }),
       });
-      const json = await res.json();
+      const json = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(json?.error || "Update failed");
 
       setDone(true);

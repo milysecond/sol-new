@@ -25,7 +25,17 @@ export async function POST(req: NextRequest) {
 
   try {
     await initDb();
-    const data = await req.json();
+    const data = (await req.json()) as {
+      wallet: string;
+      name: string;
+      symbol: string;
+      supply?: string;
+      description?: string;
+      imageUrl?: string;
+      metadataUri?: string;
+      mintAddress?: string;
+      network?: string;
+    };
     if (!data.wallet || !data.name || !data.symbol) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
@@ -56,7 +66,7 @@ export async function POST(req: NextRequest) {
           symbol: data.symbol,
           description: data.description,
           imageUrl: data.imageUrl,
-          mintAddress: data.mintAddress,
+          mintAddress: data.mintAddress ?? "",
           network: data.network,
         });
       } catch (err) {

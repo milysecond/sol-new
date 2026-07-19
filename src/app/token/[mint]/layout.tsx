@@ -8,7 +8,7 @@ export async function generateMetadata({ params }: { params: Promise<{ mint: str
   try {
     const res = await fetch(`${API_BASE}/api/token/${mint}`, { next: { revalidate: 60 } });
     if (res.ok) {
-      const token = await res.json();
+      const token = (await res.json()) as { name: string; symbol: string; description?: string | null };
       // Title: target 50–60 chars
       const title = `${token.name} ($${token.symbol}) just launched on sol.new — Solana memecoin`;
       // Description: target 110–160 chars
@@ -55,7 +55,7 @@ export default async function TokenLayout({
   try {
     const res = await fetch(`${API_BASE}/api/token/${mint}`, { next: { revalidate: 60 } });
     if (res.ok) {
-      const token = await res.json();
+      const token = (await res.json()) as { name: string; symbol: string; description?: string | null; image_url?: string | null };
       jsonLd = {
         "@context": "https://schema.org",
         "@type": "Product",

@@ -98,7 +98,7 @@ export async function notifyEvent(evt: LogEvent): Promise<void> {
       }
     );
     if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
+      const j = (await res.json().catch(() => ({}))) as { description?: string };
       console.warn('[notifyEvent] failed:', j.description || res.status);
     }
   } catch (err) {
@@ -178,7 +178,7 @@ export async function notifyTokenLaunch(data: {
           reply_markup,
         }),
       });
-      const photoJson = await photoRes.json();
+      const photoJson = (await photoRes.json()) as { ok?: boolean; description?: string };
       if (photoJson.ok) {
         console.log('[notify] ✓ Token launch posted to', TG_CHANNEL, '(with photo)');
         return;
@@ -200,7 +200,7 @@ export async function notifyTokenLaunch(data: {
         reply_markup,
       }),
     });
-    const textJson = await textRes.json();
+    const textJson = (await textRes.json()) as { ok?: boolean; description?: string };
     if (textJson.ok) {
       console.log('[notify] ✓ Token launch posted to', TG_CHANNEL, '(text-only)');
     } else {

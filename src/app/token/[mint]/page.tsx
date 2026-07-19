@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { Copy, Check, ArrowRight, Sparkles, Pencil } from 'lucide-react';
 import { Navbar } from '@/components/navbar';
 import { Spinner } from '@/components/spinner';
+import { StarTokenButton } from '@/components/star-token-button';
 import { useWallet } from '@/lib/wallet-context';
 import Link from 'next/link';
 
@@ -52,7 +53,7 @@ export default function LaunchPage() {
         const res = await fetch(`/api/token/${mint}`);
         if (cancelled) return;
         if (res.ok) {
-          const data = await res.json();
+          const data = (await res.json()) as TokenData | null;
           if (data && data.mint_address) {
             setToken(data);
             setLoading(false);
@@ -141,6 +142,12 @@ export default function LaunchPage() {
                 {token.description}
               </p>
             )}
+            <StarTokenButton
+              mint={token.mint_address}
+              name={token.name}
+              symbol={token.symbol}
+              imageUrl={token.image_url}
+            />
           </div>
 
           {/* Mint address */}

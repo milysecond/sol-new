@@ -3,7 +3,13 @@ import { initDb, savePushSubscription, deletePushSubscription } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = (await req.json()) as {
+      type?: string;
+      subscription?: { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
+      token?: string;
+      wallet?: string;
+      topics?: string;
+    };
     const { type = "web", subscription, token, wallet, topics } = body;
 
     await initDb();
@@ -38,7 +44,7 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const { endpoint } = await req.json();
+    const { endpoint } = (await req.json()) as { endpoint?: string };
     if (!endpoint) return NextResponse.json({ error: "Missing endpoint" }, { status: 400 });
     await initDb();
     await deletePushSubscription(endpoint);

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { notifyEvent } from "@/lib/notify";
+import { moonpayConfigured, signedWidgetUrl } from "@/lib/moonpay";
+
+const ONRAMP_PROVIDER = process.env.ONRAMP_PROVIDER ?? "banxa";
 
 const BANXA_API_KEY = process.env.BANXA_API_KEY ?? "";
 const BANXA_API_SECRET = process.env.BANXA_API_SECRET ?? "";
@@ -26,7 +29,29 @@ export async function POST(req: NextRequest) {
     if (!address) return NextResponse.json({ error: "Missing address" }, { status: 400 });
 
     const fiatAmount = String(Math.max(20, Math.min(500, Number(amount) || 50)));
-    const returnUrl = `${req.headers.get("origin") ?? "https://sol.new"}/get?onramp=done`;
+    const origin = req.headers.get("origin") ?? "https://sol.new";
+    const returnUrl = `${origin}/get?onramp=done`;
+
+    if (ONRAMP_PROVIDER === "moonpay") {
+      if (!moonpayConfigured()) {
+        return NextResponse.json({ error: "MoonPay not configured" }, { status: 500 });
+      }
+      const url = signedWidgetUrl({
+        currencyCode: "sol",
+        walletAddress: address,
+        baseCurrencyCode: "usd",
+        baseCurrencyAmount: fiatAmount,
+        redirectURL: returnUrl,
+      });
+
+      notifyEvent({
+        kind: "onramp_order",
+        title: "MoonPay widget opened",
+        fields: { address, amount: fiatAmount },
+      });
+
+      return NextResponse.json({ ok: true, orderId: null, url });
+    }
 
     const body = JSON.stringify({
       account_reference: address,
@@ -36,7 +61,7 @@ export async function POST(req: NextRequest) {
       wallet_address: address,
       blockchain: "SOLANA",
       return_url_on_success: returnUrl,
-      return_url_on_failure: `${req.headers.get("origin") ?? "https://sol.new"}/get?onramp=failed`,
+      return_url_on_failure: `${origin}/get?onramp=failed`,
     });
 
     const path = "/api/orders";
@@ -68,12 +93,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, orderId, url });
   } catch (e) {
-    console.error("Banxa order exception:", e);
+    console.error("Onramp order exception:", e);
     notifyEvent({
       kind: "onramp_order_error",
       emoji: "⚠️",
-      title: "Banxa order failed",
-      fields: { error: String(e) },
+      title: "Onramp order failed",
+      fields: { provider: ONRAMP_PROVIDER, error: String(e) },
     });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }

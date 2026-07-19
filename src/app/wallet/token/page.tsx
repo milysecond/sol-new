@@ -21,7 +21,7 @@ export default function WalletTokenPage() {
 
   useEffect(() => {
     if (!publicKey) return;
-    fetch(`/api/token?wallet=${publicKey}`).then(r => r.json())
+    fetch(`/api/token?wallet=${publicKey}`).then(r => r.json() as Promise<{ tokens?: Token[] }>)
       .then(d => setTokens(d.tokens || []))
       .catch(() => {})
       .finally(() => setLoading(false));

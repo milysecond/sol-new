@@ -15,6 +15,9 @@ const FEEDS: Record<string, string> = {
   "The Delphi Podcast": "https://rss.buzzsprout.com/2609274.rss",
   "Zero Knowledge": "https://feeds.captivate.fm/zeroknowledge/",
   "Web3 with a16z": "https://feeds.simplecast.com/XPOpH7r4",
+  "Solana Downunder": "https://anchor.fm/s/f7351e3c/podcast/rss",
+  "The Metasal Pod": "https://anchor.fm/s/f7351ea0/podcast/rss",
+  Quickbytes: "https://milysec.com/podcast.xml",
 };
 
 type Episode = {

@@ -22,7 +22,7 @@ export async function GET() {
   try {
     const res = await fetch(JUP, { next: { revalidate: 30 } });
     if (res.ok) {
-      const data = await res.json();
+      const data = (await res.json()) as Record<string, { usdPrice?: number } | undefined>;
       const p = data?.[SOL_MINT]?.usdPrice;
       if (typeof p === "number") {
         solUsd = p;

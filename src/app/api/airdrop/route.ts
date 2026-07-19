@@ -41,7 +41,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { address } = await req.json();
+    const { address } = (await req.json()) as { address?: string };
     if (!address) return NextResponse.json({ error: "Missing address" }, { status: 400 });
 
     const recipient = new PublicKey(address);

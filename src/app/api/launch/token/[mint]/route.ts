@@ -11,8 +11,8 @@ function heliusRpc() {
   return k ? `https://mainnet.helius-rpc.com/?api-key=${k}` : "https://api.mainnet-beta.solana.com";
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { mint: string } }) {
-  const { mint } = params;
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ mint: string }> }) {
+  const { mint } = await params;
   if (!mint) return NextResponse.json({ error: "Missing mint" }, { status: 400 });
 
   const connection = new Connection(heliusRpc(), "confirmed");

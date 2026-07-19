@@ -24,7 +24,14 @@ export async function POST(req: NextRequest) {
 
   try {
     await initDb();
-    const data = await req.json();
+    const data = (await req.json()) as {
+      wallet: string;
+      name: string;
+      description?: string;
+      imageUrl?: string;
+      metadataUri?: string;
+      mintAddress?: string;
+    };
     if (!data.wallet || !data.name) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }

@@ -28,7 +28,13 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { code, uses = 1, description, expiresAt, count = 1 } = await req.json().catch(() => ({}));
+  const { code, uses = 1, description, expiresAt, count = 1 } = (await req.json().catch(() => ({}))) as {
+    code?: string;
+    uses?: number;
+    description?: string;
+    expiresAt?: string;
+    count?: number;
+  };
   await initDb();
   const codes: string[] = [];
   for (let i = 0; i < Math.min(count, 100); i++) {

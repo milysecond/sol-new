@@ -11,7 +11,7 @@ export function FaucetFooter() {
   useEffect(() => {
     if (network !== "devnet") { setFaucet(null); return; }
     fetch("/api/airdrop")
-      .then((r) => r.json())
+      .then((r) => r.json() as Promise<{ address: string; balance: number | null }>)
       .then(setFaucet)
       .catch(() => {});
   }, [network]);

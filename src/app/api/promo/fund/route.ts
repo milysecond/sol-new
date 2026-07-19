@@ -13,7 +13,12 @@ const FUND_AMOUNTS: Record<string, number> = {
 };
 
 export async function POST(req: NextRequest) {
-  const { code, wallet, kind, quantity = 1 } = await req.json().catch(() => ({}));
+  const { code, wallet, kind, quantity = 1 } = (await req.json().catch(() => ({}))) as {
+    code?: string;
+    wallet?: string;
+    kind?: string;
+    quantity?: number;
+  };
 
   if (!code || !wallet || !kind) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
