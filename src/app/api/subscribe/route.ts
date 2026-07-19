@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { initDb, upsertWalletEmail } from "@/lib/db";
+import {
+  isValidWalletPubkey,
+  magicLinkConfigured,
+  sendMagicLinkEmail,
+} from "@/lib/magic-link";
 import {
   parseEmail,
   resendConfigured,
@@ -56,6 +62,9 @@ export async function POST(request: NextRequest) {
     product?: boolean;
     launches?: boolean;
     source?: string;
+    /** Linked passkey wallet (optional) */
+    wallet?: string;
+    credentialId?: string;
     /** Honeypot — bots fill this; real users leave empty */
     website?: string;
   };
@@ -84,6 +93,15 @@ export async function POST(request: NextRequest) {
     (typeof body.name === "string" && body.name) ||
     undefined;
 
+  const wallet =
+    typeof body.wallet === "string" && isValidWalletPubkey(body.wallet)
+      ? body.wallet
+      : null;
+  const credentialId =
+    typeof body.credentialId === "string" && body.credentialId.length < 512
+      ? body.credentialId
+      : undefined;
+
   try {
     const result = await subscribeToMailingList({
       email,
@@ -94,17 +112,44 @@ export async function POST(request: NextRequest) {
         typeof body.source === "string"
           ? body.source.slice(0, 64)
           : "web",
-      sendWelcome: true,
+      // Magic link email covers the welcome CTA when a wallet is linked
+      sendWelcome: !wallet,
     });
+
+    let magicLinkSent = false;
+    if (wallet && magicLinkConfigured()) {
+      try {
+        await initDb();
+        await upsertWalletEmail({
+          email,
+          wallet,
+          credentialId,
+          verified: false,
+        });
+        await sendMagicLinkEmail({
+          email,
+          wallet,
+          credentialId,
+          purpose: "link",
+        });
+        magicLinkSent = true;
+      } catch (e) {
+        console.warn("[subscribe] magic link:", e);
+      }
+    }
 
     return NextResponse.json({
       ok: true,
       email,
       created: result.created,
       alreadySubscribed: result.alreadySubscribed,
-      message: result.alreadySubscribed
-        ? "You’re already on the list."
-        : "You’re in. Check your inbox for a welcome note.",
+      magicLinkSent,
+      wallet: wallet || undefined,
+      message: magicLinkSent
+        ? "You’re in. Check your inbox for a magic link to open this wallet."
+        : result.alreadySubscribed
+          ? "You’re already on the list."
+          : "You’re in. Check your inbox for a welcome note.",
     });
   } catch (e) {
     console.error("[subscribe]", e);

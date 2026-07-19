@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Mail, Check, Loader2 } from "lucide-react";
+import { Mail, Check, Loader2, Fingerprint } from "lucide-react";
+import { useWallet } from "@/lib/wallet-context";
 
 type Props = {
   /** Compact card for homepage sidebar; full for standalone */
@@ -15,11 +16,13 @@ export function MailingListSignup({
   source = "home",
   className = "",
 }: Props) {
+  const { publicKey } = useWallet();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [magicSent, setMagicSent] = useState(false);
   // Honeypot
   const [website, setWebsite] = useState("");
 
@@ -35,6 +38,14 @@ export function MailingListSignup({
       setError(null);
       setMessage(null);
       try {
+        let credentialId: string | undefined;
+        try {
+          credentialId =
+            localStorage.getItem("sol.new.credentialId") || undefined;
+        } catch {
+          /* ignore */
+        }
+
         const res = await fetch("/api/subscribe", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -42,6 +53,8 @@ export function MailingListSignup({
             email: trimmed,
             source,
             website: website || undefined,
+            wallet: publicKey || undefined,
+            credentialId,
           }),
         });
         const data = (await res.json().catch(() => ({}))) as {
@@ -49,11 +62,13 @@ export function MailingListSignup({
           error?: string;
           message?: string;
           alreadySubscribed?: boolean;
+          magicLinkSent?: boolean;
         };
         if (!res.ok || data.error) {
           throw new Error(data.error || "Request failed");
         }
         setDone(true);
+        setMagicSent(Boolean(data.magicLinkSent));
         setMessage(
           data.message ||
             (data.alreadySubscribed
@@ -66,7 +81,7 @@ export function MailingListSignup({
         setBusy(false);
       }
     },
-    [email, source, website]
+    [email, source, website, publicKey]
   );
 
   if (variant === "inline") {
@@ -140,11 +155,15 @@ export function MailingListSignup({
         {done ? (
           <div className="flex items-start gap-3">
             <div className="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center shrink-0">
-              <Check className="w-4 h-4 text-purple-400" />
+              {magicSent ? (
+                <Fingerprint className="w-4 h-4 text-purple-400" />
+              ) : (
+                <Check className="w-4 h-4 text-purple-400" />
+              )}
             </div>
             <div>
               <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                You’re on the list
+                {magicSent ? "Magic link sent" : "You’re on the list"}
               </p>
               <p className="text-xs text-gray-500 dark:text-white/45 mt-1 leading-relaxed">
                 {message || "Product news and launch highlights, no spam."}
@@ -154,8 +173,15 @@ export function MailingListSignup({
         ) : (
           <>
             <p className="text-xs text-gray-500 dark:text-white/45 mb-3 leading-relaxed">
-              Product news and launch highlights. Unsubscribe anytime.
+              {publicKey
+                ? "Join the list and get a magic link that opens this passkey wallet."
+                : "Product news and launch highlights. Unsubscribe anytime."}
             </p>
+            {publicKey ? (
+              <p className="mb-3 text-[11px] font-mono text-purple-400/90 truncate">
+                {publicKey.slice(0, 4)}…{publicKey.slice(-4)}
+              </p>
+            ) : null}
             <form onSubmit={submit} className="space-y-2.5">
               <label className="sr-only" htmlFor="mailing-email">
                 Email
@@ -174,7 +200,6 @@ export function MailingListSignup({
                 }}
                 className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.04] text-gray-900 dark:text-white text-[16px] sm:text-sm px-3.5 py-2.5 outline-none focus:border-purple-400/60 focus:ring-2 focus:ring-purple-500/20 placeholder:text-gray-400 dark:placeholder:text-white/30"
               />
-              {/* Honeypot */}
               <input
                 type="text"
                 name="website"
@@ -194,6 +219,11 @@ export function MailingListSignup({
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Joining…
+                  </>
+                ) : publicKey ? (
+                  <>
+                    <Fingerprint className="w-4 h-4" />
+                    Join + magic link
                   </>
                 ) : (
                   "Join the list"

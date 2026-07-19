@@ -108,10 +108,13 @@ export async function recoverPasskeyWallet(): Promise<{
   publicKey: string;
   credentialId: string;
 }> {
+  // Prefer the active / magic-link credential so we don't list every passkey.
+  const allowCredentials = getAllowCredentials();
   const credential = (await navigator.credentials.get({
     publicKey: {
       challenge: CHALLENGE,
       userVerification: "required",
+      ...(allowCredentials && { allowCredentials }),
       extensions: {
 
         prf: {

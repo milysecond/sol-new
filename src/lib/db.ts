@@ -168,7 +168,22 @@ export async function initDb() {
       created_at TEXT DEFAULT (datetime('now')),
       UNIQUE(wallet, fixture_id)
     )`,
+    `CREATE TABLE IF NOT EXISTS wallet_emails (
+      email TEXT PRIMARY KEY,
+      wallet TEXT NOT NULL,
+      credential_id TEXT,
+      verified INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      verified_at TEXT
+    )`,
   ]);
+  try {
+    await db.execute(
+      "CREATE INDEX IF NOT EXISTS idx_wallet_emails_wallet ON wallet_emails(wallet)"
+    );
+  } catch {
+    /* ignore */
+  }
   // Idempotent migration for the network column on existing deployments
   try {
     await db.execute("ALTER TABLE tokens ADD COLUMN network TEXT");
@@ -308,7 +323,84 @@ export async function saveWallet(publicKey: string, credentialId?: string): Prom
     sql: "INSERT OR IGNORE INTO wallets (public_key, credential_id) VALUES (?, ?)",
     args: [publicKey, credentialId || null],
   });
+  if (credentialId) {
+    // Backfill credential if we already knew this wallet
+    await db.execute({
+      sql: "UPDATE wallets SET credential_id = COALESCE(credential_id, ?) WHERE public_key = ?",
+      args: [credentialId, publicKey],
+    });
+  }
   return { created: r.rowsAffected > 0 };
+}
+
+export async function getWalletByPublicKey(publicKey: string) {
+  const r = await db.execute({
+    sql: "SELECT public_key, credential_id, created_at FROM wallets WHERE public_key = ? LIMIT 1",
+    args: [publicKey],
+  });
+  const row = r.rows[0];
+  if (!row) return null;
+  return {
+    publicKey: row.public_key as string,
+    credentialId: (row.credential_id as string) || null,
+    createdAt: (row.created_at as string) || null,
+  };
+}
+
+/** Upsert email ↔ wallet link (verified only after passkey proof on /magic). */
+export async function upsertWalletEmail(opts: {
+  email: string;
+  wallet: string;
+  credentialId?: string | null;
+  verified?: boolean;
+}) {
+  const email = opts.email.trim().toLowerCase();
+  const verified = opts.verified ? 1 : 0;
+  await db.execute({
+    sql: `INSERT INTO wallet_emails (email, wallet, credential_id, verified, verified_at)
+          VALUES (?, ?, ?, ?, CASE WHEN ? = 1 THEN datetime('now') ELSE NULL END)
+          ON CONFLICT(email) DO UPDATE SET
+            wallet = excluded.wallet,
+            credential_id = COALESCE(excluded.credential_id, wallet_emails.credential_id),
+            verified = CASE WHEN excluded.verified = 1 THEN 1 ELSE wallet_emails.verified END,
+            verified_at = CASE WHEN excluded.verified = 1 THEN datetime('now') ELSE wallet_emails.verified_at END`,
+    args: [
+      email,
+      opts.wallet,
+      opts.credentialId || null,
+      verified,
+      verified,
+    ],
+  });
+}
+
+export async function getWalletEmail(email: string) {
+  const r = await db.execute({
+    sql: "SELECT email, wallet, credential_id, verified, verified_at FROM wallet_emails WHERE email = ? LIMIT 1",
+    args: [email.trim().toLowerCase()],
+  });
+  const row = r.rows[0];
+  if (!row) return null;
+  return {
+    email: row.email as string,
+    wallet: row.wallet as string,
+    credentialId: (row.credential_id as string) || null,
+    verified: Boolean(row.verified),
+    verifiedAt: (row.verified_at as string) || null,
+  };
+}
+
+export async function getEmailsForWallet(wallet: string) {
+  const r = await db.execute({
+    sql: "SELECT email, wallet, credential_id, verified FROM wallet_emails WHERE wallet = ?",
+    args: [wallet],
+  });
+  return r.rows.map((row) => ({
+    email: row.email as string,
+    wallet: row.wallet as string,
+    credentialId: (row.credential_id as string) || null,
+    verified: Boolean(row.verified),
+  }));
 }
 
 export async function saveToken(data: {
