@@ -91,6 +91,15 @@ export default function PrivacyPage() {
               </Link>
               .
             </li>
+            <li>
+              <span className="font-medium text-gray-900 dark:text-white">Optional email ↔ wallet link.</span>{" "}
+              If you request a magic link while a passkey wallet is connected, we
+              store your email with the public wallet address (and optional
+              WebAuthn credential id) so the link can open that wallet on a
+              device that has the passkey. The private key never leaves your
+              device; the link only names which public address to open and still
+              requires Face ID / fingerprint.
+            </li>
           </ul>
         </section>
 
