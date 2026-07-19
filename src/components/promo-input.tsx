@@ -20,7 +20,7 @@ export function PromoInput({ onValidCode, onClear }: PromoInputProps) {
     setStatus("checking");
     try {
       const res = await fetch(`/api/promo/validate?code=${encodeURIComponent(code)}`);
-      const data = await res.json();
+      const data = (await res.json()) as { valid?: boolean; description?: string | null };
       if (data.valid) {
         setStatus("valid");
         setDescription(data.description ?? null);

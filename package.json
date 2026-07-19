@@ -10,7 +10,8 @@
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
-    "predeploy": "node -e \"const b=require('child_process').execSync('git branch --show-current').toString().trim(); if(b!=='main'){console.error('REFUSING to deploy from branch: '+b);process.exit(1)}\""
+    "predeploy": "node -e \"const b=require('child_process').execSync('git branch --show-current').toString().trim(); if(b!=='main'){console.error('REFUSING to deploy from branch: '+b);process.exit(1)}\"",
+    "postinstall": "cp node_modules/@lightprotocol/hasher.rs/dist/hasher_wasm_simd_bg.wasm node_modules/@lightprotocol/hasher.rs/dist/browser-fat/es/ && cp node_modules/@lightprotocol/hasher.rs/dist/light_wasm_hasher_bg.wasm node_modules/@lightprotocol/hasher.rs/dist/browser-fat/es/"
   },
   "dependencies": {
     "@bonfida/spl-name-service": "^3.0.23",
@@ -33,6 +34,7 @@
     "@sqds/multisig": "^2.1.4",
     "@stripe/stripe-js": "^8.7.0",
     "bn.js": "^5.2.2",
+    "buffer": "^6.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "gsap": "^3.15.0",
@@ -41,6 +43,8 @@
     "lucide-react": "^0.563.0",
     "motion": "^12.34.0",
     "next": "^16.2.6",
+    "privacycash": "^1.2.2",
+    "process": "^0.11.10",
     "pumpdotfun-sdk": "^1.4.2",
     "qrcode": "^1.5.4",
     "radix-ui": "^1.4.3",
@@ -50,6 +54,7 @@
     "stripe": "^20.3.1",
     "tailwind-merge": "^3.4.0",
     "three": "^0.184.0",
+    "tweetnacl": "^1.0.3",
     "web-push": "^3.6.7"
   },
   "devDependencies": {

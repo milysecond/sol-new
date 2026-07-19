@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { WalletShell } from "@/components/wallet-shell";
 import { PageTransition } from "@/components/page-transition";
-import { Send, Coins, Image as ImageIcon, ArrowRight, Check, ExternalLink } from "lucide-react";
+import { Coins, Image as ImageIcon, ArrowRight, Check, ExternalLink } from "lucide-react";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
+import { PrivateSendSheet } from "@/components/private-send-sheet";
 import { Connection, PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 type Tab = "sol" | "token" | "nft";
@@ -161,6 +162,9 @@ export default function SendPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Private send via Umbra */}
+              <PrivateSendSheet />
 
               {/* Error */}
               {error && (

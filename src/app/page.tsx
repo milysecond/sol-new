@@ -7,6 +7,7 @@ import { Navbar } from "@/components/navbar";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { FaucetFooter } from "@/components/faucet-footer";
+import { MailingListSignup } from "@/components/mailing-list-signup";
 import { Coins, Image, Wallet, ShieldCheck, ArrowRight, Sparkles, Users, Newspaper, Headphones, ChevronDown, X, ExternalLink, HandCoins, Gift, Trophy } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
@@ -211,7 +212,7 @@ const SOURCE_COLOR: Record<string, string> = {
 
 function newsAgo(iso: string): string {
   if (!iso) return "";
-  const diff = Date.now() - new Date(iso).getTime();
+  const diff = Math.max(0, Date.now() - new Date(iso).getTime());
   const m = Math.floor(diff / 60000);
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
@@ -324,12 +325,15 @@ export default function Home() {
       <Navbar />
       <main className="flex-1 flex flex-col px-3 sm:px-6 sm:items-center sm:justify-center min-h-0">
         <PageTransition>
-        <div className="w-full sm:max-w-lg md:max-w-2xl lg:max-w-3xl flex flex-col gap-3 sm:gap-4 md:gap-5 py-3">
+        <div className="w-full sm:max-w-lg md:max-w-2xl lg:max-w-5xl xl:max-w-6xl flex flex-col gap-3 sm:gap-4 md:gap-5 py-3 lg:py-8">
           {/* Header */}
-          <div className="text-center space-y-2">
-            <img src="/icon-512.png" alt="sol.new" className="w-14 h-14 mx-auto rounded-xl electrify" />
-            <p className="text-gray-500 dark:text-white/50 text-sm">
-              Create anything on Solana. Instant and low fees.
+          <div className="text-center space-y-2 lg:space-y-3">
+            <img src="/icon-512.png" alt="sol.new" className="w-14 h-14 lg:w-16 lg:h-16 mx-auto rounded-xl electrify" />
+            <h1 className="hidden lg:block text-3xl xl:text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
+              Create anything on <span className="text-purple-400">Solana</span>
+            </h1>
+            <p className="text-gray-500 dark:text-white/50 text-sm lg:text-base">
+              <span className="lg:hidden">Create anything on Solana. </span>Instant and low fees.
             </p>
             <StatsBar />
             {!publicKey && (
@@ -337,55 +341,66 @@ export default function Home() {
             )}
           </div>
 
-          {/* Next-step nudge for funded-zero wallets */}
-          {publicKey && <NextStepBanner />}
+          {/* Two columns on desktop: products left, feed right */}
+          <div className="flex flex-col gap-3 sm:gap-4 md:gap-5 lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 lg:items-start">
+            <div className="flex flex-col gap-3 sm:gap-4 md:gap-5">
+              {/* Next-step nudge for funded-zero wallets */}
+              {publicKey && <NextStepBanner />}
 
-          {/* Product grid — 2x2, scales up with viewport */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-5">
-            {products.map((p) => (
-              <Link
-                key={p.href}
-                href={p.href}
-                className="group flex flex-col items-center justify-center gap-2 sm:gap-3 md:gap-4 py-6 sm:py-10 md:py-14 lg:py-16 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-95 active:bg-purple-500/10 border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150"
-              >
-                <AnimatedIcon
-                  icon={p.icon}
-                  size={24}
-                  className={`${p.color} [&_svg]:w-7 [&_svg]:h-7 sm:[&_svg]:w-10 sm:[&_svg]:h-10 md:[&_svg]:w-12 md:[&_svg]:h-12 lg:[&_svg]:w-14 lg:[&_svg]:h-14`}
-                />
-                <div className="text-sm sm:text-lg md:text-xl font-semibold text-gray-900 dark:text-white transition">{p.title}</div>
-                <div className="text-[11px] sm:text-sm md:text-base text-gray-500 dark:text-white/40 px-2 text-center leading-tight">{p.desc}</div>
-              </Link>
-            ))}
+              {/* Product grid — 2x2, scales up with viewport */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-5">
+                {products.map((p) => (
+                  <Link
+                    key={p.href}
+                    href={p.href}
+                    className="group flex flex-col items-center justify-center gap-2 sm:gap-3 md:gap-4 py-6 sm:py-10 md:py-14 lg:py-12 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-95 active:bg-purple-500/10 border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150"
+                  >
+                    <AnimatedIcon
+                      icon={p.icon}
+                      size={24}
+                      className={`${p.color} [&_svg]:w-7 [&_svg]:h-7 sm:[&_svg]:w-10 sm:[&_svg]:h-10 md:[&_svg]:w-12 md:[&_svg]:h-12`}
+                    />
+                    <div className="text-sm sm:text-lg md:text-xl font-semibold text-gray-900 dark:text-white transition">{p.title}</div>
+                    <div className="text-[11px] sm:text-sm md:text-base text-gray-500 dark:text-white/40 px-2 text-center leading-tight">{p.desc}</div>
+                  </Link>
+                ))}
+              </div>
+
+              {/* Secondary tools — reachable on every device */}
+              <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+                {[
+                  { href: "/nft", icon: Image, label: "NFT", desc: "Image to NFT", color: "text-green-400" },
+                  { href: "/multisig", icon: ShieldCheck, label: "Multisig", desc: "Shared wallet", color: "text-blue-400" },
+                  { href: "/pay", icon: HandCoins, label: "Pay", desc: "Request money", color: "text-teal-400" },
+                  { href: "/split", icon: Users, label: "Split", desc: "Split a bill", color: "text-purple-400" },
+                  { href: "/news", icon: Newspaper, label: "News", desc: "Latest headlines", color: "text-sky-400" },
+                  { href: "/pods", icon: Headphones, label: "Pods", desc: "Crypto podcasts", color: "text-fuchsia-400" },
+                ].map((t) => (
+                  <Link
+                    key={t.href}
+                    href={t.href}
+                    className="group flex flex-col items-center justify-center gap-1.5 py-4 sm:py-5 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-95 border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150"
+                  >
+                    <t.icon className={`w-5 h-5 sm:w-6 sm:h-6 ${t.color}`} />
+                    <div className="text-sm font-semibold text-gray-900 dark:text-white">{t.label}</div>
+                    <div className="text-[10px] sm:text-[11px] text-gray-500 dark:text-white/40 leading-tight text-center px-1">{t.desc}</div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:gap-4 md:gap-5 lg:sticky lg:top-20">
+              {/* Inline news feed */}
+              <NewsWidget />
+
+              <MailingListSignup source="home" />
+
+              {/* What's new banner — leads the sidebar on desktop */}
+              <div className="contents lg:block lg:-order-1">
+                <WhatsNewBanner />
+              </div>
+            </div>
           </div>
-
-          {/* Secondary tools — reachable on every device */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            {[
-              { href: "/nft", icon: Image, label: "NFT", desc: "Image to NFT", color: "text-green-400" },
-              { href: "/multisig", icon: ShieldCheck, label: "Multisig", desc: "Shared wallet", color: "text-blue-400" },
-              { href: "/pay", icon: HandCoins, label: "Pay", desc: "Request money", color: "text-teal-400" },
-              { href: "/split", icon: Users, label: "Split", desc: "Split a bill", color: "text-purple-400" },
-              { href: "/news", icon: Newspaper, label: "News", desc: "Latest headlines", color: "text-sky-400" },
-              { href: "/pods", icon: Headphones, label: "Pods", desc: "Crypto podcasts", color: "text-fuchsia-400" },
-            ].map((t) => (
-              <Link
-                key={t.href}
-                href={t.href}
-                className="group flex flex-col items-center justify-center gap-1.5 py-4 sm:py-5 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-95 border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150"
-              >
-                <t.icon className={`w-5 h-5 sm:w-6 sm:h-6 ${t.color}`} />
-                <div className="text-sm font-semibold text-gray-900 dark:text-white">{t.label}</div>
-                <div className="text-[10px] sm:text-[11px] text-gray-500 dark:text-white/40 leading-tight text-center px-1">{t.desc}</div>
-              </Link>
-            ))}
-          </div>
-
-          {/* Inline news feed */}
-          <NewsWidget />
-
-          {/* What's new banner */}
-          <WhatsNewBanner />
 
           {/* Footer row */}
           <div className="flex items-center justify-center gap-4">

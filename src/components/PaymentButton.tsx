@@ -34,13 +34,14 @@ export default function PaymentButton({
         body: JSON.stringify({ amountUsd, wallet, tokenParams }),
       });
 
-      const data = await res.json();
+      const data = (await res.json()) as { clientSecret?: string; solAmount?: number; solPrice?: number; error?: string };
 
       if (!res.ok) {
         throw new Error(data.error || 'Payment setup failed');
       }
 
       const { clientSecret, solAmount, solPrice } = data;
+      if (!clientSecret) throw new Error('Payment setup failed');
 
       // Load Stripe
       const stripe = await stripePromise;

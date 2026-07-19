@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   if (isRateLimited(ip)) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 
   try {
-    const body = await req.json();
+    const body = (await req.json()) as { name?: unknown; symbol?: unknown; creator?: unknown } & Record<string, unknown>;
     if (!body || typeof body !== "object") {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }

@@ -11,6 +11,7 @@ type Pod = {
   desc: string;
   tag: string;
   accent: string; // tailwind text + bg classes for the avatar
+  spotifyUrl?: string; // exact show link; falls back to a title search
 };
 
 type Episode = {
@@ -91,6 +92,37 @@ const PODS: Pod[] = [
     desc: "How web3 is actually built — from frontier research to real-world products.",
     tag: "Tech",
     accent: "text-teal-500 bg-teal-500/10",
+  },
+  {
+    title: "Solana Downunder",
+    host: "Sal Samani",
+    desc: "Weekly roundup of everything relevant to Solana enjoyers Downunder.",
+    tag: "Solana",
+    accent: "text-cyan-500 bg-cyan-500/10",
+    spotifyUrl: "https://open.spotify.com/show/6r9zUgG0RdolFuqbtXahGu",
+  },
+  {
+    title: "The Metasal Pod",
+    host: "Metasal",
+    desc: "Conversations on tech, blockchain, crypto, and Solana.",
+    tag: "Tech",
+    accent: "text-lime-500 bg-lime-500/10",
+    spotifyUrl: "https://open.spotify.com/show/2xce1PJ1KKDZJU10a76Uuu",
+  },
+  {
+    title: "Quickbytes",
+    host: "Sal Samani",
+    desc: "Bite-sized insights on Solana, web3, and stablecoins from Australia. New episodes weekly.",
+    tag: "Solana",
+    accent: "text-pink-500 bg-pink-500/10",
+  },
+  {
+    title: "DevRels Podcast",
+    host: "DevRels",
+    desc: "Developer relations in practice — community, advocacy, and the people behind dev ecosystems.",
+    tag: "Tech",
+    accent: "text-blue-500 bg-blue-500/10",
+    spotifyUrl: "https://open.spotify.com/show/033MSY7a0tSzFTH75TBYG1",
   },
 ];
 
@@ -238,7 +270,7 @@ export default function PodsPage() {
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
                   </button>
                   <div className="flex items-center gap-1.5 ml-auto">
-                    <PlatformLink href={spotify(p.title)} label="Spotify">
+                    <PlatformLink href={p.spotifyUrl ?? spotify(p.title)} label="Spotify">
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.52 17.34c-.24.36-.66.48-1.02.24-2.82-1.74-6.36-2.1-10.56-1.14-.42.12-.78-.18-.9-.54-.12-.42.18-.78.54-.9 4.56-1.02 8.52-.6 11.64 1.32.42.18.48.66.3 1.02zm1.44-3.3c-.3.42-.84.6-1.26.3-3.24-1.98-8.16-2.58-11.94-1.38-.48.12-1.02-.12-1.14-.6-.12-.48.12-1.02.6-1.14 4.38-1.32 9.84-.66 13.56 1.62.36.18.54.84.18 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.3c-.6.18-1.2-.18-1.38-.72-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.72 1.62.54.3.72 1.02.42 1.56-.3.42-1.02.66-1.56.36z"/></svg>
                     </PlatformLink>
                     <PlatformLink href={apple(p.title)} label="Apple Podcasts">

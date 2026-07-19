@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { BottomSheet } from "@/components/bottom-sheet";
 import { Copy, Check, Droplets, ExternalLink, Apple } from "lucide-react";
 import { QrCode } from "@/components/qr-code";
 import { WalletShell } from "@/components/wallet-shell";
@@ -16,70 +17,19 @@ const ONRAMP_ENABLED = process.env.NEXT_PUBLIC_ONRAMP_ENABLED === "1";
 function QrModal({ open, onClose, publicKey, onCopy, copied }: {
   open: boolean; onClose: () => void; publicKey: string; onCopy: () => void; copied: boolean;
 }) {
-  const sheetRef = useRef<HTMLDivElement>(null);
-  const dragStart = useRef<number | null>(null);
-  const dragY = useRef(0);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    dragStart.current = e.touches[0].clientY;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (dragStart.current === null) return;
-    const dy = e.touches[0].clientY - dragStart.current;
-    dragY.current = Math.max(0, dy);
-    if (sheetRef.current) {
-      sheetRef.current.style.transform = `translateY(${dragY.current}px)`;
-      sheetRef.current.style.transition = 'none';
-    }
-  };
-
-  const handleTouchEnd = () => {
-    if (dragY.current > 100) {
-      onClose();
-    }
-    if (sheetRef.current) {
-      sheetRef.current.style.transform = '';
-      sheetRef.current.style.transition = '';
-    }
-    dragStart.current = null;
-    dragY.current = 0;
-  };
-
-  if (!open) return null;
-
   return (
-    <>
-      {/* Backdrop — click anywhere to close on desktop */}
-      <div
-        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
-        onClick={onClose}
-      />
-      {/* Mobile: bottom sheet / Desktop: centered */}
-      <div className="fixed z-50 inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center" onClick={onClose}>
-        <div
-          ref={sheetRef}
-          onClick={(e) => e.stopPropagation()}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          className="bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-sm p-8 flex flex-col items-center gap-5 animate-[slideUp_0.3s_ease-out] sm:animate-[scaleIn_0.2s_ease-out] shadow-2xl transition-transform"
-        >
-          {/* Drag handle (mobile) */}
-          <div className="w-12 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 sm:hidden" />
-          <div className="bg-white rounded-2xl p-4">
-            <QrCode data={`solana:${publicKey}`} size={224} className="w-56 h-56" />
-          </div>
-          <p className="text-gray-500 dark:text-gray-400 text-xs font-mono break-all text-center leading-relaxed">{publicKey}</p>
-          <button
-            onClick={onCopy}
-            className="w-full flex items-center justify-center gap-1.5 bg-fuchsia-500 hover:bg-fuchsia-400 text-white font-semibold rounded-xl px-4 py-3 transition"
-          >
-            {copied ? <><Check size={16} /> Copied</> : <><Copy size={16} /> Copy address</>}
-          </button>
-        </div>
+    <BottomSheet open={open} onClose={onClose} className="p-8 flex flex-col items-center gap-5">
+      <div className="bg-white rounded-2xl p-4">
+        <QrCode data={`solana:${publicKey}`} size={224} className="w-56 h-56" />
       </div>
-    </>
+      <p className="text-gray-500 dark:text-gray-400 text-xs font-mono break-all text-center leading-relaxed">{publicKey}</p>
+      <button
+        onClick={onCopy}
+        className="w-full flex items-center justify-center gap-1.5 bg-fuchsia-500 hover:bg-fuchsia-400 text-white font-semibold rounded-xl px-4 py-3 transition"
+      >
+        {copied ? <><Check size={16} /> Copied</> : <><Copy size={16} /> Copy address</>}
+      </button>
+    </BottomSheet>
   );
 }
 

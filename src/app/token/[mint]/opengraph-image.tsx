@@ -83,7 +83,7 @@ export default async function OpengraphImage({ params }: { params: Promise<{ min
   try {
     const res = await fetch(`${API_BASE}/api/token/${mint}`, { cache: "no-store" });
     if (res.ok) {
-      const token = await res.json();
+      const token = (await res.json()) as { name?: string; symbol?: string; image_url?: string | null; created_at?: string | null };
       name = token.name || name;
       symbol = token.symbol || "";
       rawImage = token.image_url ?? null;

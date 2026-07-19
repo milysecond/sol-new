@@ -19,7 +19,12 @@
   },
   "vars": {
     "NEXT_PUBLIC_ONRAMP_ENABLED": "1",
-    "CROSSMINT_PROJECT_ID": "659bb4f5-36d6-49a6-aee0-acedfd4eabf0"
+    "ONRAMP_PROVIDER": "moonpay",
+    "CROSSMINT_PROJECT_ID": "659bb4f5-36d6-49a6-aee0-acedfd4eabf0",
+    "RESEND_FROM": "sol.new <noreply@sol.new>",
+    "RESEND_SEGMENT_ID": "483bc3e7-ddd2-4ca4-8b05-82dcd0ff6996",
+    "RESEND_TOPIC_PRODUCT": "6375d8d7-abd5-409d-8bc9-e7cb2c449cb4",
+    "RESEND_TOPIC_LAUNCHES": "76a07e10-b2da-46d9-86c0-f88b2cb15b68"
   },
   "r2_buckets": [
     {

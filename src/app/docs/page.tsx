@@ -12,7 +12,7 @@ export default function DocsPage() {
 
   useEffect(() => {
     fetch("/api/costs", { cache: "no-store" })
-      .then((r) => r.json())
+      .then((r) => r.json() as Promise<Costs>)
       .then(setCosts)
       .catch(() => {});
   }, []);

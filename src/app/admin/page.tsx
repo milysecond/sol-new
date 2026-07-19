@@ -48,7 +48,7 @@ export default function AdminPage() {
     try {
       const res = await fetch("/api/admin/promo", { headers });
       if (res.status === 401) { setAuthed(false); setAuthErr(true); return; }
-      const data = await res.json();
+      const data = (await res.json()) as { codes?: PromoCode[]; redemptions?: Redemption[] };
       setCodes(data.codes ?? []);
       setRedemptions(data.redemptions ?? []);
     } finally {
@@ -61,7 +61,7 @@ export default function AdminPage() {
     const res = await fetch("/api/admin/promo", { headers: { "x-admin-secret": secret } });
     if (res.status === 401) { setAuthErr(true); return; }
     setAuthed(true);
-    const data = await res.json();
+    const data = (await res.json()) as { codes?: PromoCode[]; redemptions?: Redemption[] };
     setCodes(data.codes ?? []);
     setRedemptions(data.redemptions ?? []);
   };
@@ -80,7 +80,7 @@ export default function AdminPage() {
           code: customCode || undefined,
         }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as { codes?: string[] };
       if (data.codes) {
         setNewCodes(data.codes);
         await load();

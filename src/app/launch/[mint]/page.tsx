@@ -9,6 +9,7 @@ import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { Connection, Transaction } from "@solana/web3.js";
 import { ExternalLink, Copy, CheckCheck, ArrowLeft, MessageSquare, Vote, TrendingUp, GraduationCap } from "lucide-react";
+import { StarTokenButton } from "@/components/star-token-button";
 
 type TokenData = {
   mint: string;
@@ -382,16 +383,27 @@ export default function LaunchTokenPage() {
                 <img src={token.imageUrl} alt={token.name ?? ""} className="w-16 h-16 rounded-xl object-cover shrink-0" />
               )}
               <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  <h1 className="text-xl font-bold">{token.name ?? "Unknown"}</h1>
-                  <span className="font-mono text-gray-500 dark:text-white/40">${token.symbol ?? "???"}</span>
-                </div>
-                {token.description && <p className="text-sm text-gray-600 dark:text-white/60 mt-1 line-clamp-2">{token.description}</p>}
-                <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 dark:text-white/40">
-                  <span className="flex items-center gap-1">
-                    {mint.slice(0, 8)}… <CopyButton text={mint} />
-                  </span>
-                  {token.creator && <span>by {shortenKey(token.creator)}</span>}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <h1 className="text-xl font-bold">{token.name ?? "Unknown"}</h1>
+                      <span className="font-mono text-gray-500 dark:text-white/40">${token.symbol ?? "???"}</span>
+                    </div>
+                    {token.description && <p className="text-sm text-gray-600 dark:text-white/60 mt-1 line-clamp-2">{token.description}</p>}
+                    <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 dark:text-white/40">
+                      <span className="flex items-center gap-1">
+                        {mint.slice(0, 8)}… <CopyButton text={mint} />
+                      </span>
+                      {token.creator && <span>by {shortenKey(token.creator)}</span>}
+                    </div>
+                  </div>
+                  <StarTokenButton
+                    mint={mint}
+                    name={token.name}
+                    symbol={token.symbol}
+                    imageUrl={token.imageUrl}
+                    size="sm"
+                  />
                 </div>
               </div>
             </div>

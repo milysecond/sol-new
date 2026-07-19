@@ -41,7 +41,7 @@ export default function GetPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: publicKey }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as { ok?: boolean };
       if (data.ok) {
         await new Promise((r) => setTimeout(r, 2000));
         await refreshBalance();
@@ -65,7 +65,7 @@ export default function GetPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: publicKey, amount }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !data.url) throw new Error(data.error || "Failed to start payment");
       window.location.href = data.url;
     } catch (e) {

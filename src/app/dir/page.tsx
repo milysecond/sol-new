@@ -34,14 +34,9 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
     ],
   },
   {
-    section: "world cup",
-    links: [
-      { label: "punt — live odds & picks", href: "/punt" },
-    ],
-  },
-  {
     section: "explore",
     links: [
+      { label: "watchlists", href: "/lists" },
       { label: "token gallery", href: "/gallery" },
       { label: "live launches", href: "/launch" },
       { label: "compare tokens", href: "/compare" },
@@ -99,7 +94,17 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
       { label: "coinbase", href: "https://www.coinbase.com" },
       { label: "binance", href: "https://www.binance.com" },
       { label: "kraken", href: "https://www.kraken.com" },
+      { label: "backpack exchange", href: "https://backpack.exchange/signup?referral=downunder" },
       { label: "jupiter (onchain)", href: "https://jup.ag" },
+    ],
+  },
+  {
+    section: "decentralized exchanges",
+    links: [
+      { label: "sunrise", href: "https://sunrise.xyz" },
+      { label: "dflow", href: "https://dflow.net" },
+      { label: "titan", href: "https://titan.exchange" },
+      { label: "flash.trade", href: "https://flash.trade" },
     ],
   },
   {
@@ -122,6 +127,7 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
       { label: "dexscreener", href: "https://dexscreener.com/solana" },
       { label: "birdeye", href: "https://birdeye.so" },
       { label: "coingecko", href: "https://www.coingecko.com" },
+      { label: "orb markets", href: "https://orbmarkets.io" },
     ],
   },
   {
@@ -140,6 +146,42 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
       { label: "terms", href: "/terms" },
     ],
   },
+];
+
+// More projects by metasal (sol.new's builder) — source: metasal.xyz.
+// sol.new, scan.sol.new, punt.fun, and stocksonsolana.com are omitted
+// because they already appear in the sections above.
+
+const METASAL_PROJECTS: { label: string; href: string }[] = [
+  { label: "devrels.xyz", href: "https://devrels.xyz" },
+  { label: "program watch", href: "https://programwatch.dev" },
+  { label: "alldomains cli", href: "https://www.npmjs.com/package/alldomains-cli" },
+  { label: "buffer2base", href: "https://buffer2base.vercel.app" },
+  { label: "clawbook", href: "https://clawbook.lol" },
+  { label: "fleeker.fun", href: "https://fleeker.fun" },
+  { label: "free rent money", href: "https://freerent.money" },
+  { label: "hackaroo.xyz", href: "https://hackaroo.xyz" },
+  { label: "jup gifts", href: "https://jup.gifts" },
+  { label: "jup.bar", href: "https://jup.bar" },
+  { label: "lazorkit", href: "https://lazorkit.com" },
+  { label: "minrent", href: "https://minrent.vercel.app" },
+  { label: "myseeker.id", href: "https://myseeker.id" },
+  { label: "nft mate", href: "https://nftmate.vercel.app" },
+  { label: "perps on sol", href: "https://perpsonsol.com" },
+  { label: "pudgy drop", href: "https://pudgydrop.vercel.app" },
+  { label: "raffle", href: "https://raffle.metasal.xyz" },
+  { label: "rpc check", href: "https://rpccheck.com" },
+  { label: "seeker tracker", href: "https://seekertracker.com" },
+  { label: "shielded sol", href: "https://www.shieldedsol.com" },
+  { label: "solage", href: "https://solage.vercel.app" },
+  { label: "solana icons", href: "https://solana-icons.vercel.app" },
+  { label: "solana unofficial docs", href: "https://kit.metasal.xyz" },
+  { label: "solanaanz", href: "https://solanaanz.org" },
+  { label: "solcheap", href: "https://solcheap.vercel.app" },
+  { label: "soltool (npm)", href: "https://www.npmjs.com/package/soltool" },
+  { label: "stables on solana", href: "https://stablesonsolana.com" },
+  { label: "token cli", href: "https://www.npmjs.com/package/token-cli" },
+  { label: "everything else", href: "https://metasal.xyz" },
 ];
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -186,6 +228,21 @@ export default function DirPage() {
               </section>
             ))}
           </div>
+
+          <section className="border-t border-black/10 dark:border-white/10 pt-4">
+            <h2 className="text-[13px] font-bold text-gray-900 dark:text-white mb-1.5">
+              more by metasal
+            </h2>
+            <ul className="columns-2 sm:columns-3 md:columns-4 gap-6 space-y-1">
+              {METASAL_PROJECTS.map(({ label, href }) => (
+                <li key={href} className="break-inside-avoid">
+                  <a href={href} target="_blank" rel="noopener noreferrer" className={linkClass}>
+                    {label} <span aria-hidden="true">↗</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
 
           <p className="text-[11px] text-gray-400 dark:text-white/30 border-t border-black/10 dark:border-white/10 pt-3">
             missing something? it probably shipped last night — check{" "}

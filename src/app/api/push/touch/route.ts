@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const { endpoint } = await req.json();
+    const { endpoint } = (await req.json()) as { endpoint?: string };
     if (!endpoint) return NextResponse.json({ error: "Missing endpoint" }, { status: 400 });
     await initDb();
     await touchPushSubscription(endpoint);

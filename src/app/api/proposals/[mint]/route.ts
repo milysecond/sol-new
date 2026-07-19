@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, getProposals, getVotes } from "@/lib/db";
 
-export async function GET(_req: NextRequest, { params }: { params: { mint: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ mint: string }> }) {
   await initDb().catch(() => {});
-  const proposals = await getProposals(params.mint);
+  const { mint } = await params;
+  const proposals = await getProposals(mint);
 
   const withVotes = await Promise.all(
     proposals.map(async (p) => {

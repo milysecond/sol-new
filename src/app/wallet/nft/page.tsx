@@ -28,7 +28,7 @@ export default function WalletNftPage() {
 
   useEffect(() => {
     if (!publicKey) return;
-    fetch(`/api/nft?wallet=${publicKey}`).then(r => r.json())
+    fetch(`/api/nft?wallet=${publicKey}`).then(r => r.json() as Promise<{ nfts?: Nft[] }>)
       .then(d => setNfts(d.nfts || []))
       .catch(() => {})
       .finally(() => setLoading(false));

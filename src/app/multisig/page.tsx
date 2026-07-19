@@ -69,7 +69,7 @@ export default function MultisigPage() {
           body: JSON.stringify({ code: promoCode, wallet: address, kind: "multisig" }),
         });
         if (!fundRes.ok) {
-          const err = await fundRes.json().catch(() => ({}));
+          const err = (await fundRes.json().catch(() => ({}))) as { error?: string };
           throw new Error(err.error ?? "Promo funding failed — please try again.");
         }
       }

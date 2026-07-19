@@ -37,10 +37,13 @@ export default function WalletMultisigPage() {
 
     (async () => {
       try {
-        const [dbResp, indexedResp] = await Promise.all([
+        const [dbResp, indexedResp] = (await Promise.all([
           fetch(`/api/multisig?wallet=${publicKey}`).then((r) => r.json()).catch(() => ({ multisigs: [] })),
           fetch(`/api/multisig/onchain?wallet=${publicKey}`).then((r) => r.json()).catch(() => ({ multisigs: [] })),
-        ]);
+        ])) as [
+          { multisigs?: { multisig_pda: string; name: string; threshold: number; member_count: number; vault: string; network: string | null }[] },
+          { multisigs?: { address: string; name: string | null; threshold: number; memberCount: number; vault: string }[] },
+        ];
         const fromDb: MultisigEntry[] = (dbResp.multisigs || []).map((m: { multisig_pda: string; name: string; threshold: number; member_count: number; vault: string; network: string | null }) => ({
           address: m.multisig_pda,
           name: m.name,
@@ -75,7 +78,7 @@ export default function WalletMultisigPage() {
           body: JSON.stringify({ addresses: merged.map((m) => m.address) }),
         });
         if (!verifyRes.ok) return;
-        const { results } = await verifyRes.json();
+        const { results } = (await verifyRes.json()) as { results?: Record<string, "mainnet" | "devnet" | null> };
         setMultisigs((prev) =>
           prev.map((m) => {
             const verified = results?.[m.address];
