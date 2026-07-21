@@ -9,11 +9,13 @@ export const dynamic = "force-dynamic";
 
 // Static, indexable routes. (Auth/wallet-only flows are intentionally omitted.)
 const STATIC_ROUTES: { path: string; priority: number; freq: MetadataRoute.Sitemap[number]["changeFrequency"] }[] = [
-  { path: "", priority: 1.0, freq: "daily" },
+  // Prefer trailing slash only on home so it matches GSC's preferred canonical.
+  { path: "/", priority: 1.0, freq: "daily" },
   { path: "/token", priority: 0.9, freq: "daily" },
   { path: "/nft", priority: 0.9, freq: "daily" },
   { path: "/multisig", priority: 0.8, freq: "weekly" },
   { path: "/wallet", priority: 0.8, freq: "weekly" },
+  { path: "/wallet/get", priority: 0.7, freq: "weekly" },
   { path: "/get", priority: 0.8, freq: "weekly" },
   { path: "/pay", priority: 0.8, freq: "weekly" },
   { path: "/split", priority: 0.8, freq: "weekly" },
@@ -27,13 +29,16 @@ const STATIC_ROUTES: { path: string; priority: number; freq: MetadataRoute.Sitem
   { path: "/compare", priority: 0.7, freq: "weekly" },
   { path: "/docs", priority: 0.7, freq: "weekly" },
   { path: "/whats-new", priority: 0.7, freq: "hourly" },
+  { path: "/privacy", priority: 0.3, freq: "yearly" },
+  { path: "/terms", priority: 0.3, freq: "yearly" },
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
   const staticEntries: MetadataRoute.Sitemap = STATIC_ROUTES.map((r) => ({
-    url: `${BASE}${r.path}`,
+    // path "/" → https://sol.new/  ; others → https://sol.new/token etc.
+    url: r.path === "/" ? `${BASE}/` : `${BASE}${r.path}`,
     lastModified: now,
     changeFrequency: r.freq,
     priority: r.priority,
