@@ -27,9 +27,9 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://sol.new"),
   title: "sol.new — Tokens, NFTs, and wallets on Solana",
   description: "The fastest way to create tokens, NFTs, wallets, payments, and DAOs on Solana. Passkey-secured, low fees. Start in seconds.",
-  alternates: {
-    canonical: "/",
-  },
+  // Do NOT set a global canonical here — it made every route claim
+  // canonical https://sol.new/ and GSC treated /token, /wallet, etc. as duplicates.
+  // Each page sets its own alternates.canonical (home does so below via page metadata).
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
