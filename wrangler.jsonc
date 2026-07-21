@@ -7,7 +7,8 @@
   "account_id": "4e8d1e0f981ddd5939a1e74aa536d38b",
   "workers_dev": true,
   "routes": [
-    { "pattern": "sol.new", "custom_domain": true }
+    { "pattern": "sol.new", "custom_domain": true },
+    { "pattern": "www.sol.new", "custom_domain": true }
   ],
   "assets": {
     "directory": ".open-next/assets",
