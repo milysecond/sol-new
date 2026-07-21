@@ -8,7 +8,9 @@
   "workers_dev": true,
   "routes": [
     { "pattern": "sol.new", "custom_domain": true },
-    { "pattern": "www.sol.new", "custom_domain": true }
+    // Zone route (not custom_domain) — www already has DNS records in the zone.
+    // Middleware redirects www → apex.
+    { "pattern": "www.sol.new/*", "zone_name": "sol.new" }
   ],
   "assets": {
     "directory": ".open-next/assets",
