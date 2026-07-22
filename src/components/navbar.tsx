@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { useState, useEffect } from "react";
-import { Coins, Image, ShieldCheck, Wallet, Droplets, Zap, ExternalLink, Copy, LogOut, Sparkles, Bell, BellOff, Activity, AtSign, MoreHorizontal, X, Gift, Trophy, HandCoins, Newspaper, Star } from "lucide-react";
+import { Coins, Image, ShieldCheck, Wallet, Droplets, Zap, ExternalLink, Copy, LogOut, Sparkles, Bell, BellOff, Activity, AtSign, MoreHorizontal, X, Gift, Trophy, HandCoins, Newspaper, Star, Receipt } from "lucide-react";
 import { getPushPermission, subscribePush, unsubscribePush, type PushPermission } from "@/lib/push-client";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Spinner } from "@/components/spinner";
@@ -63,6 +63,7 @@ export function Navbar() {
     { href: "/id", label: "Identity", icon: AtSign },
     { href: "/multisig", label: "Multisig", icon: ShieldCheck },
     { href: "/scan", label: "Scan", icon: Activity },
+    { href: "/receipt", label: "Receipt", icon: Receipt },
     { href: "/news", label: "News", icon: Newspaper },
     { href: "/whats-new", label: "What's new", icon: Sparkles },
   ];

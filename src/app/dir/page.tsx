@@ -42,6 +42,7 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
       { label: "compare tokens", href: "/compare" },
       { label: "track a wallet", href: "/track" },
       { label: "scan anything", href: "/scan" },
+      { label: "check a receipt", href: "/receipt" },
       { label: "sign a message", href: "/message" },
       { label: "news", href: "/news" },
     ],

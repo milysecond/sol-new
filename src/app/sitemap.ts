@@ -24,6 +24,7 @@ const STATIC_ROUTES: { path: string; priority: number; freq: MetadataRoute.Sitem
   { path: "/portfolio", priority: 0.6, freq: "weekly" },
   { path: "/launch", priority: 0.9, freq: "daily" },
   { path: "/scan", priority: 0.7, freq: "daily" },
+  { path: "/receipt", priority: 0.8, freq: "weekly" },
   { path: "/news", priority: 0.7, freq: "hourly" },
   { path: "/pods", priority: 0.6, freq: "weekly" },
   { path: "/compare", priority: 0.7, freq: "weekly" },
