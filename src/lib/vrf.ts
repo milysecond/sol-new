@@ -1,5 +1,5 @@
 /**
- * Fair Draw / VRF helpers for sol.new/vrf
+ * Fair Draw helpers for sol.new/draw
  *
  * Entropy sources:
  *  - solana-blockhash (default, fully public + re-verifiable)

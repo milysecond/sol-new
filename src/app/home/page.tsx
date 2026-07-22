@@ -51,10 +51,10 @@ const PRODUCTS: Product[] = [
   { index: "07", href: "/gift", title: "Gifts", blurb: "Send SOL with a link — even to people without a wallet. They claim it with Face ID.", icon: Gift, accent: "#f59e0b" },
   { index: "08", href: "/punt", title: "Punt", blurb: "Live World Cup odds with zero bookmaker margin — from the TXODDS oracle on Solana.", icon: Trophy, accent: "#4ade80" },
   { index: "09", href: "/receipt", title: "Receipts", blurb: "Turn any Solana signature into a clean, shareable payment receipt.", icon: Receipt, accent: "#fb923c" },
-  { index: "10", href: "/vrf", title: "Fair Draw", blurb: "Provably fair raffles and random picks with verifiable entropy.", icon: Dices, accent: "#a78bfa" },
+  { index: "10", href: "/draw", title: "Fair Draw", blurb: "Provably fair raffles and random picks with verifiable entropy.", icon: Dices, accent: "#a78bfa" },
 ];
 
-const MARQUEE = ["Tokens", "NFTs", "Wallets", "Payments", "Multisig", "Splits", "Gifts", "Receipts", "Fair Draw", "World Cup Odds", "Solana Pay", "Passkeys"];
+const MARQUEE = ["Tokens", "NFTs", "Wallets", "Payments", "Multisig", "Splits", "Gifts", "Receipts", "Fair Draw", "Wheel", "Coin Flip", "Dice", "Solana Pay", "Passkeys"];
 
 /* ------------------------------------------------------------------ */
 /*  Motion helpers                                                     */
