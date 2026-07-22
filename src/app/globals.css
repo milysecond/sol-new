@@ -75,6 +75,22 @@ html.dark body {
   display: none;
 }
 
+/* Print: sol.new/receipt card only */
+@media print {
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+}
+
 /* Smooth transitions */
 a, button {
   -webkit-tap-highlight-color: transparent;
