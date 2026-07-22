@@ -176,6 +176,23 @@ export async function initDb() {
       created_at TEXT DEFAULT (datetime('now')),
       verified_at TEXT
     )`,
+    `CREATE TABLE IF NOT EXISTS vrf_draws (
+      id TEXT PRIMARY KEY,
+      mode TEXT NOT NULL,
+      entries_json TEXT NOT NULL,
+      entries_hash TEXT NOT NULL,
+      entry_count INTEGER NOT NULL,
+      winner_index INTEGER NOT NULL,
+      winner TEXT NOT NULL,
+      seed TEXT NOT NULL,
+      verification_hash TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      slot INTEGER,
+      blockhash TEXT,
+      proofnetwork_id INTEGER,
+      title TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
   ]);
   try {
     await db.execute(
@@ -721,6 +738,56 @@ export async function createPromoCode(opts: { code?: string; uses?: number; desc
 function randomCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+
+// ─── VRF / Fair draws ─────────────────────────────────────────────────────────
+
+export async function saveVrfDraw(data: {
+  id: string;
+  mode: string;
+  entries: string[];
+  entriesHash: string;
+  entryCount: number;
+  winnerIndex: number;
+  winner: string;
+  seed: string;
+  verificationHash: string;
+  provider: string;
+  slot?: number | null;
+  blockhash?: string | null;
+  proofnetworkId?: number | null;
+  title?: string | null;
+}) {
+  await db.execute({
+    sql: `INSERT INTO vrf_draws (
+      id, mode, entries_json, entries_hash, entry_count, winner_index, winner,
+      seed, verification_hash, provider, slot, blockhash, proofnetwork_id, title
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      data.id,
+      data.mode,
+      JSON.stringify(data.entries),
+      data.entriesHash,
+      data.entryCount,
+      data.winnerIndex,
+      data.winner,
+      data.seed,
+      data.verificationHash,
+      data.provider,
+      data.slot ?? null,
+      data.blockhash ?? null,
+      data.proofnetworkId ?? null,
+      data.title ?? null,
+    ],
+  });
+}
+
+export async function getVrfDraw(id: string) {
+  const r = await db.execute({
+    sql: "SELECT * FROM vrf_draws WHERE id = ? LIMIT 1",
+    args: [id],
+  });
+  return r.rows[0] ?? null;
 }
 
 export async function getStats() {

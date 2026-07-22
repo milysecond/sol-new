@@ -8,7 +8,7 @@ import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { FaucetFooter } from "@/components/faucet-footer";
 import { MailingListSignup } from "@/components/mailing-list-signup";
-import { Coins, Image, Wallet, ShieldCheck, ArrowRight, Sparkles, Users, Newspaper, ChevronDown, X, ExternalLink, HandCoins, Gift, Trophy, Receipt } from "lucide-react";
+import { Coins, Image, Wallet, ShieldCheck, ArrowRight, Sparkles, Users, Newspaper, ChevronDown, X, ExternalLink, HandCoins, Gift, Trophy, Receipt, Dices } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
 import { WelcomeProvider } from "@/components/welcome-message";
@@ -374,7 +374,7 @@ export default function Home() {
                   { href: "/pay", icon: HandCoins, label: "Pay", desc: "Request money", color: "text-teal-400" },
                   { href: "/split", icon: Users, label: "Split", desc: "Split a bill", color: "text-purple-400" },
                   { href: "/receipt", icon: Receipt, label: "Receipt", desc: "Tx receipt", color: "text-orange-400" },
-                  { href: "/news", icon: Newspaper, label: "News", desc: "Latest headlines", color: "text-sky-400" },
+                  { href: "/vrf", icon: Dices, label: "Draw", desc: "Fair raffle", color: "text-violet-400" },
                 ].map((t) => (
                   <Link
                     key={t.href}
