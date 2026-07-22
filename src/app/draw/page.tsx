@@ -11,12 +11,17 @@ import {
   ListOrdered,
   Hash,
   KeyRound,
+  Volume2,
+  VolumeX,
+  History,
+  ChevronRight,
 } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { Spinner } from "@/components/spinner";
 import { VrfStage } from "@/components/vrf-animations";
 import { useWallet } from "@/lib/wallet-context";
 import { type VrfDrawMode } from "@/lib/vrf";
+import { drawSfx } from "@/lib/draw-sfx";
 
 type DrawResult = {
   id: string;
@@ -26,10 +31,31 @@ type DrawResult = {
   seed: string;
   verificationHash: string;
   entries: string[];
+  mode?: VrfDrawMode;
+  title?: string | null;
+  createdAt?: string;
+};
+
+type HistoryItem = {
+  id: string;
+  mode: string;
+  entryCount: number;
+  winnerIndex: number;
+  winner: string;
+  title: string | null;
+  createdAt: string;
 };
 
 const FREE_KEY = "sol.new.draw.freeUses";
 const FREE_KEY_LEGACY = "sol.new.vrf.freeUses";
+const DURATION_KEY = "sol.new.draw.durationSec";
+const MUTE_KEY = "sol.new.draw.muted";
+const HISTORY_KEY = "sol.new.draw.history";
+const HISTORY_MAX = 40;
+
+const DURATION_MIN = 1.5;
+const DURATION_MAX = 10;
+const DURATION_DEFAULT = 3;
 
 function parseMode(raw: string | null): VrfDrawMode {
   const s = (raw || "").toLowerCase();
@@ -80,6 +106,49 @@ function hasFreeDraw(mode: VrfDrawMode): boolean {
   return (readFreeUses()[mode] || 0) < 1;
 }
 
+function readLocalHistory(): HistoryItem[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as HistoryItem[];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function pushLocalHistory(item: HistoryItem) {
+  try {
+    const prev = readLocalHistory().filter((h) => h.id !== item.id);
+    const next = [item, ...prev].slice(0, HISTORY_MAX);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
+}
+
+function modeLabel(mode: string): string {
+  if (mode === "coin") return "Coin";
+  if (mode === "dice") return "Dice";
+  if (mode === "range") return "1–N";
+  return "Wheel";
+}
+
+function formatWhen(iso: string): string {
+  try {
+    const d = new Date(iso.includes("Z") || iso.includes("+") ? iso : `${iso}Z`);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
 function DrawInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -99,12 +168,109 @@ function DrawInner() {
   const [needsConnect, setNeedsConnect] = useState(false);
   const [username, setUsername] = useState("");
   const [freeTick, setFreeTick] = useState(0);
+  const [durationSec, setDurationSec] = useState(DURATION_DEFAULT);
+  const [muted, setMuted] = useState(false);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Sync mode from URL (/draw?mode=coin, aliases via /flip etc.)
   useEffect(() => {
     const next = parseMode(searchParams.get("mode"));
     setMode(next);
   }, [searchParams]);
+
+  // Restore duration + mute + local history
+  useEffect(() => {
+    try {
+      const d = Number(localStorage.getItem(DURATION_KEY));
+      if (Number.isFinite(d) && d >= DURATION_MIN && d <= DURATION_MAX) {
+        setDurationSec(d);
+      }
+      setMuted(localStorage.getItem(MUTE_KEY) === "1");
+      setHistory(readLocalHistory());
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  // Load wallet history when connected (merge with local)
+  useEffect(() => {
+    if (!publicKey) return;
+    let cancelled = false;
+    setHistoryLoading(true);
+    fetch(`/api/draw?wallet=${encodeURIComponent(publicKey)}&limit=40`)
+      .then((r) => r.json() as Promise<{ draws?: HistoryItem[] }>)
+      .then((j) => {
+        if (cancelled || !Array.isArray(j.draws)) return;
+        const local = readLocalHistory();
+        const byId = new Map<string, HistoryItem>();
+        for (const h of j.draws) {
+          byId.set(h.id, {
+            id: h.id,
+            mode: h.mode,
+            entryCount: h.entryCount,
+            winnerIndex: h.winnerIndex,
+            winner: h.winner,
+            title: h.title ?? null,
+            createdAt: h.createdAt,
+          });
+        }
+        for (const h of local) {
+          if (!byId.has(h.id)) byId.set(h.id, h);
+        }
+        const merged = [...byId.values()].sort((a, b) =>
+          String(b.createdAt).localeCompare(String(a.createdAt)),
+        );
+        setHistory(merged.slice(0, HISTORY_MAX));
+        try {
+          localStorage.setItem(
+            HISTORY_KEY,
+            JSON.stringify(merged.slice(0, HISTORY_MAX)),
+          );
+        } catch {
+          /* ignore */
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DURATION_KEY, String(durationSec));
+    } catch {
+      /* ignore */
+    }
+  }, [durationSec]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [muted]);
+
+  // Spinning SFX loop (ticks scale with mode)
+  useEffect(() => {
+    if (!spinning || muted) return;
+    drawSfx.unlock();
+    const interval =
+      mode === "coin" || mode === "dice"
+        ? Math.max(70, Math.round((durationSec * 1000) / 28))
+        : Math.max(55, Math.round((durationSec * 1000) / 40));
+    const id = window.setInterval(() => {
+      if (mode === "coin") drawSfx.coinFlip();
+      else if (mode === "dice") drawSfx.diceRattle();
+      else drawSfx.wheelTick();
+    }, interval);
+    return () => window.clearInterval(id);
+  }, [spinning, muted, mode, durationSec]);
 
   const freeLeft = useMemo(() => {
     void freeTick;
@@ -122,6 +288,16 @@ function DrawInner() {
     setMode(m);
     setResult(null);
     router.replace(`/draw?mode=${modeQuery(m)}`, { scroll: false });
+  };
+
+  const play = (fn: () => void) => {
+    if (muted) return;
+    try {
+      drawSfx.unlock();
+      fn();
+    } catch {
+      /* ignore autoplay blocks */
+    }
   };
 
   const previewEntries = useMemo(() => {
@@ -150,13 +326,24 @@ function DrawInner() {
     setSpinning(true);
     setResult(null);
     setNeedsConnect(false);
+    play(() => {
+      if (mode === "coin") drawSfx.coinFlip();
+      else if (mode === "dice") drawSfx.diceRattle();
+      else drawSfx.wheelTick();
+    });
 
-    // Let animation play while request runs
-    const minSpin = mode === "coin" || mode === "dice" ? 1800 : 2800;
+    // Duration = spin phase + land phase (user-adjustable)
+    const totalMs = Math.round(durationSec * 1000);
+    const spinPhaseMs = Math.round(totalMs * 0.52);
+    const landPhaseMs = totalMs - spinPhaseMs;
     const started = Date.now();
 
     try {
-      const body: Record<string, unknown> = { mode, title: title || undefined };
+      const body: Record<string, unknown> = {
+        mode,
+        title: title || undefined,
+        wallet: publicKey || undefined,
+      };
       if (mode === "list") {
         body.entries = text.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
       } else if (mode === "range") {
@@ -168,18 +355,41 @@ function DrawInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = (await res.json()) as DrawResult & { error?: string; entries?: string[] };
+      const data = (await res.json()) as DrawResult & {
+        error?: string;
+        entries?: string[];
+        createdAt?: string;
+        mode?: VrfDrawMode;
+        title?: string | null;
+      };
       if (!res.ok) throw new Error(data.error || "Draw failed");
 
-      const wait = Math.max(0, minSpin - (Date.now() - started));
-      await new Promise((r) => setTimeout(r, wait));
+      const waitSpin = Math.max(0, spinPhaseMs - (Date.now() - started));
+      await new Promise((r) => setTimeout(r, waitSpin));
 
       if (!publicKey) {
         markFreeUsed(mode);
         setFreeTick((t) => t + 1);
       }
 
-      setSpinning(false);
+      const historyItem: HistoryItem = {
+        id: data.id,
+        mode: data.mode || mode,
+        entryCount: data.entryCount,
+        winnerIndex: data.winnerIndex,
+        winner: data.winner,
+        title: (data.title ?? title) || null,
+        createdAt: data.createdAt || new Date().toISOString(),
+      };
+      pushLocalHistory(historyItem);
+      setHistory((prev) =>
+        [historyItem, ...prev.filter((h) => h.id !== historyItem.id)].slice(
+          0,
+          HISTORY_MAX,
+        ),
+      );
+
+      // Result must land before spinning ends so face/segment is correct
       setResult({
         id: data.id,
         winner: data.winner,
@@ -189,6 +399,13 @@ function DrawInner() {
         verificationHash: data.verificationHash,
         entries: data.entries || previewEntries,
       });
+      setSpinning(false);
+      play(() => {
+        drawSfx.land();
+        setTimeout(() => drawSfx.win(), Math.min(220, landPhaseMs * 0.25));
+      });
+      // Let settle animation finish before re-enabling controls
+      await new Promise((r) => setTimeout(r, landPhaseMs));
     } catch (e) {
       setSpinning(false);
       setError(e instanceof Error ? e.message : "Draw failed");
@@ -244,7 +461,49 @@ function DrawInner() {
             winner={result?.winner ?? null}
             winnerIndex={result?.winnerIndex ?? 0}
             entries={stageEntries}
+            durationSec={durationSec}
           />
+        </div>
+
+        {/* Duration + sound */}
+        <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] px-4 py-3 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <label className="text-sm font-medium text-gray-700 dark:text-white/70" htmlFor="draw-duration">
+              Duration
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-mono text-violet-500 tabular-nums w-12 text-right">
+                {durationSec.toFixed(1)}s
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setMuted((m) => !m);
+                  if (muted) drawSfx.unlock();
+                }}
+                className="p-2 rounded-lg border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 transition active:scale-[0.97]"
+                title={muted ? "Unmute" : "Mute"}
+                aria-label={muted ? "Unmute sound" : "Mute sound"}
+              >
+                {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+          <input
+            id="draw-duration"
+            type="range"
+            min={DURATION_MIN}
+            max={DURATION_MAX}
+            step={0.5}
+            value={durationSec}
+            disabled={busy || spinning}
+            onChange={(e) => setDurationSec(Number(e.target.value))}
+            className="w-full accent-violet-500 disabled:opacity-50"
+          />
+          <div className="flex justify-between text-[11px] text-gray-400 dark:text-white/30">
+            <span>Quick</span>
+            <span>Dramatic</span>
+          </div>
         </div>
 
         {/* Controls */}
@@ -399,6 +658,61 @@ function DrawInner() {
             </div>
           </div>
         )}
+
+        {/* History */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-gray-700 dark:text-white/70 flex items-center gap-1.5">
+              <History className="w-4 h-4 text-violet-400" />
+              Your draws
+            </h2>
+            {historyLoading && (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
+            )}
+          </div>
+
+          {history.length === 0 ? (
+            <p className="text-xs text-gray-500 dark:text-white/40 rounded-xl border border-black/5 dark:border-white/5 px-3 py-4 text-center">
+              {publicKey
+                ? "No draws yet. Spin, flip, or roll to start your history."
+                : "Draws on this device show up here. Connect to sync across sessions."}
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {history.map((h) => (
+                <li key={h.id}>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/draw/${h.id}`)}
+                    className="w-full flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] hover:border-violet-400/30 px-3 py-2.5 text-left transition active:scale-[0.99]"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-violet-500/10 text-violet-500 flex items-center justify-center shrink-0">
+                      {h.mode === "coin" ? (
+                        <Coins className="w-4 h-4" />
+                      ) : h.mode === "dice" ? (
+                        <Dices className="w-4 h-4" />
+                      ) : (
+                        <ListOrdered className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold truncate">
+                        {h.winner}
+                      </div>
+                      <div className="text-[11px] text-gray-500 dark:text-white/40 truncate">
+                        {modeLabel(h.mode)}
+                        {h.title ? ` · ${h.title}` : ""}
+                        {" · "}
+                        {h.entryCount} entries · {formatWhen(h.createdAt)}
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </main>
     </div>
   );

@@ -73,7 +73,15 @@ export async function POST(req: NextRequest) {
       entries?: string[];
       rangeEnd?: number;
       title?: string;
+      wallet?: string;
     };
+
+    const wallet =
+      typeof body.wallet === "string" &&
+      body.wallet.length >= 32 &&
+      body.wallet.length <= 64
+        ? body.wallet
+        : null;
 
     const mode: VrfDrawMode =
       body.mode === "coin" || body.mode === "dice" || body.mode === "range" || body.mode === "list"
@@ -139,6 +147,8 @@ export async function POST(req: NextRequest) {
 
     const winner = entries[winnerIndex];
 
+    const createdAt = new Date().toISOString();
+
     await saveVrfDraw({
       id,
       mode,
@@ -154,6 +164,7 @@ export async function POST(req: NextRequest) {
       blockhash,
       proofnetworkId,
       title,
+      wallet,
     });
 
     return NextResponse.json({
@@ -171,10 +182,44 @@ export async function POST(req: NextRequest) {
       proofnetworkId,
       title,
       entries,
-      createdAt: new Date().toISOString(),
+      wallet,
+      createdAt,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Draw failed";
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+/** List draws for a wallet (user history). */
+export async function GET(req: NextRequest) {
+  try {
+    await initDb();
+    const wallet = req.nextUrl.searchParams.get("wallet")?.trim();
+    if (!wallet || wallet.length < 32 || wallet.length > 64) {
+      return NextResponse.json({ error: "Invalid wallet" }, { status: 400 });
+    }
+    const limit = Math.min(
+      100,
+      Math.max(1, Number(req.nextUrl.searchParams.get("limit")) || 40),
+    );
+    const { getVrfDrawsByWallet } = await import("@/lib/db");
+    const rows = await getVrfDrawsByWallet(wallet, limit);
+    const draws = rows.map((row) => ({
+      id: String(row.id),
+      mode: String(row.mode),
+      entryCount: Number(row.entry_count),
+      winnerIndex: Number(row.winner_index),
+      winner: String(row.winner),
+      title: row.title != null ? String(row.title) : null,
+      createdAt: String(row.created_at),
+      entriesHash: String(row.entries_hash),
+    }));
+    return NextResponse.json({ draws });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Failed" },
+      { status: 500 },
+    );
   }
 }
