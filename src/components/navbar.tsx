@@ -64,7 +64,7 @@ export function Navbar() {
     { href: "/multisig", label: "Multisig", icon: ShieldCheck },
     { href: "/scan", label: "Scan", icon: Activity },
     { href: "/receipt", label: "Receipt", icon: Receipt },
-    { href: "/vrf", label: "Draw", icon: Dices },
+    { href: "/draw", label: "Draw", icon: Dices },
     { href: "/news", label: "News", icon: Newspaper },
     { href: "/whats-new", label: "What's new", icon: Sparkles },
   ];

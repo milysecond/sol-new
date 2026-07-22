@@ -374,7 +374,7 @@ export default function Home() {
                   { href: "/pay", icon: HandCoins, label: "Pay", desc: "Request money", color: "text-teal-400" },
                   { href: "/split", icon: Users, label: "Split", desc: "Split a bill", color: "text-purple-400" },
                   { href: "/receipt", icon: Receipt, label: "Receipt", desc: "Tx receipt", color: "text-orange-400" },
-                  { href: "/vrf", icon: Dices, label: "Draw", desc: "Fair raffle", color: "text-violet-400" },
+                  { href: "/draw", icon: Dices, label: "Draw", desc: "Fair raffle", color: "text-violet-400" },
                 ].map((t) => (
                   <Link
                     key={t.href}
