@@ -191,12 +191,25 @@ export async function initDb() {
       blockhash TEXT,
       proofnetwork_id INTEGER,
       title TEXT,
+      wallet TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     )`,
   ]);
   try {
     await db.execute(
       "CREATE INDEX IF NOT EXISTS idx_wallet_emails_wallet ON wallet_emails(wallet)"
+    );
+  } catch {
+    /* ignore */
+  }
+  try {
+    await db.execute("ALTER TABLE vrf_draws ADD COLUMN wallet TEXT");
+  } catch {
+    /* column already exists */
+  }
+  try {
+    await db.execute(
+      "CREATE INDEX IF NOT EXISTS idx_vrf_draws_wallet ON vrf_draws(wallet, created_at DESC)"
     );
   } catch {
     /* ignore */
@@ -757,12 +770,13 @@ export async function saveVrfDraw(data: {
   blockhash?: string | null;
   proofnetworkId?: number | null;
   title?: string | null;
+  wallet?: string | null;
 }) {
   await db.execute({
     sql: `INSERT INTO vrf_draws (
       id, mode, entries_json, entries_hash, entry_count, winner_index, winner,
-      seed, verification_hash, provider, slot, blockhash, proofnetwork_id, title
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      seed, verification_hash, provider, slot, blockhash, proofnetwork_id, title, wallet
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       data.id,
       data.mode,
@@ -778,6 +792,7 @@ export async function saveVrfDraw(data: {
       data.blockhash ?? null,
       data.proofnetworkId ?? null,
       data.title ?? null,
+      data.wallet ?? null,
     ],
   });
 }
@@ -788,6 +803,18 @@ export async function getVrfDraw(id: string) {
     args: [id],
   });
   return r.rows[0] ?? null;
+}
+
+export async function getVrfDrawsByWallet(wallet: string, limit = 50) {
+  const r = await db.execute({
+    sql: `SELECT id, mode, entry_count, winner_index, winner, title, created_at, entries_hash
+          FROM vrf_draws
+          WHERE wallet = ?
+          ORDER BY created_at DESC
+          LIMIT ?`,
+    args: [wallet, limit],
+  });
+  return r.rows;
 }
 
 export async function getStats() {

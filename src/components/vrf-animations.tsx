@@ -4,20 +4,25 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 
 const EASE_OUT = [0.23, 1, 0.32, 1] as const;
+const LAND_EASE = [0.12, 0.8, 0.12, 1] as const;
 
 // ── Coin flip ────────────────────────────────────────────────────────────────
 
 export function VrfCoinFlip({
   spinning,
   result,
+  durationSec,
 }: {
   spinning: boolean;
   result: "Heads" | "Tails" | string | null;
+  /** Total animation budget in seconds (spin + settle). */
+  durationSec: number;
 }) {
   const reduce = useReducedMotion();
   const isHeads = !result || result === "Heads";
-  // Full flips while spinning, land on correct face
-  const endRot = isHeads ? 1800 : 1980; // even half-turns = heads face, odd = tails
+  const endRot = isHeads ? 1800 : 1980;
+  const spinLoop = Math.max(0.35, durationSec * 0.22);
+  const settle = Math.max(0.5, durationSec * 0.55);
 
   return (
     <div className="flex justify-center py-6" style={{ perspective: 900 }}>
@@ -33,11 +38,10 @@ export function VrfCoinFlip({
         }
         transition={
           spinning
-            ? { duration: 1.4, ease: "linear", repeat: Infinity }
-            : { duration: 1.8, ease: EASE_OUT }
+            ? { duration: spinLoop, ease: "linear", repeat: Infinity }
+            : { duration: settle, ease: EASE_OUT }
         }
       >
-        {/* Heads */}
         <div
           className="absolute inset-0 rounded-full flex items-center justify-center shadow-xl border-4 border-violet-300/40"
           style={{
@@ -48,7 +52,6 @@ export function VrfCoinFlip({
         >
           <span className="text-3xl font-black text-white drop-shadow">H</span>
         </div>
-        {/* Tails */}
         <div
           className="absolute inset-0 rounded-full flex items-center justify-center shadow-xl border-4 border-fuchsia-300/40"
           style={{
@@ -119,21 +122,25 @@ function DieFace({ n }: { n: number }) {
 export function VrfDice({
   spinning,
   result,
+  durationSec,
 }: {
   spinning: boolean;
   result: string | number | null;
+  durationSec: number;
 }) {
   const reduce = useReducedMotion();
   const face = Math.min(6, Math.max(1, Number(result) || 1));
   const [flash, setFlash] = useState(1);
+  const flashMs = Math.max(50, Math.min(140, Math.round((durationSec * 1000) / 24)));
 
   useEffect(() => {
     if (!spinning) return;
-    const t = setInterval(() => setFlash((f) => (f % 6) + 1), 90);
+    const t = setInterval(() => setFlash((f) => (f % 6) + 1), flashMs);
     return () => clearInterval(t);
-  }, [spinning]);
+  }, [spinning, flashMs]);
 
   const show = spinning ? flash : face;
+  const tumble = Math.max(0.28, durationSec * 0.12);
 
   return (
     <div className="flex justify-center py-6">
@@ -148,8 +155,8 @@ export function VrfDice({
         }
         transition={
           spinning
-            ? { duration: 0.45, repeat: Infinity, ease: "easeInOut" }
-            : { type: "spring", duration: 0.6, bounce: 0.35 }
+            ? { duration: tumble, repeat: Infinity, ease: "easeInOut" }
+            : { type: "spring", duration: Math.min(0.9, durationSec * 0.25), bounce: 0.35 }
         }
       >
         <DieFace n={show} />
@@ -158,7 +165,7 @@ export function VrfDice({
   );
 }
 
-// ── Wheel (list / range) ─────────────────────────────────────────────────────
+// ── Wheel ────────────────────────────────────────────────────────────────────
 
 const WHEEL_COLORS = [
   "#8b5cf6",
@@ -175,10 +182,12 @@ export function VrfWheel({
   entries,
   winnerIndex,
   spinning,
+  durationSec,
 }: {
   entries: string[];
   winnerIndex: number;
   spinning: boolean;
+  durationSec: number;
 }) {
   const reduce = useReducedMotion();
   const n = Math.max(entries.length, 1);
@@ -193,15 +202,17 @@ export function VrfWheel({
     return `conic-gradient(from -90deg, ${parts.join(", ")})`;
   }, [n]);
 
-  // Pointer at top. Segment i center from gradient start; land under pointer.
   const segmentAngle = 360 / n;
   const winnerCenterFromStart = winnerIndex * segmentAngle + segmentAngle / 2;
-  const landRotation = 360 * 6 + (360 - winnerCenterFromStart);
+  // More turns for longer durations
+  const extraTurns = Math.max(4, Math.round(durationSec * 2.2));
+  const landRotation = 360 * extraTurns + (360 - winnerCenterFromStart);
+  const spinLoop = Math.max(0.5, durationSec * 0.18);
+  const settle = Math.max(0.8, durationSec * 0.72);
 
   return (
     <div className="flex flex-col items-center py-4 gap-2">
       <div className="relative w-56 h-56 sm:w-64 sm:h-64">
-        {/* Pointer */}
         <div
           className="absolute left-1/2 -translate-x-1/2 -top-1 z-10 w-0 h-0"
           style={{
@@ -213,9 +224,7 @@ export function VrfWheel({
         />
         <motion.div
           className="w-full h-full rounded-full border-4 border-violet-400/30 shadow-2xl relative overflow-hidden"
-          style={{
-            background: conic,
-          }}
+          style={{ background: conic }}
           animate={
             reduce
               ? { rotate: landRotation % 360 }
@@ -225,11 +234,10 @@ export function VrfWheel({
           }
           transition={
             spinning
-              ? { duration: 1.2, ease: "linear", repeat: Infinity }
-              : { duration: 3.2, ease: [0.12, 0.8, 0.12, 1] }
+              ? { duration: spinLoop, ease: "linear", repeat: Infinity }
+              : { duration: settle, ease: LAND_EASE }
           }
         >
-          {/* Labels */}
           {showLabels &&
             entries.map((item, i) => {
               const mid = ((i + 0.5) / n) * 360 - 90;
@@ -252,16 +260,13 @@ export function VrfWheel({
                 </span>
               );
             })}
-          {/* Hub */}
           <div className="absolute inset-0 m-auto w-12 h-12 rounded-full bg-black/80 border-2 border-violet-300/50 flex items-center justify-center">
             <span className="text-[10px] font-bold text-violet-200">sol</span>
           </div>
         </motion.div>
       </div>
       {n > 16 && (
-        <p className="text-[11px] text-gray-500 dark:text-white/40">
-          {n} entries
-        </p>
+        <p className="text-[11px] text-gray-500 dark:text-white/40">{n} entries</p>
       )}
     </div>
   );
@@ -273,29 +278,35 @@ export function VrfStage({
   winner,
   winnerIndex,
   entries,
+  durationSec,
 }: {
   mode: "list" | "range" | "coin" | "dice";
   spinning: boolean;
   winner: string | null;
   winnerIndex: number;
   entries: string[];
+  durationSec: number;
 }) {
   if (mode === "coin") {
     return (
       <VrfCoinFlip
         spinning={spinning}
         result={winner as "Heads" | "Tails" | null}
+        durationSec={durationSec}
       />
     );
   }
   if (mode === "dice") {
-    return <VrfDice spinning={spinning} result={winner} />;
+    return (
+      <VrfDice spinning={spinning} result={winner} durationSec={durationSec} />
+    );
   }
   return (
     <VrfWheel
       entries={entries.length ? entries : ["?", "?", "?", "?"]}
       winnerIndex={Math.max(0, winnerIndex)}
       spinning={spinning}
+      durationSec={durationSec}
     />
   );
 }
