@@ -8,12 +8,11 @@ import {
   Check,
   Copy,
   Dices,
-  ExternalLink,
   Loader2,
   Trophy,
 } from "lucide-react";
 import { Navbar } from "@/components/navbar";
-import { MAGICBLOCK, PROOFNETWORK, type VrfDrawRecord } from "@/lib/vrf";
+import { type VrfDrawRecord } from "@/lib/vrf";
 
 export default function VrfReceiptPage() {
   const params = useParams<{ id: string }>();
@@ -111,7 +110,6 @@ export default function VrfReceiptPage() {
               </div>
 
               <dl className="space-y-2 text-sm">
-                <Row label="Provider" value={draw.provider} />
                 <Row label="Entries hash" value={short(draw.entriesHash)} mono copy={draw.entriesHash} />
                 <Row label="Seed" value={short(draw.seed)} mono copy={draw.seed} />
                 <Row
@@ -121,7 +119,7 @@ export default function VrfReceiptPage() {
                   copy={draw.verificationHash}
                 />
                 {draw.slot != null && (
-                  <Row label="Solana slot" value={String(draw.slot)} mono />
+                  <Row label="Slot" value={String(draw.slot)} mono />
                 )}
                 {draw.blockhash && (
                   <Row label="Blockhash" value={short(draw.blockhash)} mono copy={draw.blockhash} />
@@ -129,7 +127,10 @@ export default function VrfReceiptPage() {
                 {draw.createdAt && (
                   <Row
                     label="Time"
-                    value={new Date(String(draw.createdAt) + (String(draw.createdAt).includes("Z") ? "" : "Z")).toLocaleString()}
+                    value={new Date(
+                      String(draw.createdAt) +
+                        (String(draw.createdAt).includes("Z") ? "" : "Z"),
+                    ).toLocaleString()}
                   />
                 )}
               </dl>
@@ -160,7 +161,7 @@ export default function VrfReceiptPage() {
                 <button
                   type="button"
                   onClick={copyLink}
-                  className="flex items-center justify-center gap-1.5 rounded-xl bg-violet-500 hover:bg-violet-400 text-white font-semibold py-2.5 text-sm transition"
+                  className="flex items-center justify-center gap-1.5 rounded-xl bg-violet-500 hover:bg-violet-400 text-white font-semibold py-2.5 text-sm transition active:scale-[0.98]"
                 >
                   {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   {copied ? "Copied" : "Copy receipt link"}
@@ -172,33 +173,6 @@ export default function VrfReceiptPage() {
                 >
                   Print
                 </button>
-              </div>
-
-              <div className="print:hidden flex flex-col gap-1.5 text-xs text-gray-500 dark:text-white/40">
-                {draw.provider === "solana-blockhash" && (
-                  <p>
-                    Recompute:{" "}
-                    <code className="text-[10px]">
-                      sha256(blockhash|entriesHash|id|slot) → u64 % n
-                    </code>
-                  </p>
-                )}
-                <a
-                  href={PROOFNETWORK.vrfExplorer}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-violet-500 hover:underline"
-                >
-                  ProofNetwork explorer <ExternalLink className="w-3 h-3" />
-                </a>
-                <a
-                  href={MAGICBLOCK.docs}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-violet-500 hover:underline"
-                >
-                  MagicBlock Solana VRF docs <ExternalLink className="w-3 h-3" />
-                </a>
               </div>
             </div>
           </div>

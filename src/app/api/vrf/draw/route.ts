@@ -172,14 +172,6 @@ export async function POST(req: NextRequest) {
       title,
       entries,
       createdAt: new Date().toISOString(),
-      verify: {
-        method:
-          provider === "proofnetwork"
-            ? "ProofNetwork VRF range draw (see proofnetwork.lol/vrfs)"
-            : "sha256(blockhash|entriesHash|id|slot) → first 8 bytes % n",
-        magicblockNote:
-          "On-chain MagicBlock Solana VRF consumer program is phase 2. Constants available in /vrf UI.",
-      },
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Draw failed";

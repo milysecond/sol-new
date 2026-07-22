@@ -6,10 +6,10 @@ export const contentType = ogContentType;
 
 export default async function Image() {
   return featureOgImage({
-    eyebrow: "Verifiable randomness",
-    title: "Fair draws anyone can audit",
+    eyebrow: "Fair draws",
+    title: "Wheel · coin · dice",
     subtitle:
-      "Raffle winners, coin flips, and dice — entropy from Solana, ProofNetwork, and MagicBlock VRF.",
+      "Spin a wheel, flip a coin, or roll the dice. Provably fair picks with a shareable receipt.",
     cta: "Draw a winner →",
   });
 }
