@@ -1,23 +1,12 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Create a Token — sol.new",
-  description: "Launch your own token on Solana in seconds. Passkey-secured, low fees. Upload an image, pick a name, and go live instantly.",
-  openGraph: {
-    title: "Create a Token — sol.new",
-    description: "Launch your own token on Solana in seconds. Passkey-secured, low fees.",
-    url: "https://sol.new/token",
-    siteName: "sol.new",
-    images: [{ url: "https://sol.new/og-token.png", width: 1200, height: 630 }],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Create a Token — sol.new",
-    description: "Launch your own token on Solana in seconds. Passkey-secured, low fees.",
-    images: ["https://sol.new/og-token.png"],
-    creator: "@soldotnew",
-  },
-};
+  description:
+    "Launch your own token on Solana in seconds. Passkey-secured, low fees. Upload an image, pick a name, and go live instantly.",
+  path: "/token",
+});
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return children;

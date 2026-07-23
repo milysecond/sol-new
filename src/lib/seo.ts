@@ -4,7 +4,10 @@ const BASE = "https://sol.new";
 
 export function pageMeta(opts: { title: string; description: string; path: string; image?: string }): Metadata {
   const url = `${BASE}${opts.path}`;
-  const image = opts.image ?? `${BASE}/og.png`;
+  // Prefer colocated opengraph-image.tsx (dynamic). Explicit image only when provided.
+  const images = opts.image
+    ? [{ url: opts.image, width: 1200, height: 630, alt: opts.title }]
+    : undefined;
   return {
     title: opts.title,
     description: opts.description,
@@ -15,14 +18,14 @@ export function pageMeta(opts: { title: string; description: string; path: strin
       url,
       siteName: "sol.new",
       type: "website",
-      images: [{ url: image, width: 1200, height: 630, alt: opts.title }],
+      ...(images ? { images } : {}),
     },
     twitter: {
       card: "summary_large_image",
       title: opts.title,
       description: opts.description,
       creator: "@soldotnew",
-      images: [image],
+      ...(opts.image ? { images: [opts.image] } : {}),
     },
   };
 }

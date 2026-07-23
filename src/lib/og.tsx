@@ -12,6 +12,50 @@ const FONTS = {
 export const ogSize = { width: 1200, height: 630 };
 export const ogContentType = "image/png";
 
+export type OgAccent = "purple" | "orange" | "green" | "blue" | "pink" | "cyan";
+
+const ACCENTS: Record<
+  OgAccent,
+  { solid: string; soft: string; glow: string; label: string }
+> = {
+  purple: {
+    solid: "#a855f7",
+    soft: "rgba(168,85,247,0.55)",
+    glow: "rgba(168,85,247,0.4)",
+    label: "rgba(216,180,254,0.95)",
+  },
+  orange: {
+    solid: "#f97316",
+    soft: "rgba(249,115,22,0.5)",
+    glow: "rgba(249,115,22,0.35)",
+    label: "rgba(253,186,116,0.95)",
+  },
+  green: {
+    solid: "#22c55e",
+    soft: "rgba(34,197,94,0.45)",
+    glow: "rgba(34,197,94,0.32)",
+    label: "rgba(134,239,172,0.95)",
+  },
+  blue: {
+    solid: "#3b82f6",
+    soft: "rgba(59,130,246,0.5)",
+    glow: "rgba(59,130,246,0.35)",
+    label: "rgba(147,197,253,0.95)",
+  },
+  pink: {
+    solid: "#d946ef",
+    soft: "rgba(217,70,239,0.5)",
+    glow: "rgba(217,70,239,0.35)",
+    label: "rgba(240,171,252,0.95)",
+  },
+  cyan: {
+    solid: "#06b6d4",
+    soft: "rgba(6,182,212,0.45)",
+    glow: "rgba(6,182,212,0.32)",
+    label: "rgba(103,232,249,0.95)",
+  },
+};
+
 async function fetchFont(url: string): Promise<ArrayBuffer | null> {
   try {
     const res = await fetch(url, { cache: "force-cache" });
@@ -22,7 +66,7 @@ async function fetchFont(url: string): Promise<ArrayBuffer | null> {
   }
 }
 
-async function fetchLogo(): Promise<string | null> {
+export async function fetchLogo(): Promise<string | null> {
   try {
     const res = await fetch(`${API_BASE}/icon-512.png`, { cache: "force-cache" });
     if (!res.ok) return null;
@@ -33,25 +77,39 @@ async function fetchLogo(): Promise<string | null> {
   }
 }
 
-/** A branded 1200×630 feature card used as the OG image for product pages. */
+async function loadFonts() {
+  const [interReg, interBold, interExtra] = await Promise.all([
+    fetchFont(FONTS.interRegular),
+    fetchFont(FONTS.interBold),
+    fetchFont(FONTS.interExtraBold),
+  ]);
+  return [
+    interReg && { name: "Inter", data: interReg, weight: 400 as const, style: "normal" as const },
+    interBold && { name: "Inter", data: interBold, weight: 700 as const, style: "normal" as const },
+    interExtra && { name: "Inter", data: interExtra, weight: 800 as const, style: "normal" as const },
+  ].filter(Boolean) as Array<{
+    name: string;
+    data: ArrayBuffer;
+    weight: 400 | 700 | 800;
+    style: "normal";
+  }>;
+}
+
+/**
+ * Premium dark 1200×630 feature card. Shared visual language for product OGs.
+ * No emoji. Tight type. Accent bar + single glow.
+ */
 export async function featureOgImage(opts: {
   eyebrow: string;
   title: string;
   subtitle: string;
   cta?: string;
+  accent?: OgAccent;
+  /** Small path shown under brand, e.g. sol.new/token */
+  path?: string;
 }) {
-  const [logo, interReg, interBold, interExtra] = await Promise.all([
-    fetchLogo(),
-    fetchFont(FONTS.interRegular),
-    fetchFont(FONTS.interBold),
-    fetchFont(FONTS.interExtraBold),
-  ]);
-
-  const fonts = [
-    interReg && { name: "Inter", data: interReg, weight: 400 as const, style: "normal" as const },
-    interBold && { name: "Inter", data: interBold, weight: 700 as const, style: "normal" as const },
-    interExtra && { name: "Inter", data: interExtra, weight: 800 as const, style: "normal" as const },
-  ].filter(Boolean) as Array<{ name: string; data: ArrayBuffer; weight: 400 | 700 | 800; style: "normal" }>;
+  const accent = ACCENTS[opts.accent || "purple"];
+  const [logo, fonts] = await Promise.all([fetchLogo(), loadFonts()]);
 
   return new ImageResponse(
     (
@@ -61,85 +119,241 @@ export async function featureOgImage(opts: {
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          background: "linear-gradient(135deg, #0a0a14 0%, #1a0b2e 50%, #2a0e1f 100%)",
+          background: "#050508",
           color: "white",
-          fontFamily: "Inter",
-          padding: "64px",
+          fontFamily: "Inter, system-ui, sans-serif",
           position: "relative",
+          overflow: "hidden",
         }}
       >
+        {/* Ambient glows */}
         <div
           style={{
-            display: "flex",
             position: "absolute",
-            top: "-200px",
-            right: "-200px",
-            width: "600px",
-            height: "600px",
-            background: "radial-gradient(circle, rgba(168,85,247,0.35) 0%, transparent 70%)",
+            display: "flex",
+            top: -180,
+            right: -120,
+            width: 640,
+            height: 640,
+            borderRadius: 999,
+            background: `radial-gradient(circle, ${accent.glow} 0%, transparent 68%)`,
           }}
         />
         <div
           style={{
-            display: "flex",
             position: "absolute",
-            bottom: "-200px",
-            left: "-200px",
-            width: "600px",
-            height: "600px",
-            background: "radial-gradient(circle, rgba(251,146,60,0.25) 0%, transparent 70%)",
+            display: "flex",
+            bottom: -220,
+            left: -160,
+            width: 560,
+            height: 560,
+            borderRadius: 999,
+            background: "radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%)",
           }}
         />
 
-        {/* Logo */}
-        <div style={{ display: "flex", alignItems: "center", gap: "16px", fontSize: "32px", fontWeight: 700, letterSpacing: "-0.02em" }}>
-          {logo && <img src={logo} alt="" width={48} height={48} style={{ borderRadius: "12px" }} />}
-          <div style={{ display: "flex" }}>
-            <span>sol</span>
-            <span style={{ color: "#a855f7" }}>.new</span>
-          </div>
-        </div>
+        {/* Left accent rail */}
+        <div
+          style={{
+            position: "absolute",
+            display: "flex",
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 8,
+            background: accent.solid,
+          }}
+        />
 
-        {/* Body */}
-        <div style={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "center" }}>
-          <div style={{ display: "flex", fontSize: "30px", color: "#fb923c", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "16px" }}>
-            {opts.eyebrow}
-          </div>
-          <div style={{ display: "flex", fontSize: "84px", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.03em", maxWidth: "1000px" }}>
-            {opts.title}
-          </div>
-          <div style={{ display: "flex", fontSize: "32px", fontWeight: 400, color: "rgba(255,255,255,0.7)", marginTop: "24px", maxWidth: "920px", lineHeight: 1.35 }}>
-            {opts.subtitle}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "28px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "20px", fontSize: "20px", color: "rgba(255,255,255,0.7)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="rgba(255,255,255,0.85)">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-              </svg>
-              <span style={{ display: "flex" }}>@soldotnew</span>
-            </div>
-          </div>
+        {/* Content */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            flex: 1,
+            padding: "56px 72px 48px 80px",
+            position: "relative",
+          }}
+        >
+          {/* Brand row */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              padding: "14px 28px",
-              borderRadius: "999px",
-              background: "linear-gradient(90deg, #a855f7 0%, #fb923c 100%)",
-              fontSize: "22px",
-              fontWeight: 700,
-              color: "white",
+              justifyContent: "space-between",
             }}
           >
-            {opts.cta ?? "Try it free →"}
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              {logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logo}
+                  alt=""
+                  width={52}
+                  height={52}
+                  style={{ borderRadius: 14 }}
+                />
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    width: 52,
+                    height: 52,
+                    borderRadius: 14,
+                    background: accent.solid,
+                  }}
+                />
+              )}
+              <div
+                style={{
+                  display: "flex",
+                  fontSize: 34,
+                  fontWeight: 800,
+                  letterSpacing: "-0.04em",
+                }}
+              >
+                <span>sol</span>
+                <span style={{ color: accent.solid }}>.new</span>
+              </div>
+            </div>
+            {opts.path && (
+              <div
+                style={{
+                  display: "flex",
+                  fontSize: 22,
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.45)",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                {opts.path}
+              </div>
+            )}
+          </div>
+
+          {/* Body */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              justifyContent: "center",
+              paddingTop: 24,
+              paddingBottom: 16,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 20,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  width: 36,
+                  height: 3,
+                  borderRadius: 2,
+                  background: accent.solid,
+                }}
+              />
+              <div
+                style={{
+                  display: "flex",
+                  fontSize: 22,
+                  fontWeight: 700,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: accent.label,
+                }}
+              >
+                {opts.eyebrow}
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                fontSize: 72,
+                fontWeight: 800,
+                lineHeight: 1.05,
+                letterSpacing: "-0.035em",
+                maxWidth: 980,
+              }}
+            >
+              {opts.title}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                fontSize: 28,
+                fontWeight: 400,
+                color: "rgba(255,255,255,0.62)",
+                marginTop: 22,
+                maxWidth: 860,
+                lineHeight: 1.35,
+              }}
+            >
+              {opts.subtitle}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              borderTop: "1px solid rgba(255,255,255,0.1)",
+              paddingTop: 28,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                fontSize: 20,
+                fontWeight: 500,
+                color: "rgba(255,255,255,0.45)",
+              }}
+            >
+              Passkey-secured Solana tools
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                padding: "14px 30px",
+                borderRadius: 999,
+                background: accent.solid,
+                fontSize: 22,
+                fontWeight: 700,
+                color: "white",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              {opts.cta ?? "Open sol.new"}
+            </div>
           </div>
         </div>
       </div>
     ),
-    { ...ogSize, fonts }
+    { ...ogSize, fonts },
   );
+}
+
+/** Default homepage / brand OG. */
+export async function brandOgImage(opts?: { subtitle?: string }) {
+  return featureOgImage({
+    eyebrow: "sol.new",
+    title: "Create on Solana",
+    subtitle:
+      opts?.subtitle ??
+      "Tokens, NFTs, wallets, pay, gifts, and more. Face ID. No seed phrases.",
+    cta: "Start free",
+    accent: "purple",
+    path: "sol.new",
+  });
 }

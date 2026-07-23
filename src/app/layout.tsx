@@ -51,20 +51,12 @@ export const metadata: Metadata = {
     url: "https://sol.new",
     siteName: "sol.new",
     type: "website",
-    images: [
-      {
-        url: "https://sol.new/og.png",
-        width: 1200,
-        height: 630,
-        alt: "sol.new — Create anything on Solana",
-      },
-    ],
+    // Image from src/app/opengraph-image.tsx (dynamic dark brand card)
   },
   twitter: {
     card: "summary_large_image",
     title: "sol.new — Tokens, NFTs, and wallets on Solana",
     description: "The fastest way to create tokens, NFTs, wallets, payments, and DAOs on Solana. Passkey-secured, low fees.",
-    images: ["https://sol.new/og.png"],
     creator: "@soldotnew",
   },
   other: {
