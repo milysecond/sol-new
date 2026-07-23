@@ -50,6 +50,7 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
     section: "explore",
     links: [
       { label: "watchlists", href: "/lists" },
+      { label: "stocks on solana", href: "/stocks" },
       { label: "token gallery", href: "/gallery" },
       { label: "live launches", href: "/launch" },
       { label: "compare tokens", href: "/compare" },

@@ -14,6 +14,15 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-07-24",
+    title: "Stocks screener",
+    items: [
+      "Browse tokenized equities at /stocks with prices, volume, liquidity, and premium to traditional quotes.",
+      "Filter by provider and sector; sort by volume, change, premium, and more.",
+      "Trade links open on Jupiter.",
+    ],
+  },
+  {
+    date: "2026-07-24",
     title: "NFTs, earn, burn, and polish",
     items: [
       "Browse on-chain NFTs by wallet at /nfts, with Tensor and Magic Eden links.",
