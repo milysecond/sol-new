@@ -6,10 +6,11 @@ export const contentType = ogContentType;
 
 export default async function Image() {
   return featureOgImage({
-    eyebrow: "Transaction receipts",
-    title: "Verify any Solana payment",
-    subtitle:
-      "Paste a signature. Get a clean, shareable receipt with amount, memo, and USD value.",
-    cta: "Check a receipt →",
+    eyebrow: "Receipt",
+    title: "Share a receipt",
+    subtitle: "Beautiful transaction cards from any Solana signature.",
+    cta: "Look up a tx",
+    accent: "purple",
+    path: "sol.new/receipt",
   });
 }
