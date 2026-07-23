@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
 import { getAssetsByOwner } from "@/lib/helius-das";
-import { priceHintsForOwner, sortNftCards, type SortKey } from "@/lib/nft-prices";
+import {
+  priceHintsForOwner,
+  sortNftCards,
+  filterNftCards,
+  filtersActive,
+  parseNftFilters,
+  collectionFacets,
+  type SortKey,
+} from "@/lib/nft-prices";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,13 +18,14 @@ const noStore = { "Cache-Control": "no-store" };
 
 const SORTS = new Set<SortKey>(["recent", "name", "price_asc", "price_desc"]);
 
-/** GET ?owner=&page=&limit=&sort=recent|name|price_asc|price_desc */
+/** GET ?owner=&page=&limit=&sort=&q=&type=&listed=&price=&collection= */
 export async function GET(req: NextRequest) {
   const owner = req.nextUrl.searchParams.get("owner")?.trim() || "";
   const page = parseInt(req.nextUrl.searchParams.get("page") || "1", 10) || 1;
   const limit = parseInt(req.nextUrl.searchParams.get("limit") || "48", 10) || 48;
   const sortRaw = (req.nextUrl.searchParams.get("sort") || "recent").trim() as SortKey;
   const sort: SortKey = SORTS.has(sortRaw) ? sortRaw : "recent";
+  const filters = parseNftFilters(req.nextUrl.searchParams);
 
   try {
     new PublicKey(owner);
@@ -25,10 +34,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Price sorts need a wider window so order is meaningful across inventory.
-    const fetchLimit =
-      sort === "price_asc" || sort === "price_desc" ? Math.min(200, Math.max(limit, 100)) : limit;
-    const fetchPage = sort === "price_asc" || sort === "price_desc" ? 1 : page;
+    const needWide =
+      filtersActive(filters) || sort === "price_asc" || sort === "price_desc";
+    const fetchLimit = needWide ? Math.min(200, Math.max(limit, 100)) : limit;
+    const fetchPage = needWide ? 1 : page;
 
     const data = await getAssetsByOwner({ owner, page: fetchPage, limit: fetchLimit });
     const mints = data.items.map((i) => i.mint);
@@ -55,15 +64,16 @@ export async function GET(req: NextRequest) {
       }));
     }
 
+    const facets = collectionFacets(items);
+    items = filterNftCards(items, filters);
     items = sortNftCards(items, sort);
 
-    // Client page slice when we widened the fetch for price sort
     let pageItems = items;
-    let total = data.total;
-    if (sort === "price_asc" || sort === "price_desc") {
-      total = items.length;
+    let total = needWide ? items.length : data.total;
+    if (needWide) {
       const start = (page - 1) * limit;
       pageItems = items.slice(start, start + limit);
+      total = items.length;
     }
 
     return NextResponse.json(
@@ -74,6 +84,8 @@ export async function GET(req: NextRequest) {
         page,
         limit,
         sort,
+        filters,
+        collections: facets.slice(0, 40),
       },
       { headers: noStore },
     );

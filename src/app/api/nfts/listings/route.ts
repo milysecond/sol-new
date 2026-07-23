@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
 import { getAssetsByOwner, type NftCard } from "@/lib/helius-das";
-import { priceHintsForOwner, sortNftCards, type SortKey } from "@/lib/nft-prices";
+import {
+  priceHintsForOwner,
+  sortNftCards,
+  filterNftCards,
+  parseNftFilters,
+  collectionFacets,
+  type SortKey,
+} from "@/lib/nft-prices";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,14 +17,12 @@ const noStore = { "Cache-Control": "no-store" };
 
 const SORTS = new Set<SortKey>(["recent", "name", "price_asc", "price_desc"]);
 
-/**
- * GET ?owner=&sort=
- * Prefer items with listing prices; deep links to Tensor / ME.
- */
+/** GET ?owner=&sort=&q=&type=&listed=&price=&collection= */
 export async function GET(req: NextRequest) {
   const owner = req.nextUrl.searchParams.get("owner")?.trim() || "";
   const sortRaw = (req.nextUrl.searchParams.get("sort") || "price_desc").trim() as SortKey;
   const sort: SortKey = SORTS.has(sortRaw) ? sortRaw : "price_desc";
+  const filters = parseNftFilters(req.nextUrl.searchParams);
 
   try {
     new PublicKey(owner);
@@ -50,18 +55,21 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Markets tab: listed first, then anything with a floor
+    // Markets tab baseline: listed or has floor
     items = items.filter((i) => i.listed || i.priceSol != null);
+    const facets = collectionFacets(items);
+    items = filterNftCards(items, filters);
     items = sortNftCards(items, sort);
 
     return NextResponse.json(
       {
         ok: true,
         mode: "me_prices",
-        note: "Prices from Magic Eden (listing or collection floor). Tensor links for trading.",
         items,
         total: items.length,
         sort,
+        filters,
+        collections: facets.slice(0, 40),
       },
       { headers: noStore },
     );
