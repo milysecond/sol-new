@@ -92,11 +92,17 @@ export async function POST(req: NextRequest) {
         : await luloGenerateDeposit({ owner: wallet, amount });
 
     if (!res.ok) {
+      const d = res.data as {
+        message?: string;
+        error?: { message?: string } | string;
+      };
+      const msg =
+        (typeof d.error === "object" && d.error?.message) ||
+        (typeof d.error === "string" ? d.error : null) ||
+        d.message ||
+        `${action} failed`;
       return NextResponse.json(
-        {
-          error: (res.data as { message?: string })?.message || `${action} failed`,
-          details: res.data,
-        },
+        { error: msg, details: res.data },
         { status: res.status >= 400 ? res.status : 502, headers: noStore },
       );
     }
