@@ -22,22 +22,36 @@ function rateLimited(ip: string): boolean {
   return false;
 }
 
-/** GET ?wallet= — stored Bridge customer / KYC status for a wallet. */
+const noStore = { "Cache-Control": "no-store" };
+
+/** GET ?wallet= optional — Bridge configured flag + optional customer for wallet. */
 export async function GET(req: NextRequest) {
-  if (!bridgeConfigured()) {
-    return NextResponse.json({ ok: false, error: "Bridge not configured", configured: false });
+  const configured = bridgeConfigured();
+  if (!configured) {
+    return NextResponse.json(
+      { ok: false, error: "Bridge not configured", configured: false },
+      { headers: noStore },
+    );
   }
+
   const wallet = req.nextUrl.searchParams.get("wallet")?.trim() || "";
+  if (!wallet) {
+    return NextResponse.json({ ok: true, configured: true, customer: null }, { headers: noStore });
+  }
+
   try {
     new PublicKey(wallet);
   } catch {
-    return NextResponse.json({ error: "Invalid wallet" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid wallet", configured: true },
+      { status: 400, headers: noStore },
+    );
   }
 
   await initDb();
   const row = await getBridgeCustomerByWallet(wallet);
   if (!row) {
-    return NextResponse.json({ ok: true, configured: true, customer: null });
+    return NextResponse.json({ ok: true, configured: true, customer: null }, { headers: noStore });
   }
 
   // Refresh KYC status from Bridge when we have a link id
@@ -57,14 +71,17 @@ export async function GET(req: NextRequest) {
           tosUrl: (d.tos_link as string) || row.tosUrl,
         });
         const fresh = await getBridgeCustomerByWallet(wallet);
-        return NextResponse.json({ ok: true, configured: true, customer: fresh });
+        return NextResponse.json(
+          { ok: true, configured: true, customer: fresh },
+          { headers: noStore },
+        );
       }
     } catch {
       /* use cached */
     }
   }
 
-  return NextResponse.json({ ok: true, configured: true, customer: row });
+  return NextResponse.json({ ok: true, configured: true, customer: row }, { headers: noStore });
 }
 
 /**

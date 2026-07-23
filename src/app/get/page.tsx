@@ -49,7 +49,8 @@ export default function GetPage() {
   const [bridgeBusy, setBridgeBusy] = useState(false);
   const [bridgeError, setBridgeError] = useState<string | null>(null);
   const [bridgeCustomer, setBridgeCustomer] = useState<BridgeCustomer | null>(null);
-  const [bridgeConfigured, setBridgeConfigured] = useState(false);
+  // null = still checking API (do not flash "not configured")
+  const [bridgeConfigured, setBridgeConfigured] = useState<boolean | null>(null);
   const [deposit, setDeposit] = useState<DepositInstructions | null>(null);
   const [transferId, setTransferId] = useState<string | null>(null);
 
@@ -85,15 +86,19 @@ export default function GetPage() {
   }, [publicKey, network, refreshBalance]);
 
   const loadBridge = useCallback(async () => {
-    if (!publicKey || !BRIDGE_UI) return;
+    if (!BRIDGE_UI) return;
     try {
-      const res = await fetch(`/api/bridge/kyc?wallet=${encodeURIComponent(publicKey)}`);
+      const q = publicKey
+        ? `?wallet=${encodeURIComponent(publicKey)}`
+        : "";
+      const res = await fetch(`/api/bridge/kyc${q}`, { cache: "no-store" });
       const data = (await res.json()) as {
         configured?: boolean;
         customer?: BridgeCustomer | null;
       };
-      setBridgeConfigured(Boolean(data.configured));
-      setBridgeCustomer(data.customer ?? null);
+      setBridgeConfigured(data.configured === true);
+      if (data.customer) setBridgeCustomer(data.customer);
+      else if (publicKey) setBridgeCustomer(null);
     } catch {
       setBridgeConfigured(false);
     }
@@ -256,13 +261,19 @@ export default function GetPage() {
                   Deposit USD (ACH or wire). Bridge sends USDC to your Solana wallet after KYC.
                 </p>
 
-                {!bridgeConfigured && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400">
-                    Bridge is not configured on this environment yet (needs BRIDGE_API_KEY).
+                {bridgeConfigured === null && (
+                  <p className="text-xs text-gray-500 dark:text-white/40 flex items-center gap-2">
+                    <Spinner size={14} /> Checking Bridge…
                   </p>
                 )}
 
-                {bridgeConfigured && !kycApproved && (
+                {bridgeConfigured === false && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Bridge is temporarily unavailable. Refresh and try again.
+                  </p>
+                )}
+
+                {bridgeConfigured === true && !kycApproved && (
                   <div className="space-y-3">
                     <input
                       type="email"
@@ -296,7 +307,7 @@ export default function GetPage() {
                   </div>
                 )}
 
-                {bridgeConfigured && kycApproved && !deposit && (
+                {bridgeConfigured === true && kycApproved && !deposit && (
                   <div className="space-y-3">
                     <p className="text-xs text-emerald-600 dark:text-emerald-400">KYC approved. Create a deposit.</p>
                     <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-white/60 cursor-pointer">
