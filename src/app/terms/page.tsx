@@ -162,6 +162,10 @@ export default function TermsPage() {
           <Link href="/privacy" className="text-purple-400 hover:underline">
             Privacy
           </Link>
+          {" · "}
+          <Link href="/changelog" className="text-purple-400 hover:underline">
+            Changelog
+          </Link>
           .
         </footer>
       </main>

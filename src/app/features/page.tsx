@@ -136,6 +136,7 @@ const SECTIONS: Section[] = [
       { href: "/dir", title: "Directory", blurb: "Every internal and curated external link.", icon: FolderOpen },
       { href: "/docs", title: "Docs", blurb: "Costs, storage, and what we store.", icon: BookOpen },
       { href: "/features", title: "Features", blurb: "This page.", icon: Sparkles },
+      { href: "/changelog", title: "Changelog", blurb: "Public product updates and ship notes.", icon: BookOpen },
       { href: "/privacy", title: "Privacy", blurb: "Privacy policy.", icon: BookOpen },
       { href: "/terms", title: "Terms", blurb: "Terms of use.", icon: BookOpen },
     ],

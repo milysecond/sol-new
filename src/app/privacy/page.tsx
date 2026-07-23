@@ -182,6 +182,10 @@ export default function PrivacyPage() {
           <Link href="/terms" className="text-purple-400 hover:underline">
             Terms of Use
           </Link>
+          {" · "}
+          <Link href="/changelog" className="text-purple-400 hover:underline">
+            Changelog
+          </Link>
           .
         </footer>
       </main>
