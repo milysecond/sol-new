@@ -21,6 +21,19 @@ import {
 
 export const runtime = "nodejs";
 
+const recentIPs = new Map<string, number[]>();
+const RATE_LIMIT = 8;
+const WINDOW_MS = 60_000;
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const timestamps = (recentIPs.get(ip) || []).filter((t) => now - t < WINDOW_MS);
+  if (timestamps.length >= RATE_LIMIT) return true;
+  timestamps.push(now);
+  recentIPs.set(ip, timestamps);
+  return false;
+}
+
 function originFrom(req: NextRequest): string {
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "sol.new";
   const proto = req.headers.get("x-forwarded-proto") || "https";
@@ -30,7 +43,8 @@ function originFrom(req: NextRequest): string {
 function rpcUrl(): string {
   const k = process.env.HELIUS_API_KEY;
   if (k) return `https://mainnet.helius-rpc.com/?api-key=${k}`;
-  return process.env.NEXT_PUBLIC_RPC_URL || "https://api.mainnet-beta.solana.com";
+  if (process.env.FLUXRPC_URL) return process.env.FLUXRPC_URL;
+  return process.env.MAINNET_RPC || "https://api.mainnet-beta.solana.com";
 }
 
 /**
@@ -114,6 +128,11 @@ async function verifyCustomPayment(
 
 /** Create a short link. Body: { url, code?, title?, wallet?, paymentSig? } */
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (isRateLimited(ip)) {
+    return NextResponse.json({ ok: false, error: "Too many requests. Try again in a minute." }, { status: 429 });
+  }
+
   try {
     await initDb();
     const body = (await req.json().catch(() => ({}))) as {

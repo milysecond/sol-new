@@ -661,18 +661,9 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
       const connection = new Connection(rpc, "confirmed");
       const client = new DynamicBondingCurveClient(connection, "confirmed");
 
-      let mintKeypair: Keypair;
-      try {
-        const gk = await fetch("/api/ground-key").then((r) => r.json()) as { ok?: boolean; secretKey?: string };
-        if (gk.ok && gk.secretKey) {
-          const bs58 = (await import("bs58")).default;
-          mintKeypair = Keypair.fromSecretKey(bs58.decode(gk.secretKey));
-        } else {
-          mintKeypair = Keypair.generate();
-        }
-      } catch {
-        mintKeypair = Keypair.generate();
-      }
+      // Mint keypair is generated client-side. Vanity (NEW…) keys are only
+      // assigned server-side during launch build routes — never over public HTTP.
+      const mintKeypair = Keypair.generate();
       const userPubkey = new PublicKey(address);
 
       const tx: Transaction = await client.pool.createPool({
@@ -921,21 +912,9 @@ function GenesisForm({ onBack }: { onBack: () => void }) {
 
       const umi = await createUmiWithKeypair(rpc, userKeypair);
 
-      // Use a pre-ground NEW... keypair; fall back to random if pool is empty
-      let baseMint;
-      try {
-        const gk = await fetch("/api/ground-key").then((r) => r.json()) as { ok?: boolean; secretKey?: string };
-        if (gk.ok && gk.secretKey) {
-          const bs58 = (await import("bs58")).default;
-          const secretKeyBytes = bs58.decode(gk.secretKey);
-          const groundKeypair = umi.eddsa.createKeypairFromSecretKey(secretKeyBytes);
-          baseMint = createSignerFromKeypair(umi, groundKeypair);
-        } else {
-          baseMint = generateSigner(umi);
-        }
-      } catch {
-        baseMint = generateSigner(umi);
-      }
+      // Random mint signer client-side. Server launch routes may still attach
+      // vanity ground keys without exposing secrets to browsers.
+      const baseMint = generateSigner(umi);
       const TOTAL_SUPPLY = BigInt(1_000_000_000) * BigInt(1_000_000_000); // 1B tokens, 9 decimals
       const WSOL = publicKey("So11111111111111111111111111111111111111112");
 

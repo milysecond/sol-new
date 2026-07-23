@@ -5,9 +5,15 @@ import { analytics } from "./analytics";
 
 export type Network = "mainnet" | "devnet";
 
+// Public client RPCs only — never embed provider API keys in the browser bundle.
+// Server routes use `@/lib/rpc-server` with HELIUS_API_KEY / FLUXRPC_URL secrets.
 export const RPC: Record<Network, string> = {
-  mainnet: "https://eu.fluxrpc.com?key=04a32b3f-cf44-48fb-8c13-faace267ee5d",
-  devnet: "https://api.devnet.solana.com",
+  mainnet:
+    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_RPC_URL) ||
+    "https://api.mainnet-beta.solana.com",
+  devnet:
+    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_RPC_DEVNET) ||
+    "https://api.devnet.solana.com",
 };
 
 const EXPLORER: Record<Network, string> = {

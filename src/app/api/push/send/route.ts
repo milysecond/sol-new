@@ -15,7 +15,8 @@ export interface PushPayload {
 export async function POST(req: NextRequest) {
   const secret = req.headers.get("x-push-secret");
   const INTERNAL_SECRET = process.env.PUSH_SECRET;
-  if (INTERNAL_SECRET && secret !== INTERNAL_SECRET) {
+  // Fail closed: if PUSH_SECRET is unset or wrong, reject (do not allow open broadcast).
+  if (!INTERNAL_SECRET || secret !== INTERNAL_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

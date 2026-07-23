@@ -7,14 +7,15 @@ import {
 } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { notifyEvent } from "@/lib/notify";
 import { initDb, claimGroundKey } from "@/lib/db";
+import { rpcUrlFor } from "@/lib/rpc-server";
 
 const WRAPPED_SOL = new PublicKey("So11111111111111111111111111111111111111112");
 
 function getConnection(network: string) {
-  if (network === "mainnet") {
-    return new Connection("https://eu.fluxrpc.com?key=04a32b3f-cf44-48fb-8c13-faace267ee5d", "confirmed");
-  }
-  return new Connection("https://api.devnet.solana.com", "confirmed");
+  return new Connection(
+    rpcUrlFor(network === "devnet" ? "devnet" : "mainnet"),
+    "confirmed"
+  );
 }
 
 function getPartnerConfigKey(): PublicKey {

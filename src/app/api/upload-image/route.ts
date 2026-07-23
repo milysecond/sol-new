@@ -9,12 +9,12 @@ const RATE_LIMIT = 3;
 const WINDOW_MS = 60_000;
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
+// SVG disallowed: can carry executable script when opened top-level.
 const EXT: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/gif": "gif",
   "image/webp": "webp",
-  "image/svg+xml": "svg",
 };
 
 function isRateLimited(ip: string): boolean {
@@ -37,8 +37,16 @@ export async function POST(req: NextRequest) {
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 400 });
     }
+    if (file.type === "image/svg+xml" || (file.name || "").toLowerCase().endsWith(".svg")) {
+      return NextResponse.json({ error: "SVG uploads are not allowed" }, { status: 400 });
+    }
     const ext = EXT[file.type];
-    if (!ext) return NextResponse.json({ error: "Invalid file type" }, { status: 400 });
+    if (!ext) {
+      return NextResponse.json(
+        { error: "Invalid file type (use PNG, JPEG, GIF, or WebP)" },
+        { status: 400 }
+      );
+    }
 
     const id = crypto.randomBytes(8).toString("hex");
     const key = `images/${id}.${ext}`;

@@ -85,3 +85,9 @@ export function absoluteShortUrl(code: string, origin?: string): string {
   const base = origin || (typeof window !== "undefined" ? window.location.origin : "https://sol.new");
   return `${base.replace(/\/$/, "")}${shortPath(code)}`;
 }
+
+/** Hosts we auto-redirect without an interstitial (same product brand). */
+export function isTrustedShortLinkHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/\.$/, "");
+  return h === "sol.new" || h.endsWith(".sol.new");
+}
