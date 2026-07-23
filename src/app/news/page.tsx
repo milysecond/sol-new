@@ -18,6 +18,8 @@ const SOURCE_COLOR: Record<string, string> = {
   Cointelegraph: "text-yellow-500 bg-yellow-500/10",
   Decrypt: "text-sky-500 bg-sky-500/10",
   "The Defiant": "text-fuchsia-500 bg-fuchsia-500/10",
+  "Solana ANZ": "text-emerald-500 bg-emerald-500/10",
+  "devrels.xyz": "text-violet-500 bg-violet-500/10",
 };
 
 function ago(iso: string): string {

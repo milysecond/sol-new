@@ -12,6 +12,14 @@ export const metadata: Metadata = {
 
 const DIRECTORY: { section: string; links: { label: string; href: string }[] }[] = [
   {
+    section: "start here",
+    links: [
+      { label: "features at a glance", href: "/features" },
+      { label: "docs and costs", href: "/docs" },
+      { label: "what's new", href: "/whats-new" },
+    ],
+  },
+  {
     section: "create",
     links: [
       { label: "launch a token", href: "/token" },

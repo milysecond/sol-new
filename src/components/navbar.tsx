@@ -9,6 +9,7 @@ import { Coins, Image, ShieldCheck, Wallet, Droplets, Zap, ExternalLink, Copy, L
 import { getPushPermission, subscribePush, unsubscribePush, type PushPermission } from "@/lib/push-client";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Spinner } from "@/components/spinner";
+import { useDefaultToken } from "@/lib/currency-pref";
 import type { LucideIcon } from "lucide-react";
 
 /** Full desktop nav (lg+). Order: create → money → tools. */
@@ -35,6 +36,7 @@ const TABLET_NAV: { href: string; label: string; icon: LucideIcon }[] = [
 export function Navbar() {
   const { publicKey, walletLabel, wallets, balance, connect, recover, switchWallet, disconnect, loading, airdropping, airdropDone, handleAirdrop } = useWallet();
   const { network, toggle } = useNetwork();
+  const [defaultToken, setDefaultToken] = useDefaultToken();
   const [showMenu, setShowMenu] = useState(false);
   const [pushPermission, setPushPermission] = useState<PushPermission>("default");
   const [pushLoading, setPushLoading] = useState(false);
@@ -196,6 +198,29 @@ export function Navbar() {
                     >
                       <Wallet size={14} className="inline mr-1.5" /> Wallet details
                     </Link>
+                    <div className="px-4 py-2.5 border-b border-black/10 dark:border-white/10">
+                      <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-white/30 mb-1.5">
+                        Default currency
+                      </p>
+                      <div className="flex gap-1.5">
+                        {(["SOL", "USDC"] as const).map((t) => (
+                          <button
+                            key={t}
+                            onClick={() => setDefaultToken(t)}
+                            className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition cursor-pointer border ${
+                              defaultToken === t
+                                ? "bg-purple-500/20 border-purple-400/50 text-purple-400"
+                                : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white"
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-gray-400 dark:text-white/30 mt-1.5">
+                        Used for send, gift, and pay
+                      </p>
+                    </div>
                     <a
                       href={`https://orbmarkets.io/address/${publicKey}${network === "devnet" ? "?cluster=devnet&hideSpam=true" : "?hideSpam=true"}`}
                       target="_blank"
