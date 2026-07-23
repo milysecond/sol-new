@@ -135,6 +135,94 @@ export async function priceHintsForOwner(
 
 export type SortKey = "recent" | "name" | "price_asc" | "price_desc";
 
+export type NftFilters = {
+  /** Name / mint / symbol search */
+  q?: string;
+  /** all | compressed | standard */
+  type?: "all" | "compressed" | "standard";
+  /** all | listed | unlisted */
+  listed?: "all" | "listed" | "unlisted";
+  /** all | priced | unpriced */
+  price?: "all" | "priced" | "unpriced";
+  /** Collection mint/id, or empty for all */
+  collection?: string;
+};
+
+export function parseNftFilters(sp: URLSearchParams): NftFilters {
+  const typeRaw = sp.get("type")?.trim() || "all";
+  const listedRaw = sp.get("listed")?.trim() || "all";
+  const priceRaw = sp.get("price")?.trim() || "all";
+  return {
+    q: sp.get("q")?.trim() || "",
+    type:
+      typeRaw === "compressed" || typeRaw === "standard" || typeRaw === "all"
+        ? typeRaw
+        : "all",
+    listed:
+      listedRaw === "listed" || listedRaw === "unlisted" || listedRaw === "all"
+        ? listedRaw
+        : "all",
+    price:
+      priceRaw === "priced" || priceRaw === "unpriced" || priceRaw === "all"
+        ? priceRaw
+        : "all",
+    collection: sp.get("collection")?.trim() || "",
+  };
+}
+
+export function filtersActive(f: NftFilters): boolean {
+  return Boolean(
+    (f.q && f.q.length > 0) ||
+      (f.type && f.type !== "all") ||
+      (f.listed && f.listed !== "all") ||
+      (f.price && f.price !== "all") ||
+      (f.collection && f.collection.length > 0),
+  );
+}
+
+export function filterNftCards<
+  T extends {
+    name: string;
+    mint: string;
+    symbol?: string | null;
+    collection?: string | null;
+    compressed?: boolean;
+    listed?: boolean;
+    priceSol?: number | null;
+  },
+>(items: T[], f: NftFilters): T[] {
+  const q = (f.q || "").toLowerCase();
+  return items.filter((n) => {
+    if (q) {
+      const hay = `${n.name} ${n.mint} ${n.symbol || ""} ${n.collection || ""}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (f.type === "compressed" && !n.compressed) return false;
+    if (f.type === "standard" && n.compressed) return false;
+    if (f.listed === "listed" && !n.listed) return false;
+    if (f.listed === "unlisted" && n.listed) return false;
+    const hasPrice = n.priceSol != null && Number.isFinite(n.priceSol);
+    if (f.price === "priced" && !hasPrice) return false;
+    if (f.price === "unpriced" && hasPrice) return false;
+    if (f.collection && n.collection !== f.collection) return false;
+    return true;
+  });
+}
+
+/** Unique collections for filter dropdown (id + count + sample name). */
+export function collectionFacets<
+  T extends { collection?: string | null; name: string },
+>(items: T[]): { id: string; count: number }[] {
+  const map = new Map<string, number>();
+  for (const n of items) {
+    if (!n.collection) continue;
+    map.set(n.collection, (map.get(n.collection) || 0) + 1);
+  }
+  return [...map.entries()]
+    .map(([id, count]) => ({ id, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
 export function sortNftCards<
   T extends { name: string; priceSol?: number | null; mint: string },
 >(items: T[], sort: SortKey): T[] {

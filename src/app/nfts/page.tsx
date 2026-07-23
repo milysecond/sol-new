@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Image as ImageIcon, ExternalLink, Search, Layers } from "lucide-react";
+import { Image as ImageIcon, ExternalLink, Search, Layers, Filter, X } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { PageTransition } from "@/components/page-transition";
 import { Spinner } from "@/components/spinner";
@@ -14,6 +14,9 @@ import { PublicKey } from "@solana/web3.js";
 import { Suspense } from "react";
 
 type SortKey = "recent" | "name" | "price_asc" | "price_desc";
+type TypeFilter = "all" | "compressed" | "standard";
+type ListedFilter = "all" | "listed" | "unlisted";
+type PriceFilter = "all" | "priced" | "unpriced";
 
 type NftCard = {
   id: string;
@@ -33,11 +36,17 @@ type NftCard = {
   listingUrl?: string;
 };
 
+type Facet = { id: string; count: number };
+
 function formatSol(n: number): string {
   if (n >= 100) return n.toFixed(1);
   if (n >= 1) return n.toFixed(2);
   if (n >= 0.01) return n.toFixed(3);
   return n.toFixed(4);
+}
+
+function shortCol(id: string) {
+  return id.length > 12 ? `${id.slice(0, 4)}…${id.slice(-4)}` : id;
 }
 
 function NftsBrowseInner() {
@@ -48,14 +57,27 @@ function NftsBrowseInner() {
   const [owner, setOwner] = useState<string | null>(null);
   const [tab, setTab] = useState<"owned" | "listed">("owned");
   const [sort, setSort] = useState<SortKey>("recent");
+  const [q, setQ] = useState("");
+  const [qDebounced, setQDebounced] = useState("");
+  const [typeF, setTypeF] = useState<TypeFilter>("all");
+  const [listedF, setListedF] = useState<ListedFilter>("all");
+  const [priceF, setPriceF] = useState<PriceFilter>("all");
+  const [collection, setCollection] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
   const [items, setItems] = useState<NftCard[]>([]);
+  const [collections, setCollections] = useState<Facet[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
-    const q = searchParams.get("owner")?.trim();
+    const t = setTimeout(() => setQDebounced(q.trim()), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  useEffect(() => {
+    const o = searchParams.get("owner")?.trim();
     let sessionOwner: string | null = null;
     try {
       sessionOwner = sessionStorage.getItem("sol.new.nfts.owner");
@@ -63,7 +85,7 @@ function NftsBrowseInner() {
     } catch {
       /* ignore */
     }
-    const initial = q || sessionOwner;
+    const initial = o || sessionOwner;
     if (initial) {
       try {
         new PublicKey(initial);
@@ -81,39 +103,70 @@ function NftsBrowseInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publicKey, searchParams]);
 
-  const load = useCallback(async (addr: string, p: number, t: "owned" | "listed", s: SortKey) => {
-    setLoading(true);
-    setError(null);
-    try {
-      new PublicKey(addr);
-      const path =
-        t === "listed"
-          ? `/api/nfts/listings?owner=${encodeURIComponent(addr)}&sort=${s}`
-          : `/api/nfts?owner=${encodeURIComponent(addr)}&page=${p}&limit=48&sort=${s}`;
-      const res = await fetch(path, { cache: "no-store" });
-      const data = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
-        items?: NftCard[];
-        total?: number;
-        note?: string;
-      };
-      if (!res.ok) throw new Error(data.error || "Failed to load");
-      setItems(data.items || []);
-      setTotal(data.total ?? data.items?.length ?? 0);
-    } catch (e) {
-      setItems([]);
-      setTotal(0);
-      setError(e instanceof Error ? e.message : "Failed to load NFTs");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const filterQuery = useMemo(() => {
+    const p = new URLSearchParams();
+    if (qDebounced) p.set("q", qDebounced);
+    if (typeF !== "all") p.set("type", typeF);
+    if (listedF !== "all") p.set("listed", listedF);
+    if (priceF !== "all") p.set("price", priceF);
+    if (collection) p.set("collection", collection);
+    return p.toString();
+  }, [qDebounced, typeF, listedF, priceF, collection]);
+
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (qDebounced) n++;
+    if (typeF !== "all") n++;
+    if (listedF !== "all") n++;
+    if (priceF !== "all") n++;
+    if (collection) n++;
+    return n;
+  }, [qDebounced, typeF, listedF, priceF, collection]);
+
+  const load = useCallback(
+    async (
+      addr: string,
+      p: number,
+      t: "owned" | "listed",
+      s: SortKey,
+      fq: string,
+    ) => {
+      setLoading(true);
+      setError(null);
+      try {
+        new PublicKey(addr);
+        const base =
+          t === "listed"
+            ? `/api/nfts/listings?owner=${encodeURIComponent(addr)}&sort=${s}`
+            : `/api/nfts?owner=${encodeURIComponent(addr)}&page=${p}&limit=48&sort=${s}`;
+        const path = fq ? `${base}&${fq}` : base;
+        const res = await fetch(path, { cache: "no-store" });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          error?: string;
+          items?: NftCard[];
+          total?: number;
+          collections?: Facet[];
+        };
+        if (!res.ok) throw new Error(data.error || "Failed to load");
+        setItems(data.items || []);
+        setTotal(data.total ?? data.items?.length ?? 0);
+        if (data.collections) setCollections(data.collections);
+      } catch (e) {
+        setItems([]);
+        setTotal(0);
+        setError(e instanceof Error ? e.message : "Failed to load NFTs");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!owner) return;
-    void load(owner, page, tab, sort);
-  }, [owner, page, tab, sort, load]);
+    void load(owner, page, tab, sort, filterQuery);
+  }, [owner, page, tab, sort, filterQuery, load]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,6 +180,24 @@ function NftsBrowseInner() {
       setError("Invalid Solana address");
     }
   };
+
+  const clearFilters = () => {
+    setQ("");
+    setQDebounced("");
+    setTypeF("all");
+    setListedF("all");
+    setPriceF("all");
+    setCollection("");
+    setPage(1);
+  };
+
+  const selectCls = "px-2.5 py-1.5 rounded-lg text-xs sm:text-sm bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 cursor-pointer";
+  const chip = (active: boolean) =>
+    `px-2.5 py-1 rounded-full text-xs transition cursor-pointer border ${
+      active
+        ? "bg-purple-500/20 text-purple-300 border-purple-400/50"
+        : "bg-black/5 dark:bg-white/5 text-gray-500 border-black/10 dark:border-white/10 hover:border-purple-400/30"
+    }`;
 
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
@@ -211,33 +282,175 @@ function NftsBrowseInner() {
             )}
 
             {owner && (
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <label className="text-xs text-gray-500 dark:text-white/40">Sort</label>
-                <select
-                  value={sort}
-                  onChange={(e) => {
-                    setSort(e.target.value as SortKey);
-                    setPage(1);
-                  }}
-                  className="px-3 py-1.5 rounded-lg text-sm bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 cursor-pointer"
-                >
-                  <option value="recent">Recent</option>
-                  <option value="name">Name</option>
-                  <option value="price_desc">Price: high to low</option>
-                  <option value="price_asc">Price: low to high</option>
-                </select>
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <div className="relative flex-1 min-w-[140px] max-w-xs">
+                    <Search
+                      size={14}
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+                    />
+                    <input
+                      value={q}
+                      onChange={(e) => {
+                        setQ(e.target.value);
+                        setPage(1);
+                      }}
+                      placeholder="Filter by name or mint"
+                      className="w-full pl-8 pr-3 py-1.5 rounded-lg text-sm bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 focus:outline-none focus:border-purple-400/50"
+                    />
+                  </div>
+                  <label className="text-xs text-gray-500 dark:text-white/40">Sort</label>
+                  <select
+                    value={sort}
+                    onChange={(e) => {
+                      setSort(e.target.value as SortKey);
+                      setPage(1);
+                    }}
+                    className={selectCls}
+                  >
+                    <option value="recent">Recent</option>
+                    <option value="name">Name</option>
+                    <option value="price_desc">Price: high to low</option>
+                    <option value="price_asc">Price: low to high</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowFilters((v) => !v)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm border transition cursor-pointer ${
+                      showFilters || activeFilterCount > 0
+                        ? "bg-purple-500/20 text-purple-300 border-purple-400/50"
+                        : "bg-black/5 dark:bg-white/5 text-gray-500 border-black/10 dark:border-white/10"
+                    }`}
+                  >
+                    <Filter size={14} />
+                    Filters
+                    {activeFilterCount > 0 && (
+                      <span className="ml-0.5 min-w-[1.1rem] h-[1.1rem] rounded-full bg-purple-500 text-[10px] text-white flex items-center justify-center">
+                        {activeFilterCount}
+                      </span>
+                    )}
+                  </button>
+                  {activeFilterCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearFilters}
+                      className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-purple-400 cursor-pointer"
+                    >
+                      <X size={12} /> Clear
+                    </button>
+                  )}
+                </div>
+
+                {showFilters && (
+                  <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] p-3 sm:p-4 space-y-3">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider text-gray-400 mb-1.5">
+                        Type
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(
+                          [
+                            ["all", "All"],
+                            ["compressed", "Compressed"],
+                            ["standard", "Standard"],
+                          ] as const
+                        ).map(([v, label]) => (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => {
+                              setTypeF(v);
+                              setPage(1);
+                            }}
+                            className={chip(typeF === v)}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider text-gray-400 mb-1.5">
+                        Listing
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(
+                          [
+                            ["all", "All"],
+                            ["listed", "Listed"],
+                            ["unlisted", "Unlisted"],
+                          ] as const
+                        ).map(([v, label]) => (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => {
+                              setListedF(v);
+                              setPage(1);
+                            }}
+                            className={chip(listedF === v)}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider text-gray-400 mb-1.5">
+                        Price
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(
+                          [
+                            ["all", "All"],
+                            ["priced", "Has price"],
+                            ["unpriced", "No price"],
+                          ] as const
+                        ).map(([v, label]) => (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => {
+                              setPriceF(v);
+                              setPage(1);
+                            }}
+                            className={chip(priceF === v)}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {collections.length > 0 && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-gray-400 mb-1.5">
+                          Collection
+                        </p>
+                        <select
+                          value={collection}
+                          onChange={(e) => {
+                            setCollection(e.target.value);
+                            setPage(1);
+                          }}
+                          className={`${selectCls} w-full sm:w-auto max-w-full`}
+                        >
+                          <option value="">All collections</option>
+                          {collections.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {shortCol(c.id)} ({c.count})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
             {tab === "listed" && (
               <p className="text-xs text-center text-gray-500 dark:text-white/40">
-                Prices from Magic Eden (active list or collection floor). Trade on Tensor or ME.
-              </p>
-            )}
-
-            {(sort === "price_asc" || sort === "price_desc") && tab === "owned" && (
-              <p className="text-xs text-center text-gray-500 dark:text-white/40">
-                Price uses ME listing when listed, else collection floor. Unpriced last.
+                Markets show items with a listing or floor estimate.
               </p>
             )}
 
@@ -258,15 +471,30 @@ function NftsBrowseInner() {
             ) : items.length === 0 ? (
               <div className="text-center py-12 space-y-2">
                 <ImageIcon className="mx-auto text-gray-400" size={32} />
-                <p className="text-gray-400">No NFTs found for this wallet</p>
-                <Link href="/nft" className="text-purple-400 text-sm hover:underline">
-                  Mint one
-                </Link>
+                <p className="text-gray-400">
+                  {activeFilterCount > 0
+                    ? "No NFTs match these filters"
+                    : "No NFTs found for this wallet"}
+                </p>
+                {activeFilterCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="text-purple-400 text-sm hover:underline cursor-pointer"
+                  >
+                    Clear filters
+                  </button>
+                ) : (
+                  <Link href="/nft" className="text-purple-400 text-sm hover:underline">
+                    Mint one
+                  </Link>
+                )}
               </div>
             ) : (
               <>
                 <p className="text-xs text-gray-500 text-center">
                   {total} item{total === 1 ? "" : "s"}
+                  {activeFilterCount > 0 ? " match" : ""}
                   {owner ? (
                     <span className="font-mono">
                       {" "}
@@ -304,11 +532,18 @@ function NftsBrowseInner() {
                         ) : (
                           <p className="text-xs text-gray-400">No price</p>
                         )}
-                        {n.compressed && (
-                          <span className="text-[10px] uppercase tracking-wide text-emerald-500">
-                            compressed
-                          </span>
-                        )}
+                        <div className="flex flex-wrap gap-1">
+                          {n.compressed && (
+                            <span className="text-[10px] uppercase tracking-wide text-emerald-500">
+                              compressed
+                            </span>
+                          )}
+                          {n.listed && (
+                            <span className="text-[10px] uppercase tracking-wide text-amber-500">
+                              for sale
+                            </span>
+                          )}
+                        </div>
                         <div className="mt-auto flex flex-wrap gap-2 pt-1">
                           <a
                             href={n.tensorUrl}
