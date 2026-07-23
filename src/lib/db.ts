@@ -200,6 +200,7 @@ export async function initDb() {
       title TEXT,
       wallet TEXT,
       clicks INTEGER NOT NULL DEFAULT 0,
+      payment_sig TEXT UNIQUE,
       created_at TEXT DEFAULT (datetime('now')),
       expires_at TEXT
     )`,
@@ -207,6 +208,18 @@ export async function initDb() {
   try {
     await db.execute(
       "CREATE INDEX IF NOT EXISTS idx_short_links_wallet ON short_links(wallet, created_at DESC)"
+    );
+  } catch {
+    /* ignore */
+  }
+  try {
+    await db.execute("ALTER TABLE short_links ADD COLUMN payment_sig TEXT");
+  } catch {
+    /* column already exists */
+  }
+  try {
+    await db.execute(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_short_links_payment_sig ON short_links(payment_sig) WHERE payment_sig IS NOT NULL"
     );
   } catch {
     /* ignore */
@@ -949,6 +962,7 @@ export type ShortLinkRow = {
   title: string | null;
   wallet: string | null;
   clicks: number;
+  paymentSig: string | null;
   createdAt: string | null;
   expiresAt: string | null;
 };
@@ -960,6 +974,7 @@ function mapShortLink(row: Record<string, unknown>): ShortLinkRow {
     title: (row.title as string) || null,
     wallet: (row.wallet as string) || null,
     clicks: Number(row.clicks ?? 0),
+    paymentSig: (row.payment_sig as string) || null,
     createdAt: (row.created_at as string) || null,
     expiresAt: (row.expires_at as string) || null,
   };
@@ -971,17 +986,19 @@ export async function createShortLink(data: {
   title?: string | null;
   wallet?: string | null;
   expiresAt?: string | null;
+  paymentSig?: string | null;
 }): Promise<boolean> {
   try {
     await db.execute({
-      sql: `INSERT INTO short_links (code, target_url, title, wallet, expires_at)
-            VALUES (?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO short_links (code, target_url, title, wallet, expires_at, payment_sig)
+            VALUES (?, ?, ?, ?, ?, ?)`,
       args: [
         data.code,
         data.targetUrl,
         data.title ?? null,
         data.wallet ?? null,
         data.expiresAt ?? null,
+        data.paymentSig ?? null,
       ],
     });
     return true;
@@ -989,6 +1006,30 @@ export async function createShortLink(data: {
     // unique violation or other
     return false;
   }
+}
+
+export async function paymentSigUsed(sig: string): Promise<boolean> {
+  const r = await db.execute({
+    sql: "SELECT 1 FROM short_links WHERE payment_sig = ? LIMIT 1",
+    args: [sig],
+  });
+  return r.rows.length > 0;
+}
+
+export async function deleteShortLink(code: string): Promise<boolean> {
+  const r = await db.execute({
+    sql: "DELETE FROM short_links WHERE code = ?",
+    args: [code.toLowerCase()],
+  });
+  return r.rowsAffected > 0;
+}
+
+export async function listShortLinks(limit = 100): Promise<ShortLinkRow[]> {
+  const r = await db.execute({
+    sql: `SELECT * FROM short_links ORDER BY created_at DESC LIMIT ?`,
+    args: [limit],
+  });
+  return r.rows.map((row) => mapShortLink(row as Record<string, unknown>));
 }
 
 export async function getShortLink(code: string): Promise<ShortLinkRow | null> {

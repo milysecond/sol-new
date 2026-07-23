@@ -1,5 +1,12 @@
 /** Shared validation + code generation for sol.new short links. */
 
+/** Platform fee vault (same as NFT mint fees). */
+export const LINK_FEE_VAULT = "Deqi6CBfo2FR2XVZXxSwmcjELy1JdbAXWDNFPzDAbtxW";
+
+/** Custom short codes cost 0.01 SOL. Random codes are free. */
+export const CUSTOM_LINK_FEE_SOL = 0.01;
+export const CUSTOM_LINK_FEE_LAMPORTS = 10_000_000;
+
 export const SHORT_CODE_RE = /^[a-z0-9][a-z0-9_-]{1,31}$/;
 export const RESERVED_CODES = new Set([
   "api",

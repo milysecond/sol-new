@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Navbar } from "@/components/navbar";
-import { Clipboard, ClipboardCheck, Plus, RefreshCw, Tag, Ticket, Users } from "lucide-react";
+import { Clipboard, ClipboardCheck, Link2, Plus, RefreshCw, Tag, Ticket, Trash2, Users } from "lucide-react";
 import { Spinner } from "@/components/spinner";
 
 type PromoCode = {
@@ -22,6 +22,17 @@ type Redemption = {
   redeemed_at: string;
 };
 
+type ShortLink = {
+  code: string;
+  shortUrl: string;
+  targetUrl: string;
+  title: string | null;
+  wallet: string | null;
+  clicks: number;
+  paymentSig: string | null;
+  createdAt: string | null;
+};
+
 const short = (s: string) => `${s.slice(0, 4)}…${s.slice(-4)}`;
 
 export default function AdminPage() {
@@ -31,7 +42,9 @@ export default function AdminPage() {
 
   const [codes, setCodes] = useState<PromoCode[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
+  const [links, setLinks] = useState<ShortLink[]>([]);
   const [loading, setLoading] = useState(false);
+  const [deletingCode, setDeletingCode] = useState<string | null>(null);
 
   const [count, setCount] = useState(5);
   const [uses, setUses] = useState(1);
@@ -43,6 +56,13 @@ export default function AdminPage() {
 
   const headers = { "Content-Type": "application/json", "x-admin-secret": secret };
 
+  const loadLinks = async (hdrs: Record<string, string>) => {
+    const res = await fetch("/api/admin/links", { headers: hdrs });
+    if (res.status === 401) return null;
+    const data = (await res.json()) as { links?: ShortLink[] };
+    return data.links ?? [];
+  };
+
   const load = async () => {
     setLoading(true);
     try {
@@ -51,6 +71,8 @@ export default function AdminPage() {
       const data = (await res.json()) as { codes?: PromoCode[]; redemptions?: Redemption[] };
       setCodes(data.codes ?? []);
       setRedemptions(data.redemptions ?? []);
+      const nextLinks = await loadLinks(headers);
+      if (nextLinks) setLinks(nextLinks);
     } finally {
       setLoading(false);
     }
@@ -64,6 +86,23 @@ export default function AdminPage() {
     const data = (await res.json()) as { codes?: PromoCode[]; redemptions?: Redemption[] };
     setCodes(data.codes ?? []);
     setRedemptions(data.redemptions ?? []);
+    const nextLinks = await loadLinks({ "x-admin-secret": secret });
+    if (nextLinks) setLinks(nextLinks);
+  };
+
+  const deleteLink = async (code: string) => {
+    if (!confirm(`Delete short link /l/${code}?`)) return;
+    setDeletingCode(code);
+    try {
+      const res = await fetch("/api/admin/links", {
+        method: "DELETE",
+        headers,
+        body: JSON.stringify({ code }),
+      });
+      if (res.ok) setLinks((prev) => prev.filter((l) => l.code !== code));
+    } finally {
+      setDeletingCode(null);
+    }
   };
 
   const generate = async () => {
@@ -298,6 +337,75 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {/* Short links */}
+        <div className="border border-black/10 dark:border-white/10 rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-black/10 dark:border-white/10 flex items-center justify-between">
+            <h2 className="font-semibold flex items-center gap-2">
+              <Link2 className="w-4 h-4 text-sky-400" /> Short links
+            </h2>
+            <button onClick={load} disabled={loading} className="text-gray-400 hover:text-white transition">
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-black/10 dark:border-white/10 text-xs text-gray-500 dark:text-white/40">
+                  <th className="text-left px-6 py-3">Code</th>
+                  <th className="text-left px-4 py-3">Target</th>
+                  <th className="text-center px-4 py-3">Clicks</th>
+                  <th className="text-center px-4 py-3">Paid</th>
+                  <th className="text-left px-4 py-3">Created</th>
+                  <th className="text-right px-4 py-3"> </th>
+                </tr>
+              </thead>
+              <tbody>
+                {links.map((l) => (
+                  <tr key={l.code} className="border-b border-black/5 dark:border-white/5 hover:bg-black/2 dark:hover:bg-white/2">
+                    <td className="px-6 py-3 font-mono text-sky-500">
+                      <a href={l.shortUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                        /l/{l.code}
+                      </a>
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 dark:text-white/50 max-w-[220px] truncate" title={l.targetUrl}>
+                      {l.title ? `${l.title} · ` : ""}
+                      {l.targetUrl}
+                    </td>
+                    <td className="px-4 py-3 text-center">{l.clicks}</td>
+                    <td className="px-4 py-3 text-center text-xs">
+                      {l.paymentSig ? (
+                        <span className="text-amber-500">0.01 SOL</span>
+                      ) : (
+                        <span className="text-gray-400">free</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
+                      {l.createdAt ? new Date(l.createdAt).toLocaleDateString() : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => void deleteLink(l.code)}
+                        disabled={deletingCode === l.code}
+                        className="text-red-400 hover:text-red-300 transition cursor-pointer disabled:opacity-40 p-1"
+                        title="Delete"
+                      >
+                        {deletingCode === l.code ? <Spinner size={14} /> : <Trash2 className="w-4 h-4" />}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {links.length === 0 && !loading && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-center text-gray-400">
+                      No short links yet
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
       </main>
     </div>
