@@ -12,6 +12,8 @@ import { fastIpfsUrl } from "@/lib/ipfs";
 import { PublicKey } from "@solana/web3.js";
 import { Suspense } from "react";
 
+type SortKey = "recent" | "name" | "price_asc" | "price_desc";
+
 type NftCard = {
   id: string;
   mint: string;
@@ -25,8 +27,17 @@ type NftCard = {
   tensorUrl: string;
   solscanUrl: string;
   priceSol?: number | null;
+  priceSource?: "listing" | "floor" | null;
+  listed?: boolean;
   listingUrl?: string;
 };
+
+function formatSol(n: number): string {
+  if (n >= 100) return n.toFixed(1);
+  if (n >= 1) return n.toFixed(2);
+  if (n >= 0.01) return n.toFixed(3);
+  return n.toFixed(4);
+}
 
 function NftsBrowseInner() {
   const { publicKey } = useWallet();
@@ -35,6 +46,7 @@ function NftsBrowseInner() {
   const [input, setInput] = useState("");
   const [owner, setOwner] = useState<string | null>(null);
   const [tab, setTab] = useState<"owned" | "listed">("owned");
+  const [sort, setSort] = useState<SortKey>("recent");
   const [items, setItems] = useState<NftCard[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -68,15 +80,15 @@ function NftsBrowseInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publicKey, searchParams]);
 
-  const load = useCallback(async (addr: string, p: number, t: "owned" | "listed") => {
+  const load = useCallback(async (addr: string, p: number, t: "owned" | "listed", s: SortKey) => {
     setLoading(true);
     setError(null);
     try {
       new PublicKey(addr);
       const path =
         t === "listed"
-          ? `/api/nfts/listings?owner=${encodeURIComponent(addr)}`
-          : `/api/nfts?owner=${encodeURIComponent(addr)}&page=${p}&limit=48`;
+          ? `/api/nfts/listings?owner=${encodeURIComponent(addr)}&sort=${s}`
+          : `/api/nfts?owner=${encodeURIComponent(addr)}&page=${p}&limit=48&sort=${s}`;
       const res = await fetch(path, { cache: "no-store" });
       const data = (await res.json()) as {
         ok?: boolean;
@@ -88,9 +100,6 @@ function NftsBrowseInner() {
       if (!res.ok) throw new Error(data.error || "Failed to load");
       setItems(data.items || []);
       setTotal(data.total ?? data.items?.length ?? 0);
-      if (data.note && t === "listed") {
-        /* note shown in UI */
-      }
     } catch (e) {
       setItems([]);
       setTotal(0);
@@ -102,8 +111,8 @@ function NftsBrowseInner() {
 
   useEffect(() => {
     if (!owner) return;
-    void load(owner, page, tab);
-  }, [owner, page, tab, load]);
+    void load(owner, page, tab, sort);
+  }, [owner, page, tab, sort, load]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,9 +209,34 @@ function NftsBrowseInner() {
               </div>
             )}
 
+            {owner && (
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <label className="text-xs text-gray-500 dark:text-white/40">Sort</label>
+                <select
+                  value={sort}
+                  onChange={(e) => {
+                    setSort(e.target.value as SortKey);
+                    setPage(1);
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-sm bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 cursor-pointer"
+                >
+                  <option value="recent">Recent</option>
+                  <option value="name">Name</option>
+                  <option value="price_desc">Price: high to low</option>
+                  <option value="price_asc">Price: low to high</option>
+                </select>
+              </div>
+            )}
+
             {tab === "listed" && (
               <p className="text-xs text-center text-gray-500 dark:text-white/40">
-                Open listings on Tensor or Magic Eden. Live prices when marketplace API keys are set.
+                Prices from Magic Eden (active list or collection floor). Trade on Tensor or ME.
+              </p>
+            )}
+
+            {(sort === "price_asc" || sort === "price_desc") && tab === "owned" && (
+              <p className="text-xs text-center text-gray-500 dark:text-white/40">
+                Price uses ME listing when listed, else collection floor. Unpriced last.
               </p>
             )}
 
@@ -262,6 +296,20 @@ function NftsBrowseInner() {
                       </div>
                       <div className="p-3 space-y-1.5 flex-1 flex flex-col">
                         <p className="font-semibold text-sm line-clamp-2">{n.name}</p>
+                        {n.priceSol != null && Number.isFinite(n.priceSol) ? (
+                          <p className="text-sm font-semibold text-purple-300">
+                            {formatSol(n.priceSol)} SOL
+                            <span className="ml-1 text-[10px] font-normal text-gray-500">
+                              {n.priceSource === "listing"
+                                ? "listed"
+                                : n.priceSource === "floor"
+                                  ? "floor"
+                                  : ""}
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="text-xs text-gray-400">No price</p>
+                        )}
                         {n.compressed && (
                           <span className="text-[10px] uppercase tracking-wide text-emerald-500">
                             compressed

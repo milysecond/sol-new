@@ -1,26 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
 import { getAssetsByOwner, type NftCard } from "@/lib/helius-das";
+import { priceHintsForOwner, sortNftCards, type SortKey } from "@/lib/nft-prices";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const noStore = { "Cache-Control": "no-store" };
 
-export type ListingHint = NftCard & {
-  /** Live price when marketplace API is wired; null = deep-link only */
-  priceSol: number | null;
-  marketplace: "magiceden" | "tensor" | "unknown";
-  listingUrl: string;
-};
+const SORTS = new Set<SortKey>(["recent", "name", "price_asc", "price_desc"]);
 
 /**
- * GET ?owner=
- * v1: returns owned NFTs with ME + Tensor deep links (list/buy off-platform).
- * When TENSOR_API_KEY / ME keys land, enrich with live listing prices.
+ * GET ?owner=&sort=
+ * Prefer items with listing prices; deep links to Tensor / ME.
  */
 export async function GET(req: NextRequest) {
   const owner = req.nextUrl.searchParams.get("owner")?.trim() || "";
+  const sortRaw = (req.nextUrl.searchParams.get("sort") || "price_desc").trim() as SortKey;
+  const sort: SortKey = SORTS.has(sortRaw) ? sortRaw : "price_desc";
+
   try {
     new PublicKey(owner);
   } catch {
@@ -28,21 +26,42 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const data = await getAssetsByOwner({ owner, page: 1, limit: 50 });
-    const listings: ListingHint[] = data.items.map((n) => ({
-      ...n,
-      priceSol: null,
-      marketplace: "tensor",
-      listingUrl: n.tensorUrl,
-    }));
+    const data = await getAssetsByOwner({ owner, page: 1, limit: 100 });
+    const hints = await priceHintsForOwner(
+      owner,
+      data.items.map((i) => i.mint),
+    );
+
+    let items: (NftCard & {
+      priceSol: number | null;
+      priceSource: "listing" | "floor" | null;
+      listed: boolean;
+      listingUrl: string;
+      marketplace: string;
+    })[] = data.items.map((n) => {
+      const h = hints.get(n.mint);
+      return {
+        ...n,
+        priceSol: h?.priceSol ?? null,
+        priceSource: h?.priceSource ?? null,
+        listed: h?.listed ?? false,
+        listingUrl: n.meUrl,
+        marketplace: h?.listed ? "magiceden" : "unknown",
+      };
+    });
+
+    // Markets tab: listed first, then anything with a floor
+    items = items.filter((i) => i.listed || i.priceSol != null);
+    items = sortNftCards(items, sort);
 
     return NextResponse.json(
       {
         ok: true,
-        mode: "deep_links",
-        note: "Live ME/Tensor prices need marketplace API keys. Deep links work now.",
-        items: listings,
-        total: listings.length,
+        mode: "me_prices",
+        note: "Prices from Magic Eden (listing or collection floor). Tensor links for trading.",
+        items,
+        total: items.length,
+        sort,
       },
       { headers: noStore },
     );
