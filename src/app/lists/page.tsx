@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { Spinner } from "@/components/spinner";
+import { ImageWithPlaceholder } from "@/components/image-with-placeholder";
 import { useWallet } from "@/lib/wallet-context";
 import {
   loadLists,
@@ -692,16 +693,12 @@ export default function ListsPage() {
                         onClick={() => void handlePickSearch(hit)}
                         className="w-full flex items-center gap-2.5 px-3 py-3 sm:py-2.5 min-h-[56px] text-left hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/5 dark:active:bg-white/5 transition disabled:opacity-50 cursor-pointer disabled:cursor-default"
                       >
-                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/10 dark:bg-white/10 shrink-0">
-                          {hit.imageUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={hit.imageUrl} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400">
-                              <Star size={12} />
-                            </div>
-                          )}
-                        </div>
+                        <ImageWithPlaceholder
+                          src={hit.imageUrl}
+                          alt=""
+                          className="w-8 h-8 rounded-lg shrink-0"
+                          fallback={<Star size={12} />}
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline gap-1.5">
                             <span className="text-sm font-semibold truncate">
@@ -948,16 +945,12 @@ function TokenCard({
           href={`/token/${item.mint}`}
           className="flex-1 flex items-center gap-3 min-w-0 p-3 active:bg-black/5 dark:active:bg-white/5"
         >
-          <div className="w-11 h-11 rounded-xl overflow-hidden bg-black/10 dark:bg-white/10 shrink-0">
-            {image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={image} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                <Star size={16} />
-              </div>
-            )}
-          </div>
+          <ImageWithPlaceholder
+            src={image}
+            alt=""
+            className="w-11 h-11 rounded-xl shrink-0"
+            fallback={<Star size={16} />}
+          />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <span className="font-semibold text-[15px] truncate">{name}</span>
@@ -1020,16 +1013,12 @@ function TokenRow({
         href={`/token/${item.mint}`}
         className="flex items-center gap-2.5 min-w-0"
       >
-        <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-lg overflow-hidden bg-black/10 dark:bg-white/10 shrink-0">
-          {image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={image} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-400">
-              <Star size={14} />
-            </div>
-          )}
-        </div>
+        <ImageWithPlaceholder
+          src={image}
+          alt=""
+          className="w-9 h-9 lg:w-10 lg:h-10 rounded-lg shrink-0"
+          fallback={<Star size={14} />}
+        />
         <div className="min-w-0">
           <div className="flex items-baseline gap-1.5">
             <span className="font-semibold text-sm truncate">{name}</span>

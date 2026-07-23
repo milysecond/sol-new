@@ -62,6 +62,35 @@ html.dark body {
   min-width: 44px;
 }
 
+/* Image load shimmer (used by ImageWithPlaceholder) */
+.img-skeleton {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(128, 128, 128, 0.12) 40%,
+    rgba(128, 128, 128, 0.22) 50%,
+    rgba(128, 128, 128, 0.12) 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: img-shimmer 1.2s ease-in-out infinite;
+}
+html.dark .img-skeleton {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 40%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.06) 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+}
+@keyframes img-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
 /* Horizontal scroll strip without ugly scrollbar (list tabs, chips) */
 .scroll-x-strip {
   display: flex;
