@@ -4,9 +4,10 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { PumpFunSDK } from "pumpdotfun-sdk";
 
+import { mainnetRpcUrl } from "@/lib/rpc-server";
+
 function heliusRpc() {
-  const k = process.env.HELIUS_API_KEY;
-  return k ? `https://mainnet.helius-rpc.com/?api-key=${k}` : "https://api.mainnet-beta.solana.com";
+  return mainnetRpcUrl();
 }
 
 export async function POST(req: NextRequest) {

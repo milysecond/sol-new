@@ -1,12 +1,12 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
 import { Connection } from "@solana/web3.js";
+import { mainnetRpcUrl } from "@/lib/rpc-server";
 
 export const runtime = "nodejs";
 
 function heliusRpc() {
-  const k = process.env.HELIUS_API_KEY;
-  return k ? `https://mainnet.helius-rpc.com/?api-key=${k}` : "https://api.mainnet-beta.solana.com";
+  return mainnetRpcUrl();
 }
 
 export async function GET(req: NextRequest) {

@@ -87,7 +87,7 @@ export function ConvertToSolCard() {
         </p>
       </div>
       <p className="text-xs text-gray-500 dark:text-white/50 leading-relaxed">
-        Your Apple Pay purchase arrived as USDC. Convert to SOL to use the app — we cover the gas fee.
+        You have USDC but little SOL. Convert to SOL to cover network fees — we cover the swap gas.
       </p>
       {err && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs">

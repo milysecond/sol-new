@@ -58,7 +58,7 @@ const SECTIONS: Section[] = [
     intro: "Passkey-secured Solana. No seed phrase, no install.",
     items: [
       { href: "/wallet", title: "Wallet", blurb: "Create or recover with Face ID / fingerprint.", icon: Wallet },
-      { href: "/get", title: "Get SOL", blurb: "Fund your wallet (onramp / faucet by network).", icon: Coins },
+      { href: "/get", title: "Get funds", blurb: "USDC via Bridge, SOL via card, or receive on-chain.", icon: Coins },
       { href: "/wallet/send", title: "Send", blurb: "Transfer from your passkey wallet.", icon: ArrowUpRight },
       { href: "/portfolio", title: "Portfolio", blurb: "Balances and holdings overview.", icon: FolderOpen },
       { href: "/id", title: ".sol name", blurb: "Check and register a Solana name.", icon: AtSign },

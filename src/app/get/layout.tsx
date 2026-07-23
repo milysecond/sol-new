@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
-  title: "Get SOL — Buy with Apple Pay or Google Pay — sol.new",
+  title: "Get funds — USDC and SOL — sol.new",
   description:
-    "Add SOL to your wallet in seconds with Apple Pay, Google Pay, or a card. The fastest way to fund a Solana wallet — no exchange account needed.",
+    "Fund your sol.new wallet. Get USDC via Bridge, receive on-chain, or use the devnet faucet.",
   path: "/get",
 });
 

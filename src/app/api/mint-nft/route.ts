@@ -18,12 +18,12 @@ import {
 } from "@solana/spl-token";
 import { notifyEvent } from "@/lib/notify";
 
-const DEVNET_RPC = "https://devnet.helius-rpc.com/?api-key=" + process.env.HELIUS_API_KEY;
-const MAINNET_RPC = "https://mainnet.helius-rpc.com/?api-key=" + process.env.HELIUS_API_KEY;
+import { mainnetRpcUrl, devnetRpcUrl } from "@/lib/rpc-server";
+
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
 
 function getRpc(network: string) {
-  return network === "devnet" ? DEVNET_RPC : MAINNET_RPC;
+  return network === "devnet" ? devnetRpcUrl() : mainnetRpcUrl();
 }
 
 function createMetadataInstruction(

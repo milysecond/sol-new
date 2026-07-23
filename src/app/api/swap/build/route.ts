@@ -8,9 +8,10 @@ import {
   AddressLookupTableAccount,
 } from "@solana/web3.js";
 import bs58 from "bs58";
+import { mainnetRpcUrl } from "@/lib/rpc-server";
 
 const FEE_PAYER_SECRET = process.env.SOL_FEE_PAYER_SECRET!;
-const RPC = process.env.MAINNET_RPC || "https://api.mainnet-beta.solana.com";
+const RPC = mainnetRpcUrl();
 
 function feePayerKeypair(): Keypair {
   if (!FEE_PAYER_SECRET) throw new Error("SOL_FEE_PAYER_SECRET not configured");

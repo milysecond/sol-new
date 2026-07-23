@@ -1,16 +1,39 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { PageTransition } from "@/components/page-transition";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { Download, Copy, Check, Droplets, ExternalLink, Apple } from "lucide-react";
+import { Download, Copy, Check, Droplets, ExternalLink, DollarSign } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { friendlyError } from "@/lib/friendly-errors";
+import { Spinner } from "@/components/spinner";
 
-const ONRAMP_ENABLED = process.env.NEXT_PUBLIC_ONRAMP_ENABLED === "1";
+// Bridge UI on by default; set NEXT_PUBLIC_BRIDGE_ENABLED=0 to hide.
+const BRIDGE_UI = process.env.NEXT_PUBLIC_BRIDGE_ENABLED !== "0";
+
+type BridgeCustomer = {
+  wallet: string;
+  email: string;
+  customerId: string | null;
+  kycStatus: string | null;
+  tosStatus: string | null;
+  kycUrl: string | null;
+  tosUrl: string | null;
+};
+
+type DepositInstructions = {
+  bank_name?: string;
+  bank_routing_number?: string;
+  bank_account_number?: string;
+  bank_beneficiary_name?: string;
+  deposit_message?: string;
+  amount?: string;
+  currency?: string;
+  payment_rail?: string;
+};
 
 export default function GetPage() {
   const { publicKey, refreshBalance } = useWallet();
@@ -19,10 +42,16 @@ export default function GetPage() {
   const [airdropping, setAirdropping] = useState(false);
   const [airdropDone, setAirdropDone] = useState(false);
 
-  // Apple Pay form — kept under $150 to stay in MoonPay's no-KYC tier
-  const [amount, setAmount] = useState(25);
-  const [buying, setBuying] = useState(false);
-  const [buyError, setBuyError] = useState<string | null>(null);
+  // Bridge USDC onramp
+  const [bridgeEmail, setBridgeEmail] = useState("");
+  const [bridgeAmount, setBridgeAmount] = useState(50);
+  const [bridgeFlexible, setBridgeFlexible] = useState(true);
+  const [bridgeBusy, setBridgeBusy] = useState(false);
+  const [bridgeError, setBridgeError] = useState<string | null>(null);
+  const [bridgeCustomer, setBridgeCustomer] = useState<BridgeCustomer | null>(null);
+  const [bridgeConfigured, setBridgeConfigured] = useState(false);
+  const [deposit, setDeposit] = useState<DepositInstructions | null>(null);
+  const [transferId, setTransferId] = useState<string | null>(null);
 
   const copyAddress = useCallback(() => {
     if (!publicKey) return;
@@ -55,26 +84,97 @@ export default function GetPage() {
     }
   }, [publicKey, network, refreshBalance]);
 
-  const buyWithApplePay = async () => {
-    if (!publicKey) return;
-    setBuyError(null);
-    setBuying(true);
+  const loadBridge = useCallback(async () => {
+    if (!publicKey || !BRIDGE_UI) return;
     try {
-      const res = await fetch("/api/onramp/order", {
+      const res = await fetch(`/api/bridge/kyc?wallet=${encodeURIComponent(publicKey)}`);
+      const data = (await res.json()) as {
+        configured?: boolean;
+        customer?: BridgeCustomer | null;
+      };
+      setBridgeConfigured(Boolean(data.configured));
+      setBridgeCustomer(data.customer ?? null);
+    } catch {
+      setBridgeConfigured(false);
+    }
+  }, [publicKey]);
+
+  useEffect(() => {
+    void loadBridge();
+  }, [loadBridge]);
+
+  const startBridgeKyc = async () => {
+    if (!publicKey || !bridgeEmail.trim()) return;
+    setBridgeError(null);
+    setBridgeBusy(true);
+    try {
+      const res = await fetch("/api/bridge/kyc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: publicKey, amount }),
+        body: JSON.stringify({ wallet: publicKey, email: bridgeEmail.trim() }),
       });
-      const data = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !data.url) throw new Error(data.error || "Failed to start payment");
-      window.location.href = data.url;
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        customer?: BridgeCustomer;
+        kycUrl?: string;
+        tosUrl?: string;
+        alreadyApproved?: boolean;
+      };
+      if (!res.ok || !data.ok) throw new Error(data.error || "Could not start KYC");
+      setBridgeCustomer(data.customer ?? null);
+      if (data.alreadyApproved) return;
+      // Prefer KYC link; ToS is often embedded or listed separately
+      const url = data.kycUrl || data.tosUrl || data.customer?.kycUrl || data.customer?.tosUrl;
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
+      else throw new Error("No KYC URL returned");
     } catch (e) {
-      setBuyError(friendlyError(e, "Couldn't start payment. Try again."));
-      setBuying(false);
+      setBridgeError(friendlyError(e, "Could not start Bridge KYC."));
+    } finally {
+      setBridgeBusy(false);
     }
   };
 
-  const isValid = amount >= 20 && amount <= 150;
+  const createBridgeTransfer = async () => {
+    if (!publicKey) return;
+    setBridgeError(null);
+    setBridgeBusy(true);
+    setDeposit(null);
+    try {
+      const res = await fetch("/api/bridge/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet: publicKey,
+          amount: bridgeFlexible ? undefined : bridgeAmount,
+          flexible: bridgeFlexible,
+        }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        needKyc?: boolean;
+        kycUrl?: string;
+        depositInstructions?: DepositInstructions | null;
+        transfer?: { id?: string; state?: string };
+      };
+      if (!res.ok || !data.ok) {
+        if (data.needKyc && data.kycUrl) {
+          window.open(data.kycUrl, "_blank", "noopener,noreferrer");
+        }
+        throw new Error(data.error || "Could not create transfer");
+      }
+      setDeposit(data.depositInstructions || null);
+      setTransferId(data.transfer?.id || null);
+      await loadBridge();
+    } catch (e) {
+      setBridgeError(friendlyError(e, "Could not create Bridge transfer."));
+    } finally {
+      setBridgeBusy(false);
+    }
+  };
+
+  const kycApproved = bridgeCustomer?.kycStatus === "approved";
 
   const solscanUrl = publicKey
     ? `https://orbmarkets.io/address/${publicKey}${network === "devnet" ? "?cluster=devnet&hideSpam=true" : "?hideSpam=true"}`
@@ -89,8 +189,10 @@ export default function GetPage() {
           <div className="w-full sm:max-w-lg space-y-8">
             <div className="text-center space-y-3">
               <AnimatedIcon icon={Download} size={40} className="text-purple-400" />
-              <h1 className="text-3xl font-bold tracking-tight">Get SOL</h1>
-              <p className="text-gray-500 dark:text-white/50">Receive SOL or tokens to your wallet.</p>
+              <h1 className="text-3xl font-bold tracking-tight">Get funds</h1>
+              <p className="text-gray-500 dark:text-white/50">
+                Receive SOL or USDC to your wallet.
+              </p>
             </div>
 
             {/* Your address */}
@@ -141,61 +243,144 @@ export default function GetPage() {
               </div>
             )}
 
-            {/* Mainnet on-ramp — direct Apple Pay */}
-            {ONRAMP_ENABLED && network === "mainnet" && (
-              <div className="bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl p-5 space-y-4">
+            {/* Bridge — Get USDC (ACH / wire) */}
+            {BRIDGE_UI && network === "mainnet" && (
+              <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
-                    <Apple size={16} className="inline" /> Buy with Apple Pay
+                    <DollarSign size={16} className="text-emerald-500" /> Get USDC
                   </p>
-                  <span className="text-xs text-gray-400 dark:text-white/30">no signup</span>
+                  <span className="text-xs text-emerald-600/80 dark:text-emerald-400/80">via Bridge</span>
                 </div>
+                <p className="text-xs text-gray-500 dark:text-white/40">
+                  Deposit USD (ACH or wire). Bridge sends USDC to your Solana wallet after KYC.
+                </p>
 
-                <div>
-                  <label className="text-xs text-gray-500 dark:text-white/40 mb-1.5 block">Amount</label>
-                  <div className="grid grid-cols-4 gap-2 mb-2">
-                    {[20, 50, 100, 150].map((n) => (
-                      <button
-                        key={n}
-                        type="button"
-                        onClick={() => setAmount(n)}
-                        className={`rounded-lg py-2 text-sm font-medium transition cursor-pointer ${
-                          amount === n
-                            ? "bg-purple-500/20 border border-purple-400/50 text-purple-400"
-                            : "bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-500 dark:text-white/40 hover:text-gray-900 dark:hover:text-white"
-                        }`}
-                      >
-                        ${n}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-white/30">$</span>
-                    <input
-                      type="number"
-                      min={20}
-                      max={150}
-                      value={amount}
-                      onChange={(e) => setAmount(Math.max(20, Math.min(150, parseInt(e.target.value) || 20)))}
-                      className="w-full pl-7 pr-3 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-900 dark:text-white focus:outline-none focus:border-purple-400/50 text-sm tabular-nums"
-                    />
-                  </div>
-                </div>
-
-                {buyError && (
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs">{buyError}</div>
+                {!bridgeConfigured && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Bridge is not configured on this environment yet (needs BRIDGE_API_KEY).
+                  </p>
                 )}
 
-                <button
-                  onClick={buyWithApplePay}
-                  disabled={!isValid || buying}
-                  className="w-full flex items-center justify-center gap-2 bg-black dark:bg-white text-white dark:text-black font-semibold rounded-xl px-5 py-3 hover:bg-black/85 dark:hover:bg-white/85 transition active:scale-[0.98] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {buying ? "Starting…" : <><Apple size={18} className="inline" /> Pay ${amount}</>}
-                </button>
-                <p className="text-[10px] text-gray-400 dark:text-white/30 text-center leading-snug">
-                  Processed by Banxa. Card, Apple Pay &amp; more. SOL arrives within minutes.
-                </p>
+                {bridgeConfigured && !kycApproved && (
+                  <div className="space-y-3">
+                    <input
+                      type="email"
+                      placeholder="Email for KYC"
+                      value={bridgeEmail}
+                      onChange={(e) => setBridgeEmail(e.target.value)}
+                      disabled={bridgeBusy}
+                      className="w-full px-3 py-2.5 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm focus:outline-none focus:border-emerald-400/50"
+                    />
+                    {bridgeCustomer?.kycStatus && (
+                      <p className="text-xs text-gray-500 dark:text-white/40">
+                        Status: <span className="font-mono">{bridgeCustomer.kycStatus}</span>
+                        {bridgeCustomer.tosStatus ? ` · ToS ${bridgeCustomer.tosStatus}` : ""}
+                      </p>
+                    )}
+                    <button
+                      onClick={() => void startBridgeKyc()}
+                      disabled={bridgeBusy || !bridgeEmail.trim()}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {bridgeBusy ? <Spinner size={16} /> : null}
+                      {bridgeCustomer?.kycUrl ? "Continue KYC" : "Start KYC"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void loadBridge()}
+                      className="w-full text-xs text-gray-400 hover:text-emerald-500 transition cursor-pointer"
+                    >
+                      Refresh status after KYC
+                    </button>
+                  </div>
+                )}
+
+                {bridgeConfigured && kycApproved && !deposit && (
+                  <div className="space-y-3">
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400">KYC approved. Create a deposit.</p>
+                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-white/60 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={bridgeFlexible}
+                        onChange={(e) => setBridgeFlexible(e.target.checked)}
+                        className="rounded"
+                      />
+                      Flexible amount (any deposit size)
+                    </label>
+                    {!bridgeFlexible && (
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={50000}
+                          value={bridgeAmount}
+                          onChange={(e) => setBridgeAmount(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-full pl-7 pr-3 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm"
+                        />
+                      </div>
+                    )}
+                    <button
+                      onClick={() => void createBridgeTransfer()}
+                      disabled={bridgeBusy}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {bridgeBusy ? <Spinner size={16} /> : null}
+                      Get deposit instructions
+                    </button>
+                  </div>
+                )}
+
+                {deposit && (
+                  <div className="space-y-2 text-left bg-black/5 dark:bg-white/5 rounded-xl p-4 text-sm">
+                    <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+                      Send USD bank deposit
+                    </p>
+                    {deposit.bank_name && (
+                      <p>
+                        <span className="text-gray-400">Bank: </span>
+                        {deposit.bank_name}
+                      </p>
+                    )}
+                    {deposit.bank_routing_number && (
+                      <p className="font-mono text-xs">
+                        <span className="text-gray-400 font-sans">Routing: </span>
+                        {deposit.bank_routing_number}
+                      </p>
+                    )}
+                    {deposit.bank_account_number && (
+                      <p className="font-mono text-xs">
+                        <span className="text-gray-400 font-sans">Account: </span>
+                        {deposit.bank_account_number}
+                      </p>
+                    )}
+                    {deposit.bank_beneficiary_name && (
+                      <p>
+                        <span className="text-gray-400">Beneficiary: </span>
+                        {deposit.bank_beneficiary_name}
+                      </p>
+                    )}
+                    {deposit.deposit_message && (
+                      <p className="font-mono text-xs break-all">
+                        <span className="text-gray-400 font-sans">Memo (required): </span>
+                        {deposit.deposit_message}
+                      </p>
+                    )}
+                    {transferId && (
+                      <p className="text-[11px] text-gray-400 font-mono">Transfer {transferId}</p>
+                    )}
+                    <p className="text-[11px] text-gray-500 dark:text-white/40 pt-1">
+                      Memo must match exactly. USDC arrives on Solana after Bridge processes the deposit.
+                    </p>
+                  </div>
+                )}
+
+                {bridgeError && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs">
+                    {bridgeError}
+                  </div>
+                )}
               </div>
             )}
 

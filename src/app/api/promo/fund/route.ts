@@ -93,8 +93,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const RPC = process.env.NEXT_PUBLIC_RPC_URL ?? "https://api.mainnet-beta.solana.com";
-    const connection = new Connection(RPC, "confirmed");
+    const { mainnetRpcUrl } = await import("@/lib/rpc-server");
+    const connection = new Connection(mainnetRpcUrl(), "confirmed");
 
     const bs58 = (await import("bs58")).default;
     const treasury = Keypair.fromSecretKey(bs58.decode(TREASURY_KEY));

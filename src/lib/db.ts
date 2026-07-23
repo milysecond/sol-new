@@ -204,10 +204,46 @@ export async function initDb() {
       created_at TEXT DEFAULT (datetime('now')),
       expires_at TEXT
     )`,
+    `CREATE TABLE IF NOT EXISTS bridge_customers (
+      wallet TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      customer_id TEXT,
+      kyc_link_id TEXT,
+      kyc_status TEXT,
+      tos_status TEXT,
+      kyc_url TEXT,
+      tos_url TEXT,
+      updated_at TEXT DEFAULT (datetime('now')),
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS bridge_transfers (
+      transfer_id TEXT PRIMARY KEY,
+      wallet TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      amount TEXT,
+      state TEXT,
+      deposit_json TEXT,
+      updated_at TEXT DEFAULT (datetime('now')),
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
   ]);
   try {
     await db.execute(
       "CREATE INDEX IF NOT EXISTS idx_short_links_wallet ON short_links(wallet, created_at DESC)"
+    );
+  } catch {
+    /* ignore */
+  }
+  try {
+    await db.execute(
+      "CREATE INDEX IF NOT EXISTS idx_bridge_customers_customer ON bridge_customers(customer_id)"
+    );
+  } catch {
+    /* ignore */
+  }
+  try {
+    await db.execute(
+      "CREATE INDEX IF NOT EXISTS idx_bridge_transfers_wallet ON bridge_transfers(wallet, created_at DESC)"
     );
   } catch {
     /* ignore */
@@ -961,6 +997,122 @@ export async function saveVote(data: { id: string; proposalId: string; wallet: s
 
 export async function getVotes(proposalId: string) {
   const r = await db.execute({ sql: "SELECT * FROM votes WHERE proposal_id = ?", args: [proposalId] });
+  return r.rows;
+}
+
+// ─── Bridge.xyz customers & transfers ────────────────────────────────────────
+
+export type BridgeCustomerRow = {
+  wallet: string;
+  email: string;
+  customerId: string | null;
+  kycLinkId: string | null;
+  kycStatus: string | null;
+  tosStatus: string | null;
+  kycUrl: string | null;
+  tosUrl: string | null;
+  updatedAt: string | null;
+  createdAt: string | null;
+};
+
+export async function upsertBridgeCustomer(data: {
+  wallet: string;
+  email: string;
+  customerId?: string | null;
+  kycLinkId?: string | null;
+  kycStatus?: string | null;
+  tosStatus?: string | null;
+  kycUrl?: string | null;
+  tosUrl?: string | null;
+}) {
+  await db.execute({
+    sql: `INSERT INTO bridge_customers (
+            wallet, email, customer_id, kyc_link_id, kyc_status, tos_status, kyc_url, tos_url, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          ON CONFLICT(wallet) DO UPDATE SET
+            email = excluded.email,
+            customer_id = COALESCE(excluded.customer_id, bridge_customers.customer_id),
+            kyc_link_id = COALESCE(excluded.kyc_link_id, bridge_customers.kyc_link_id),
+            kyc_status = COALESCE(excluded.kyc_status, bridge_customers.kyc_status),
+            tos_status = COALESCE(excluded.tos_status, bridge_customers.tos_status),
+            kyc_url = COALESCE(excluded.kyc_url, bridge_customers.kyc_url),
+            tos_url = COALESCE(excluded.tos_url, bridge_customers.tos_url),
+            updated_at = datetime('now')`,
+    args: [
+      data.wallet,
+      data.email.trim().toLowerCase(),
+      data.customerId ?? null,
+      data.kycLinkId ?? null,
+      data.kycStatus ?? null,
+      data.tosStatus ?? null,
+      data.kycUrl ?? null,
+      data.tosUrl ?? null,
+    ],
+  });
+}
+
+export async function getBridgeCustomerByWallet(wallet: string): Promise<BridgeCustomerRow | null> {
+  const r = await db.execute({
+    sql: "SELECT * FROM bridge_customers WHERE wallet = ? LIMIT 1",
+    args: [wallet],
+  });
+  const row = r.rows[0] as Record<string, unknown> | undefined;
+  if (!row) return null;
+  return {
+    wallet: row.wallet as string,
+    email: row.email as string,
+    customerId: (row.customer_id as string) || null,
+    kycLinkId: (row.kyc_link_id as string) || null,
+    kycStatus: (row.kyc_status as string) || null,
+    tosStatus: (row.tos_status as string) || null,
+    kycUrl: (row.kyc_url as string) || null,
+    tosUrl: (row.tos_url as string) || null,
+    updatedAt: (row.updated_at as string) || null,
+    createdAt: (row.created_at as string) || null,
+  };
+}
+
+export async function saveBridgeTransfer(data: {
+  transferId: string;
+  wallet: string;
+  customerId: string;
+  amount: string | null;
+  state: string;
+  depositJson?: string | null;
+}) {
+  await db.execute({
+    sql: `INSERT INTO bridge_transfers (transfer_id, wallet, customer_id, amount, state, deposit_json, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+          ON CONFLICT(transfer_id) DO UPDATE SET
+            state = excluded.state,
+            amount = COALESCE(excluded.amount, bridge_transfers.amount),
+            deposit_json = COALESCE(excluded.deposit_json, bridge_transfers.deposit_json),
+            updated_at = datetime('now')`,
+    args: [
+      data.transferId,
+      data.wallet,
+      data.customerId,
+      data.amount,
+      data.state,
+      data.depositJson ?? null,
+    ],
+  });
+}
+
+export async function getBridgeTransfer(transferId: string) {
+  const r = await db.execute({
+    sql: "SELECT * FROM bridge_transfers WHERE transfer_id = ? LIMIT 1",
+    args: [transferId],
+  });
+  return r.rows[0] ?? null;
+}
+
+export async function getWalletBridgeTransfers(wallet: string, limit = 20) {
+  const r = await db.execute({
+    sql: `SELECT * FROM bridge_transfers WHERE wallet = ?
+          ORDER BY created_at DESC LIMIT ?`,
+    args: [wallet, limit],
+  });
   return r.rows;
 }
 

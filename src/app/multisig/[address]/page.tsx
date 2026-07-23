@@ -8,7 +8,7 @@ import * as multisig from "@sqds/multisig";
 import { Navbar } from "@/components/navbar";
 import { PageTransition } from "@/components/page-transition";
 import { Spinner } from "@/components/spinner";
-import { useNetwork } from "@/lib/network";
+import { useNetwork, RPC, MAINNET_RPC_POOL } from "@/lib/network";
 import { useWallet } from "@/lib/wallet-context";
 import {
   ShieldCheck,
@@ -66,9 +66,10 @@ type MultisigView = {
   foundOnNetwork: "mainnet" | "devnet";
 };
 
-const PUBLIC_RPC: Record<"mainnet" | "devnet", string> = {
-  mainnet: "https://api.mainnet-beta.solana.com",
-  devnet: "https://api.devnet.solana.com",
+/** Paid mainnet only — never free public Solana RPC. */
+const FALLBACK_RPC: Record<"mainnet" | "devnet", string> = {
+  mainnet: MAINNET_RPC_POOL[1] || MAINNET_RPC_POOL[0],
+  devnet: RPC.devnet,
 };
 
 function describeConfigAction(action: { __kind?: string } & Record<string, unknown> | undefined): string {
@@ -226,7 +227,7 @@ export default function MultisigDetailPage() {
         const primary = await tryLoadMultisig(rpc, network, multisigPda);
         let result = primary;
         if (!primary.ok && primary.reason === "missing") {
-          const fallback = await tryLoadMultisig(PUBLIC_RPC[otherNetwork], otherNetwork, multisigPda);
+          const fallback = await tryLoadMultisig(FALLBACK_RPC[otherNetwork], otherNetwork, multisigPda);
           if (fallback.ok) result = fallback;
         }
 
@@ -282,7 +283,7 @@ export default function MultisigDetailPage() {
     setProposalsLoading(true);
     (async () => {
       const targetNet = view.foundOnNetwork;
-      const targetRpc = targetNet === network ? rpc : PUBLIC_RPC[targetNet];
+      const targetRpc = targetNet === network ? rpc : FALLBACK_RPC[targetNet];
       const conn = new Connection(targetRpc, "confirmed");
       const multisigPda = new PublicKey(view.address);
 
@@ -368,7 +369,7 @@ export default function MultisigDetailPage() {
     setTxAction({ idx, kind: "approve" });
     try {
       const targetNet = view.foundOnNetwork;
-      const targetRpc = targetNet === network ? rpc : PUBLIC_RPC[targetNet];
+      const targetRpc = targetNet === network ? rpc : FALLBACK_RPC[targetNet];
       const conn = new Connection(targetRpc, "confirmed");
       const { keypair } = await getPasskeyKeypair();
       await multisig.rpc.proposalApprove({
@@ -392,7 +393,7 @@ export default function MultisigDetailPage() {
     setTxAction({ idx, kind: "execute" });
     try {
       const targetNet = view.foundOnNetwork;
-      const targetRpc = targetNet === network ? rpc : PUBLIC_RPC[targetNet];
+      const targetRpc = targetNet === network ? rpc : FALLBACK_RPC[targetNet];
       const conn = new Connection(targetRpc, "confirmed");
       const { keypair } = await getPasskeyKeypair();
       const multisigPda = new PublicKey(view.address);
@@ -433,7 +434,7 @@ export default function MultisigDetailPage() {
     setSubmitSuccess(null);
     try {
       const targetNet = view.foundOnNetwork;
-      const targetRpc = targetNet === network ? rpc : PUBLIC_RPC[targetNet];
+      const targetRpc = targetNet === network ? rpc : FALLBACK_RPC[targetNet];
       const conn = new Connection(targetRpc, "confirmed");
       const { keypair } = await getPasskeyKeypair();
       const multisigPda = new PublicKey(view.address);

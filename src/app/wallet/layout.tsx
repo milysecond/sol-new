@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Your Solana Wallet — sol.new",
-  description: "A Solana wallet secured by passkeys. Get SOL with Apple Pay or Google Pay, send payments, and manage your tokens and NFTs.",
+  description: "A Solana wallet secured by passkeys. Get USDC, send payments, and manage your tokens and NFTs.",
   openGraph: {
     title: "Your Solana Wallet — sol.new",
     description: "A Solana wallet secured by passkeys. Simple and secure.",
