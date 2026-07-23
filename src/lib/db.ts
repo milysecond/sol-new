@@ -194,7 +194,23 @@ export async function initDb() {
       wallet TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS short_links (
+      code TEXT PRIMARY KEY,
+      target_url TEXT NOT NULL,
+      title TEXT,
+      wallet TEXT,
+      clicks INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT
+    )`,
   ]);
+  try {
+    await db.execute(
+      "CREATE INDEX IF NOT EXISTS idx_short_links_wallet ON short_links(wallet, created_at DESC)"
+    );
+  } catch {
+    /* ignore */
+  }
   try {
     await db.execute(
       "CREATE INDEX IF NOT EXISTS idx_wallet_emails_wallet ON wallet_emails(wallet)"
@@ -923,4 +939,87 @@ export async function saveVote(data: { id: string; proposalId: string; wallet: s
 export async function getVotes(proposalId: string) {
   const r = await db.execute({ sql: "SELECT * FROM votes WHERE proposal_id = ?", args: [proposalId] });
   return r.rows;
+}
+
+// ─── Short links ─────────────────────────────────────────────────────────────
+
+export type ShortLinkRow = {
+  code: string;
+  targetUrl: string;
+  title: string | null;
+  wallet: string | null;
+  clicks: number;
+  createdAt: string | null;
+  expiresAt: string | null;
+};
+
+function mapShortLink(row: Record<string, unknown>): ShortLinkRow {
+  return {
+    code: row.code as string,
+    targetUrl: row.target_url as string,
+    title: (row.title as string) || null,
+    wallet: (row.wallet as string) || null,
+    clicks: Number(row.clicks ?? 0),
+    createdAt: (row.created_at as string) || null,
+    expiresAt: (row.expires_at as string) || null,
+  };
+}
+
+export async function createShortLink(data: {
+  code: string;
+  targetUrl: string;
+  title?: string | null;
+  wallet?: string | null;
+  expiresAt?: string | null;
+}): Promise<boolean> {
+  try {
+    await db.execute({
+      sql: `INSERT INTO short_links (code, target_url, title, wallet, expires_at)
+            VALUES (?, ?, ?, ?, ?)`,
+      args: [
+        data.code,
+        data.targetUrl,
+        data.title ?? null,
+        data.wallet ?? null,
+        data.expiresAt ?? null,
+      ],
+    });
+    return true;
+  } catch {
+    // unique violation or other
+    return false;
+  }
+}
+
+export async function getShortLink(code: string): Promise<ShortLinkRow | null> {
+  const r = await db.execute({
+    sql: "SELECT * FROM short_links WHERE code = ? LIMIT 1",
+    args: [code.toLowerCase()],
+  });
+  const row = r.rows[0] as Record<string, unknown> | undefined;
+  return row ? mapShortLink(row) : null;
+}
+
+export async function incrementShortLinkClicks(code: string): Promise<void> {
+  await db.execute({
+    sql: "UPDATE short_links SET clicks = clicks + 1 WHERE code = ?",
+    args: [code.toLowerCase()],
+  });
+}
+
+export async function shortLinkCodeExists(code: string): Promise<boolean> {
+  const r = await db.execute({
+    sql: "SELECT 1 FROM short_links WHERE code = ? LIMIT 1",
+    args: [code.toLowerCase()],
+  });
+  return r.rows.length > 0;
+}
+
+export async function getWalletShortLinks(wallet: string, limit = 50): Promise<ShortLinkRow[]> {
+  const r = await db.execute({
+    sql: `SELECT * FROM short_links WHERE wallet = ?
+          ORDER BY created_at DESC LIMIT ?`,
+    args: [wallet, limit],
+  });
+  return r.rows.map((row) => mapShortLink(row as Record<string, unknown>));
 }
