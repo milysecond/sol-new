@@ -7,11 +7,86 @@ import {
   getBridgeTransfer,
   getWalletBridgeTransfers,
 } from "@/lib/db";
-import { bridgeConfigured, createUsdcOnrampTransfer, getTransfer } from "@/lib/bridge";
+import {
+  bridgeConfigured,
+  createUsdcOnrampTransfer,
+  getTransfer,
+  isBridgeCustomerReady,
+} from "@/lib/bridge";
 import { notifyEvent } from "@/lib/notify";
+import { resendConfigured, sendEmail, SITE_URL } from "@/lib/resend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+type DepositInstructions = {
+  bank_name?: string;
+  bank_routing_number?: string;
+  bank_account_number?: string;
+  bank_beneficiary_name?: string;
+  deposit_message?: string;
+  amount?: string;
+  currency?: string;
+  payment_rail?: string;
+};
+
+async function emailDepositInstructions(opts: {
+  email: string;
+  wallet: string;
+  transferId: string;
+  deposit: DepositInstructions | null;
+  amount?: string | null;
+}) {
+  if (!resendConfigured() || !opts.deposit) {
+    return { sent: false as const };
+  }
+  const d = opts.deposit;
+  const rows = [
+    d.bank_name ? ["Bank", d.bank_name] : null,
+    d.bank_routing_number ? ["Routing", d.bank_routing_number] : null,
+    d.bank_account_number ? ["Account", d.bank_account_number] : null,
+    d.bank_beneficiary_name ? ["Beneficiary", d.bank_beneficiary_name] : null,
+    d.deposit_message ? ["Memo (required)", d.deposit_message] : null,
+    opts.amount ? ["Amount", `$${opts.amount} USD`] : ["Amount", "Flexible (send any amount)"],
+    d.payment_rail ? ["Rail", d.payment_rail] : null,
+  ].filter(Boolean) as [string, string][];
+
+  const htmlRows = rows
+    .map(
+      ([k, v]) =>
+        `<tr><td style="padding:6px 12px 6px 0;color:#666;vertical-align:top">${k}</td><td style="padding:6px 0;font-family:ui-monospace,monospace;word-break:break-all">${v}</td></tr>`,
+    )
+    .join("");
+
+  try {
+    await sendEmail({
+      to: opts.email,
+      subject: "Your USDC deposit instructions (sol.new)",
+      html: `
+        <div style="font-family:system-ui,sans-serif;max-width:520px;line-height:1.5;color:#111">
+          <p>Send a USD bank deposit with the details below. Bridge will mint USDC to your Solana wallet:</p>
+          <p style="font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;background:#f5f5f5;padding:10px;border-radius:8px">${opts.wallet}</p>
+          <table style="border-collapse:collapse;margin:16px 0">${htmlRows}</table>
+          <p style="color:#b45309"><strong>The memo must match exactly</strong> or funds may not credit.</p>
+          <p>Track status at <a href="${SITE_URL}/get">${SITE_URL}/get</a>. Transfer id: <code>${opts.transferId}</code></p>
+        </div>
+      `,
+      text: [
+        "Your USDC deposit instructions (sol.new)",
+        `Wallet: ${opts.wallet}`,
+        ...rows.map(([k, v]) => `${k}: ${v}`),
+        "Memo must match exactly.",
+        `Transfer: ${opts.transferId}`,
+        SITE_URL + "/get",
+      ].join("\n"),
+      tags: [{ name: "kind", value: "bridge_deposit_instructions" }],
+    });
+    return { sent: true as const };
+  } catch (e) {
+    console.error("[bridge/transfer] deposit email failed", e);
+    return { sent: false as const };
+  }
+}
 
 /** GET ?id=transfer_… or ?wallet= */
 export async function GET(req: NextRequest) {
@@ -62,7 +137,7 @@ export async function GET(req: NextRequest) {
 /**
  * POST { wallet, amount? }
  * Creates Bridge transfer: USD ACH/wire deposit → USDC on Solana to wallet.
- * Requires approved Bridge customer (KYC).
+ * Requires approved Bridge customer (KYC + ToS). Emails deposit instructions.
  */
 export async function POST(req: NextRequest) {
   if (!bridgeConfigured()) {
@@ -86,20 +161,28 @@ export async function POST(req: NextRequest) {
   const customer = await getBridgeCustomerByWallet(wallet);
   if (!customer?.customerId) {
     return NextResponse.json(
-      { error: "Complete Bridge KYC first", needKyc: true },
-      { status: 400 }
+      { error: "Complete Bridge verification first (terms + KYC)", needKyc: true },
+      { status: 400 },
     );
   }
-  if (customer.kycStatus !== "approved") {
+
+  const tosOk = customer.tosStatus === "approved";
+  const kycOk = customer.kycStatus === "approved";
+  if (!isBridgeCustomerReady(customer.kycStatus, customer.tosStatus)) {
+    const missing: string[] = [];
+    if (!tosOk) missing.push("Bridge terms of service");
+    if (!kycOk) missing.push("identity verification (KYC)");
     return NextResponse.json(
       {
-        error: `KYC not approved yet (status: ${customer.kycStatus || "unknown"})`,
+        error: `Still needed: ${missing.join(" and ")}. Open the links on /get and complete them yourself (not the Bridge admin dashboard).`,
         needKyc: true,
+        needTos: !tosOk,
         kycStatus: customer.kycStatus,
+        tosStatus: customer.tosStatus,
         kycUrl: customer.kycUrl,
         tosUrl: customer.tosUrl,
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -130,13 +213,13 @@ export async function POST(req: NextRequest) {
         error: (res.data as { message?: string })?.message || "Could not create transfer",
         details: res.data,
       },
-      { status: res.status >= 400 ? res.status : 502 }
+      { status: res.status >= 400 ? res.status : 502 },
     );
   }
 
   const d = res.data as Record<string, unknown>;
   const transferId = String(d.id || "");
-  const deposit = d.source_deposit_instructions;
+  const deposit = (d.source_deposit_instructions as DepositInstructions | null) || null;
 
   if (transferId) {
     await saveBridgeTransfer({
@@ -149,6 +232,14 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  const mail = await emailDepositInstructions({
+    email: customer.email,
+    wallet,
+    transferId,
+    deposit,
+    amount: d.amount != null ? String(d.amount) : amountUsd || null,
+  });
+
   notifyEvent({
     kind: "bridge_transfer_created",
     title: "Bridge USDC onramp created",
@@ -157,6 +248,7 @@ export async function POST(req: NextRequest) {
       transferId,
       amount: amountUsd || "flexible",
       state: String(d.state || ""),
+      emailSent: mail.sent ? "yes" : "no",
     },
   }).catch(() => {});
 
@@ -164,5 +256,7 @@ export async function POST(req: NextRequest) {
     ok: true,
     transfer: d,
     depositInstructions: deposit || null,
+    emailSent: mail.sent,
+    emailedTo: mail.sent ? customer.email : null,
   });
 }

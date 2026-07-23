@@ -5,8 +5,14 @@ import {
   upsertBridgeCustomer,
   getBridgeCustomerByWallet,
 } from "@/lib/db";
-import { bridgeConfigured, createKycLink, getKycLink } from "@/lib/bridge";
+import {
+  bridgeConfigured,
+  createKycLink,
+  getKycLink,
+  isBridgeCustomerReady,
+} from "@/lib/bridge";
 import { notifyEvent } from "@/lib/notify";
+import { resendConfigured, sendEmail, SITE_URL } from "@/lib/resend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +29,65 @@ function rateLimited(ip: string): boolean {
 }
 
 const noStore = { "Cache-Control": "no-store" };
+
+function customerReady(c: { kycStatus?: string | null; tosStatus?: string | null }) {
+  return isBridgeCustomerReady(c.kycStatus, c.tosStatus);
+}
+
+async function emailOnboardingLinks(opts: {
+  email: string;
+  tosUrl?: string | null;
+  kycUrl?: string | null;
+}) {
+  if (!resendConfigured()) return { sent: false as const, reason: "resend_unconfigured" };
+  const tos = opts.tosUrl?.trim();
+  const kyc = opts.kycUrl?.trim();
+  if (!tos && !kyc) return { sent: false as const, reason: "no_links" };
+
+  const steps: string[] = [];
+  if (tos) {
+    steps.push(
+      `<li style="margin-bottom:10px"><strong>1. Accept Bridge terms</strong><br/><a href="${tos}">${tos}</a></li>`,
+    );
+  }
+  if (kyc) {
+    const n = tos ? "2" : "1";
+    steps.push(
+      `<li style="margin-bottom:10px"><strong>${n}. Verify your identity</strong><br/><a href="${kyc}">${kyc}</a></li>`,
+    );
+  }
+
+  try {
+    await sendEmail({
+      to: opts.email,
+      subject: "Complete verification to get USDC on sol.new",
+      html: `
+        <div style="font-family:system-ui,sans-serif;max-width:520px;line-height:1.5;color:#111">
+          <p>You started Get USDC on <a href="${SITE_URL}/get">sol.new/get</a>.</p>
+          <p>Bridge requires two steps (you do both; nothing to do in a dashboard):</p>
+          <ol style="padding-left:18px">${steps.join("")}</ol>
+          <p>When both are done, return to <a href="${SITE_URL}/get">${SITE_URL}/get</a> and tap <strong>Refresh status</strong>, then create your deposit. We will email bank deposit instructions.</p>
+          <p style="color:#666;font-size:12px">If a link expired, start again from sol.new/get with the same email.</p>
+        </div>
+      `,
+      text: [
+        "Complete verification to get USDC on sol.new",
+        tos ? `1. Accept Bridge terms: ${tos}` : "",
+        kyc ? `${tos ? "2" : "1"}. Verify identity: ${kyc}` : "",
+        `Then return to ${SITE_URL}/get`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      tags: [
+        { name: "kind", value: "bridge_kyc_onboarding" },
+      ],
+    });
+    return { sent: true as const };
+  } catch (e) {
+    console.error("[bridge/kyc] onboarding email failed", e);
+    return { sent: false as const, reason: "send_failed" };
+  }
+}
 
 /** GET ?wallet= optional — Bridge configured flag + optional customer for wallet. */
 export async function GET(req: NextRequest) {
@@ -54,7 +119,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, configured: true, customer: null }, { headers: noStore });
   }
 
-  // Refresh KYC status from Bridge when we have a link id
+  // Refresh KYC + ToS status from Bridge when we have a link id
   if (row.kycLinkId) {
     try {
       const remote = await getKycLink(row.kycLinkId);
@@ -72,7 +137,12 @@ export async function GET(req: NextRequest) {
         });
         const fresh = await getBridgeCustomerByWallet(wallet);
         return NextResponse.json(
-          { ok: true, configured: true, customer: fresh },
+          {
+            ok: true,
+            configured: true,
+            customer: fresh,
+            ready: fresh ? customerReady(fresh) : false,
+          },
           { headers: noStore },
         );
       }
@@ -81,12 +151,21 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, configured: true, customer: row }, { headers: noStore });
+  return NextResponse.json(
+    {
+      ok: true,
+      configured: true,
+      customer: row,
+      ready: customerReady(row),
+    },
+    { headers: noStore },
+  );
 }
 
 /**
  * POST { wallet, email, fullName? }
- * Starts Bridge hosted KYC + ToS. Returns URLs to complete onboarding.
+ * Starts Bridge hosted KYC + ToS. Returns both URLs. Emails the user the links.
+ * Customer must open tos_link (Bridge terms) AND kyc_link (Persona) themselves.
  */
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
@@ -126,13 +205,65 @@ export async function POST(req: NextRequest) {
 
   await initDb();
 
-  // Reuse existing approved customer
+  // Fully ready (KYC + ToS approved)
   const existing = await getBridgeCustomerByWallet(wallet);
-  if (existing?.kycStatus === "approved" && existing.customerId) {
+  if (existing?.customerId && customerReady(existing)) {
     return NextResponse.json({
       ok: true,
       alreadyApproved: true,
+      ready: true,
       customer: existing,
+    });
+  }
+
+  // Reuse open onboarding links instead of spinning a new KYC link every click
+  if (
+    existing?.kycLinkId &&
+    (existing.tosUrl || existing.kycUrl) &&
+    existing.email === email &&
+    !customerReady(existing)
+  ) {
+    // Refresh remote status first
+    try {
+      const remote = await getKycLink(existing.kycLinkId);
+      if (remote.ok && remote.data) {
+        const d = remote.data as Record<string, unknown>;
+        await upsertBridgeCustomer({
+          wallet,
+          email,
+          customerId: (d.customer_id as string) || existing.customerId,
+          kycLinkId: existing.kycLinkId,
+          kycStatus: (d.kyc_status as string) || existing.kycStatus,
+          tosStatus: (d.tos_status as string) || existing.tosStatus,
+          kycUrl: (d.kyc_link as string) || existing.kycUrl,
+          tosUrl: (d.tos_link as string) || existing.tosUrl,
+        });
+      }
+    } catch {
+      /* keep cached urls */
+    }
+    const fresh = await getBridgeCustomerByWallet(wallet);
+    if (fresh && customerReady(fresh)) {
+      return NextResponse.json({
+        ok: true,
+        alreadyApproved: true,
+        ready: true,
+        customer: fresh,
+      });
+    }
+    const mail = await emailOnboardingLinks({
+      email,
+      tosUrl: fresh?.tosUrl || existing.tosUrl,
+      kycUrl: fresh?.kycUrl || existing.kycUrl,
+    });
+    return NextResponse.json({
+      ok: true,
+      resumed: true,
+      ready: false,
+      customer: fresh || existing,
+      kycUrl: fresh?.kycUrl || existing.kycUrl,
+      tosUrl: fresh?.tosUrl || existing.tosUrl,
+      emailSent: mail.sent,
     });
   }
 
@@ -148,7 +279,7 @@ export async function POST(req: NextRequest) {
     console.error("[bridge/kyc]", res.status, res.data);
     return NextResponse.json(
       { error: (res.data as { message?: string })?.message || "Bridge KYC failed", details: res.data },
-      { status: res.status >= 400 ? res.status : 502 }
+      { status: res.status >= 400 ? res.status : 502 },
     );
   }
 
@@ -170,11 +301,24 @@ export async function POST(req: NextRequest) {
     fields: { wallet, email, customerId: d.customer_id as string },
   }).catch(() => {});
 
+  const mail = await emailOnboardingLinks({
+    email,
+    tosUrl: (d.tos_link as string) || null,
+    kycUrl: (d.kyc_link as string) || null,
+  });
+
   const customer = await getBridgeCustomerByWallet(wallet);
   return NextResponse.json({
     ok: true,
+    ready: customer ? customerReady(customer) : false,
     customer,
     kycUrl: d.kyc_link,
     tosUrl: d.tos_link,
+    emailSent: mail.sent,
+    nextSteps: [
+      "Open Accept Bridge terms and complete that page first",
+      "Then open Verify identity and finish Persona KYC",
+      "Return here and refresh status",
+    ],
   });
 }

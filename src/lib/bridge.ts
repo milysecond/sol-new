@@ -105,6 +105,14 @@ export async function getCustomer(customerId: string) {
   return bridgeFetch("GET", `/customers/${customerId}`);
 }
 
+/** Customer can create transfers only when KYC and ToS are both approved. */
+export function isBridgeCustomerReady(
+  kycStatus?: string | null,
+  tosStatus?: string | null,
+): boolean {
+  return kycStatus === "approved" && tosStatus === "approved";
+}
+
 /**
  * USD ACH push / wire → USDC on Solana to the user's non-custodial address.
  */
