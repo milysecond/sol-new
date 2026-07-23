@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
-import { TrendingUp, ExternalLink } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { PageTransition } from "@/components/page-transition";
@@ -21,7 +21,6 @@ export default function EarnPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rates, setRates] = useState<unknown>(null);
-  const [account, setAccount] = useState<unknown>(null);
   const [sig, setSig] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -31,12 +30,10 @@ export default function EarnPage() {
       const data = (await res.json()) as {
         configured?: boolean;
         rates?: unknown;
-        account?: unknown;
         error?: string;
       };
       setConfigured(data.configured === true);
       setRates(data.rates ?? null);
-      setAccount(data.account ?? null);
     } catch {
       setConfigured(false);
     }
@@ -49,7 +46,7 @@ export default function EarnPage() {
   const submit = async () => {
     if (!publicKey) return;
     if (network !== "mainnet") {
-      setError("Switch to mainnet for Lulo earn.");
+      setError("Switch to mainnet to earn.");
       return;
     }
     setBusy(true);
@@ -68,15 +65,12 @@ export default function EarnPage() {
       const data = (await res.json()) as {
         error?: string;
         transactions?: string[];
-        raw?: unknown;
       };
-      if (!res.ok) throw new Error(data.error || "Lulo request failed");
+      if (!res.ok) throw new Error(data.error || "Earn request failed");
 
       const txs = data.transactions || [];
       if (txs.length === 0) {
-        throw new Error(
-          "Lulo returned no transactions. Check API response shape or API key permissions.",
-        );
+        throw new Error("No transactions returned. Try again in a moment.");
       }
 
       const { keypair } = await getPasskeyKeypair();
@@ -132,40 +126,19 @@ export default function EarnPage() {
                 <TrendingUp className="mx-auto text-emerald-400" size={36} />
                 <h1 className="text-3xl font-bold tracking-tight">Earn</h1>
                 <p className="text-gray-500 dark:text-white/50 text-sm">
-                  Protected stablecoin yield via{" "}
-                  <a
-                    href="https://lulo.fi"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-emerald-400 hover:underline inline-flex items-center gap-0.5"
-                  >
-                    Lulo <ExternalLink size={12} />
-                  </a>
-                  . Not validator staking.
+                  Protected USDC yield on Solana. Deposit, earn, withdraw with your passkey.
                 </p>
               </div>
 
               {configured === null && (
                 <p className="text-center text-gray-400 text-sm flex justify-center gap-2">
-                  <Spinner size={16} /> Checking Lulo…
+                  <Spinner size={16} /> Loading…
                 </p>
               )}
 
               {configured === false && (
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-sm text-amber-700 dark:text-amber-300 space-y-2">
-                  <p className="font-semibold">Lulo API key not set on this environment</p>
-                  <p className="text-xs opacity-90">
-                    Add Worker secret <code className="font-mono">LULO_API_KEY</code> from{" "}
-                    <a
-                      href="https://dev.lulo.fi"
-                      className="underline"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      dev.lulo.fi
-                    </a>
-                    . UI is ready; deposit/withdraw activate once the key is live.
-                  </p>
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-sm text-amber-700 dark:text-amber-300">
+                  Earn is temporarily unavailable. Try again later.
                 </div>
               )}
 
@@ -173,17 +146,15 @@ export default function EarnPage() {
                 <>
                   <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 text-sm space-y-1">
                     <p>
-                      Product: <span className="font-semibold">Lulo Protected</span> (USDC)
+                      Asset: <span className="font-semibold">USDC</span>
+                    </p>
+                    <p>
+                      Mode: <span className="font-semibold">Protected</span>
                     </p>
                     {rateHint && (
                       <p>
-                        APY hint: <span className="font-semibold text-emerald-400">{rateHint}</span>
+                        APY: <span className="font-semibold text-emerald-400">{rateHint}</span>
                       </p>
-                    )}
-                    {account != null && (
-                      <pre className="text-[10px] mt-2 overflow-x-auto max-h-24 text-gray-500">
-                        {JSON.stringify(account, null, 0).slice(0, 400)}
-                      </pre>
                     )}
                   </div>
 
@@ -249,8 +220,7 @@ export default function EarnPage() {
               )}
 
               <p className="text-[11px] text-gray-400 text-center">
-                Yield is provided by Lulo infrastructure. sol.new never takes custody. /stake redirects
-                here.
+                sol.new never takes custody of your funds. Passkey signs every move.
               </p>
             </div>
           </PageTransition>
