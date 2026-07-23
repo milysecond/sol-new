@@ -26,6 +26,9 @@ import {
   Sparkles,
   ArrowUpRight,
   ListOrdered,
+  Flame,
+  TrendingUp,
+  Layers,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -61,6 +64,9 @@ const SECTIONS: Section[] = [
       { href: "/get", title: "Get funds", blurb: "USDC via Bridge, SOL via card, or receive on-chain.", icon: Coins },
       { href: "/wallet/send", title: "Send", blurb: "Transfer from your passkey wallet.", icon: ArrowUpRight },
       { href: "/portfolio", title: "Portfolio", blurb: "Balances and holdings overview.", icon: FolderOpen },
+      { href: "/nfts", title: "Browse NFTs", blurb: "On-chain NFTs by address. Tensor and Magic Eden links.", icon: Layers },
+      { href: "/burn", title: "Burn / reclaim", blurb: "Close empty token accounts, reclaim SOL rent.", icon: Flame },
+      { href: "/earn", title: "Earn", blurb: "Lulo Protected USDC yield. /stake redirects here.", icon: TrendingUp, aliases: ["/stake"] },
       { href: "/id", title: ".sol name", blurb: "Check and register a Solana name.", icon: AtSign },
       { href: "/message", title: "Sign message", blurb: "Prove wallet ownership.", icon: MessageSquare },
       { href: "/magic", title: "Magic link", blurb: "Email-linked open for passkey wallets.", icon: Sparkles },
@@ -72,7 +78,7 @@ const SECTIONS: Section[] = [
     intro: "Ship tokens, NFTs, and shared wallets in minutes.",
     items: [
       { href: "/token", title: "Token", blurb: "Launch an SPL token with a bonding curve.", icon: Coins },
-      { href: "/nft", title: "NFT", blurb: "Image to NFT - standard or compressed.", icon: Image },
+      { href: "/nft", title: "Mint NFT", blurb: "Image to NFT - standard or compressed.", icon: Image },
       { href: "/multisig", title: "Multisig", blurb: "Shared wallet with multiple signers.", icon: ShieldCheck },
       { href: "/launch", title: "Live launches", blurb: "Browse recent token launches.", icon: Rocket },
     ],

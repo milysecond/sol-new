@@ -24,6 +24,7 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
     links: [
       { label: "launch a token", href: "/token" },
       { label: "mint an NFT", href: "/nft" },
+      { label: "browse NFTs", href: "/nfts" },
       { label: "get a .sol name", href: "/id" },
       { label: "start a multisig", href: "/multisig" },
       { label: "pods", href: "/pods" },
@@ -38,6 +39,8 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
       { label: "split a bill", href: "/split" },
       { label: "short links", href: "/link" },
       { label: "get SOL", href: "/get" },
+      { label: "earn USDC (Lulo)", href: "/earn" },
+      { label: "reclaim rent", href: "/burn" },
       { label: "your wallet", href: "/wallet" },
       { label: "portfolio", href: "/portfolio" },
     ],
@@ -63,6 +66,7 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
   {
     section: "buy NFTs",
     links: [
+      { label: "browse your NFTs", href: "/nfts" },
       { label: "magic eden", href: "https://magiceden.io/solana" },
       { label: "tensor", href: "https://www.tensor.trade" },
     ],
