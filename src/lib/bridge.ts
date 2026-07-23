@@ -14,17 +14,33 @@
 
 import crypto from "crypto";
 
-export const bridgeConfigured = () => Boolean(process.env.BRIDGE_API_KEY?.trim());
+/** Read secret from process.env or Cloudflare Worker bindings (OpenNext). */
+function envVar(name: string): string | undefined {
+  const fromProcess = process.env[name]?.trim();
+  if (fromProcess) return fromProcess;
+  try {
+    // Sync path works inside request handlers after OpenNext injects context.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getCloudflareContext } = require("@opennextjs/cloudflare") as {
+      getCloudflareContext: (opts?: { async?: boolean }) => { env?: Record<string, unknown> };
+    };
+    const ctx = getCloudflareContext();
+    const v = ctx?.env?.[name];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  } catch {
+    /* not in CF request context */
+  }
+  return undefined;
+}
+
+export const bridgeConfigured = () => Boolean(envVar("BRIDGE_API_KEY"));
 
 export function bridgeBaseUrl(): string {
-  return (
-    process.env.BRIDGE_API_BASE?.trim() ||
-    "https://api.sandbox.bridge.xyz/v0"
-  );
+  return envVar("BRIDGE_API_BASE") || "https://api.sandbox.bridge.xyz/v0";
 }
 
 function apiKey(): string {
-  const k = process.env.BRIDGE_API_KEY?.trim();
+  const k = envVar("BRIDGE_API_KEY");
   if (!k) throw new Error("BRIDGE_API_KEY not configured");
   return k;
 }
@@ -137,7 +153,7 @@ export function verifyBridgeWebhookSignature(
   header: string | null,
   rawBody: string,
 ): boolean {
-  const pem = process.env.BRIDGE_WEBHOOK_PUBLIC_KEY?.trim();
+  const pem = envVar("BRIDGE_WEBHOOK_PUBLIC_KEY");
   if (!pem || !header) return false;
 
   const parts = Object.fromEntries(
