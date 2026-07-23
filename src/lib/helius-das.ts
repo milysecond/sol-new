@@ -38,6 +38,10 @@ export type NftCard = {
   meUrl: string;
   tensorUrl: string;
   solscanUrl: string;
+  /** SOL listing or floor estimate */
+  priceSol?: number | null;
+  priceSource?: "listing" | "floor" | null;
+  listed?: boolean;
 };
 
 function assetImage(a: DasAsset): string | null {
