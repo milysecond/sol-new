@@ -385,9 +385,10 @@ export default function HomeShowcase() {
             <img src="/icon-192.png" alt="" className="w-6 h-6 rounded-md" />
             <span className="font-bold tracking-tight">sol<span className="text-purple-400">.new</span></span>
           </div>
-          <div className="flex items-center gap-5 text-sm text-white/50">
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-white/50">
             <a href="https://x.com/soldotnew" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">X</a>
             <a href="https://t.me/soldotnew" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Telegram</a>
+            <Link href="/changelog" className="hover:text-white transition-colors">Changelog</Link>
             <Link href="/docs" className="hover:text-white transition-colors">Docs</Link>
             <Link href="/" className="hover:text-white transition-colors">Open app</Link>
           </div>

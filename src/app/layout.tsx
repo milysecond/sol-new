@@ -8,6 +8,7 @@ import { PodPlayerProvider } from "@/lib/pod-player";
 import { Toaster } from "sonner";
 import { InstallPrompt } from "@/components/install-prompt";
 import { PushPrompt } from "@/components/push-prompt";
+import { SiteFooter } from "@/components/site-footer";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -130,7 +131,16 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} antialiased`}>
         <ThemeProvider>
-        <NetworkProvider><WalletProvider><PodPlayerProvider>{children}</PodPlayerProvider></WalletProvider></NetworkProvider>
+        <NetworkProvider>
+          <WalletProvider>
+            <PodPlayerProvider>
+              <div className="min-h-screen flex flex-col">
+                <div className="flex-1 flex flex-col">{children}</div>
+                <SiteFooter />
+              </div>
+            </PodPlayerProvider>
+          </WalletProvider>
+        </NetworkProvider>
         </ThemeProvider>
         <Toaster theme="light" position="top-center" richColors />
         <InstallPrompt />

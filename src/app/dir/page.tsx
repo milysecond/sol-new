@@ -16,6 +16,7 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
     links: [
       { label: "features at a glance", href: "/features" },
       { label: "docs and costs", href: "/docs" },
+      { label: "changelog", href: "/changelog" },
       { label: "what's new", href: "/whats-new" },
     ],
   },
