@@ -3,7 +3,7 @@ import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
   title: "Earn USDC — sol.new",
-  description: "Earn Protected stablecoin yield via Lulo. Passkey wallet, deposit and withdraw USDC.",
+  description: "Earn protected USDC yield on Solana. Deposit and withdraw with your passkey wallet.",
   path: "/earn",
 });
 

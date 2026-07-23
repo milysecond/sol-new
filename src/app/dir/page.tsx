@@ -39,7 +39,7 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
       { label: "split a bill", href: "/split" },
       { label: "short links", href: "/link" },
       { label: "get SOL", href: "/get" },
-      { label: "earn USDC (Lulo)", href: "/earn" },
+      { label: "earn USDC", href: "/earn" },
       { label: "reclaim rent", href: "/burn" },
       { label: "your wallet", href: "/wallet" },
       { label: "portfolio", href: "/portfolio" },

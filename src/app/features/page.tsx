@@ -66,7 +66,7 @@ const SECTIONS: Section[] = [
       { href: "/portfolio", title: "Portfolio", blurb: "Balances and holdings overview.", icon: FolderOpen },
       { href: "/nfts", title: "Browse NFTs", blurb: "On-chain NFTs by address. Tensor and Magic Eden links.", icon: Layers },
       { href: "/burn", title: "Burn / reclaim", blurb: "Close empty token accounts, reclaim SOL rent.", icon: Flame },
-      { href: "/earn", title: "Earn", blurb: "Lulo Protected USDC yield. /stake redirects here.", icon: TrendingUp, aliases: ["/stake"] },
+      { href: "/earn", title: "Earn", blurb: "Protected USDC yield. Deposit and withdraw with Face ID.", icon: TrendingUp, aliases: ["/stake"] },
       { href: "/id", title: ".sol name", blurb: "Check and register a Solana name.", icon: AtSign },
       { href: "/message", title: "Sign message", blurb: "Prove wallet ownership.", icon: MessageSquare },
       { href: "/magic", title: "Magic link", blurb: "Email-linked open for passkey wallets.", icon: Sparkles },
