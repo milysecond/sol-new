@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { useState, useEffect } from "react";
-import { Coins, Image, ShieldCheck, Wallet, Droplets, Zap, ExternalLink, Copy, LogOut, Sparkles, Bell, BellOff, Activity, AtSign, MoreHorizontal, X, Gift, Trophy, HandCoins, Newspaper, Star, Receipt, Dices } from "lucide-react";
+import { Coins, Image, ShieldCheck, Wallet, Droplets, Zap, ExternalLink, Copy, LogOut, Sparkles, Bell, BellOff, Activity, AtSign, MoreHorizontal, X, Gift, Trophy, HandCoins, Newspaper, Star, Receipt, Dices, Link2 } from "lucide-react";
 import { getPushPermission, subscribePush, unsubscribePush, type PushPermission } from "@/lib/push-client";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Spinner } from "@/components/spinner";
@@ -60,6 +60,7 @@ export function Navbar() {
   const MOBILE_MORE = [
     { href: "/gift", label: "Gift", icon: Gift },
     { href: "/pay", label: "Pay", icon: HandCoins },
+    { href: "/link", label: "Links", icon: Link2 },
     { href: "/punt", label: "Punt", icon: Trophy },
     { href: "/nft", label: "NFT", icon: Image },
     { href: "/id", label: "Identity", icon: AtSign },
