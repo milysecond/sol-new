@@ -82,10 +82,10 @@ function placeholderTexture(token: Token): THREE.CanvasTexture {
   ctx.fillStyle = "#f4f1ea";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `700 ${sym.length > 4 ? 96 : 132}px Inter, system-ui, sans-serif`;
+  ctx.font = `700 ${sym.length > 4 ? 96 : 132}px "Bricolage Grotesque", system-ui, sans-serif`;
   ctx.fillText(sym, cw / 2, ch * 0.42);
   ctx.fillStyle = "rgba(168,85,247,0.9)";
-  ctx.font = "600 30px Inter, system-ui, sans-serif";
+  ctx.font = '600 30px "Bricolage Grotesque", system-ui, sans-serif';
   ctx.fillText("sol.new", cw / 2, ch * 0.78);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;

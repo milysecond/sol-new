@@ -15,6 +15,13 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-07-24",
+    title: "Bricolage Grotesque typeface",
+    items: [
+      "Default UI font is now Bricolage Grotesque across the app.",
+    ],
+  },
+  {
+    date: "2026-07-24",
     title: "Stocks screener and brand polish",
     items: [
       "New /stocks screener for tokenized equities on Solana (xStocks, Ondo, PreStocks, Backpack, and more).",

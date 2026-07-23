@@ -12,7 +12,7 @@
   z-index: 50;
   background: var(--bg);
   color: var(--fg);
-  font-family: inherit; /* inherits sol.new's Inter from <body> */
+  font-family: inherit; /* inherits sol.new body font (Bricolage Grotesque) */
   overflow: hidden;
   cursor: none;
   -webkit-font-smoothing: antialiased;
