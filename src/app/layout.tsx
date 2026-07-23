@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import { WalletProvider } from "@/lib/wallet-context";
 import { NetworkProvider } from "@/lib/network";
@@ -10,7 +10,11 @@ import { InstallPrompt } from "@/components/install-prompt";
 import { PushPrompt } from "@/components/push-prompt";
 import { SiteFooter } from "@/components/site-footer";
 
-const inter = Inter({ subsets: ["latin"] });
+const bricolage = Bricolage_Grotesque({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-bricolage",
+});
 
 export const viewport: Viewport = {
   themeColor: [
@@ -121,7 +125,7 @@ export default function RootLayout({
           </>
         )}
       </head>
-      <body className={`${inter.className} antialiased`}>
+      <body className={`${bricolage.variable} ${bricolage.className} antialiased`}>
         <ThemeProvider>
         <NetworkProvider>
           <WalletProvider>
