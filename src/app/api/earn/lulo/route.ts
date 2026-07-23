@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       {
         ok: false,
         configured: false,
-        error: "Lulo not configured (needs LULO_API_KEY)",
+        error: "Earn is not available",
         mint: USDC_MINT,
       },
       { headers: noStore },
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!luloConfigured()) {
     return NextResponse.json(
-      { error: "Lulo not configured", configured: false },
+      { error: "Earn is not available", configured: false },
       { status: 503, headers: noStore },
     );
   }
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     if (!res.ok) {
       return NextResponse.json(
         {
-          error: (res.data as { message?: string })?.message || `Lulo ${action} failed`,
+          error: (res.data as { message?: string })?.message || `${action} failed`,
           details: res.data,
         },
         { status: res.status >= 400 ? res.status : 502, headers: noStore },
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     console.error("[api/earn/lulo]", e);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Lulo request failed" },
+      { error: e instanceof Error ? e.message : "Earn request failed" },
       { status: 502, headers: noStore },
     );
   }
