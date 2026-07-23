@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ReceiptData, ReceiptStatus, ReceiptType } from "@/lib/receipt";
-import { mainnetRpcUrl } from "@/lib/rpc-server";
+import { mainnetRpcEndpoints } from "@/lib/rpc-server";
 
 const SYSTEM_PROGRAM = "11111111111111111111111111111111";
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
@@ -12,29 +12,9 @@ const SOL_LOGO =
 
 const SIG_RE = /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{87,88}$/;
 
-/**
- * Ordered RPC list. Prefer secret-backed endpoints first. Public nodes keep
- * older slots when private caches miss.
- */
+/** Paid Helius Fast + Flux only — never free public Solana RPC. */
 function rpcEndpoints(): string[] {
-  const list: string[] = [mainnetRpcUrl()];
-  for (const envKey of [
-    "MAINNET_RPC",
-    "FLUXRPC_URL",
-    "NEXT_PUBLIC_RPC_MAINNET",
-    "NEXT_PUBLIC_RPC_URL",
-    "SOLANA_RPC_URL",
-  ] as const) {
-    const v = process.env[envKey];
-    if (v) list.push(v);
-  }
-  list.push(
-    "https://solana-rpc.publicnode.com",
-    "https://api.mainnet-beta.solana.com",
-    "https://rpc.ankr.com/solana",
-  );
-  // de-dupe while preserving order
-  return [...new Set(list)];
+  return mainnetRpcEndpoints();
 }
 
 function isCacheMiss(message: string | undefined): boolean {

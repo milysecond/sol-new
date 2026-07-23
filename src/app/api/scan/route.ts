@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { mainnetRpcUrl } from "@/lib/rpc-server";
 
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const TOKEN_2022_PROGRAM = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 const BPF_UPGRADEABLE = "BPFLoaderUpgradeab1e11111111111111111111111";
 
 function heliusRpc() {
-  const k = process.env.HELIUS_API_KEY;
-  return k
-    ? `https://mainnet.helius-rpc.com/?api-key=${k}`
-    : "https://api.mainnet-beta.solana.com";
+  return mainnetRpcUrl();
 }
 
 async function rpc<T = unknown>(method: string, params: unknown[]): Promise<T> {

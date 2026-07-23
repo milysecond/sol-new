@@ -119,9 +119,11 @@ All platform fees are collected to this treasury address. Fees fund:
 Create `.env.local`:
 
 ```env
-# RPC (Helius recommended for compressed NFTs)
-NEXT_PUBLIC_RPC_URL=https://api.mainnet-beta.solana.com
+# RPC — paid Helius Fast + Flux only (never free public Solana RPC)
+NEXT_PUBLIC_RPC_URL=https://cassandra-bq5oqs-fast-mainnet.helius-rpc.com/
+# Server pool also uses viviyan-bkj12u-fast-mainnet + FLUXRPC_URL secret
 HELIUS_API_KEY=your_helius_key
+FLUXRPC_URL=https://eu.fluxrpc.com?key=your_flux_key
 
 # Meteora Partner Config (mainnet/devnet)
 NEXT_PUBLIC_DBC_PARTNER_CONFIG=your_config_pubkey

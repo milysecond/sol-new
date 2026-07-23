@@ -18,6 +18,7 @@ import {
   CUSTOM_LINK_FEE_LAMPORTS,
   CUSTOM_LINK_FEE_SOL,
 } from "@/lib/short-link";
+import { mainnetRpcUrl } from "@/lib/rpc-server";
 
 export const runtime = "nodejs";
 
@@ -41,10 +42,7 @@ function originFrom(req: NextRequest): string {
 }
 
 function rpcUrl(): string {
-  const k = process.env.HELIUS_API_KEY;
-  if (k) return `https://mainnet.helius-rpc.com/?api-key=${k}`;
-  if (process.env.FLUXRPC_URL) return process.env.FLUXRPC_URL;
-  return process.env.MAINNET_RPC || "https://api.mainnet-beta.solana.com";
+  return mainnetRpcUrl();
 }
 
 /**

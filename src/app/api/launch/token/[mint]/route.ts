@@ -3,12 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { PumpFunSDK } from "pumpdotfun-sdk";
+import { mainnetRpcUrl } from "@/lib/rpc-server";
 
 const PUMP_API = "https://client-api-2-74b1891ee9f9.herokuapp.com";
 
 function heliusRpc() {
-  const k = process.env.HELIUS_API_KEY;
-  return k ? `https://mainnet.helius-rpc.com/?api-key=${k}` : "https://api.mainnet-beta.solana.com";
+  return mainnetRpcUrl();
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ mint: string }> }) {

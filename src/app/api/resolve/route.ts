@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Connection, PublicKey } from "@solana/web3.js";
+import { mainnetRpcUrl } from "@/lib/rpc-server";
 
 export const runtime = "nodejs";
 
 function rpcUrl() {
-  const k = process.env.HELIUS_API_KEY;
-  if (k) return `https://mainnet.helius-rpc.com/?api-key=${k}`;
-  return process.env.NEXT_PUBLIC_RPC_URL || "https://api.mainnet-beta.solana.com";
+  return mainnetRpcUrl();
 }
 
 const SUPPORTED = new Set(["sol", "bonk", "skr"]);

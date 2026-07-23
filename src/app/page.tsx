@@ -189,7 +189,7 @@ function NextStepBanner() {
       <div className="flex-1 min-w-0">
         <div className="text-[10px] uppercase tracking-wider text-purple-500 dark:text-purple-300 font-semibold">Next step</div>
         <div className="text-sm font-semibold text-gray-900 dark:text-white">Add SOL to start creating</div>
-        <div className="text-[11px] text-gray-500 dark:text-white/50">Use Apple Pay, Google Pay, or a friend</div>
+        <div className="text-[11px] text-gray-500 dark:text-white/50">Get USDC, receive on-chain, or ask a friend</div>
       </div>
       <ArrowRight className="w-5 h-5 text-purple-500 dark:text-purple-300 group-hover:translate-x-0.5 transition-transform shrink-0" />
     </Link>

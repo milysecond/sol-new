@@ -1,7 +1,8 @@
 // @ts-nocheck
 import { NextResponse } from "next/server";
+import { mainnetRpcUrl } from "@/lib/rpc-server";
 
-const MAINNET_RPC = process.env.NEXT_PUBLIC_RPC_MAINNET || "https://api.mainnet-beta.solana.com";
+const MAINNET_RPC = mainnetRpcUrl();
 
 export const runtime = "nodejs";
 
