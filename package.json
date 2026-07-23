@@ -26,6 +26,7 @@
     "@metaplex-foundation/umi-bundle-defaults": "^1.5.1",
     "@metaplex-foundation/umi-web3js-adapters": "^1.5.1",
     "@meteora-ag/dynamic-bonding-curve-sdk": "^1.5.7",
+    "@onsol/tldparser": "^1.2.1",
     "@opennextjs/cloudflare": "^1.19.11",
     "@parse/node-apn": "^8.1.0",
     "@solana/connector": "^0.2.4",

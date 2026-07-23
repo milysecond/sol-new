@@ -3,11 +3,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
-import { Gift, Check, Share2, Undo2, ExternalLink } from "lucide-react";
+import { Gift, Check, Share2, Undo2, ExternalLink, X } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
+import { SlideToSend } from "@/components/slide-to-send";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
+import { useDefaultToken } from "@/lib/currency-pref";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import {
   CLAIM_FEE_LAMPORTS,
@@ -39,24 +41,38 @@ const PRESETS: Record<GiftToken, string[]> = {
 // account rent + own tx fee.
 const USDC_GIFT_SENDER_LAMPORTS = USDC_GIFT_FUND_LAMPORTS + 2_100_000;
 
+/** Seconds after create during which cancel is prominently offered. */
+const CANCEL_WINDOW_SEC = 30;
+
 export default function GiftPage() {
+  const [defaultToken] = useDefaultToken();
   const [amount, setAmount] = useState("");
   const [token, setToken] = useState<GiftToken>("SOL");
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [giftUrl, setGiftUrl] = useState<string | null>(null);
+  const [giftEntry, setGiftEntry] = useState<GiftLinkEntry | null>(null);
   const [copied, setCopied] = useState(false);
   const [links, setLinks] = useState<GiftLinkEntry[]>([]);
   const [linkStatuses, setLinkStatuses] = useState<Record<string, string>>({});
   const [reclaiming, setReclaiming] = useState<string | null>(null);
+  const [cancelLeft, setCancelLeft] = useState(0);
+  const [cancelling, setCancelling] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cancelTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { publicKey, walletLabel, balance, usdcBalance, refreshBalance } = useWallet();
   const { network, rpc } = useNetwork();
 
+  useEffect(() => {
+    setToken(defaultToken as GiftToken);
+  }, [defaultToken]);
+
   const refreshLinks = useCallback(() => setLinks(loadGiftLinks()), []);
-  useEffect(() => { refreshLinks(); }, [refreshLinks]);
+  useEffect(() => {
+    refreshLinks();
+  }, [refreshLinks]);
 
   // Fetch claim status for listed links
   useEffect(() => {
@@ -75,7 +91,9 @@ export default function GiftPage() {
       );
       if (!cancelled) setLinkStatuses(Object.fromEntries(entries));
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [links]);
 
   useEffect(() => {
@@ -87,6 +105,27 @@ export default function GiftPage() {
     });
   }, [giftUrl]);
 
+  useEffect(() => {
+    return () => {
+      if (cancelTimer.current) clearInterval(cancelTimer.current);
+    };
+  }, []);
+
+  const startCancelWindow = () => {
+    if (cancelTimer.current) clearInterval(cancelTimer.current);
+    setCancelLeft(CANCEL_WINDOW_SEC);
+    cancelTimer.current = setInterval(() => {
+      setCancelLeft((s) => {
+        if (s <= 1) {
+          if (cancelTimer.current) clearInterval(cancelTimer.current);
+          cancelTimer.current = null;
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  };
+
   const handleCreate = async () => {
     if (!publicKey) return;
     setError(null);
@@ -96,7 +135,7 @@ export default function GiftPage() {
       if (isNaN(parsed) || parsed <= 0) throw new Error("Enter an amount");
 
       const balanceLamports = balance ? balance * LAMPORTS_PER_SOL : 0;
-      let amountBase: number; // base units of the gifted token
+      let amountBase: number;
 
       if (token === "SOL") {
         amountBase = Math.round(parsed * LAMPORTS_PER_SOL);
@@ -117,7 +156,7 @@ export default function GiftPage() {
       const { keypair: sender } = await getPasskeyKeypair();
       if (sender.publicKey.toBase58() !== publicKey) {
         throw new Error(
-          `That passkey belongs to a different wallet. Pick the passkey for ${walletLabel || `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`}, or switch wallets in the menu.`,
+          `That passkey belongs to a different wallet. Pick the passkey for ${walletLabel || `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`}, or switch wallets in the menu.`
         );
       }
 
@@ -143,7 +182,10 @@ export default function GiftPage() {
       tx.feePayer = senderPk;
       tx.sign(sender);
 
-      const signature = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
+      const signature = await connection.sendRawTransaction(tx.serialize(), {
+        skipPreflight: false,
+        maxRetries: 3,
+      });
       setStatus("confirming");
       await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
 
@@ -161,16 +203,28 @@ export default function GiftPage() {
       fetch("/api/gift", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicKey: entry.pubkey, sender: publicKey, amountLamports: amountBase, network, token }),
+        body: JSON.stringify({
+          publicKey: entry.pubkey,
+          sender: publicKey,
+          amountLamports: amountBase,
+          network,
+          token,
+        }),
       }).catch(() => {});
       analytics.giftLinkCreated(parsed);
 
       setGiftUrl(url);
+      setGiftEntry(entry);
       setStatus("done");
+      startCancelWindow();
       await refreshBalance();
       const { toast } = await import("sonner");
       toast.success("Gift link created!");
-      try { new Audio("/chaching.mp3").play(); } catch {}
+      try {
+        new Audio("/chaching.mp3").play();
+      } catch {
+        /* ignore */
+      }
     } catch (err) {
       const { friendlyError } = await import("@/lib/friendly-errors");
       setError(friendlyError(err, "We couldn't create the gift. Try again."));
@@ -194,8 +248,8 @@ export default function GiftPage() {
     }
   };
 
-  const handleReclaim = async (entry: GiftLinkEntry) => {
-    if (!publicKey) return;
+  const handleReclaim = async (entry: GiftLinkEntry): Promise<boolean> => {
+    if (!publicKey) return false;
     setReclaiming(entry.pubkey);
     const { toast } = await import("sonner");
     try {
@@ -203,7 +257,12 @@ export default function GiftPage() {
       const gift = secret ? keypairFromSecret(secret) : null;
       if (!gift) throw new Error("Couldn't read this link");
       const connection = new Connection(rpc, "confirmed");
-      const { lamports, usdcBase } = await sweepGift(connection, gift, new PublicKey(publicKey), entry.network);
+      const { lamports, usdcBase } = await sweepGift(
+        connection,
+        gift,
+        new PublicKey(publicKey),
+        entry.network
+      );
       fetch("/api/gift", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -217,16 +276,37 @@ export default function GiftPage() {
           ? `Reclaimed $${(usdcBase / 1e6).toFixed(2)} USDC`
           : `Reclaimed ${(lamports / LAMPORTS_PER_SOL).toFixed(4)} SOL`
       );
+      return true;
     } catch (err) {
       const { friendlyError } = await import("@/lib/friendly-errors");
       toast.error(friendlyError(err, "Couldn't reclaim this gift."));
+      return false;
     } finally {
       setReclaiming(null);
     }
   };
 
+  const handleCancelGift = async () => {
+    if (!giftEntry || !publicKey) return;
+    setCancelling(true);
+    const ok = await handleReclaim(giftEntry);
+    setCancelling(false);
+    if (ok) {
+      if (cancelTimer.current) clearInterval(cancelTimer.current);
+      setCancelLeft(0);
+      setGiftUrl(null);
+      setGiftEntry(null);
+      setStatus("idle");
+      setAmount("");
+      setMessage("");
+    }
+  };
+
   const reset = () => {
+    if (cancelTimer.current) clearInterval(cancelTimer.current);
     setGiftUrl(null);
+    setGiftEntry(null);
+    setCancelLeft(0);
     setAmount("");
     setMessage("");
     setCopied(false);
@@ -235,7 +315,13 @@ export default function GiftPage() {
   };
 
   const busy = status === "auth" || status === "sending" || status === "confirming";
-  const pendingLinks = links.filter((l) => l.network === network && linkStatuses[l.pubkey] !== "claimed" && linkStatuses[l.pubkey] !== "reclaimed");
+  const pendingLinks = links.filter(
+    (l) =>
+      l.network === network &&
+      linkStatuses[l.pubkey] !== "claimed" &&
+      linkStatuses[l.pubkey] !== "reclaimed" &&
+      l.pubkey !== giftEntry?.pubkey
+  );
   const fmtEntry = (l: GiftLinkEntry) => (l.token === "USDC" ? `$${l.amount}` : `${l.amount} SOL`);
   const setMax = () => {
     const max = token === "SOL" ? Math.max(0, (balance ?? 0) - 0.0001) : (usdcBalance ?? 0);
@@ -252,22 +338,61 @@ export default function GiftPage() {
               <AnimatedIcon icon={Gift} size={40} className="text-amber-400" />
               <h1 className="text-3xl font-bold tracking-tight">Send crypto with a link</h1>
               <p className="text-gray-500 dark:text-white/50">
-                They don&apos;t need a wallet — the link is the gift. Anyone who opens it can claim with Face ID.
+                They don&apos;t need a wallet — the link is the gift. Anyone who opens it can claim with
+                Face ID.
               </p>
             </div>
 
             {giftUrl ? (
               <div className="space-y-4">
+                {/* Cancel window */}
+                {cancelLeft > 0 && giftEntry && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-red-600 dark:text-red-400">
+                          Cancel gift?
+                        </p>
+                        <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-0.5">
+                          Funds return to your wallet. {cancelLeft}s left for quick cancel — you can
+                          still reclaim later below.
+                        </p>
+                      </div>
+                      <span className="font-mono text-lg font-bold text-red-500 tabular-nums shrink-0">
+                        {cancelLeft}s
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleCancelGift}
+                      disabled={cancelling}
+                      className="w-full flex items-center justify-center gap-2 bg-red-500 hover:bg-red-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer"
+                    >
+                      {cancelling ? (
+                        <>
+                          <Spinner size={16} /> Cancelling…
+                        </>
+                      ) : (
+                        <>
+                          <X size={16} /> Cancel and reclaim funds
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
                 <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-6 flex flex-col items-center space-y-4">
                   <canvas ref={canvasRef} className="rounded-xl" />
                   <div className="text-center">
                     <p className="text-gray-900 dark:text-white font-semibold text-lg">
                       {token === "USDC" ? `$${amount} USDC` : `${amount} SOL`}
                     </p>
-                    {message && <p className="text-gray-500 dark:text-white/40 text-sm">&ldquo;{message}&rdquo;</p>}
+                    {message && (
+                      <p className="text-gray-500 dark:text-white/40 text-sm">&ldquo;{message}&rdquo;</p>
+                    )}
                   </div>
                   <div className="w-full bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-3 text-amber-600 dark:text-amber-400 text-xs">
-                    This link <strong>is</strong> the money. Anyone who has it can claim it — share it only with the person it&apos;s for.
+                    This link <strong>is</strong> the money. Anyone who has it can claim it — share it
+                    only with the person it&apos;s for.
                   </div>
                   <div
                     onClick={copyLink}
@@ -280,7 +405,13 @@ export default function GiftPage() {
                       onClick={copyLink}
                       className="flex-1 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-1.5"
                     >
-                      {copied ? <><Check className="w-4 h-4" /> Copied!</> : "Copy link"}
+                      {copied ? (
+                        <>
+                          <Check className="w-4 h-4" /> Copied!
+                        </>
+                      ) : (
+                        "Copy link"
+                      )}
                     </button>
                     <button
                       onClick={shareLink}
@@ -290,6 +421,15 @@ export default function GiftPage() {
                       <Share2 className="w-4 h-4" />
                     </button>
                   </div>
+                  {cancelLeft === 0 && giftEntry && (
+                    <button
+                      onClick={handleCancelGift}
+                      disabled={cancelling || reclaiming === giftEntry.pubkey}
+                      className="w-full text-xs text-gray-500 dark:text-white/40 hover:text-red-500 transition cursor-pointer flex items-center justify-center gap-1 py-1"
+                    >
+                      {cancelling ? <Spinner size={12} /> : <Undo2 size={12} />} Cancel gift / reclaim
+                    </button>
+                  )}
                 </div>
                 <button
                   onClick={reset}
@@ -336,7 +476,10 @@ export default function GiftPage() {
                     className="text-xs text-gray-400 dark:text-white/40 hover:text-amber-500 dark:hover:text-amber-400 transition cursor-pointer font-mono whitespace-nowrap"
                     title="Use full balance"
                   >
-                    {token === "SOL" ? `◎ ${(balance ?? 0).toFixed(4)}` : `$${(usdcBalance ?? 0).toFixed(2)}`} max
+                    {token === "SOL"
+                      ? `◎ ${(balance ?? 0).toFixed(4)}`
+                      : `$${(usdcBalance ?? 0).toFixed(2)}`}{" "}
+                    max
                   </button>
                 </div>
                 <div className="flex gap-2">
@@ -371,31 +514,32 @@ export default function GiftPage() {
                   </div>
                 )}
 
-                <button
-                  onClick={handleCreate}
+                <SlideToSend
+                  onConfirm={handleCreate}
                   disabled={!amount || busy}
-                  className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-black font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {busy ? (
-                    <>
-                      <Spinner size={16} />
-                      {status === "auth" && "Authenticating..."}
-                      {status === "sending" && "Funding gift..."}
-                      {status === "confirming" && "Confirming..."}
-                    </>
-                  ) : (
-                    `Create ${token} gift link`
-                  )}
-                </button>
+                  loading={busy}
+                  label={`Slide to create ${token} gift`}
+                  loadingLabel={
+                    status === "auth"
+                      ? "Authenticating…"
+                      : status === "confirming"
+                        ? "Confirming…"
+                        : "Funding gift…"
+                  }
+                  tone="amber"
+                />
                 <p className="text-center text-xs text-gray-400 dark:text-white/30">
-                  Unclaimed gifts can be reclaimed below at any time.
+                  After create you get {CANCEL_WINDOW_SEC}s to cancel. Unclaimed gifts can be reclaimed
+                  anytime.
                 </p>
               </div>
             )}
 
             {pendingLinks.length > 0 && (
               <div className="space-y-3">
-                <h2 className="text-sm font-semibold text-gray-600 dark:text-white/60">Your unclaimed gifts</h2>
+                <h2 className="text-sm font-semibold text-gray-600 dark:text-white/60">
+                  Your unclaimed gifts
+                </h2>
                 {pendingLinks.map((l) => (
                   <div
                     key={l.pubkey}
@@ -404,11 +548,14 @@ export default function GiftPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium">{fmtEntry(l)}</p>
                       <p className="text-xs text-gray-400 dark:text-white/30 truncate">
-                        {new Date(l.createdAt).toLocaleDateString()} · {l.pubkey.slice(0, 4)}…{l.pubkey.slice(-4)}
+                        {new Date(l.createdAt).toLocaleDateString()} · {l.pubkey.slice(0, 4)}…
+                        {l.pubkey.slice(-4)}
                       </p>
                     </div>
                     <button
-                      onClick={() => { navigator.clipboard.writeText(l.url); }}
+                      onClick={() => {
+                        navigator.clipboard.writeText(l.url);
+                      }}
                       className="text-xs text-gray-500 dark:text-white/50 hover:text-gray-900 dark:hover:text-white transition cursor-pointer flex items-center gap-1"
                       title="Copy link"
                     >

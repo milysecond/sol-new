@@ -11,6 +11,7 @@ type NewsItem = {
 
 const FEEDS: { url: string; source: string; alwaysSolana?: boolean }[] = [
   { url: "https://devrels.xyz/feed.xml", source: "devrels.xyz", alwaysSolana: true },
+  { url: "https://solanaanz.org/rss.xml", source: "Solana ANZ", alwaysSolana: true },
   { url: "https://cointelegraph.com/rss/tag/solana", source: "Cointelegraph" },
   { url: "https://decrypt.co/feed", source: "Decrypt" },
   { url: "https://cointelegraph.com/rss", source: "Cointelegraph" },

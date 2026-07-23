@@ -3,16 +3,17 @@
 import { useState, useEffect, useRef } from "react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
-import { CreditCard, Check, ArrowRight } from "lucide-react";
+import { CreditCard, Check } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
+import { useDefaultToken } from "@/lib/currency-pref";
 import QRCode from "qrcode";
 
 const USDC_DEVNET = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
 const USDC_MAINNET = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
-const TOKENS = ["SOL", "USDC"];
+const TOKENS = ["SOL", "USDC"] as const;
 
 function buildSolanaPayUrl(recipient: string, amount: string, token: string, label: string, network: string) {
   const base = `solana:${recipient}`;
@@ -29,12 +30,17 @@ function buildSolanaPayUrl(recipient: string, amount: string, token: string, lab
 export default function PayPage() {
   const [amount, setAmount] = useState("");
   const [label, setLabel] = useState("");
-  const [selected, setSelected] = useState("SOL");
+  const [defaultToken] = useDefaultToken();
+  const [selected, setSelected] = useState<string>("SOL");
   const [payUrl, setPayUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { publicKey } = useWallet();
   const { network } = useNetwork();
+
+  useEffect(() => {
+    setSelected(defaultToken);
+  }, [defaultToken]);
 
   const handleCreate = () => {
     if (!amount || !publicKey) return;

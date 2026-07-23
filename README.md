@@ -11,13 +11,15 @@
 
 sol.new removes the complexity from Solana. No wallet downloads, no seed phrases, no gas management. Just create and go.
 
-**Features:**
-- 🪙 **Token Launcher** — Deploy SPL tokens with Meteora bonding curves
-- 🖼️ **NFT Minter** — Standard or compressed NFTs via Metaplex
-- 👥 **Multisig Creator** — Squads v4 multisig wallets
-- 💳 **Instant Wallet** — WebAuthn passkey-secured wallets
-- 💰 **SOL Onramp** — Fund wallets instantly
-- 🔄 **Auto-swap** — Built-in Jupiter integration
+**Features at a glance:** see [FEATURES.md](./FEATURES.md) and [https://sol.new/features](https://sol.new/features).
+
+**Highlights:**
+- **Token launcher** — Deploy SPL tokens with Meteora bonding curves
+- **NFT minter** — Standard or compressed NFTs via Metaplex
+- **Multisig** — Squads v4 shared wallets
+- **Passkey wallet** — WebAuthn Face ID wallets
+- **Pay / split / gift** — Links and Solana Pay
+- **Receipt / Fair Draw / Scan** — Verify, raffle, explore
 
 ---
 

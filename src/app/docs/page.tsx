@@ -31,6 +31,11 @@ export default function DocsPage() {
           <p className="text-gray-500 dark:text-white/40">
             What it costs to use, what we store, and where things live.
           </p>
+          <p className="text-sm">
+            <a href="/features" className="text-violet-500 hover:underline">
+              Features at a glance →
+            </a>
+          </p>
         </header>
 
         <section className="space-y-3">
