@@ -11,6 +11,7 @@ import {
   sha256Hex,
 } from "@/lib/vrf";
 import { tryProofNetworkRangeDraw } from "@/lib/proofnetwork";
+import { mainnetRpcUrl } from "@/lib/rpc-server";
 
 const recentIPs = new Map<string, number[]>();
 const RATE_LIMIT = 30;
@@ -27,14 +28,7 @@ function isRateLimited(ip: string): boolean {
 }
 
 function mainnetRpc(): string {
-  const k = process.env.HELIUS_API_KEY;
-  if (k) return `https://mainnet.helius-rpc.com/?api-key=${k}`;
-  return (
-    process.env.MAINNET_RPC ||
-    process.env.NEXT_PUBLIC_RPC_MAINNET ||
-    process.env.NEXT_PUBLIC_RPC_URL ||
-    "https://eu.fluxrpc.com?key=04a32b3f-cf44-48fb-8c13-faace267ee5d"
-  );
+  return mainnetRpcUrl();
 }
 
 async function fetchSolanaEntropy(): Promise<{ slot: number; blockhash: string }> {

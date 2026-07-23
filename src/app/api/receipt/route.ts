@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ReceiptData, ReceiptStatus, ReceiptType } from "@/lib/receipt";
+import { mainnetRpcUrl } from "@/lib/rpc-server";
 
 const SYSTEM_PROGRAM = "11111111111111111111111111111111";
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
@@ -12,16 +13,14 @@ const SOL_LOGO =
 const SIG_RE = /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{87,88}$/;
 
 /**
- * Ordered RPC list. Flux is fast for recent txs but prunes history
- * ("Transaction not available in cache"). Public nodes keep older slots.
- * We try each until one returns a parsed transaction.
+ * Ordered RPC list. Prefer secret-backed endpoints first. Public nodes keep
+ * older slots when private caches miss.
  */
 function rpcEndpoints(): string[] {
-  const list: string[] = [];
-  const k = process.env.HELIUS_API_KEY;
-  if (k) list.push(`https://mainnet.helius-rpc.com/?api-key=${k}`);
+  const list: string[] = [mainnetRpcUrl()];
   for (const envKey of [
     "MAINNET_RPC",
+    "FLUXRPC_URL",
     "NEXT_PUBLIC_RPC_MAINNET",
     "NEXT_PUBLIC_RPC_URL",
     "SOLANA_RPC_URL",
@@ -30,7 +29,6 @@ function rpcEndpoints(): string[] {
     if (v) list.push(v);
   }
   list.push(
-    "https://eu.fluxrpc.com?key=04a32b3f-cf44-48fb-8c13-faace267ee5d",
     "https://solana-rpc.publicnode.com",
     "https://api.mainnet-beta.solana.com",
     "https://rpc.ankr.com/solana",

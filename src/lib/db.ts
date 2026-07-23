@@ -753,17 +753,27 @@ export async function validatePromoCode(code: string): Promise<{ valid: boolean;
   };
 }
 
-export async function redeemPromoCode(code: string, wallet: string, kind: string): Promise<boolean> {
+/**
+ * Atomically consume `uses` from a promo code (default 1).
+ * Returns false if the code is invalid, expired, or lacks enough remaining uses.
+ */
+export async function redeemPromoCode(
+  code: string,
+  wallet: string,
+  kind: string,
+  uses = 1,
+): Promise<boolean> {
+  const n = Math.max(1, Math.floor(uses));
   const updated = await db.execute({
-    sql: `UPDATE promo_codes SET uses_remaining = uses_remaining - 1
-          WHERE code = ? AND uses_remaining > 0
+    sql: `UPDATE promo_codes SET uses_remaining = uses_remaining - ?
+          WHERE code = ? AND uses_remaining >= ?
             AND (expires_at IS NULL OR expires_at > datetime('now'))`,
-    args: [code.toUpperCase()],
+    args: [n, code.toUpperCase(), n],
   });
   if (!updated.rowsAffected) return false;
   await db.execute({
     sql: `INSERT INTO promo_redemptions (code, wallet, kind) VALUES (?, ?, ?)`,
-    args: [code.toUpperCase(), wallet, kind],
+    args: [code.toUpperCase(), wallet, `${kind}${n > 1 ? ` x${n}` : ""}`],
   });
   return true;
 }

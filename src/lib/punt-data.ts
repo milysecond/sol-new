@@ -12,12 +12,9 @@ import {
   type TxScoreEvent,
 } from "./txline";
 import { getUnsettledFixtures, settleFixturePicks } from "./db";
+import { mainnetRpcUrl } from "./rpc-server";
 
-export const PUNT_RPC =
-  process.env.MAINNET_RPC ||
-  (process.env.HELIUS_API_KEY
-    ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
-    : "https://eu.fluxrpc.com?key=04a32b3f-cf44-48fb-8c13-faace267ee5d");
+export const PUNT_RPC = mainnetRpcUrl();
 
 const CACHE_MS = 60_000; // free tier data is sampled every 60s anyway
 const MAX_MATCHES = 16;
