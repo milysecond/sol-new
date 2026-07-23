@@ -7,6 +7,7 @@ import { Image as ImageIcon, ExternalLink, Search, Layers } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { PageTransition } from "@/components/page-transition";
 import { Spinner } from "@/components/spinner";
+import { ImageWithPlaceholder } from "@/components/image-with-placeholder";
 import { useWallet } from "@/lib/wallet-context";
 import { fastIpfsUrl } from "@/lib/ipfs";
 import { PublicKey } from "@solana/web3.js";
@@ -279,21 +280,14 @@ function NftsBrowseInner() {
                       key={n.id}
                       className="bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl overflow-hidden hover:border-purple-400/30 transition flex flex-col"
                     >
-                      <div className="aspect-square bg-black/10 dark:bg-white/5">
-                        {n.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={fastIpfsUrl(n.image) || n.image}
-                            alt={n.name}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-400">
-                            <ImageIcon size={28} />
-                          </div>
-                        )}
-                      </div>
+                      <ImageWithPlaceholder
+                        src={n.image ? fastIpfsUrl(n.image) || n.image : null}
+                        alt={n.name}
+                        tone="purple"
+                        className="aspect-square w-full"
+                        fallback={<ImageIcon size={28} />}
+                        loading="lazy"
+                      />
                       <div className="p-3 space-y-1.5 flex-1 flex flex-col">
                         <p className="font-semibold text-sm line-clamp-2">{n.name}</p>
                         {n.priceSol != null && Number.isFinite(n.priceSol) ? (

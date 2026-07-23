@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/navbar";
-import { ChevronLeft, ChevronRight, Sparkles, ExternalLink } from "lucide-react";
+import { ImageWithPlaceholder } from "@/components/image-with-placeholder";
+import { ChevronLeft, ChevronRight, Sparkles, ExternalLink, Coins } from "lucide-react";
 import { timeAgo } from "@/lib/time";
 import { useNetwork } from "@/lib/network";
 
@@ -105,13 +106,13 @@ export default function WhatsNewPage() {
             className="block rounded-2xl border border-orange-400/30 bg-orange-500/5 hover:bg-orange-500/10 transition px-5 py-5"
           >
             <div className="flex items-center gap-4">
-              {tokens[0].image_url && (
-                <img
-                  src={tokens[0].image_url}
-                  alt=""
-                  className="w-16 h-16 rounded-xl object-cover ring-1 ring-orange-400/30"
-                />
-              )}
+              <ImageWithPlaceholder
+                src={tokens[0].image_url}
+                alt=""
+                tone="orange"
+                className="w-16 h-16 rounded-xl ring-1 ring-orange-400/30 shrink-0"
+                fallback={<Coins size={22} className="text-orange-400/50" />}
+              />
               <div className="flex-1 min-w-0">
                 <div className="text-xs uppercase tracking-wider text-orange-400 mb-0.5">Latest launch</div>
                 <div className="font-semibold text-lg truncate">
@@ -160,11 +161,12 @@ export default function WhatsNewPage() {
                 href={`/token/${t.mint_address}`}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition"
               >
-                {t.image_url ? (
-                  <img src={t.image_url} alt="" className="w-10 h-10 rounded-lg object-cover" />
-                ) : (
-                  <div className="w-10 h-10 rounded-lg bg-black/5 dark:bg-white/5" />
-                )}
+                <ImageWithPlaceholder
+                  src={t.image_url}
+                  alt=""
+                  className="w-10 h-10 rounded-lg shrink-0"
+                  fallback={<Coins size={16} className="opacity-40" />}
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2">
                     <span className="font-medium truncate">{t.name}</span>
