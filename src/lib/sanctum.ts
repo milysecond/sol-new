@@ -116,7 +116,7 @@ export async function sanctumSwapExecute(
         : body.error?.message || `Sanctum execute ${res.status}`;
     throw new Error(msg);
   }
-  return body;
+  return { signature: body.signature };
 }
 
 export function solToLamportsStr(sol: number): string {
