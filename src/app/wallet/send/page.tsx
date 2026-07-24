@@ -26,8 +26,22 @@ import {
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { usdcMint } from "@/lib/usdc";
+import { friendlyError } from "@/lib/friendly-errors";
 
 type Tab = "transfer" | "token" | "nft";
+
+/** Base fee for a 1-sig system transfer is 5_000 lamports; pad for prioritization. */
+const SOL_FEE_RESERVE_LAMPORTS = 10_000;
+
+/** Max SOL that can leave the wallet after reserving network fee (lamports → display string). */
+function maxSendableSol(balanceSol: number | null | undefined): string {
+  const bal = Math.round((balanceSol ?? 0) * LAMPORTS_PER_SOL);
+  const sendable = Math.max(0, bal - SOL_FEE_RESERVE_LAMPORTS);
+  if (sendable <= 0) return "";
+  // Avoid floating noise; trim trailing zeros
+  const s = (sendable / LAMPORTS_PER_SOL).toFixed(9).replace(/\.?0+$/, "");
+  return s;
+}
 
 export default function SendPage() {
   const [tab, setTab] = useState<Tab>("transfer");
@@ -146,9 +160,19 @@ export default function SendPage() {
 
       if (token === "SOL") {
         const amountLamports = Math.round(parsed * LAMPORTS_PER_SOL);
-        const balanceLamports = balance ? balance * LAMPORTS_PER_SOL : 0;
-        if (amountLamports > balanceLamports) {
-          throw new Error(`Insufficient balance. You have ${balance?.toFixed(4)} SOL`);
+        // Use integer lamports for balance so toFixed(4) rounding never over-sends
+        const balanceLamports = Math.round((balance ?? 0) * LAMPORTS_PER_SOL);
+        if (amountLamports <= 0) throw new Error("Invalid amount");
+        if (amountLamports + SOL_FEE_RESERVE_LAMPORTS > balanceLamports) {
+          const max = maxSendableSol(balance);
+          if (!max) {
+            throw new Error(
+              "Not enough SOL to cover the network fee. Add a little more SOL, then try again.",
+            );
+          }
+          throw new Error(
+            `Not enough SOL after the network fee. Max you can send is ${max} SOL (use Max).`,
+          );
         }
         tx.add(
           SystemProgram.transfer({
@@ -213,13 +237,12 @@ export default function SendPage() {
       setAddressValid(null);
       setResolved(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(msg);
+      setError(friendlyError(err));
       setStatus("error");
     }
   };
 
-  const solBalance = balance ? balance.toFixed(4) : "0";
+  const solBalance = balance != null ? balance.toFixed(4) : "0";
   const busy = status === "auth" || status === "sending" || status === "confirming";
   const canSend =
     !!recipient &&
@@ -230,7 +253,13 @@ export default function SendPage() {
 
   const maxAmount = () => {
     if (token === "SOL") {
-      setAmount(solBalance);
+      const max = maxSendableSol(balance);
+      if (!max) {
+        setError("Not enough SOL left after the network fee. Add a little more SOL first.");
+        return;
+      }
+      setError(null);
+      setAmount(max);
     } else {
       setAmount(usdcBalance != null ? String(Math.floor(usdcBalance * 100) / 100) : "");
     }

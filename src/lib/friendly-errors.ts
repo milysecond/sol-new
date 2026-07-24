@@ -18,8 +18,16 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
     return "No passkey found on this device. Create a new wallet, or restore from another device.";
   }
 
-  // Insufficient SOL
-  if (m.includes("insufficient lamports") || m.includes("insufficient funds") || m.includes("0x1") || m.includes("attempt to debit an account but found no record")) {
+  // Insufficient SOL (system program 0x1 / simulation logs)
+  if (
+    m.includes("insufficient lamports") ||
+    m.includes("insufficient funds") ||
+    m.includes("attempt to debit an account but found no record") ||
+    (m.includes("0x1") && (m.includes("transfer") || m.includes("simulation") || m.includes("custom program error")))
+  ) {
+    if (m.includes("insufficient lamports") || m.includes("need ")) {
+      return "Not enough SOL after the network fee. Tap Max to send what you can, or add a little more SOL.";
+    }
     return "Not enough SOL in your wallet. Add some from the Get page.";
   }
 
