@@ -240,30 +240,32 @@ function NftsBrowseInner() {
               </p>
             </div>
 
-            <form onSubmit={(e) => void submit(e)} className="flex gap-2">
-              <div className="relative flex-1">
-                <input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Address or name.sol / .bonk / .skr"
-                  spellCheck={false}
-                  autoComplete="off"
-                  className="w-full px-3 py-2.5 pr-9 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm focus:outline-none focus:border-purple-400/50"
-                />
-                {input && (
-                  <button
-                    type="button"
-                    onClick={clearAddress}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer"
-                    aria-label="Clear address"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
+            <form onSubmit={(e) => void submit(e)} className="flex gap-2 items-stretch">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Address or name.sol / .bonk / .skr"
+                spellCheck={false}
+                autoComplete="off"
+                className="flex-1 min-w-0 px-3 py-2.5 min-h-[44px] rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm focus:outline-none focus:border-purple-400/50"
+              />
+              {input.trim().length > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    clearAddress();
+                  }}
+                  className="shrink-0 min-h-[44px] min-w-[44px] px-3 rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 text-gray-600 dark:text-white/70 cursor-pointer touch-manipulation flex items-center justify-center gap-1"
+                  aria-label="Clear address"
+                >
+                  <X size={16} />
+                  <span className="text-xs font-medium">Clear</span>
+                </button>
+              )}
               <button
                 type="submit"
-                className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition cursor-pointer flex items-center gap-1.5"
+                className="shrink-0 min-h-[44px] px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition cursor-pointer flex items-center gap-1.5 touch-manipulation"
               >
                 <Search size={16} /> Look up
               </button>
