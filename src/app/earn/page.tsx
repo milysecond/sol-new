@@ -126,7 +126,18 @@ export default function EarnPage() {
                 <TrendingUp className="mx-auto text-emerald-400" size={36} />
                 <h1 className="text-3xl font-bold tracking-tight">Earn</h1>
                 <p className="text-gray-500 dark:text-white/50 text-sm">
-                  Protected USDC yield on Solana. Deposit, earn, withdraw with your passkey.
+                  Protected USDC yield powered by Lulo. Deposit and withdraw with your passkey.
+                </p>
+                <p className="text-[11px] text-gray-400">
+                  Stake SOL →{" "}
+                  <a href="/stake" className="text-purple-400 hover:underline">
+                    /stake
+                  </a>
+                  {" · "}
+                  Liquid stake (Sanctum) →{" "}
+                  <a href="/lst" className="text-purple-400 hover:underline">
+                    /lst
+                  </a>
                 </p>
               </div>
 

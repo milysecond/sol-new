@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
-  title: "Earn USDC (Lulo) — sol.new",
+  title: "Stake SOL — sol.new",
   description:
-    "Earn protected USDC yield on Solana via Lulo. Deposit and withdraw with your passkey wallet.",
-  path: "/earn",
+    "Stake SOL to a Solana validator with your passkey wallet. Earn native staking rewards.",
+  path: "/stake",
 });
 
 export default function Layout({ children }: { children: React.ReactNode }) {
