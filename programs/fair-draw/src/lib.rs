@@ -8,13 +8,18 @@
 //! Deploy: `anchor build && anchor deploy` from repo (see programs/fair-draw/README.md).
 
 use anchor_lang::prelude::*;
-use ephemeral_vrf_sdk::anchor::vrf;
-use ephemeral_vrf_sdk::instructions::{create_request_randomness_ix, RequestRandomnessParams};
+use ephemeral_vrf_sdk::anchor::{vrf, vrf_callback};
+use ephemeral_vrf_sdk::instructions::{
+    create_request_high_priority_scoped_randomness_ix, RequestRandomnessParams,
+};
 use ephemeral_vrf_sdk::types::SerializableAccountMeta;
 
-declare_id!("FairDraw1111111111111111111111111111111111");
+declare_id!("EQmor7iQN23PbKEUA9yHjsRujnb4csV9L8stussV3znp");
 
 pub const DRAW_SEED: &[u8] = b"fair-draw";
+
+/// MagicBlock base-layer default oracle queue.
+pub const DEFAULT_QUEUE: Pubkey = pubkey!("Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh");
 
 #[program]
 pub mod fair_draw {
@@ -46,7 +51,7 @@ pub mod fair_draw {
             entry_count
         );
 
-        let ix = create_request_randomness_ix(RequestRandomnessParams {
+        let ix = create_request_high_priority_scoped_randomness_ix(RequestRandomnessParams {
             payer: ctx.accounts.payer.key(),
             oracle_queue: ctx.accounts.oracle_queue.key(),
             callback_program_id: crate::ID,
@@ -105,16 +110,17 @@ pub struct RequestDraw<'info> {
     )]
     pub draw: Account<'info, Draw>,
     /// CHECK: MagicBlock oracle queue (base layer DEFAULT_QUEUE)
-    #[account(mut, address = ephemeral_vrf_sdk::consts::DEFAULT_QUEUE)]
+    #[account(mut, address = DEFAULT_QUEUE)]
     pub oracle_queue: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
+    // #[vrf] injects: program_identity, vrf_program, slot_hashes
 }
 
+/// Scoped VRF identity (default for SDK 0.4.x) authenticates the oracle callback.
+#[vrf_callback]
 #[derive(Accounts)]
 pub struct CallbackDraw<'info> {
-    /// MagicBlock VRF identity PDA — must sign the callback CPI
-    #[account(address = ephemeral_vrf_sdk::consts::VRF_PROGRAM_IDENTITY)]
-    pub vrf_program_identity: Signer<'info>,
+    // #[vrf_callback] injects scoped vrf_program_identity: Signer
     #[account(mut, seeds = [DRAW_SEED, draw.draw_id.as_ref()], bump = draw.bump)]
     pub draw: Account<'info, Draw>,
 }

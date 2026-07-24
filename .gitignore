@@ -10,3 +10,7 @@ feeUzA98vep5UvxQhwdQVBGsSFADqcYM7Dt4sLrpiyE.json
 .env.*
 !.env.example
 dapp-store/.env
+# Solana / Anchor
+target/
+test-ledger/
+.anchor/

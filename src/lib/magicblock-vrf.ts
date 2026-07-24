@@ -11,6 +11,9 @@
  *  - MAGICBLOCK_FAIR_DRAW_PROGRAM_ID (deployed programs/fair-draw)
  *  - SOL_FEE_PAYER_SECRET (or TREASURY_PRIVATE_KEY)
  *
+ * Optional:
+ *  - MAGICBLOCK_CLUSTER=devnet|mainnet (default mainnet)
+ *
  * Docs: https://docs.magicblock.gg/pages/verifiable-randomness-functions-vrfs/introduction/solana-vrf
  */
 
@@ -18,15 +21,17 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  SYSVAR_SLOT_HASHES_PUBKEY,
   SystemProgram,
   Transaction,
   TransactionInstruction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
-import { mainnetRpcUrl } from "@/lib/rpc-server";
+import { devnetRpcUrl, mainnetRpcUrl } from "@/lib/rpc-server";
 import { MAGICBLOCK, sha256Hex } from "@/lib/vrf";
 
 const DRAW_SEED = Buffer.from("fair-draw");
+const IDENTITY_SEED = Buffer.from("identity");
 
 function envVar(name: string): string | undefined {
   const fromProcess = process.env[name]?.trim();
@@ -49,6 +54,11 @@ export function magicblockConfigured(): boolean {
     envVar("MAGICBLOCK_FAIR_DRAW_PROGRAM_ID") &&
       (envVar("SOL_FEE_PAYER_SECRET") || envVar("TREASURY_PRIVATE_KEY")),
   );
+}
+
+export function magicblockCluster(): "devnet" | "mainnet" {
+  const c = (envVar("MAGICBLOCK_CLUSTER") || envVar("SOLANA_CLUSTER") || "mainnet").toLowerCase();
+  return c === "devnet" ? "devnet" : "mainnet";
 }
 
 /** sha256("global:<name>")[0..8] Anchor discriminator */
@@ -85,6 +95,11 @@ export function drawPda(program: PublicKey, drawId16: Uint8Array): PublicKey {
   return PublicKey.findProgramAddressSync([DRAW_SEED, Buffer.from(drawId16)], program)[0];
 }
 
+/** Consumer program identity PDA (seed "identity") — required by #[vrf] for CPI signing. */
+export function programIdentityPda(program: PublicKey): PublicKey {
+  return PublicKey.findProgramAddressSync([IDENTITY_SEED], program)[0];
+}
+
 /** Parse hex draw id (32 hex chars) → 16 bytes */
 export function drawIdToBytes(drawIdHex: string): Uint8Array {
   const clean = drawIdHex.replace(/[^0-9a-f]/gi, "").slice(0, 32);
@@ -108,7 +123,8 @@ async function buildCallerSeed(
 }
 
 function connection(): Connection {
-  return new Connection(mainnetRpcUrl(), "confirmed");
+  const url = magicblockCluster() === "devnet" ? devnetRpcUrl() : mainnetRpcUrl();
+  return new Connection(url, "confirmed");
 }
 
 /**
@@ -119,7 +135,7 @@ export async function requestMagicblockRandomness(opts: {
   drawIdHex: string;
   entriesHash: string;
   entryCount: number;
-  /** Poll timeout ms (default 25s) */
+  /** Poll timeout ms (default 45s — oracle can take a few slots) */
   timeoutMs?: number;
 }): Promise<{
   seed: string;
@@ -146,7 +162,11 @@ export async function requestMagicblockRandomness(opts: {
   data.writeUInt32LE(opts.entryCount, 56);
 
   const oracleQueue = new PublicKey(MAGICBLOCK.defaultQueue);
+  const programIdentity = programIdentityPda(program);
+  const vrfProgram = new PublicKey(MAGICBLOCK.vrfProgramId);
 
+  // Account order must match RequestDraw after #[vrf] expansion:
+  // payer, draw, oracle_queue, system_program, program_identity, vrf_program, slot_hashes
   const ix = new TransactionInstruction({
     programId: program,
     keys: [
@@ -154,8 +174,9 @@ export async function requestMagicblockRandomness(opts: {
       { pubkey: pda, isSigner: false, isWritable: true },
       { pubkey: oracleQueue, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      // remaining accounts for #[vrf] macro / CPI may be needed at runtime;
-      // MagicBlock invoke_signed_vrf resolves them via the queue + program.
+      { pubkey: programIdentity, isSigner: false, isWritable: false },
+      { pubkey: vrfProgram, isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_SLOT_HASHES_PUBKEY, isSigner: false, isWritable: false },
     ],
     data,
   });
@@ -173,7 +194,7 @@ export async function requestMagicblockRandomness(opts: {
   }
 
   // Poll Draw PDA: Anchor account = 8 disc + Draw fields
-  const timeout = opts.timeoutMs ?? 25_000;
+  const timeout = opts.timeoutMs ?? 45_000;
   const start = Date.now();
   while (Date.now() - start < timeout) {
     const info = await conn.getAccountInfo(pda, "confirmed");
@@ -206,7 +227,7 @@ export async function requestMagicblockRandomness(opts: {
 /** Map 32-byte VRF output → index in [0, n). */
 export function indexFromMagicblockRandomness(randomness: Uint8Array, n: number): number {
   if (n <= 0) throw new Error("n must be > 0");
-  // Use first 16 hex chars of randomness as big-endian modulus (same idea as indexFromSeed)
+  // Use first 8 bytes as big-endian modulus (same idea as indexFromSeed)
   const hex = Buffer.from(randomness.subarray(0, 8)).toString("hex");
   const value = BigInt("0x" + hex);
   return Number(value % BigInt(n));

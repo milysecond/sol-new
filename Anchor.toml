@@ -1,0 +1,25 @@
+[toolchain]
+anchor_version = "0.31.1"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+fair_draw = "EQmor7iQN23PbKEUA9yHjsRujnb4csV9L8stussV3znp"
+
+[programs.devnet]
+fair_draw = "EQmor7iQN23PbKEUA9yHjsRujnb4csV9L8stussV3znp"
+
+[programs.mainnet]
+fair_draw = "EQmor7iQN23PbKEUA9yHjsRujnb4csV9L8stussV3znp"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "devnet"
+wallet = "/Volumes/PRO-G40/solnew/sol-new/feeUzA98vep5UvxQhwdQVBGsSFADqcYM7Dt4sLrpiyE.json"
+
+[scripts]
+test = "echo ok"
