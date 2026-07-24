@@ -11,6 +11,7 @@ import { Download, Copy, Check, Droplets, ExternalLink, DollarSign } from "lucid
 import { AnimatedIcon } from "@/components/animated-icon";
 import { friendlyError } from "@/lib/friendly-errors";
 import { Spinner } from "@/components/spinner";
+import { StripeOnrampPanel } from "@/components/stripe-onramp";
 
 // Bridge UI on by default; set NEXT_PUBLIC_BRIDGE_ENABLED=0 to hide.
 const BRIDGE_UI = process.env.NEXT_PUBLIC_BRIDGE_ENABLED !== "0";
@@ -42,6 +43,127 @@ function openExternal(url: string) {
 
 function isReady(c: BridgeCustomer | null | undefined) {
   return c?.kycStatus === "approved" && c?.tosStatus === "approved";
+}
+
+function StripeGetSection() {
+  const { publicKey, refreshBalance } = useWallet();
+  const [stripeOk, setStripeOk] = useState<boolean | null>(null);
+  const [amount, setAmount] = useState(50);
+  const [asset, setAsset] = useState<"usdc" | "sol">("usdc");
+  const [showCheckout, setShowCheckout] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/stripe/onramp", { cache: "no-store" });
+        const data = (await res.json()) as { configured?: boolean };
+        if (!cancelled) setStripeOk(data.configured === true);
+      } catch {
+        if (!cancelled) setStripeOk(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (stripeOk === null) {
+    return (
+      <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-5 text-xs text-gray-500 flex items-center gap-2">
+        <Spinner size={14} /> Checking Apple Pay / card…
+      </div>
+    );
+  }
+
+  if (!stripeOk) {
+    return null;
+  }
+
+  return (
+    <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
+          <DollarSign size={16} className="text-purple-500" /> Buy with Apple Pay
+        </p>
+        <span className="text-xs text-purple-600/80 dark:text-purple-400/80">via Stripe</span>
+      </div>
+      <p className="text-xs text-gray-500 dark:text-white/40">
+        Card, Apple Pay, Google Pay, or bank. Stripe handles KYC and sends crypto to your wallet.
+        Usually minutes, not days.
+      </p>
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setAsset("usdc");
+            setShowCheckout(false);
+          }}
+          className={`flex-1 text-sm font-semibold rounded-lg px-3 py-2 transition cursor-pointer ${
+            asset === "usdc"
+              ? "bg-purple-600 text-white"
+              : "bg-black/5 dark:bg-white/5 text-gray-600 dark:text-white/60"
+          }`}
+        >
+          USDC
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setAsset("sol");
+            setShowCheckout(false);
+          }}
+          className={`flex-1 text-sm font-semibold rounded-lg px-3 py-2 transition cursor-pointer ${
+            asset === "sol"
+              ? "bg-purple-600 text-white"
+              : "bg-black/5 dark:bg-white/5 text-gray-600 dark:text-white/60"
+          }`}
+        >
+          SOL
+        </button>
+      </div>
+
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+        <input
+          type="number"
+          min={5}
+          max={10000}
+          step={1}
+          value={amount}
+          onChange={(e) => {
+            setAmount(Math.max(5, Math.min(10000, parseInt(e.target.value) || 5)));
+            setShowCheckout(false);
+          }}
+          className="w-full pl-7 pr-3 py-2.5 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm"
+        />
+      </div>
+
+      {!showCheckout && publicKey && (
+        <button
+          type="button"
+          onClick={() => setShowCheckout(true)}
+          className="w-full bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer"
+        >
+          Continue to Apple Pay / card
+        </button>
+      )}
+
+      {showCheckout && publicKey && (
+        <StripeOnrampPanel
+          wallet={publicKey}
+          amountUsd={amount}
+          asset={asset}
+          onComplete={(st) => {
+            if (st === "fulfillment_complete" || st === "fulfillment_processing") {
+              void refreshBalance();
+            }
+          }}
+        />
+      )}
+    </div>
+  );
 }
 
 function BridgeGetSection() {
@@ -217,12 +339,12 @@ function BridgeGetSection() {
     <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-5 space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
-          <DollarSign size={16} className="text-emerald-500" /> Get USDC
+          <DollarSign size={16} className="text-emerald-500" /> Bank deposit (USDC)
         </p>
         <span className="text-xs text-emerald-600/80 dark:text-emerald-400/80">via Bridge</span>
       </div>
       <p className="text-xs text-gray-500 dark:text-white/40">
-        Deposit USD (ACH or wire). Bridge sends USDC to your Solana wallet after you accept terms and finish KYC.
+        ACH or wire. Usually lower fees, slower (1–3 business days). Complete Bridge terms + KYC yourself, then send a bank transfer.
       </p>
 
       {bridgeConfigured === null && (
@@ -558,17 +680,22 @@ export default function GetPage() {
               </div>
             )}
 
-            {/* Bridge — Get USDC (ACH / wire) */}
-            {BRIDGE_UI && network === "mainnet" && (
-              <Suspense
-                fallback={
-                  <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-5 text-xs text-gray-500">
-                    Loading Get USDC…
-                  </div>
-                }
-              >
-                <BridgeGetSection />
-              </Suspense>
+            {/* Stripe Apple Pay / card (primary) + Bridge bank (secondary) */}
+            {network === "mainnet" && (
+              <>
+                <StripeGetSection />
+                {BRIDGE_UI && (
+                  <Suspense
+                    fallback={
+                      <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-5 text-xs text-gray-500">
+                        Loading bank deposit…
+                      </div>
+                    }
+                  >
+                    <BridgeGetSection />
+                  </Suspense>
+                )}
+              </>
             )}
 
             {/* View on explorer */}

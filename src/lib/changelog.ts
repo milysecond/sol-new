@@ -15,6 +15,15 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-07-24",
+    title: "Apple Pay and card onramp",
+    items: [
+      "Buy USDC or SOL on /get with Apple Pay, card, Google Pay, or bank via Stripe Crypto Onramp.",
+      "Funds go straight to your passkey wallet on Solana. Stripe handles KYC.",
+      "Bridge bank deposit remains available for ACH/wire (usually lower fee, slower).",
+    ],
+  },
+  {
+    date: "2026-07-24",
     title: "Bricolage Grotesque typeface",
     items: [
       "Default UI font is now Bricolage Grotesque across the app.",
