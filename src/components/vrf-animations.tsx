@@ -203,11 +203,14 @@ export function VrfWheel({
   winnerIndex,
   spinning,
   durationSec,
+  winnerName,
 }: {
   entries: string[];
   winnerIndex: number;
   spinning: boolean;
   durationSec: number;
+  /** Shown under the pointer after the wheel stops */
+  winnerName?: string | null;
 }) {
   const reduce = useReducedMotion();
   const n = Math.max(entries.length, 1);
@@ -216,6 +219,7 @@ export function VrfWheel({
   const cx = size / 2;
   const cy = size / 2;
   const r = size / 2 - 4;
+  const showWinner = !spinning && Boolean(winnerName) && winnerIndex >= 0 && winnerIndex < n;
 
   const segments = useMemo(() => {
     return Array.from({ length: n }, (_, i) => {
@@ -235,14 +239,16 @@ export function VrfWheel({
   }, [n, cx, cy, r]);
 
   const segmentAngle = 360 / n;
+  // Segment 0 starts at top (0°) and goes clockwise. Pointer is fixed at top.
+  // After rotation R, the segment under the pointer is the one whose center is at 0.
+  // Center of index i is at (i + 0.5) * segmentAngle. We need R such that
+  // (winnerCenter + R) mod 360 === 0  =>  R ≡ -winnerCenter (mod 360).
   const winnerCenterFromStart = winnerIndex * segmentAngle + segmentAngle / 2;
-  // Pointer is at top; rotate wheel so winner center lands under pointer
   const extraTurns = Math.max(4, Math.round(durationSec * 2.2));
-  const landRotation = 360 * extraTurns + (360 - winnerCenterFromStart);
+  const landRotation = 360 * extraTurns + (360 - (winnerCenterFromStart % 360));
   const spinLoop = Math.max(0.45, durationSec * 0.16);
   const settle = Math.max(0.85, durationSec * 0.72);
 
-  // Track displayed rotation so Edge doesn't jump when exiting infinite spin
   const [rotation, setRotation] = useState(0);
   const [phase, setPhase] = useState<"idle" | "spin" | "land">("idle");
   const wasSpinning = useRef(false);
@@ -259,7 +265,6 @@ export function VrfWheel({
       setPhase("spin");
       return;
     }
-    // Only settle after a real spin, not on first mount
     if (!wasSpinning.current) return;
     wasSpinning.current = false;
     setPhase("land");
@@ -274,26 +279,26 @@ export function VrfWheel({
   }, [spinning, landRotation, reduce, winnerCenterFromStart]);
 
   return (
-    <div className="flex flex-col items-center py-4 gap-2 vrf-allow-motion">
+    <div className="flex flex-col items-center py-4 gap-3 vrf-allow-motion">
+      <p className="text-[11px] font-medium text-gray-500 dark:text-white/45 flex items-center gap-1.5">
+        <span className="inline-block w-0 h-0 border-l-[5px] border-r-[5px] border-t-[8px] border-l-transparent border-r-transparent border-t-violet-400" />
+        Winner stops under the purple arrow
+      </p>
+
       <div className="relative w-56 h-56 sm:w-64 sm:h-64">
-        {/* Pointer (no filter — Edge often mishandles drop-shadow on border triangles) */}
-        <div
-          className="absolute left-1/2 -translate-x-1/2 -top-1 z-10"
-          aria-hidden
-        >
-          <svg width="22" height="20" viewBox="0 0 22 20" className="block">
+        <div className="absolute left-1/2 -translate-x-1/2 -top-1 z-10" aria-hidden>
+          <svg width="22" height="20" viewBox="0 0 22 20" className="block drop-shadow-md">
             <polygon points="11,18 1,2 21,2" fill="#a78bfa" stroke="#7c3aed" strokeWidth="1" />
           </svg>
         </div>
 
         <div
-          className={`w-full h-full rounded-full border-4 border-violet-400/30 shadow-2xl relative vrf-wheel ${
-            phase === "spin" && !reduce ? "vrf-wheel-spinning" : ""
-          }`}
+          className={`w-full h-full rounded-full border-4 shadow-2xl relative vrf-wheel ${
+            showWinner ? "border-amber-400/60" : "border-violet-400/30"
+          } ${phase === "spin" && !reduce ? "vrf-wheel-spinning" : ""}`}
           style={
             {
               transformOrigin: "50% 50%",
-              // Hardware-friendly layer (helps Edge)
               willChange: spinning || phase === "land" ? "transform" : "auto",
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
@@ -302,7 +307,6 @@ export function VrfWheel({
                 phase === "land" && !reduce
                   ? `transform ${settle}s cubic-bezier(0.12, 0.8, 0.12, 1)`
                   : "none",
-              // CSS var for spin keyframes duration
               ["--vrf-spin-dur" as string]: `${spinLoop}s`,
             } as CSSProperties
           }
@@ -314,22 +318,33 @@ export function VrfWheel({
             aria-label="Prize wheel"
           >
             <circle cx={cx} cy={cy} r={r} fill="#1e1b4b" />
-            {segments.map((seg) => (
-              <path key={seg.i} d={seg.path} fill={seg.color} stroke="rgba(255,255,255,0.12)" strokeWidth={1} />
-            ))}
+            {segments.map((seg) => {
+              const isWin = showWinner && seg.i === winnerIndex;
+              return (
+                <path
+                  key={seg.i}
+                  d={seg.path}
+                  fill={isWin ? "#fbbf24" : seg.color}
+                  stroke={isWin ? "#f59e0b" : "rgba(255,255,255,0.12)"}
+                  strokeWidth={isWin ? 3 : 1}
+                  opacity={showWinner && !isWin ? 0.55 : 1}
+                />
+              );
+            })}
             {showLabels &&
               entries.map((item, i) => {
                 const seg = segments[i];
                 if (!seg) return null;
                 const label = item.length > 10 ? item.slice(0, 9) + "…" : item;
+                const isWin = showWinner && i === winnerIndex;
                 return (
                   <text
                     key={`t-${i}`}
                     x={seg.labelX}
                     y={seg.labelY}
-                    fill="white"
+                    fill={isWin ? "#1c1917" : "white"}
                     fontSize={n > 10 ? 9 : 11}
-                    fontWeight={600}
+                    fontWeight={isWin ? 800 : 600}
                     textAnchor="middle"
                     dominantBaseline="middle"
                     transform={`rotate(${seg.mid}, ${seg.labelX}, ${seg.labelY})`}
@@ -339,7 +354,14 @@ export function VrfWheel({
                   </text>
                 );
               })}
-            <circle cx={cx} cy={cy} r={28} fill="rgba(0,0,0,0.85)" stroke="rgba(196,181,253,0.5)" strokeWidth={2} />
+            <circle
+              cx={cx}
+              cy={cy}
+              r={28}
+              fill="rgba(0,0,0,0.85)"
+              stroke="rgba(196,181,253,0.5)"
+              strokeWidth={2}
+            />
             <text
               x={cx}
               y={cy}
@@ -354,8 +376,20 @@ export function VrfWheel({
           </svg>
         </div>
       </div>
-      {n > 16 && (
-        <p className="text-[11px] text-gray-500 dark:text-white/40">{n} entries</p>
+
+      {spinning ? (
+        <p className="text-sm font-medium text-violet-500 animate-pulse">Spinning…</p>
+      ) : showWinner ? (
+        <p className="text-center px-3">
+          <span className="text-[11px] uppercase tracking-wider text-gray-500 dark:text-white/40 block mb-0.5">
+            Arrow points to
+          </span>
+          <span className="text-lg font-bold text-amber-500 break-all">{winnerName}</span>
+        </p>
+      ) : (
+        <p className="text-xs text-gray-500 dark:text-white/40">
+          {n} {n === 1 ? "name" : "names"} on the wheel
+        </p>
       )}
     </div>
   );
@@ -392,10 +426,11 @@ export function VrfStage({
   }
   return (
     <VrfWheel
-      entries={entries.length ? entries : ["?", "?", "?", "?"]}
-      winnerIndex={Math.max(0, winnerIndex)}
+      entries={entries.length ? entries : ["Add", "names", "below", "→"]}
+      winnerIndex={Math.max(0, Math.min(winnerIndex, Math.max(entries.length - 1, 0)))}
       spinning={spinning}
       durationSec={durationSec}
+      winnerName={winner}
     />
   );
 }
