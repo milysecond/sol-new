@@ -23,17 +23,16 @@ import {
   RotateCcw,
   Check,
   Pencil,
+  Star,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import {
-  getPrimaryOrder,
-  getSecondaryOrder,
+  getHomeIconOrder,
+  setHomeIconOrder,
   resetHomeOrders,
-  setPrimaryOrder,
-  setSecondaryOrder,
-  PRIMARY_DEFAULT,
-  SECONDARY_DEFAULT,
+  HOME_DEFAULT_ORDER,
+  HOME_PIN_COUNT,
 } from "@/lib/home-icons-pref";
 
 type Tile = {
@@ -44,14 +43,12 @@ type Tile = {
   color: string;
 };
 
-const PRIMARY_TILES: Tile[] = [
+/** Full catalog — every icon is free to move anywhere in the list. */
+const ALL_TILES: Tile[] = [
   { href: "/wallet", title: "Wallet", desc: "Get SOL, send, manage", icon: Wallet, color: "text-fuchsia-500 dark:text-fuchsia-400" },
   { href: "/token", title: "Token", desc: "Launch your own coin", icon: Coins, color: "text-orange-500 dark:text-orange-400" },
   { href: "/gift", title: "Gift", desc: "Send crypto with a link", icon: Gift, color: "text-amber-500 dark:text-amber-400" },
   { href: "/punt", title: "Punt", desc: "Odds, picks, markets", icon: Trophy, color: "text-green-600 dark:text-green-400" },
-];
-
-const SECONDARY_TILES: Tile[] = [
   { href: "/nft", title: "NFT", desc: "Image to NFT", icon: Image, color: "text-green-600 dark:text-green-400" },
   { href: "/nfts", title: "Browse", desc: "NFT gallery", icon: Layers, color: "text-emerald-600 dark:text-emerald-400" },
   { href: "/multisig", title: "Multisig", desc: "Shared wallet", icon: ShieldCheck, color: "text-blue-600 dark:text-blue-400" },
@@ -66,14 +63,14 @@ const SECONDARY_TILES: Tile[] = [
   { href: "/portfolio", title: "Portfolio", desc: "Holdings", icon: Wallet, color: "text-fuchsia-600 dark:text-fuchsia-400" },
 ];
 
-function orderTiles(catalog: Tile[], order: string[]): Tile[] {
-  const map = new Map(catalog.map((t) => [t.href, t]));
+function orderTiles(order: string[]): Tile[] {
+  const map = new Map(ALL_TILES.map((t) => [t.href, t]));
   const out: Tile[] = [];
   for (const href of order) {
     const t = map.get(href);
     if (t) out.push(t);
   }
-  for (const t of catalog) {
+  for (const t of ALL_TILES) {
     if (!out.some((x) => x.href === t.href)) out.push(t);
   }
   return out;
@@ -81,21 +78,20 @@ function orderTiles(catalog: Tile[], order: string[]): Tile[] {
 
 function DragRow({
   tile,
-  size,
+  index,
 }: {
   tile: Tile;
-  size: "primary" | "secondary";
+  index: number;
 }) {
   const controls = useDragControls();
   const Icon = tile.icon;
+  const pinned = index < HOME_PIN_COUNT;
   return (
     <Reorder.Item
       value={tile.href}
       dragListener={false}
       dragControls={controls}
-      className={`flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-black px-3 py-3 touch-none list-none ${
-        size === "primary" ? "min-h-[56px]" : "min-h-[48px]"
-      }`}
+      className="flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-black px-3 py-3 touch-none list-none min-h-[52px]"
       whileDrag={{ scale: 1.02, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 20 }}
     >
       <button
@@ -107,10 +103,18 @@ function DragRow({
       >
         <GripVertical size={18} />
       </button>
+      <span className="w-5 text-[10px] font-mono text-gray-400 tabular-nums shrink-0">
+        {index + 1}
+      </span>
       <Icon className={`w-5 h-5 shrink-0 ${tile.color}`} />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate flex items-center gap-1.5">
           {tile.title}
+          {pinned && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+              <Star size={10} className="fill-current" /> large
+            </span>
+          )}
         </p>
         <p className="text-[11px] text-gray-500 dark:text-white/40 truncate">{tile.desc}</p>
       </div>
@@ -120,43 +124,29 @@ function DragRow({
 
 export function HomeIconGrid() {
   const [editing, setEditing] = useState(false);
-  const [primaryOrder, setPrimary] = useState<string[]>([...PRIMARY_DEFAULT]);
-  const [secondaryOrder, setSecondary] = useState<string[]>([...SECONDARY_DEFAULT]);
+  const [order, setOrder] = useState<string[]>([...HOME_DEFAULT_ORDER]);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setPrimary(getPrimaryOrder());
-    setSecondary(getSecondaryOrder());
+    setOrder(getHomeIconOrder());
     setHydrated(true);
   }, []);
 
-  const primary = useMemo(
-    () => orderTiles(PRIMARY_TILES, primaryOrder),
-    [primaryOrder],
-  );
-  const secondary = useMemo(
-    () => orderTiles(SECONDARY_TILES, secondaryOrder),
-    [secondaryOrder],
-  );
+  const tiles = useMemo(() => orderTiles(order), [order]);
+  const pinned = tiles.slice(0, HOME_PIN_COUNT);
+  const rest = tiles.slice(HOME_PIN_COUNT);
 
-  const onPrimaryReorder = useCallback((next: string[]) => {
-    setPrimary(next);
-    setPrimaryOrder(next);
-  }, []);
-
-  const onSecondaryReorder = useCallback((next: string[]) => {
-    setSecondary(next);
-    setSecondaryOrder(next);
+  const onReorder = useCallback((next: string[]) => {
+    setOrder(next);
+    setHomeIconOrder(next);
   }, []);
 
   const reset = () => {
     resetHomeOrders();
-    setPrimary([...PRIMARY_DEFAULT]);
-    setSecondary([...SECONDARY_DEFAULT]);
+    setOrder([...HOME_DEFAULT_ORDER]);
   };
 
   if (!hydrated) {
-    // Avoid order flash
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 min-h-[120px] animate-pulse">
         {Array.from({ length: 4 }).map((_, i) => (
@@ -173,7 +163,9 @@ export function HomeIconGrid() {
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 px-0.5">
         <p className="text-[11px] text-gray-400 dark:text-white/30">
-          {editing ? "Drag the handle to reorder. Order is saved on this device." : "Your tools"}
+          {editing
+            ? `Drag any icon. Top ${HOME_PIN_COUNT} show as large tiles.`
+            : "Your tools · rearrange any icon"}
         </p>
         <div className="flex items-center gap-1.5">
           {editing && (
@@ -208,38 +200,20 @@ export function HomeIconGrid() {
       </div>
 
       {editing ? (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <p className="text-[10px] uppercase tracking-wider text-gray-400 px-0.5">Primary</p>
-            <Reorder.Group
-              axis="y"
-              values={primaryOrder}
-              onReorder={onPrimaryReorder}
-              className="flex flex-col gap-2 list-none m-0 p-0"
-            >
-              {primary.map((tile) => (
-                <DragRow key={tile.href} tile={tile} size="primary" />
-              ))}
-            </Reorder.Group>
-          </div>
-          <div className="space-y-2">
-            <p className="text-[10px] uppercase tracking-wider text-gray-400 px-0.5">More tools</p>
-            <Reorder.Group
-              axis="y"
-              values={secondaryOrder}
-              onReorder={onSecondaryReorder}
-              className="flex flex-col gap-2 list-none m-0 p-0"
-            >
-              {secondary.map((tile) => (
-                <DragRow key={tile.href} tile={tile} size="secondary" />
-              ))}
-            </Reorder.Group>
-          </div>
-        </div>
+        <Reorder.Group
+          axis="y"
+          values={order}
+          onReorder={onReorder}
+          className="flex flex-col gap-2 list-none m-0 p-0"
+        >
+          {tiles.map((tile, i) => (
+            <DragRow key={tile.href} tile={tile} index={i} />
+          ))}
+        </Reorder.Group>
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-            {primary.map((p) => (
+            {pinned.map((p) => (
               <Link
                 key={p.href}
                 href={p.href}
@@ -261,7 +235,7 @@ export function HomeIconGrid() {
           </div>
 
           <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
-            {secondary.map((t) => (
+            {rest.map((t) => (
               <Link
                 key={t.href}
                 href={t.href}
