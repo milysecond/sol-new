@@ -5,7 +5,8 @@ import {
   type SanctumSwapQuote,
 } from "@/lib/sanctum";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * POST /api/lst/execute
