@@ -11,6 +11,11 @@ import {
   sha256Hex,
 } from "@/lib/vrf";
 import { tryProofNetworkRangeDraw } from "@/lib/proofnetwork";
+import {
+  indexFromMagicblockRandomness,
+  magicblockConfigured,
+  requestMagicblockRandomness,
+} from "@/lib/magicblock-vrf";
 import { mainnetRpcUrl } from "@/lib/rpc-server";
 
 const recentIPs = new Map<string, number[]>();
@@ -112,31 +117,77 @@ export async function POST(req: NextRequest) {
     const n = entries.length;
     const title = body.title?.trim().slice(0, 80) || null;
 
-    // Prefer ProofNetwork when configured
-    const pn = await tryProofNetworkRangeDraw(0, n - 1);
+    // Entropy order (default): MagicBlock VRF → ProofNetwork → Solana blockhash
+    // DRAW_PROVIDER=magicblock | proofnetwork | solana-blockhash forces a source.
+    const prefer = (process.env.DRAW_PROVIDER || "auto").toLowerCase().trim();
+    const strictMagic = prefer === "magicblock";
+
     let provider: VrfProvider = "solana-blockhash";
-    let seed: string;
-    let verificationHash: string;
-    let winnerIndex: number;
+    let seed = "";
+    let verificationHash = "";
+    let winnerIndex = 0;
     let slot: number | null = null;
     let blockhash: string | null = null;
     let proofnetworkId: number | null = null;
 
-    if (pn && Number.isFinite(pn.result) && pn.result >= 0 && pn.result < n) {
-      provider = "proofnetwork";
-      seed = pn.seed || (await sha256Hex(`${id}:${pn.result}:${entriesHash}`));
-      verificationHash =
-        pn.verificationHash || (await sha256Hex(`pn:${seed}:${entriesHash}`));
-      winnerIndex = Math.floor(pn.result);
-      proofnetworkId = pn.requestId;
-    } else {
+    let resolved = false;
+
+    // 1) MagicBlock on-chain VRF (requires deployed fair-draw program + fee payer)
+    if ((prefer === "auto" || prefer === "magicblock") && magicblockConfigured()) {
+      const mb = await requestMagicblockRandomness({
+        drawIdHex: id,
+        entriesHash,
+        entryCount: n,
+      });
+      if (mb) {
+        provider = "magicblock";
+        seed = mb.seed;
+        verificationHash = mb.verificationHash;
+        winnerIndex = indexFromMagicblockRandomness(mb.randomness, n);
+        blockhash = mb.signature; // store request tx sig in blockhash field for receipt
+        resolved = true;
+      } else if (strictMagic) {
+        return NextResponse.json(
+          {
+            error:
+              "MagicBlock VRF unavailable. Deploy programs/fair-draw and set MAGICBLOCK_FAIR_DRAW_PROGRAM_ID + SOL_FEE_PAYER_SECRET.",
+          },
+          { status: 503 },
+        );
+      }
+    } else if (strictMagic) {
+      return NextResponse.json(
+        {
+          error:
+            "MagicBlock not configured. Set MAGICBLOCK_FAIR_DRAW_PROGRAM_ID and SOL_FEE_PAYER_SECRET (see programs/fair-draw/README.md).",
+        },
+        { status: 503 },
+      );
+    }
+
+    // 2) ProofNetwork (optional HTTP VRF)
+    if (!resolved && (prefer === "auto" || prefer === "proofnetwork")) {
+      const pn = await tryProofNetworkRangeDraw(0, n - 1);
+      if (pn && Number.isFinite(pn.result) && pn.result >= 0 && pn.result < n) {
+        provider = "proofnetwork";
+        seed = pn.seed || (await sha256Hex(`${id}:${pn.result}:${entriesHash}`));
+        verificationHash =
+          pn.verificationHash || (await sha256Hex(`pn:${seed}:${entriesHash}`));
+        winnerIndex = Math.floor(pn.result);
+        proofnetworkId = pn.requestId;
+        resolved = true;
+      }
+    }
+
+    // 3) Solana blockhash (public, re-verifiable default)
+    if (!resolved) {
       const entropy = await fetchSolanaEntropy();
       slot = entropy.slot;
       blockhash = entropy.blockhash;
-      // Public re-verification: sha256(blockhash || entriesHash || id || slot)
       seed = await sha256Hex(`${blockhash}|${entriesHash}|${id}|${slot}`);
       verificationHash = await sha256Hex(`verify:${seed}|${n}`);
       winnerIndex = indexFromSeed(seed, n);
+      provider = "solana-blockhash";
     }
 
     const winner = entries[winnerIndex];

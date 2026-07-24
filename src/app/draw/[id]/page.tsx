@@ -110,6 +110,16 @@ export default function VrfReceiptPage() {
               </div>
 
               <dl className="space-y-2 text-sm">
+                <Row
+                  label="Entropy"
+                  value={
+                    draw.provider === "magicblock"
+                      ? "MagicBlock VRF (on-chain)"
+                      : draw.provider === "proofnetwork"
+                        ? "ProofNetwork VRF"
+                        : "Solana blockhash"
+                  }
+                />
                 <Row label="Entries hash" value={short(draw.entriesHash)} mono copy={draw.entriesHash} />
                 <Row label="Seed" value={short(draw.seed)} mono copy={draw.seed} />
                 <Row
@@ -122,7 +132,12 @@ export default function VrfReceiptPage() {
                   <Row label="Slot" value={String(draw.slot)} mono />
                 )}
                 {draw.blockhash && (
-                  <Row label="Blockhash" value={short(draw.blockhash)} mono copy={draw.blockhash} />
+                  <Row
+                    label={draw.provider === "magicblock" ? "Request tx" : "Blockhash"}
+                    value={short(draw.blockhash)}
+                    mono
+                    copy={draw.blockhash}
+                  />
                 )}
                 {draw.createdAt && (
                   <Row

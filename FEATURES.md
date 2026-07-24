@@ -74,7 +74,7 @@
 **Fair Draw rules of thumb**
 - One free draw per mode per device, then passkey connect.
 - History on-device always; server history when wallet is connected.
-- Entropy defaults to Solana blockhash (re-verifiable from public data).
+- Entropy: MagicBlock Solana VRF when `programs/fair-draw` is deployed and env is set; otherwise Solana blockhash (public, re-verifiable). ProofNetwork optional.
 
 ---
 

@@ -1,10 +1,12 @@
 /**
  * Fair Draw helpers for sol.new/draw
  *
- * Entropy sources:
- *  - solana-blockhash (default, fully public + re-verifiable)
- *  - proofnetwork (when PROOFNETWORK_* env configured)
- *  - magicblock (on-chain path — program constants; consumer program TBD)
+ * Entropy sources (see POST /api/draw):
+ *  1. magicblock — MagicBlock Solana VRF via programs/fair-draw (when deployed + env set)
+ *  2. proofnetwork — optional HTTP VRF when PROOFNETWORK_* configured
+ *  3. solana-blockhash — default public fallback (slot + blockhash hash)
+ *
+ * MagicBlock is program-only (no HTTP VRF). Deploy programs/fair-draw first.
  */
 
 export type VrfProvider = "solana-blockhash" | "proofnetwork" | "magicblock";
