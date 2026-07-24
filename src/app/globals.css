@@ -224,15 +224,38 @@ a, button {
   }
 }
 
-/* Respect the user's OS-level reduced-motion setting. Loading spinners stay
-   animated — a frozen spinner reads as a hang, and rotation conveys state. */
+/* Fair Draw wheel: Edge-safe CSS spin (transform, not Motion infinite). */
+@keyframes vrf-wheel-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.vrf-wheel-spinning {
+  animation: vrf-wheel-spin var(--vrf-spin-dur, 0.6s) linear infinite;
+  transform-origin: 50% 50%;
+  -webkit-transform-origin: 50% 50%;
+}
+
+/* Respect reduced motion, but keep loaders and Fair Draw wheel motion. */
 @media (prefers-reduced-motion: reduce) {
-  *:not(.animate-spin),
-  *:not(.animate-spin)::before,
-  *:not(.animate-spin)::after {
+  *:not(.animate-spin):not(.vrf-wheel-spinning),
+  *:not(.animate-spin):not(.vrf-wheel-spinning)::before,
+  *:not(.animate-spin):not(.vrf-wheel-spinning)::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .vrf-allow-motion,
+  .vrf-allow-motion *,
+  .vrf-wheel-spinning {
+    animation-duration: revert !important;
+    animation-iteration-count: revert !important;
+    transition-duration: revert !important;
   }
 }

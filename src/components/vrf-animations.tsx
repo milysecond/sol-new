@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { motion, useReducedMotion } from "motion/react";
 
 const EASE_OUT = [0.23, 1, 0.32, 1] as const;
@@ -166,6 +166,8 @@ export function VrfDice({
 }
 
 // ── Wheel ────────────────────────────────────────────────────────────────────
+// SVG segments + CSS transform (Edge-safe). Avoids conic-gradient dual-stop
+// bugs and Motion infinite-rotate glitches in Chromium Edge.
 
 const WHEEL_COLORS = [
   "#8b5cf6",
@@ -177,6 +179,24 @@ const WHEEL_COLORS = [
   "#ec4899",
   "#9333ea",
 ];
+
+function polar(cx: number, cy: number, r: number, deg: number) {
+  const rad = ((deg - 90) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+/** Full pie slice from startDeg to endDeg (degrees, 0 = top). */
+function slicePath(cx: number, cy: number, r: number, startDeg: number, endDeg: number) {
+  const span = endDeg - startDeg;
+  // Full circle needs special handling
+  if (span >= 359.99) {
+    return `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} A ${r} ${r} 0 1 1 ${cx} ${cy - r} Z`;
+  }
+  const s = polar(cx, cy, r, startDeg);
+  const e = polar(cx, cy, r, endDeg);
+  const large = span > 180 ? 1 : 0;
+  return `M ${cx} ${cy} L ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y} Z`;
+}
 
 export function VrfWheel({
   entries,
@@ -192,78 +212,147 @@ export function VrfWheel({
   const reduce = useReducedMotion();
   const n = Math.max(entries.length, 1);
   const showLabels = n <= 16;
-  const conic = useMemo(() => {
-    const parts: string[] = [];
-    for (let i = 0; i < n; i++) {
+  const size = 256;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size / 2 - 4;
+
+  const segments = useMemo(() => {
+    return Array.from({ length: n }, (_, i) => {
       const a0 = (i / n) * 360;
       const a1 = ((i + 1) / n) * 360;
-      parts.push(`${WHEEL_COLORS[i % WHEEL_COLORS.length]} ${a0}deg ${a1}deg`);
-    }
-    return `conic-gradient(from -90deg, ${parts.join(", ")})`;
-  }, [n]);
+      const mid = (a0 + a1) / 2;
+      const labelPos = polar(cx, cy, r * 0.62, mid);
+      return {
+        i,
+        path: slicePath(cx, cy, r, a0, a1),
+        color: WHEEL_COLORS[i % WHEEL_COLORS.length],
+        mid,
+        labelX: labelPos.x,
+        labelY: labelPos.y,
+      };
+    });
+  }, [n, cx, cy, r]);
 
   const segmentAngle = 360 / n;
   const winnerCenterFromStart = winnerIndex * segmentAngle + segmentAngle / 2;
-  // More turns for longer durations
+  // Pointer is at top; rotate wheel so winner center lands under pointer
   const extraTurns = Math.max(4, Math.round(durationSec * 2.2));
   const landRotation = 360 * extraTurns + (360 - winnerCenterFromStart);
-  const spinLoop = Math.max(0.5, durationSec * 0.18);
-  const settle = Math.max(0.8, durationSec * 0.72);
+  const spinLoop = Math.max(0.45, durationSec * 0.16);
+  const settle = Math.max(0.85, durationSec * 0.72);
+
+  // Track displayed rotation so Edge doesn't jump when exiting infinite spin
+  const [rotation, setRotation] = useState(0);
+  const [phase, setPhase] = useState<"idle" | "spin" | "land">("idle");
+  const wasSpinning = useRef(false);
+
+  useEffect(() => {
+    if (reduce) {
+      setPhase("idle");
+      setRotation(((360 - winnerCenterFromStart) % 360 + 360) % 360);
+      wasSpinning.current = false;
+      return;
+    }
+    if (spinning) {
+      wasSpinning.current = true;
+      setPhase("spin");
+      return;
+    }
+    // Only settle after a real spin, not on first mount
+    if (!wasSpinning.current) return;
+    wasSpinning.current = false;
+    setPhase("land");
+    setRotation((prev) => {
+      const base = ((prev % 360) + 360) % 360;
+      const targetMod = ((landRotation % 360) + 360) % 360;
+      let delta = targetMod - base;
+      if (delta < 0) delta += 360;
+      const turns = Math.max(3, Math.round(landRotation / 360));
+      return prev + delta + turns * 360;
+    });
+  }, [spinning, landRotation, reduce, winnerCenterFromStart]);
 
   return (
-    <div className="flex flex-col items-center py-4 gap-2">
+    <div className="flex flex-col items-center py-4 gap-2 vrf-allow-motion">
       <div className="relative w-56 h-56 sm:w-64 sm:h-64">
+        {/* Pointer (no filter — Edge often mishandles drop-shadow on border triangles) */}
         <div
-          className="absolute left-1/2 -translate-x-1/2 -top-1 z-10 w-0 h-0"
-          style={{
-            borderLeft: "10px solid transparent",
-            borderRight: "10px solid transparent",
-            borderTop: "18px solid #a78bfa",
-            filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.3))",
-          }}
-        />
-        <motion.div
-          className="w-full h-full rounded-full border-4 border-violet-400/30 shadow-2xl relative overflow-hidden"
-          style={{ background: conic }}
-          animate={
-            reduce
-              ? { rotate: landRotation % 360 }
-              : spinning
-                ? { rotate: 360 * 8 }
-                : { rotate: landRotation }
-          }
-          transition={
-            spinning
-              ? { duration: spinLoop, ease: "linear", repeat: Infinity }
-              : { duration: settle, ease: LAND_EASE }
+          className="absolute left-1/2 -translate-x-1/2 -top-1 z-10"
+          aria-hidden
+        >
+          <svg width="22" height="20" viewBox="0 0 22 20" className="block">
+            <polygon points="11,18 1,2 21,2" fill="#a78bfa" stroke="#7c3aed" strokeWidth="1" />
+          </svg>
+        </div>
+
+        <div
+          className={`w-full h-full rounded-full border-4 border-violet-400/30 shadow-2xl relative vrf-wheel ${
+            phase === "spin" && !reduce ? "vrf-wheel-spinning" : ""
+          }`}
+          style={
+            {
+              transformOrigin: "50% 50%",
+              // Hardware-friendly layer (helps Edge)
+              willChange: spinning || phase === "land" ? "transform" : "auto",
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+              transform: reduce || phase !== "spin" ? `rotate(${rotation}deg)` : undefined,
+              transition:
+                phase === "land" && !reduce
+                  ? `transform ${settle}s cubic-bezier(0.12, 0.8, 0.12, 1)`
+                  : "none",
+              // CSS var for spin keyframes duration
+              ["--vrf-spin-dur" as string]: `${spinLoop}s`,
+            } as CSSProperties
           }
         >
-          {showLabels &&
-            entries.map((item, i) => {
-              const mid = ((i + 0.5) / n) * 360 - 90;
-              const rad = (mid * Math.PI) / 180;
-              const r = 38;
-              const x = 50 + r * Math.cos(rad);
-              const y = 50 + r * Math.sin(rad);
-              const label = item.length > 10 ? item.slice(0, 9) + "…" : item;
-              return (
-                <span
-                  key={i}
-                  className="absolute text-[9px] sm:text-[10px] font-semibold text-white/95 drop-shadow pointer-events-none max-w-[4.5rem] truncate text-center"
-                  style={{
-                    left: `${x}%`,
-                    top: `${y}%`,
-                    transform: `translate(-50%, -50%) rotate(${mid + 90}deg)`,
-                  }}
-                >
-                  {label}
-                </span>
-              );
-            })}
-          <div className="absolute inset-0 m-auto w-12 h-12 rounded-full bg-black/80 border-2 border-violet-300/50 flex items-center justify-center">
-            <span className="text-[10px] font-bold text-violet-200">sol</span>
-          </div>
-        </motion.div>
+          <svg
+            viewBox={`0 0 ${size} ${size}`}
+            className="w-full h-full block"
+            role="img"
+            aria-label="Prize wheel"
+          >
+            <circle cx={cx} cy={cy} r={r} fill="#1e1b4b" />
+            {segments.map((seg) => (
+              <path key={seg.i} d={seg.path} fill={seg.color} stroke="rgba(255,255,255,0.12)" strokeWidth={1} />
+            ))}
+            {showLabels &&
+              entries.map((item, i) => {
+                const seg = segments[i];
+                if (!seg) return null;
+                const label = item.length > 10 ? item.slice(0, 9) + "…" : item;
+                return (
+                  <text
+                    key={`t-${i}`}
+                    x={seg.labelX}
+                    y={seg.labelY}
+                    fill="white"
+                    fontSize={n > 10 ? 9 : 11}
+                    fontWeight={600}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    transform={`rotate(${seg.mid}, ${seg.labelX}, ${seg.labelY})`}
+                    style={{ pointerEvents: "none", userSelect: "none" }}
+                  >
+                    {label}
+                  </text>
+                );
+              })}
+            <circle cx={cx} cy={cy} r={28} fill="rgba(0,0,0,0.85)" stroke="rgba(196,181,253,0.5)" strokeWidth={2} />
+            <text
+              x={cx}
+              y={cy}
+              fill="#ddd6fe"
+              fontSize={11}
+              fontWeight={700}
+              textAnchor="middle"
+              dominantBaseline="middle"
+            >
+              sol
+            </text>
+          </svg>
+        </div>
       </div>
       {n > 16 && (
         <p className="text-[11px] text-gray-500 dark:text-white/40">{n} entries</p>
