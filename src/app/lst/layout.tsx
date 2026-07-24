@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
-  title: "Liquid stake (Sanctum) — sol.new",
+  title: "Liquid stake — sol.new",
   description:
-    "Swap SOL for liquid staking tokens in the Sanctum ecosystem. Keep stake liquid with your passkey wallet.",
+    "Swap SOL for liquid staking tokens. Stay liquid while earning with your passkey wallet.",
   path: "/lst",
 });
 

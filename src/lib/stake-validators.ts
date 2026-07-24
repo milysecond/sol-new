@@ -17,20 +17,6 @@ export const STAKE_VALIDATORS: StakeValidator[] = [
     note: "0% commission · infra team",
   },
   {
-    id: "drift",
-    name: "Drift",
-    vote: "3N7s9zXMZ4QqvHQR15t5GNHyqc89KduzMP7423eWiD5g",
-    commission: 0,
-    note: "0% commission",
-  },
-  {
-    id: "laine",
-    name: "Laine",
-    vote: "DumiCKHVqoCQKD8roLApzR5Fit8qGV5fVQsJV9sTZk4a",
-    commission: 0,
-    note: "0% commission · community",
-  },
-  {
     id: "jupiter",
     name: "Jupiter",
     vote: "CatzoSMUkTRidT5DwBxAC2pEtnwMBTpkCepHkFgZDiqb",

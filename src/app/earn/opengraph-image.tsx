@@ -6,7 +6,7 @@ export const contentType = ogContentType;
 
 export default async function Image() {
   return featureOgImage({
-    eyebrow: "Earn · Lulo",
+    eyebrow: "Earn",
     title: "Protected USDC yield",
     subtitle: "Deposit and withdraw with your passkey. No seed phrases.",
     cta: "Start earning",

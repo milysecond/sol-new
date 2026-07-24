@@ -8,7 +8,7 @@ import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { FaucetFooter } from "@/components/faucet-footer";
 import { MailingListSignup } from "@/components/mailing-list-signup";
-import { Coins, Image, Wallet, ShieldCheck, ArrowRight, Sparkles, Users, Newspaper, ChevronDown, X, ExternalLink, HandCoins, Gift, Trophy, Receipt, Dices } from "lucide-react";
+import { Coins, Image, Wallet, ShieldCheck, ArrowRight, Sparkles, Users, Newspaper, ChevronDown, X, ExternalLink, HandCoins, Gift, Trophy, Receipt, Dices, TrendingUp, Landmark, Droplets, Flame, Layers } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
 import { WelcomeProvider } from "@/components/welcome-message";
@@ -166,12 +166,27 @@ function WhatsNewBanner() {
   );
 }
 
-// Same order as the mobile nav: your money, make things, share it, play.
+// Primary grid: money, create, share, play.
 const products: { href: string; icon: LucideIcon; title: string; desc: string; color: string }[] = [
-  { href: "/wallet", icon: Wallet, title: "Wallet", desc: "Get SOL, send, manage", color: "text-fuchsia-400" },
-  { href: "/token", icon: Coins, title: "Token", desc: "Launch your own coin", color: "text-orange-400" },
-  { href: "/gift", icon: Gift, title: "Gift", desc: "Send crypto with a link", color: "text-amber-400" },
-  { href: "/punt", icon: Trophy, title: "Punt", desc: "World Cup odds & picks", color: "text-green-400" },
+  { href: "/wallet", icon: Wallet, title: "Wallet", desc: "Get SOL, send, manage", color: "text-fuchsia-500 dark:text-fuchsia-400" },
+  { href: "/token", icon: Coins, title: "Token", desc: "Launch your own coin", color: "text-orange-500 dark:text-orange-400" },
+  { href: "/gift", icon: Gift, title: "Gift", desc: "Send crypto with a link", color: "text-amber-500 dark:text-amber-400" },
+  { href: "/punt", icon: Trophy, title: "Punt", desc: "Odds, picks, markets", color: "text-green-600 dark:text-green-400" },
+];
+
+const secondary: { href: string; icon: LucideIcon; label: string; desc: string; color: string }[] = [
+  { href: "/nft", icon: Image, label: "NFT", desc: "Image to NFT", color: "text-green-600 dark:text-green-400" },
+  { href: "/nfts", icon: Layers, label: "Browse", desc: "NFT gallery", color: "text-emerald-600 dark:text-emerald-400" },
+  { href: "/multisig", icon: ShieldCheck, label: "Multisig", desc: "Shared wallet", color: "text-blue-600 dark:text-blue-400" },
+  { href: "/pay", icon: HandCoins, label: "Pay", desc: "Request money", color: "text-teal-600 dark:text-teal-400" },
+  { href: "/split", icon: Users, label: "Split", desc: "Split a bill", color: "text-purple-600 dark:text-purple-400" },
+  { href: "/receipt", icon: Receipt, label: "Receipt", desc: "Tx receipt", color: "text-orange-600 dark:text-orange-400" },
+  { href: "/draw", icon: Dices, label: "Draw", desc: "Fair raffle", color: "text-violet-600 dark:text-violet-400" },
+  { href: "/earn", icon: TrendingUp, label: "Earn", desc: "USDC yield", color: "text-emerald-600 dark:text-emerald-400" },
+  { href: "/stake", icon: Landmark, label: "Stake", desc: "Stake SOL", color: "text-purple-600 dark:text-purple-400" },
+  { href: "/lst", icon: Droplets, label: "LST", desc: "Liquid stake", color: "text-cyan-600 dark:text-cyan-400" },
+  { href: "/burn", icon: Flame, label: "Burn", desc: "Reclaim rent", color: "text-rose-600 dark:text-rose-400" },
+  { href: "/portfolio", icon: Wallet, label: "Portfolio", desc: "Holdings", color: "text-fuchsia-600 dark:text-fuchsia-400" },
 ];
 
 function NextStepBanner() {
@@ -325,15 +340,15 @@ export default function Home() {
       <Navbar />
       <main className="flex-1 flex flex-col px-3 sm:px-6 sm:items-center sm:justify-center min-h-0">
         <PageTransition>
-        <div className="w-full sm:max-w-lg md:max-w-2xl lg:max-w-5xl xl:max-w-6xl flex flex-col gap-3 sm:gap-4 md:gap-5 py-3 lg:py-8">
+        <div className="w-full max-w-lg md:max-w-3xl lg:max-w-5xl xl:max-w-6xl flex flex-col gap-3 sm:gap-4 md:gap-5 py-3 md:py-6 lg:py-8">
           {/* Header */}
           <div className="text-center space-y-2 lg:space-y-3">
-            <img src="/icon-512.png" alt="sol.new" className="w-14 h-14 lg:w-16 lg:h-16 mx-auto rounded-xl electrify" />
-            <h1 className="hidden lg:block text-3xl xl:text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
-              Create anything on <span className="text-purple-400">Solana</span>
+            <img src="/icon-512.png" alt="sol.new" className="w-14 h-14 md:w-16 md:h-16 mx-auto rounded-xl electrify" />
+            <h1 className="hidden md:block text-2xl lg:text-3xl xl:text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
+              Create anything on <span className="text-purple-500 dark:text-purple-400">Solana</span>
             </h1>
             <p className="text-gray-500 dark:text-white/50 text-sm lg:text-base">
-              <span className="lg:hidden">Create anything on Solana. </span>Instant and low fees.
+              <span className="md:hidden">Create anything on Solana. </span>Instant and low fees.
             </p>
             <StatsBar />
             {!publicKey && (
@@ -341,49 +356,41 @@ export default function Home() {
             )}
           </div>
 
-          {/* Two columns on desktop: products left, feed right */}
-          <div className="flex flex-col gap-3 sm:gap-4 md:gap-5 lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 lg:items-start">
+          {/* Two columns from tablet landscape / desktop */}
+          <div className="flex flex-col gap-3 sm:gap-4 md:gap-5 lg:grid lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_340px] lg:gap-6 lg:items-start">
             <div className="flex flex-col gap-3 sm:gap-4 md:gap-5">
-              {/* Next-step nudge for funded-zero wallets */}
               {publicKey && <NextStepBanner />}
 
-              {/* Product grid — 2x2, scales up with viewport */}
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-5">
+              {/* Primary — 2x2 phone, 4-col iPad */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                 {products.map((p) => (
                   <Link
                     key={p.href}
                     href={p.href}
-                    className="group flex flex-col items-center justify-center gap-2 sm:gap-3 md:gap-4 py-6 sm:py-10 md:py-14 lg:py-12 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-95 active:bg-purple-500/10 border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150"
+                    className="group flex flex-col items-center justify-center gap-2 sm:gap-3 py-6 sm:py-8 md:py-10 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-95 border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150"
                   >
                     <AnimatedIcon
                       icon={p.icon}
                       size={24}
-                      className={`${p.color} [&_svg]:w-7 [&_svg]:h-7 sm:[&_svg]:w-10 sm:[&_svg]:h-10 md:[&_svg]:w-12 md:[&_svg]:h-12`}
+                      className={`${p.color} [&_svg]:w-7 [&_svg]:h-7 sm:[&_svg]:w-9 sm:[&_svg]:h-9`}
                     />
-                    <div className="text-sm sm:text-lg md:text-xl font-semibold text-gray-900 dark:text-white transition">{p.title}</div>
-                    <div className="text-[11px] sm:text-sm md:text-base text-gray-500 dark:text-white/40 px-2 text-center leading-tight">{p.desc}</div>
+                    <div className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">{p.title}</div>
+                    <div className="text-[11px] sm:text-xs text-gray-500 dark:text-white/40 px-2 text-center leading-tight">{p.desc}</div>
                   </Link>
                 ))}
               </div>
 
-              {/* Secondary tools — reachable on every device */}
-              <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-                {[
-                  { href: "/nft", icon: Image, label: "NFT", desc: "Image to NFT", color: "text-green-400" },
-                  { href: "/multisig", icon: ShieldCheck, label: "Multisig", desc: "Shared wallet", color: "text-blue-400" },
-                  { href: "/pay", icon: HandCoins, label: "Pay", desc: "Request money", color: "text-teal-400" },
-                  { href: "/split", icon: Users, label: "Split", desc: "Split a bill", color: "text-purple-400" },
-                  { href: "/receipt", icon: Receipt, label: "Receipt", desc: "Tx receipt", color: "text-orange-400" },
-                  { href: "/draw", icon: Dices, label: "Draw", desc: "Fair raffle", color: "text-violet-400" },
-                ].map((t) => (
+              {/* Secondary tools — 3-col phone, 4-col iPad, 6-col desktop */}
+              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
+                {secondary.map((t) => (
                   <Link
                     key={t.href}
                     href={t.href}
-                    className="group flex flex-col items-center justify-center gap-1.5 py-4 sm:py-5 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-95 border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150"
+                    className="group flex flex-col items-center justify-center gap-1.5 py-3.5 sm:py-4 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-95 border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150"
                   >
-                    <t.icon className={`w-5 h-5 sm:w-6 sm:h-6 ${t.color}`} />
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">{t.label}</div>
-                    <div className="text-[10px] sm:text-[11px] text-gray-500 dark:text-white/40 leading-tight text-center px-1">{t.desc}</div>
+                    <t.icon className={`w-5 h-5 sm:w-5.5 sm:h-5.5 ${t.color}`} />
+                    <div className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">{t.label}</div>
+                    <div className="text-[10px] text-gray-500 dark:text-white/40 leading-tight text-center px-1 hidden sm:block">{t.desc}</div>
                   </Link>
                 ))}
               </div>

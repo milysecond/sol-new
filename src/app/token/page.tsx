@@ -212,6 +212,64 @@ const EXAMPLE_TOKENS: {
   },
 ];
 
+function TopTokensBrowse() {
+  const { network } = useNetwork();
+  const [tokens, setTokens] = useState<
+    { name: string; symbol: string; mint_address: string; image_url: string | null; created_at: string }[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/tokens/recent?limit=12&network=${network}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const data = d as { tokens?: typeof tokens };
+        setTokens(data.tokens || []);
+      })
+      .catch(() => setTokens([]))
+      .finally(() => setLoading(false));
+  }, [network]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-gray-900 dark:text-white">Top recent launches</p>
+        <Link href="/whats-new" className="text-xs text-purple-600 dark:text-purple-400 hover:underline">
+          See all
+        </Link>
+      </div>
+      {loading ? (
+        <p className="text-xs text-gray-400 text-center py-4">Loading…</p>
+      ) : tokens.length === 0 ? (
+        <p className="text-xs text-gray-400 text-center py-4">No launches yet on this network.</p>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {tokens.map((t) => (
+            <Link
+              key={t.mint_address}
+              href={`/token/${t.mint_address}`}
+              className="flex items-center gap-2 p-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] hover:border-purple-400/40 transition"
+            >
+              {t.image_url ? (
+                <img src={t.image_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-orange-500/15 flex items-center justify-center shrink-0">
+                  <Coins size={14} className="text-orange-500" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-xs font-semibold truncate text-gray-900 dark:text-white">{t.name}</p>
+                <p className="text-[10px] font-mono text-gray-400">${t.symbol}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ExampleTokens() {
   return (
     <div className="space-y-2">
@@ -388,6 +446,7 @@ function StylePicker({ onSelect }: { onSelect: (s: Exclude<Style, "pick">) => vo
           })}
         </div>
 
+        <TopTokensBrowse />
         <ExampleTokens />
       </div>
 

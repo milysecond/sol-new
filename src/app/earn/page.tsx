@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Connection, PublicKey, Transaction } from "@solana/web3.js";
+import {
+  Connection,
+  PublicKey,
+  Transaction,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import { TrendingUp } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
@@ -11,9 +16,50 @@ import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { friendlyError } from "@/lib/friendly-errors";
+import type { Keypair } from "@solana/web3.js";
+
+async function signAndSendBase64(
+  connection: Connection,
+  b64: string,
+  keypair: Keypair,
+  feePayer: PublicKey,
+): Promise<string> {
+  const raw = Buffer.from(b64, "base64");
+  // Prefer versioned decode; fall back to legacy Transaction.
+  try {
+    const vtx = VersionedTransaction.deserialize(raw);
+    vtx.sign([keypair]);
+    const sig = await connection.sendRawTransaction(vtx.serialize(), {
+      skipPreflight: false,
+      maxRetries: 3,
+    });
+    await connection.confirmTransaction(sig, "confirmed");
+    return sig;
+  } catch (first) {
+    try {
+      const tx = Transaction.from(raw);
+      const { blockhash, lastValidBlockHeight } =
+        await connection.getLatestBlockhash("confirmed");
+      tx.recentBlockhash = blockhash;
+      if (!tx.feePayer) tx.feePayer = feePayer;
+      tx.partialSign(keypair);
+      const sig = await connection.sendRawTransaction(tx.serialize(), {
+        skipPreflight: false,
+        maxRetries: 3,
+      });
+      await connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        "confirmed",
+      );
+      return sig;
+    } catch {
+      throw first instanceof Error ? first : new Error(String(first));
+    }
+  }
+}
 
 export default function EarnPage() {
-  const { publicKey, refreshBalance } = useWallet();
+  const { publicKey, usdcBalance, refreshBalance } = useWallet();
   const { rpc, network } = useNetwork();
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [amount, setAmount] = useState("10");
@@ -49,6 +95,21 @@ export default function EarnPage() {
       setError("Switch to mainnet to earn.");
       return;
     }
+    const amt = parseFloat(amount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      setError("Enter a valid amount.");
+      return;
+    }
+    if (action === "deposit") {
+      const bal = usdcBalance ?? 0;
+      if (amt > bal + 1e-6) {
+        setError(
+          `Not enough USDC. You have $${bal.toFixed(2)}. Add funds from Get, then try again.`,
+        );
+        return;
+      }
+    }
+
     setBusy(true);
     setError(null);
     setSig(null);
@@ -75,23 +136,11 @@ export default function EarnPage() {
 
       const { keypair } = await getPasskeyKeypair();
       const connection = new Connection(rpc, "confirmed");
+      const feePayer = new PublicKey(publicKey);
       let lastSig = "";
 
       for (const b64 of txs) {
-        const tx = Transaction.from(Buffer.from(b64, "base64"));
-        const { blockhash, lastValidBlockHeight } =
-          await connection.getLatestBlockhash("confirmed");
-        tx.recentBlockhash = blockhash;
-        if (!tx.feePayer) tx.feePayer = new PublicKey(publicKey);
-        tx.partialSign(keypair);
-        lastSig = await connection.sendRawTransaction(tx.serialize(), {
-          skipPreflight: false,
-          maxRetries: 3,
-        });
-        await connection.confirmTransaction(
-          { signature: lastSig, blockhash, lastValidBlockHeight },
-          "confirmed",
-        );
+        lastSig = await signAndSendBase64(connection, b64, keypair, feePayer);
       }
 
       setSig(lastSig);
@@ -123,19 +172,19 @@ export default function EarnPage() {
           <PageTransition>
             <div className="w-full sm:max-w-lg space-y-6">
               <div className="text-center space-y-2">
-                <TrendingUp className="mx-auto text-emerald-400" size={36} />
+                <TrendingUp className="mx-auto text-emerald-500" size={36} />
                 <h1 className="text-3xl font-bold tracking-tight">Earn</h1>
                 <p className="text-gray-500 dark:text-white/50 text-sm">
-                  Protected USDC yield powered by Lulo. Deposit and withdraw with your passkey.
+                  Protected USDC yield. Deposit and withdraw with your passkey.
                 </p>
                 <p className="text-[11px] text-gray-400">
                   Stake SOL →{" "}
-                  <a href="/stake" className="text-purple-400 hover:underline">
+                  <a href="/stake" className="text-purple-600 dark:text-purple-400 hover:underline">
                     /stake
                   </a>
                   {" · "}
-                  Liquid stake (Sanctum) →{" "}
-                  <a href="/lst" className="text-purple-400 hover:underline">
+                  Liquid stake →{" "}
+                  <a href="/lst" className="text-purple-600 dark:text-purple-400 hover:underline">
                     /lst
                   </a>
                 </p>
@@ -148,7 +197,7 @@ export default function EarnPage() {
               )}
 
               {configured === false && (
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-sm text-amber-700 dark:text-amber-300">
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-sm text-amber-800 dark:text-amber-300">
                   Earn is temporarily unavailable. Try again later.
                 </div>
               )}
@@ -164,7 +213,15 @@ export default function EarnPage() {
                     </p>
                     {rateHint && (
                       <p>
-                        APY: <span className="font-semibold text-emerald-400">{rateHint}</span>
+                        APY:{" "}
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                          {rateHint}
+                        </span>
+                      </p>
+                    )}
+                    {action === "deposit" && (
+                      <p className="text-xs text-gray-500 dark:text-white/40">
+                        Wallet USDC: ${(usdcBalance ?? 0).toFixed(2)}
                       </p>
                     )}
                   </div>
@@ -178,7 +235,7 @@ export default function EarnPage() {
                         className={`flex-1 py-2 rounded-xl text-sm capitalize transition cursor-pointer ${
                           action === a
                             ? "bg-emerald-600 text-white"
-                            : "bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10"
+                            : "bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/70"
                         }`}
                       >
                         {a}
@@ -218,14 +275,14 @@ export default function EarnPage() {
                   href={`https://solscan.io/tx/${sig}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block text-xs text-emerald-400 font-mono truncate hover:underline"
+                  className="block text-xs text-emerald-700 dark:text-emerald-400 font-mono truncate hover:underline"
                 >
                   {sig}
                 </a>
               )}
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-red-400 text-xs">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-red-600 dark:text-red-400 text-xs">
                   {error}
                 </div>
               )}

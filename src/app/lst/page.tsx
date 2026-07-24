@@ -155,7 +155,7 @@ export default function LstPage() {
         }
       }
 
-      // Order with signer so Sanctum builds the unsigned tx
+      // Order with signer so the route builds the unsigned tx
       const params = new URLSearchParams({
         inp: inputMint,
         out: outputMint,
@@ -166,8 +166,8 @@ export default function LstPage() {
       });
       const oRes = await fetch(`/api/lst/order?${params}`, { cache: "no-store" });
       const order = (await oRes.json()) as OrderResponse;
-      if (!oRes.ok) throw new Error(order.error || "Sanctum quote failed");
-      if (!order.tx) throw new Error("Sanctum did not return a transaction. Try again.");
+      if (!oRes.ok) throw new Error(order.error || "Quote failed");
+      if (!order.tx) throw new Error("No transaction returned. Try again.");
 
       const { keypair } = await getPasskeyKeypair();
       if (keypair.publicKey.toBase58() !== publicKey) {
@@ -187,7 +187,7 @@ export default function LstPage() {
 
       let signature = eData.signature;
       if (!eRes.ok || !signature) {
-        // Fallback: broadcast signed tx ourselves if Sanctum execute rejects
+        // Fallback: broadcast signed tx ourselves if execute rejects
         try {
           const conn = new Connection(rpc, "confirmed");
           const raw = Buffer.from(signedTx, "base64");
@@ -205,7 +205,7 @@ export default function LstPage() {
           }
           await conn.confirmTransaction(signature, "confirmed");
         } catch {
-          throw new Error(eData.error || "Sanctum execute failed");
+          throw new Error(eData.error || "Swap failed");
         }
       }
 
@@ -241,7 +241,7 @@ export default function LstPage() {
                 <Droplets className="mx-auto text-cyan-400" size={36} />
                 <h1 className="text-3xl font-bold tracking-tight">Liquid stake</h1>
                 <p className="text-gray-500 dark:text-white/50 text-sm">
-                  Sanctum Router. Swap SOL for LSTs (and back) with your passkey.
+                  Swap SOL for liquid staked tokens (and back) with your passkey.
                 </p>
                 <p className="text-[11px] text-gray-400">
                   Native stake →{" "}
@@ -249,14 +249,14 @@ export default function LstPage() {
                     /stake
                   </a>
                   {" · "}
-                  USDC yield (Lulo) →{" "}
+                  USDC yield →{" "}
                   <a href="/earn" className="text-emerald-400 hover:underline">
                     /earn
                   </a>
                 </p>
                 {sanctumOk === false && (
                   <p className="text-[11px] text-amber-500">
-                    Sanctum API unavailable — try again shortly.
+                    Quotes unavailable — try again shortly.
                   </p>
                 )}
               </div>
@@ -298,14 +298,14 @@ export default function LstPage() {
                         disabled={busy}
                         className={`text-left px-3 py-2 rounded-xl border text-xs transition cursor-pointer ${
                           lst.id === opt.id
-                            ? "bg-cyan-500/15 border-cyan-400/50 text-cyan-100"
-                            : "bg-white dark:bg-black border-black/10 dark:border-white/10 text-gray-600 dark:text-white/70"
+                            ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-900 dark:text-cyan-100"
+                            : "bg-white dark:bg-black border-black/10 dark:border-white/10 text-gray-700 dark:text-white/70"
                         }`}
                       >
                         <span className="font-semibold block">
                           {opt.symbol}
                           {opt.apyLabel ? (
-                            <span className="font-normal text-cyan-400/90 ml-1">
+                            <span className="font-normal text-cyan-700 dark:text-cyan-400/90 ml-1">
                               {opt.apyLabel}
                             </span>
                           ) : null}
@@ -358,7 +358,7 @@ export default function LstPage() {
                 </div>
 
                 <div className="text-xs text-gray-500 dark:text-white/50 min-h-[1.25rem]">
-                  {quoting && "Quoting Sanctum…"}
+                  {quoting && "Quoting…"}
                   {!quoting && quoteOut && (
                     <>
                       Est. receive ≈{" "}
@@ -398,16 +398,7 @@ export default function LstPage() {
               )}
 
               <p className="text-[11px] text-gray-400 text-center leading-relaxed">
-                Quotes and execution via{" "}
-                <a
-                  href="https://learn.sanctum.so/docs/for-developers/sanctum-api"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-cyan-400 hover:underline"
-                >
-                  Sanctum API
-                </a>
-                . sol.new never holds your funds.
+                sol.new never holds your funds. Passkey signs every swap.
               </p>
             </div>
           </PageTransition>

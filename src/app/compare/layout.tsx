@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
-  title: "Earn USDC — sol.new",
+  title: "Compare — sol.new vs launchpads",
   description:
-    "Earn protected USDC yield on Solana. Deposit and withdraw with your passkey wallet.",
-  path: "/earn",
+    "How sol.new compares for launching tokens, minting NFTs, staking, and managing wallets on Solana.",
+  path: "/compare",
 });
 
 export default function Layout({ children }: { children: React.ReactNode }) {

@@ -12,6 +12,7 @@ import { useWallet } from "@/lib/wallet-context";
 import { fastIpfsUrl } from "@/lib/ipfs";
 import { PublicKey } from "@solana/web3.js";
 import { Suspense } from "react";
+import { resolveRecipient } from "@/lib/resolve-name";
 
 type SortKey = "recent" | "name" | "price_asc" | "price_desc";
 type TypeFilter = "all" | "compressed" | "standard";
@@ -168,17 +169,37 @@ function NftsBrowseInner() {
     void load(owner, page, tab, sort, filterQuery);
   }, [owner, page, tab, sort, filterQuery, load]);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const a = input.trim();
+    if (!a) return;
+    setError(null);
+    setLoading(true);
     try {
-      new PublicKey(a);
-      setOwner(a);
+      const result = await resolveRecipient(a);
+      if (!result.ok) {
+        setError(result.error);
+        setLoading(false);
+        return;
+      }
+      setOwner(result.owner);
+      setInput(result.kind !== "pubkey" ? a : result.owner);
       setPage(1);
-      router.replace(`/nfts?owner=${encodeURIComponent(a)}`);
+      router.replace(`/nfts?owner=${encodeURIComponent(result.owner)}`);
     } catch {
-      setError("Invalid Solana address");
+      setError("Could not resolve address");
+      setLoading(false);
     }
+  };
+
+  const clearAddress = () => {
+    setInput("");
+    setOwner(null);
+    setItems([]);
+    setTotal(0);
+    setError(null);
+    setPage(1);
+    router.replace("/nfts");
   };
 
   const clearFilters = () => {
@@ -195,8 +216,8 @@ function NftsBrowseInner() {
   const chip = (active: boolean) =>
     `px-2.5 py-1 rounded-full text-xs transition cursor-pointer border ${
       active
-        ? "bg-purple-500/20 text-purple-300 border-purple-400/50"
-        : "bg-black/5 dark:bg-white/5 text-gray-500 border-black/10 dark:border-white/10 hover:border-purple-400/30"
+        ? "bg-purple-500/15 text-purple-800 dark:text-purple-200 border-purple-400/50"
+        : "bg-black/5 dark:bg-white/5 text-gray-600 dark:text-gray-500 border-black/10 dark:border-white/10 hover:border-purple-400/30"
     }`;
 
   return (
@@ -219,13 +240,27 @@ function NftsBrowseInner() {
               </p>
             </div>
 
-            <form onSubmit={submit} className="flex gap-2">
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Wallet address"
-                className="flex-1 px-3 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm font-mono focus:outline-none focus:border-purple-400/50"
-              />
+            <form onSubmit={(e) => void submit(e)} className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Address or name.sol / .bonk / .skr"
+                  spellCheck={false}
+                  autoComplete="off"
+                  className="w-full px-3 py-2.5 pr-9 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm focus:outline-none focus:border-purple-400/50"
+                />
+                {input && (
+                  <button
+                    type="button"
+                    onClick={clearAddress}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer"
+                    aria-label="Clear address"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
               <button
                 type="submit"
                 className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition cursor-pointer flex items-center gap-1.5"
@@ -234,19 +269,31 @@ function NftsBrowseInner() {
               </button>
             </form>
 
-            {publicKey && owner !== publicKey && (
-              <button
-                type="button"
-                onClick={() => {
-                  setInput(publicKey);
-                  setOwner(publicKey);
-                  setPage(1);
-                }}
-                className="text-xs text-purple-400 hover:underline cursor-pointer"
-              >
-                Use my wallet
-              </button>
-            )}
+            <div className="flex flex-wrap gap-3 justify-center">
+              {publicKey && owner !== publicKey && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInput(publicKey);
+                    setOwner(publicKey);
+                    setPage(1);
+                    router.replace(`/nfts?owner=${encodeURIComponent(publicKey)}`);
+                  }}
+                  className="text-xs text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
+                >
+                  Use my wallet
+                </button>
+              )}
+              {owner && (
+                <button
+                  type="button"
+                  onClick={clearAddress}
+                  className="text-xs text-gray-500 hover:underline cursor-pointer"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
 
             {owner && (
               <div className="flex gap-2 justify-center">

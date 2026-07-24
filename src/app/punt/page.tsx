@@ -2,13 +2,24 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Navbar } from "@/components/navbar";
-import { Trophy, RefreshCw, Medal } from "lucide-react";
+import { Trophy, RefreshCw, Medal, ExternalLink } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
+import { PageTransition } from "@/components/page-transition";
 import { useWallet } from "@/lib/wallet-context";
 import type { PuntMatch, PuntOutcome } from "@/app/api/punt/route";
 
 const POLL_MS = 60_000;
+
+type SourceTab = "txodds" | "kalshi" | "polymarket";
+
+type ExtMarket = {
+  id: string;
+  title: string;
+  url: string;
+  price?: string | null;
+  volume?: string | null;
+};
 
 interface MyPick {
   fixtureId: number;
@@ -230,114 +241,307 @@ export default function PuntPage() {
     }
   };
 
+  const [source, setSource] = useState<SourceTab>("txodds");
+  const [extMarkets, setExtMarkets] = useState<ExtMarket[]>([]);
+  const [extLoading, setExtLoading] = useState(false);
+  const [extError, setExtError] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+
+  useEffect(() => {
+    if (source === "txodds") return;
+    let cancelled = false;
+    setExtLoading(true);
+    setExtError(null);
+    setExtMarkets([]);
+    (async () => {
+      try {
+        if (source === "polymarket") {
+          const res = await fetch(
+            "https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=40&order=volume24hr&ascending=false",
+            { cache: "no-store" },
+          );
+          if (!res.ok) throw new Error("Could not load Polymarket");
+          const data = (await res.json()) as Array<{
+            id?: string;
+            question?: string;
+            slug?: string;
+            outcomePrices?: string;
+            volume24hr?: number;
+            volume?: number;
+          }>;
+          if (cancelled) return;
+          setExtMarkets(
+            (Array.isArray(data) ? data : []).slice(0, 30).map((m, i) => {
+              let price: string | null = null;
+              try {
+                const prices = JSON.parse(m.outcomePrices || "[]") as string[];
+                if (prices[0]) price = `${(Number(prices[0]) * 100).toFixed(0)}¢`;
+              } catch {
+                /* ignore */
+              }
+              const vol = m.volume24hr ?? m.volume;
+              return {
+                id: m.id || m.slug || String(i),
+                title: m.question || m.slug || "Market",
+                url: m.slug
+                  ? `https://polymarket.com/event/${m.slug}`
+                  : "https://polymarket.com",
+                price,
+                volume: vol != null ? `$${Math.round(Number(vol)).toLocaleString()}` : null,
+              };
+            }),
+          );
+        } else {
+          // Kalshi public market list (best effort)
+          const res = await fetch(
+            "https://api.elections.kalshi.com/trade-api/v2/markets?limit=40&status=open",
+            { cache: "no-store" },
+          );
+          if (!res.ok) throw new Error("Could not load Kalshi");
+          const data = (await res.json()) as {
+            markets?: Array<{
+              ticker?: string;
+              title?: string;
+              yes_bid?: number;
+              yes_ask?: number;
+              volume_24h?: number;
+            }>;
+          };
+          if (cancelled) return;
+          setExtMarkets(
+            (data.markets || []).slice(0, 30).map((m, i) => {
+              const mid =
+                m.yes_bid != null && m.yes_ask != null
+                  ? (m.yes_bid + m.yes_ask) / 2
+                  : m.yes_bid ?? m.yes_ask;
+              return {
+                id: m.ticker || String(i),
+                title: m.title || m.ticker || "Market",
+                url: m.ticker
+                  ? `https://kalshi.com/markets/${m.ticker.toLowerCase()}`
+                  : "https://kalshi.com",
+                price: mid != null ? `${Math.round(mid)}¢` : null,
+                volume:
+                  m.volume_24h != null
+                    ? `${Math.round(m.volume_24h).toLocaleString()} contracts`
+                    : null,
+              };
+            }),
+          );
+        }
+      } catch (e) {
+        if (!cancelled) setExtError(e instanceof Error ? e.message : "Load failed");
+      } finally {
+        if (!cancelled) setExtLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [source]);
+
   const liveMatches = matches?.filter((m) => m.live) ?? [];
   const upcoming = matches?.filter((m) => !m.live) ?? [];
   const settledPicks = Object.values(myPicks).filter((p) => p.settled);
   const myPoints = settledPicks.reduce((s, p) => s + p.points, 0);
   const myWins = settledPicks.filter((p) => p.pick === p.result).length;
 
+  const filteredExt = extMarkets.filter((m) =>
+    !q.trim() ? true : m.title.toLowerCase().includes(q.trim().toLowerCase()),
+  );
+
+  const sourceChip = (id: SourceTab, label: string) => (
+    <button
+      key={id}
+      type="button"
+      onClick={() => setSource(id)}
+      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition cursor-pointer ${
+        source === id
+          ? "bg-green-600 text-white border-green-600"
+          : "bg-black/5 dark:bg-white/5 text-gray-700 dark:text-white/70 border-black/10 dark:border-white/10"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
       <main className="flex-1 w-full max-w-2xl mx-auto px-4 py-8 space-y-8">
+        <PageTransition>
         <div className="text-center space-y-3">
-          <AnimatedIcon icon={Trophy} size={40} className="text-green-400" />
-          <h1 className="text-3xl font-bold tracking-tight">World Cup odds, live</h1>
+          <AnimatedIcon icon={Trophy} size={40} className="text-green-600 dark:text-green-400" />
+          <h1 className="text-3xl font-bold tracking-tight">Punt</h1>
           <p className="text-gray-500 dark:text-white/50">
-            Fair, de-margined odds from the TXODDS oracle — and a free picks game.
-            Tap a team before kickoff. Bolder picks, more points.
+            Live odds, free picks, and prediction markets. Filter by source.
           </p>
+          <a
+            href="https://punt.fun"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-400 hover:underline"
+          >
+            Open punt.fun <ExternalLink size={14} />
+          </a>
         </div>
 
-        {publicKey && settledPicks.length > 0 && (
-          <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl px-5 py-4 flex items-center justify-center gap-6 text-sm">
-            <span><span className="font-mono font-bold text-amber-500">{myPoints}</span> pts</span>
-            <span className="text-gray-300 dark:text-white/15">·</span>
-            <span><span className="font-mono font-bold">{myWins}</span>/{settledPicks.length} correct</span>
-          </div>
-        )}
+        <div className="flex flex-wrap justify-center gap-2">
+          {sourceChip("txodds", "TXODDS")}
+          {sourceChip("polymarket", "Polymarket")}
+          {sourceChip("kalshi", "Kalshi")}
+        </div>
 
-        {!matches && !error && (
-          <div className="text-center py-12">
-            <Spinner size={28} className="mx-auto" />
-            <p className="text-gray-400 dark:text-white/30 text-sm mt-3">Fetching the latest odds…</p>
-          </div>
-        )}
+        {source === "txodds" && (
+          <>
+            {publicKey && settledPicks.length > 0 && (
+              <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl px-5 py-4 flex items-center justify-center gap-6 text-sm">
+                <span><span className="font-mono font-bold text-amber-600 dark:text-amber-500">{myPoints}</span> pts</span>
+                <span className="text-gray-300 dark:text-white/15">·</span>
+                <span><span className="font-mono font-bold">{myWins}</span>/{settledPicks.length} correct</span>
+              </div>
+            )}
 
-        {error && !matches && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-500 dark:text-red-400 text-sm text-center">
-            Couldn&apos;t load odds right now — try again in a minute.
-          </div>
-        )}
+            {!matches && !error && (
+              <div className="text-center py-12">
+                <Spinner size={28} className="mx-auto" />
+                <p className="text-gray-400 dark:text-white/30 text-sm mt-3">Fetching the latest odds…</p>
+              </div>
+            )}
 
-        {matches && matches.length === 0 && (
-          <div className="text-center py-12 space-y-2">
-            <p className="text-gray-500 dark:text-white/50">No matches on the board right now.</p>
-            <p className="text-gray-400 dark:text-white/30 text-sm">Check back closer to kickoff.</p>
-          </div>
-        )}
+            {error && !matches && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-600 dark:text-red-400 text-sm text-center">
+                Couldn&apos;t load odds right now — try again in a minute.
+              </div>
+            )}
 
-        {liveMatches.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold text-gray-600 dark:text-white/60">Live now</h2>
-            {liveMatches.map((m) => (
-              <MatchCard key={m.fixtureId} match={m} myPick={myPicks[m.fixtureId]?.pick ?? null} busy={picking === m.fixtureId} onPick={(p) => handlePick(m, p)} />
-            ))}
-          </section>
-        )}
+            {matches && matches.length === 0 && (
+              <div className="text-center py-12 space-y-2">
+                <p className="text-gray-500 dark:text-white/50">No matches on the board right now.</p>
+                <p className="text-gray-400 dark:text-white/30 text-sm">Check back closer to kickoff.</p>
+              </div>
+            )}
 
-        {upcoming.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold text-gray-600 dark:text-white/60">
-              Coming up {publicKey ? "— tap to pick" : ""}
-            </h2>
-            {upcoming.map((m) => (
-              <MatchCard key={m.fixtureId} match={m} myPick={myPicks[m.fixtureId]?.pick ?? null} busy={picking === m.fixtureId} onPick={(p) => handlePick(m, p)} />
-            ))}
-          </section>
-        )}
+            {liveMatches.length > 0 && (
+              <section className="space-y-3">
+                <h2 className="text-sm font-semibold text-gray-700 dark:text-white/60">Live now</h2>
+                {liveMatches.map((m) => (
+                  <MatchCard key={m.fixtureId} match={m} myPick={myPicks[m.fixtureId]?.pick ?? null} busy={picking === m.fixtureId} onPick={(p) => handlePick(m, p)} />
+                ))}
+              </section>
+            )}
 
-        {leaders && leaders.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold text-gray-600 dark:text-white/60 flex items-center gap-1.5">
-              <Medal size={14} /> Leaderboard
-            </h2>
-            <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl divide-y divide-black/5 dark:divide-white/5">
-              {leaders.map((l) => (
-                <div
-                  key={l.wallet}
-                  className={`flex items-center gap-3 px-4 py-2.5 text-sm ${l.wallet === publicKey ? "bg-amber-500/10" : ""}`}
-                >
-                  <span className="w-6 text-gray-400 dark:text-white/30 font-mono text-xs">{l.rank}</span>
-                  <span className="flex-1 font-mono text-xs">
-                    {l.wallet === publicKey ? "You" : short(l.wallet)}
-                  </span>
-                  <span className="text-xs text-gray-400 dark:text-white/30">{l.wins}/{l.settled}</span>
-                  <span className="font-mono font-semibold text-amber-500 w-14 text-right">{l.points}</span>
+            {upcoming.length > 0 && (
+              <section className="space-y-3">
+                <h2 className="text-sm font-semibold text-gray-700 dark:text-white/60">
+                  Coming up {publicKey ? "— tap to pick" : ""}
+                </h2>
+                {upcoming.map((m) => (
+                  <MatchCard key={m.fixtureId} match={m} myPick={myPicks[m.fixtureId]?.pick ?? null} busy={picking === m.fixtureId} onPick={(p) => handlePick(m, p)} />
+                ))}
+              </section>
+            )}
+
+            {leaders && leaders.length > 0 && (
+              <section className="space-y-3">
+                <h2 className="text-sm font-semibold text-gray-700 dark:text-white/60 flex items-center gap-1.5">
+                  <Medal size={14} /> Leaderboard
+                </h2>
+                <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl divide-y divide-black/5 dark:divide-white/5">
+                  {leaders.map((l) => (
+                    <div
+                      key={l.wallet}
+                      className={`flex items-center gap-3 px-4 py-2.5 text-sm ${l.wallet === publicKey ? "bg-amber-500/10" : ""}`}
+                    >
+                      <span className="w-6 text-gray-400 dark:text-white/30 font-mono text-xs">{l.rank}</span>
+                      <span className="flex-1 font-mono text-xs">
+                        {l.wallet === publicKey ? "You" : short(l.wallet)}
+                      </span>
+                      <span className="text-xs text-gray-400 dark:text-white/30">{l.wins}/{l.settled}</span>
+                      <span className="font-mono font-semibold text-amber-600 dark:text-amber-500 w-14 text-right">{l.points}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </section>
+              </section>
+            )}
+
+            {matches && (
+              <div className="flex items-center justify-center gap-3 text-xs text-gray-400 dark:text-white/30">
+                {updatedAt && <span>Updated {new Date(updatedAt).toLocaleTimeString()}</span>}
+                <button
+                  onClick={() => { load(true); loadPicks(); loadLeaders(); }}
+                  disabled={refreshing}
+                  className="inline-flex items-center gap-1 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw size={11} className={refreshing ? "animate-spin" : ""} /> Refresh
+                </button>
+              </div>
+            )}
+          </>
         )}
 
-        {matches && (
-          <div className="flex items-center justify-center gap-3 text-xs text-gray-400 dark:text-white/30">
-            {updatedAt && <span>Updated {new Date(updatedAt).toLocaleTimeString()}</span>}
-            <button
-              onClick={() => { load(true); loadPicks(); loadLeaders(); }}
-              disabled={refreshing}
-              className="inline-flex items-center gap-1 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw size={11} className={refreshing ? "animate-spin" : ""} /> Refresh
-            </button>
-          </div>
+        {source !== "txodds" && (
+          <section className="space-y-3">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={`Filter ${source} markets…`}
+              className="w-full px-3 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm"
+            />
+            {extLoading && (
+              <div className="text-center py-10">
+                <Spinner size={24} className="mx-auto" />
+              </div>
+            )}
+            {extError && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-600 dark:text-red-400 text-sm text-center">
+                {extError}. Open{" "}
+                <a
+                  href={source === "kalshi" ? "https://kalshi.com" : "https://polymarket.com"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  {source}
+                </a>{" "}
+                directly.
+              </div>
+            )}
+            {!extLoading &&
+              filteredExt.map((m) => (
+                <a
+                  key={m.id}
+                  href={m.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] px-4 py-3 hover:border-green-500/40 transition"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white leading-snug">
+                      {m.title}
+                    </p>
+                    <ExternalLink size={14} className="shrink-0 text-gray-400 mt-0.5" />
+                  </div>
+                  <div className="flex gap-3 mt-1.5 text-xs text-gray-500 dark:text-white/40">
+                    {m.price && <span className="font-mono text-green-700 dark:text-green-400">{m.price}</span>}
+                    {m.volume && <span>vol {m.volume}</span>}
+                  </div>
+                </a>
+              ))}
+            {!extLoading && !extError && filteredExt.length === 0 && (
+              <p className="text-center text-sm text-gray-400 py-8">No markets match that filter.</p>
+            )}
+          </section>
         )}
 
         <p className="text-center text-[11px] text-gray-400 dark:text-white/25 leading-relaxed">
-          Odds by TXODDS TxLINE — cryptographically anchored on Solana. Percentages are de-margined
-          implied probabilities. The picks game is free to play: no stakes, no payouts, just points and glory.
-          This is information and entertainment, not a betting service.
+          TXODDS picks are free: points only, no payouts. External markets open on their own sites.
+          Information and entertainment only — not a betting service.{" "}
+          <a href="https://punt.fun" target="_blank" rel="noopener noreferrer" className="underline">
+            punt.fun
+          </a>
         </p>
+        </PageTransition>
       </main>
     </div>
   );
