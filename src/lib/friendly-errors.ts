@@ -42,6 +42,17 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
     return "Too many requests too fast — wait a few seconds and retry.";
   }
 
+  // Versioned / legacy tx decode
+  if (
+    m.includes("versionedtransaction") ||
+    m.includes("versioned transaction") ||
+    m.includes("does not support versioned") ||
+    m.includes("expected number") && m.includes("transaction") ||
+    m.includes("unable to parse") && m.includes("transaction")
+  ) {
+    return "Couldn't read that transaction. Refresh and try again.";
+  }
+
   // Slot / preflight
   if (m.includes("simulation failed") || m.includes("preflight")) {
     return "The transaction couldn't be built. Refresh the page and try again.";

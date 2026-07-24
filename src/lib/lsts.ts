@@ -1,7 +1,4 @@
-/**
- * Curated Sanctum-ecosystem liquid staking tokens for /lst.
- * Swaps run via Jupiter (browser → lite-api) so no Sanctum API key is required.
- */
+/** Curated liquid staking tokens for /lst. */
 
 export type LstOption = {
   id: string;
@@ -27,7 +24,7 @@ export const SANCTUM_LSTS: LstOption[] = [
     symbol: "anzSOL",
     name: "Solana ANZ Staked SOL",
     mint: "ANZvHuXQh5DnBMzJ55MUyMtPxkdphgBwiPeYji2B3kxS",
-    blurb: "ANZ community LST via Sanctum",
+    blurb: "ANZ community liquid stake",
   },
   {
     id: "msol",
@@ -46,9 +43,9 @@ export const SANCTUM_LSTS: LstOption[] = [
   {
     id: "inf",
     symbol: "INF",
-    name: "Sanctum Infinity",
+    name: "Infinity",
     mint: "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
-    blurb: "Sanctum multi-LST infinity pool",
+    blurb: "Multi-LST infinity pool",
   },
   {
     id: "hsol",

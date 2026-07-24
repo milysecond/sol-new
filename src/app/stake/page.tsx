@@ -273,12 +273,12 @@ export default function StakePage() {
                   Unstaking takes ~2 epochs.
                 </p>
                 <p className="text-[11px] text-gray-400">
-                  USDC yield (Lulo) →{" "}
+                  USDC yield →{" "}
                   <a href="/earn" className="text-emerald-400 hover:underline">
                     /earn
                   </a>
                   {" · "}
-                  Liquid stake (Sanctum) →{" "}
+                  Liquid stake →{" "}
                   <a href="/lst" className="text-cyan-400 hover:underline">
                     /lst
                   </a>
@@ -327,7 +327,7 @@ export default function StakePage() {
                         disabled={busy}
                         className={`w-full text-left px-3 py-2.5 rounded-xl border text-sm transition cursor-pointer ${
                           vote === v.vote
-                            ? "bg-purple-500/15 border-purple-400/50 text-purple-200"
+                            ? "bg-purple-500/15 border-purple-400/50 text-purple-900 dark:text-purple-100"
                             : "bg-white dark:bg-black border-black/10 dark:border-white/10 text-gray-700 dark:text-white/70"
                         }`}
                       >
