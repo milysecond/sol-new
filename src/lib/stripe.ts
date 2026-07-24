@@ -74,52 +74,59 @@ export type OnrampSessionResult = {
 
 /**
  * Mint a crypto onramp session locked to Solana + the user's passkey wallet.
- * Stripe hosts KYC + Apple Pay / card / bank inside the widget.
+ * Stripe hosts KYC + Apple Pay / card / bank. Uses form POST via fetch so it
+ * works on Cloudflare Workers (stripe-node rawRequest can hang there).
  */
 export async function createCryptoOnrampSession(
   opts: CreateOnrampSessionOpts,
 ): Promise<OnrampSessionResult> {
-  const stripe = getStripe();
+  const key = envVar("STRIPE_SECRET_KEY");
+  if (!key) throw new Error("STRIPE_SECRET_KEY not configured");
+
   const asset: OnrampAsset = opts.asset === "sol" ? "sol" : "usdc";
-
-  const params: Record<string, unknown> = {
-    wallet_addresses: { solana: opts.wallet },
-    lock_wallet_address: true,
-    destination_networks: ["solana"],
-    destination_currencies: [asset],
-    destination_network: "solana",
-    destination_currency: asset,
-    source_currency: "usd",
-  };
-
-  if (opts.sourceAmountUsd) {
-    params.source_amount = opts.sourceAmountUsd;
-  }
-  if (opts.customerIp) {
-    params.customer_ip_address = opts.customerIp;
-  }
+  const body = new URLSearchParams();
+  body.set("wallet_addresses[solana]", opts.wallet);
+  body.set("lock_wallet_address", "true");
+  body.set("destination_networks[0]", "solana");
+  body.set("destination_currencies[0]", asset);
+  body.set("destination_network", "solana");
+  body.set("destination_currency", asset);
+  body.set("source_currency", "usd");
+  if (opts.sourceAmountUsd) body.set("source_amount", opts.sourceAmountUsd);
+  if (opts.customerIp) body.set("customer_ip_address", opts.customerIp);
   if (opts.metadata) {
-    params.metadata = opts.metadata;
+    for (const [k, v] of Object.entries(opts.metadata)) {
+      if (v) body.set(`metadata[${k}]`, v.slice(0, 500));
+    }
   }
 
-  // Onramp API is preview — not typed on stripe-node yet.
-  const session = (await stripe.rawRequest(
-    "POST",
-    "/v1/crypto/onramp_sessions",
-    params,
-  )) as {
+  const res = await fetch("https://api.stripe.com/v1/crypto/onramp_sessions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      // Stripe prefers Idempotency-Key for creates
+      "Idempotency-Key": `onramp-${opts.wallet.slice(0, 16)}-${asset}-${opts.sourceAmountUsd || "open"}-${Date.now()}`.slice(
+        0,
+        64,
+      ),
+    },
+    body: body.toString(),
+  });
+
+  const session = (await res.json()) as {
     id?: string;
     client_secret?: string;
     redirect_url?: string | null;
     status?: string;
     livemode?: boolean;
-    error?: { message?: string; code?: string };
+    error?: { message?: string; code?: string; type?: string };
   };
 
-  if (!session?.client_secret || !session?.id) {
+  if (!res.ok || !session?.client_secret || !session?.id) {
     throw new Error(
-      (session as { error?: { message?: string } })?.error?.message ||
-        "Stripe did not return an onramp client secret",
+      session.error?.message ||
+        `Stripe onramp failed (${res.status})`,
     );
   }
 
