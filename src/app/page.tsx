@@ -8,12 +8,11 @@ import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { FaucetFooter } from "@/components/faucet-footer";
 import { MailingListSignup } from "@/components/mailing-list-signup";
-import { Coins, Image, Wallet, ShieldCheck, ArrowRight, Sparkles, Users, Newspaper, ChevronDown, X, ExternalLink, HandCoins, Gift, Trophy, Receipt, Dices, TrendingUp, Landmark, Droplets, Flame, Layers } from "lucide-react";
-import { AnimatedIcon } from "@/components/animated-icon";
+import { ArrowRight, Sparkles, Newspaper, ChevronDown, X, ExternalLink, HandCoins } from "lucide-react";
 import { Spinner } from "@/components/spinner";
 import { WelcomeProvider } from "@/components/welcome-message";
 import { StatsBar } from "@/components/stats-bar";
-import type { LucideIcon } from "lucide-react";
+import { HomeIconGrid } from "@/components/home-icon-grid";
 
 function SplashScreen({ onDone }: { onDone: () => void }) {
   const [fadeOut, setFadeOut] = useState(false);
@@ -165,29 +164,6 @@ function WhatsNewBanner() {
     </Link>
   );
 }
-
-// Primary grid: money, create, share, play.
-const products: { href: string; icon: LucideIcon; title: string; desc: string; color: string }[] = [
-  { href: "/wallet", icon: Wallet, title: "Wallet", desc: "Get SOL, send, manage", color: "text-fuchsia-500 dark:text-fuchsia-400" },
-  { href: "/token", icon: Coins, title: "Token", desc: "Launch your own coin", color: "text-orange-500 dark:text-orange-400" },
-  { href: "/gift", icon: Gift, title: "Gift", desc: "Send crypto with a link", color: "text-amber-500 dark:text-amber-400" },
-  { href: "/punt", icon: Trophy, title: "Punt", desc: "Odds, picks, markets", color: "text-green-600 dark:text-green-400" },
-];
-
-const secondary: { href: string; icon: LucideIcon; label: string; desc: string; color: string }[] = [
-  { href: "/nft", icon: Image, label: "NFT", desc: "Image to NFT", color: "text-green-600 dark:text-green-400" },
-  { href: "/nfts", icon: Layers, label: "Browse", desc: "NFT gallery", color: "text-emerald-600 dark:text-emerald-400" },
-  { href: "/multisig", icon: ShieldCheck, label: "Multisig", desc: "Shared wallet", color: "text-blue-600 dark:text-blue-400" },
-  { href: "/pay", icon: HandCoins, label: "Pay", desc: "Request money", color: "text-teal-600 dark:text-teal-400" },
-  { href: "/split", icon: Users, label: "Split", desc: "Split a bill", color: "text-purple-600 dark:text-purple-400" },
-  { href: "/receipt", icon: Receipt, label: "Receipt", desc: "Tx receipt", color: "text-orange-600 dark:text-orange-400" },
-  { href: "/draw", icon: Dices, label: "Draw", desc: "Fair raffle", color: "text-violet-600 dark:text-violet-400" },
-  { href: "/earn", icon: TrendingUp, label: "Earn", desc: "USDC yield", color: "text-emerald-600 dark:text-emerald-400" },
-  { href: "/stake", icon: Landmark, label: "Stake", desc: "Stake SOL", color: "text-purple-600 dark:text-purple-400" },
-  { href: "/lst", icon: Droplets, label: "LST", desc: "Liquid stake", color: "text-cyan-600 dark:text-cyan-400" },
-  { href: "/burn", icon: Flame, label: "Burn", desc: "Reclaim rent", color: "text-rose-600 dark:text-rose-400" },
-  { href: "/portfolio", icon: Wallet, label: "Portfolio", desc: "Holdings", color: "text-fuchsia-600 dark:text-fuchsia-400" },
-];
 
 function NextStepBanner() {
   const { balance } = useWallet();
@@ -361,39 +337,7 @@ export default function Home() {
             <div className="flex flex-col gap-3 sm:gap-4 md:gap-5">
               {publicKey && <NextStepBanner />}
 
-              {/* Primary — 2x2 phone, 4-col iPad */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-                {products.map((p) => (
-                  <Link
-                    key={p.href}
-                    href={p.href}
-                    className="group relative z-0 flex flex-col items-center justify-center gap-2 sm:gap-3 py-6 sm:py-8 md:py-10 min-h-[120px] bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-[0.98] border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150 touch-manipulation select-none"
-                  >
-                    <AnimatedIcon
-                      icon={p.icon}
-                      size={28}
-                      className={`${p.color} [&_svg]:w-7 [&_svg]:h-7 sm:[&_svg]:w-9 sm:[&_svg]:h-9`}
-                    />
-                    <div className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white pointer-events-none">{p.title}</div>
-                    <div className="text-[11px] sm:text-xs text-gray-500 dark:text-white/40 px-2 text-center leading-tight pointer-events-none">{p.desc}</div>
-                  </Link>
-                ))}
-              </div>
-
-              {/* Secondary tools — 3-col phone, 4-col iPad, 6-col desktop */}
-              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
-                {secondary.map((t) => (
-                  <Link
-                    key={t.href}
-                    href={t.href}
-                    className="group relative z-0 flex flex-col items-center justify-center gap-1.5 py-3.5 sm:py-4 min-h-[84px] bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-[0.98] border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150 touch-manipulation select-none"
-                  >
-                    <t.icon className={`w-5 h-5 sm:w-6 sm:h-6 ${t.color} pointer-events-none`} />
-                    <div className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white pointer-events-none">{t.label}</div>
-                    <div className="text-[10px] text-gray-500 dark:text-white/40 leading-tight text-center px-1 hidden sm:block pointer-events-none">{t.desc}</div>
-                  </Link>
-                ))}
-              </div>
+              <HomeIconGrid />
             </div>
 
             <div className="flex flex-col gap-3 sm:gap-4 md:gap-5 lg:sticky lg:top-20">
