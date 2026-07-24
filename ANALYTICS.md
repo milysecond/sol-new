@@ -1,10 +1,10 @@
 # Analytics Setup
 
-sol.new uses **dual analytics tracking** with Umami (self-hosted) and Vercel Analytics.
+sol.new uses **GA4** (and optionally Umami) for product analytics. There is no Vercel Analytics dependency; the app deploys on Cloudflare.
 
-## 🎯 Tracking Events
+## Tracking Events
 
-Custom event tracking is handled via `/src/lib/analytics.ts`. Both platforms receive the same events automatically.
+Custom event tracking is handled via `/src/lib/analytics.ts` (GA4 `gtag`).
 
 ### Active Events
 
@@ -36,40 +36,13 @@ import { track } from '@/lib/analytics';
 track('custom_event', { key: 'value' });
 ```
 
-## 📊 Dashboards
+## Dashboards
 
-- **Umami**: https://stats.sal.fun (website ID: `2fd088a3-f7b5-486c-9b38-6c0f50ec5d9e`)
-- **Vercel**: https://vercel.com/analytics (project dashboard)
+- **GA4**: configured via `NEXT_PUBLIC_GA_ID` (layout loads gtag)
+- **Umami** (optional): https://stats.sal.fun if the script is enabled in layout
 
-## 🔧 Configuration
-
-### Umami (Self-Hosted)
-```tsx
-// In layout.tsx <head>
-<script 
-  defer 
-  src="https://stats.sal.fun/script.js" 
-  data-website-id="2fd088a3-f7b5-486c-9b38-6c0f50ec5d9e" 
-/>
-```
-
-### Vercel Analytics
-```tsx
-// In layout.tsx <body>
-import { Analytics } from '@vercel/analytics/react';
-<Analytics />
-```
-
-## 🛠️ Adding New Events
-
-1. Add event name to `AnalyticsEvent` type in `/src/lib/analytics.ts`
-2. Optionally create a convenience function in the `analytics` object
-3. Call `track('event_name', { data })` where needed
-4. Both Umami and Vercel will receive the event automatically
-
-## 🚫 Privacy
+## Privacy
 
 - No PII is tracked
 - Wallet addresses are pseudonymous identifiers
-- IP addresses are not stored (Umami config)
-- Complies with GDPR/privacy best practices
+- Prefer not storing raw IPs in product analytics

@@ -4,7 +4,6 @@
 interface __BaseEnv_CloudflareEnv {
 	IMAGES_BUCKET: R2Bucket;
 	ASSETS: Fetcher;
-	BLOB_READ_WRITE_TOKEN: string;
 	NEXT_PUBLIC_GA_ID: string;
 	STRIPE_SECRET_KEY: string;
 	TG_BOT_TOKEN: string;
@@ -12,7 +11,6 @@ interface __BaseEnv_CloudflareEnv {
 	CROSSMINT_PROJECT_ID: string;
 	SOL_FEE_PAYER_SECRET: string;
 	NEXT_PUBLIC_ONRAMP_ENABLED: string;
-	VERCEL_OIDC_TOKEN: string;
 }
 declare namespace Cloudflare {
 	interface Env extends __BaseEnv_CloudflareEnv {}
@@ -22,7 +20,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "BLOB_READ_WRITE_TOKEN" | "NEXT_PUBLIC_GA_ID" | "STRIPE_SECRET_KEY" | "TG_BOT_TOKEN" | "CROSSMINT_API_KEY" | "CROSSMINT_PROJECT_ID" | "SOL_FEE_PAYER_SECRET" | "NEXT_PUBLIC_ONRAMP_ENABLED" | "VERCEL_OIDC_TOKEN">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "NEXT_PUBLIC_GA_ID" | "STRIPE_SECRET_KEY" | "TG_BOT_TOKEN" | "CROSSMINT_API_KEY" | "CROSSMINT_PROJECT_ID" | "SOL_FEE_PAYER_SECRET" | "NEXT_PUBLIC_ONRAMP_ENABLED">> {}
 }
 
 // Begin runtime types
