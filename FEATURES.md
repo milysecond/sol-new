@@ -60,6 +60,16 @@
 
 ---
 
+## Yield and staking
+
+| Feature | Path | One-liner |
+|---------|------|-----------|
+| Earn (Lulo) | `/earn` | Protected USDC yield via Lulo. Passkey deposit / withdraw. |
+| Stake SOL | `/stake` | Native validator staking (create, deactivate, withdraw). |
+| Liquid stake | `/lst` | Sanctum-ecosystem LSTs (jitoSOL, mSOL, INF, more) via Jupiter. |
+
+---
+
 ## Fair Draw
 
 | Feature | Path | One-liner |

@@ -49,8 +49,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Sort NFTs by price (listing or collection floor).",
       "Filter by name/mint, type (compressed or standard), listing status, price, and collection.",
       "Close empty token accounts and reclaim SOL rent at /burn.",
-      "Protected USDC yield at /earn (/stake redirects there). Passkey deposit and withdraw.",
+      "Protected USDC yield at /earn via Lulo. Passkey deposit and withdraw.",
       "Shimmer placeholders while images load on lists, what's new, and NFT grids.",
+    ],
+  },
+  {
+    date: "2026-07-24",
+    title: "Stake, LST, and yield split",
+    items: [
+      "/earn is Lulo protected USDC yield.",
+      "/stake is native SOL staking to curated validators (Helius, Drift, Laine, Jupiter).",
+      "/lst is Sanctum-ecosystem liquid staking (jitoSOL, mSOL, INF, and more).",
     ],
   },
   {

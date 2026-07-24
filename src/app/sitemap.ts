@@ -40,6 +40,8 @@ const STATIC_ROUTES: { path: string; priority: number; freq: MetadataRoute.Sitem
   { path: "/nfts", priority: 0.7, freq: "weekly" },
   { path: "/stocks", priority: 0.8, freq: "hourly" },
   { path: "/earn", priority: 0.7, freq: "weekly" },
+  { path: "/stake", priority: 0.7, freq: "weekly" },
+  { path: "/lst", priority: 0.7, freq: "weekly" },
   { path: "/burn", priority: 0.6, freq: "weekly" },
   { path: "/privacy", priority: 0.3, freq: "yearly" },
   { path: "/terms", priority: 0.3, freq: "yearly" },
