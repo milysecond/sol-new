@@ -1,9 +1,9 @@
 /**
- * MagicBlock Solana VRF client for Fair Draw.
+ * MagicBlock Solana VRF client for Fair Draw (Cloudflare Workers–safe).
  *
  * MagicBlock VRF is on-chain only (request CPI → oracle → callback CPI into our
  * fair-draw program). This module:
- *  1. Submits `request_draw` with SOL_FEE_PAYER_SECRET
+ *  1. Submits `request_draw` with SOL_FEE_PAYER_SECRET (JSON-RPC over fetch)
  *  2. Polls the Draw PDA until `fulfilled`
  *  3. Returns 32-byte randomness for winner selection
  *
@@ -18,14 +18,12 @@
  */
 
 import {
-  Connection,
   Keypair,
   PublicKey,
   SYSVAR_SLOT_HASHES_PUBKEY,
   SystemProgram,
   Transaction,
   TransactionInstruction,
-  sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import { devnetRpcUrl, mainnetRpcUrl } from "@/lib/rpc-server";
 import { MAGICBLOCK, sha256Hex } from "@/lib/vrf";
@@ -70,7 +68,6 @@ async function anchorDisc(name: string): Promise<Buffer> {
 function feePayer(): Keypair {
   const raw = envVar("SOL_FEE_PAYER_SECRET") || envVar("TREASURY_PRIVATE_KEY");
   if (!raw) throw new Error("SOL_FEE_PAYER_SECRET not configured");
-  // support base58 or JSON byte array
   try {
     if (raw.startsWith("[")) {
       const arr = JSON.parse(raw) as number[];
@@ -79,7 +76,6 @@ function feePayer(): Keypair {
   } catch {
     /* fall through */
   }
-  // dynamic require bs58 if present via solana web3 decode
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const bs58 = require("bs58") as { decode: (s: string) => Uint8Array };
   return Keypair.fromSecretKey(bs58.decode(raw));
@@ -122,9 +118,110 @@ async function buildCallerSeed(
   return Buffer.from(hex, "hex");
 }
 
-function connection(): Connection {
-  const url = magicblockCluster() === "devnet" ? devnetRpcUrl() : mainnetRpcUrl();
-  return new Connection(url, "confirmed");
+function rpcUrl(): string {
+  return magicblockCluster() === "devnet" ? devnetRpcUrl() : mainnetRpcUrl();
+}
+
+/** Workers-safe JSON-RPC (no Node http agents / websockets). */
+async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
+  const res = await fetch(rpcUrl(), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  if (!res.ok) {
+    throw new Error(`RPC HTTP ${res.status} for ${method}`);
+  }
+  const body = (await res.json()) as {
+    result?: T;
+    error?: { message?: string; code?: number };
+  };
+  if (body.error) {
+    throw new Error(`RPC ${method}: ${body.error.message || JSON.stringify(body.error)}`);
+  }
+  return body.result as T;
+}
+
+async function getLatestBlockhash(): Promise<{
+  blockhash: string;
+  lastValidBlockHeight: number;
+}> {
+  const r = await rpcCall<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
+    "getLatestBlockhash",
+    [{ commitment: "confirmed" }],
+  );
+  return r.value;
+}
+
+async function sendRawTransaction(base64: string): Promise<string> {
+  return rpcCall<string>("sendTransaction", [
+    base64,
+    {
+      encoding: "base64",
+      skipPreflight: false,
+      preflightCommitment: "confirmed",
+      maxRetries: 3,
+    },
+  ]);
+}
+
+async function getSignatureStatus(
+  signature: string,
+): Promise<{ confirmationStatus?: string; err?: unknown } | null> {
+  const r = await rpcCall<{ value: Array<{ confirmationStatus?: string; err?: unknown } | null> }>(
+    "getSignatureStatuses",
+    [[signature], { searchTransactionHistory: true }],
+  );
+  return r.value?.[0] ?? null;
+}
+
+async function getAccountDataBase64(pubkey: string): Promise<string | null> {
+  const r = await rpcCall<{ value: { data: [string, string] } | null }>("getAccountInfo", [
+    pubkey,
+    { encoding: "base64", commitment: "confirmed" },
+  ]);
+  if (!r.value?.data?.[0]) return null;
+  return r.value.data[0];
+}
+
+async function confirmSignature(
+  signature: string,
+  lastValidBlockHeight: number,
+  timeoutMs = 25_000,
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const st = await getSignatureStatus(signature);
+    if (st?.err) {
+      throw new Error(`tx failed: ${JSON.stringify(st.err)}`);
+    }
+    if (
+      st?.confirmationStatus === "confirmed" ||
+      st?.confirmationStatus === "finalized"
+    ) {
+      return;
+    }
+    // stop early if chain moved past lastValidBlockHeight
+    try {
+      const h = await rpcCall<number>("getBlockHeight", [{ commitment: "confirmed" }]);
+      if (typeof h === "number" && h > lastValidBlockHeight) {
+        // still check status once more (may have landed)
+        const st2 = await getSignatureStatus(signature);
+        if (
+          st2?.confirmationStatus === "confirmed" ||
+          st2?.confirmationStatus === "finalized"
+        ) {
+          return;
+        }
+        throw new Error(`tx expired at block height ${h} (lastValid ${lastValidBlockHeight})`);
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("tx expired")) throw e;
+      /* ignore height probe errors */
+    }
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  throw new Error(`confirm timeout for ${signature}`);
 }
 
 /**
@@ -135,7 +232,7 @@ export async function requestMagicblockRandomness(opts: {
   drawIdHex: string;
   entriesHash: string;
   entryCount: number;
-  /** Poll timeout ms (default 45s — oracle can take a few slots) */
+  /** Poll timeout ms after confirm (default 35s) */
   timeoutMs?: number;
 }): Promise<{
   seed: string;
@@ -148,7 +245,6 @@ export async function requestMagicblockRandomness(opts: {
 
   const program = programId();
   const payer = feePayer();
-  const conn = connection();
   const drawId16 = drawIdToBytes(opts.drawIdHex);
   const pda = drawPda(program, drawId16);
   const callerSeed = await buildCallerSeed(drawId16, opts.entriesHash, opts.entryCount);
@@ -183,41 +279,58 @@ export async function requestMagicblockRandomness(opts: {
 
   let signature: string;
   try {
+    const { blockhash, lastValidBlockHeight } = await getLatestBlockhash();
     const tx = new Transaction().add(ix);
-    signature = await sendAndConfirmTransaction(conn, tx, [payer], {
-      commitment: "confirmed",
-      maxRetries: 3,
-    });
+    tx.feePayer = payer.publicKey;
+    tx.recentBlockhash = blockhash;
+    tx.sign(payer);
+    const raw = tx.serialize();
+    const b64 =
+      typeof Buffer !== "undefined"
+        ? Buffer.from(raw).toString("base64")
+        : btoa(String.fromCharCode(...raw));
+    signature = await sendRawTransaction(b64);
+    await confirmSignature(signature, lastValidBlockHeight, 25_000);
   } catch (e) {
     console.error("[magicblock-vrf] request_draw failed", e);
     return null;
   }
 
   // Poll Draw PDA: Anchor account = 8 disc + Draw fields
-  const timeout = opts.timeoutMs ?? 45_000;
+  const timeout = opts.timeoutMs ?? 35_000;
   const start = Date.now();
   while (Date.now() - start < timeout) {
-    const info = await conn.getAccountInfo(pda, "confirmed");
-    if (info?.data && info.data.length >= 8 + 32 + 16 + 4 + 32 + 1) {
-      const body = info.data.subarray(8); // skip discriminator
-      // authority 32 | draw_id 16 | entry_count 4 | randomness 32 | fulfilled 1 | bump 1
-      const randomness = body.subarray(32 + 16 + 4, 32 + 16 + 4 + 32);
-      const fulfilled = body[32 + 16 + 4 + 32] === 1;
-      if (fulfilled) {
-        const seed = Buffer.from(randomness).toString("hex");
-        const verificationHash = await sha256Hex(
-          `magicblock-vrf|${signature}|${seed}|${opts.entriesHash}`,
-        );
-        return {
-          seed,
-          verificationHash,
-          signature,
-          drawAccount: pda.toBase58(),
-          randomness: new Uint8Array(randomness),
-        };
+    try {
+      const b64 = await getAccountDataBase64(pda.toBase58());
+      if (b64) {
+        const bytes =
+          typeof Buffer !== "undefined"
+            ? Buffer.from(b64, "base64")
+            : Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        if (bytes.length >= 8 + 32 + 16 + 4 + 32 + 1) {
+          const body = bytes.subarray(8); // skip discriminator
+          // authority 32 | draw_id 16 | entry_count 4 | randomness 32 | fulfilled 1 | bump 1
+          const randomness = body.subarray(32 + 16 + 4, 32 + 16 + 4 + 32);
+          const fulfilled = body[32 + 16 + 4 + 32] === 1;
+          if (fulfilled) {
+            const seed = Buffer.from(randomness).toString("hex");
+            const verificationHash = await sha256Hex(
+              `magicblock-vrf|${signature}|${seed}|${opts.entriesHash}`,
+            );
+            return {
+              seed,
+              verificationHash,
+              signature,
+              drawAccount: pda.toBase58(),
+              randomness: new Uint8Array(randomness),
+            };
+          }
+        }
       }
+    } catch (e) {
+      console.error("[magicblock-vrf] poll error", e);
     }
-    await new Promise((r) => setTimeout(r, 800));
+    await new Promise((r) => setTimeout(r, 700));
   }
 
   console.error("[magicblock-vrf] timeout waiting for callback", { signature, pda: pda.toBase58() });
@@ -227,7 +340,6 @@ export async function requestMagicblockRandomness(opts: {
 /** Map 32-byte VRF output → index in [0, n). */
 export function indexFromMagicblockRandomness(randomness: Uint8Array, n: number): number {
   if (n <= 0) throw new Error("n must be > 0");
-  // Use first 8 bytes as big-endian modulus (same idea as indexFromSeed)
   const hex = Buffer.from(randomness.subarray(0, 8)).toString("hex");
   const value = BigInt("0x" + hex);
   return Number(value % BigInt(n));
