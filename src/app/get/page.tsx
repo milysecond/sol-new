@@ -90,7 +90,8 @@ function StripeGetSection() {
       </div>
       <p className="text-xs text-gray-500 dark:text-white/40">
         Card, Apple Pay, Google Pay, or bank. Stripe handles KYC and sends crypto to your wallet.
-        Usually minutes, not days.
+        Usually minutes. Available in the US and EU only (not Hawaii). Everywhere else, use bank
+        deposit below.
       </p>
 
       <div className="flex gap-2">

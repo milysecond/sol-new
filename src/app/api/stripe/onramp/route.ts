@@ -95,14 +95,18 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Do not send customer_ip_address by default. Stripe's pre-check rejects
+    // anyone outside US/EU at mint time (including false CF edges / travel).
+    // Hosted checkout re-validates in-browser; better to open the session and
+    // let Stripe's UI handle geo than hard-fail sol.new for the whole world.
     const session = await createCryptoOnrampSession({
       wallet,
       sourceAmountUsd,
       asset,
-      customerIp: ip !== "unknown" ? ip : undefined,
       metadata: {
         wallet: wallet.slice(0, 44),
         source: "sol.new/get",
+        client_ip: ip !== "unknown" ? ip.slice(0, 45) : "",
       },
     });
 
@@ -132,18 +136,19 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Could not create onramp session";
     console.error("[stripe/onramp]", msg);
-    // Surface Stripe geo / supportability errors cleanly
     const lower = msg.toLowerCase();
     const unsupportable =
       lower.includes("unsupportable") ||
       lower.includes("unsupported_country") ||
-      lower.includes("unable to support");
+      lower.includes("unable to support") ||
+      lower.includes("transactions in this country");
     return NextResponse.json(
       {
         error: unsupportable
-          ? "Stripe onramp is not available in your region yet (US and EU only, excluding Hawaii)."
+          ? "Apple Pay / card is only available in the US and EU (not Hawaii). Use bank deposit below, or open checkout from a supported region."
           : msg,
         unsupportable,
+        useBankDeposit: unsupportable,
       },
       { status: unsupportable ? 400 : 502 },
     );
