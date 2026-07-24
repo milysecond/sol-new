@@ -474,6 +474,10 @@ function DrawInner() {
             1. Choose a mode · 2. Add names or options · 3. Spin. Fair random pick with a shareable
             receipt.
           </p>
+          <p className="text-[11px] text-gray-400 dark:text-white/30 max-w-md mx-auto">
+            Entropy prefers MagicBlock on-chain VRF when the fair-draw program is deployed; otherwise
+            Solana mainnet blockhash. Receipts show which was used.
+          </p>
         </header>
 
         {/* 1. Mode */}
