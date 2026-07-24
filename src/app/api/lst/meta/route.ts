@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { formatApy, sanctumConfigured, sanctumGetLsts } from "@/lib/sanctum";
 import { SANCTUM_LSTS } from "@/lib/lsts";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * GET /api/lst/meta?mint=optional

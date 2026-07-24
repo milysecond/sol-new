@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sanctumConfigured, sanctumSwapOrder, WSOL_MINT } from "@/lib/sanctum";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * GET /api/lst/order?inp=&out=&amt=&signer=&mode=
