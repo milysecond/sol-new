@@ -72,12 +72,26 @@ function modeQuery(mode: VrfDrawMode): string {
   return "wheel";
 }
 
-const MODES: { id: VrfDrawMode; label: string; icon: React.ElementType }[] = [
-  { id: "list", label: "Wheel", icon: ListOrdered },
-  { id: "range", label: "1–N", icon: Hash },
-  { id: "coin", label: "Coin", icon: Coins },
-  { id: "dice", label: "Dice", icon: Dices },
+const SAMPLE_NAMES = "Alice\nBob\nCarol\nDave";
+
+const MODES: {
+  id: VrfDrawMode;
+  label: string;
+  hint: string;
+  icon: React.ElementType;
+}[] = [
+  { id: "list", label: "Wheel", hint: "Pick a name", icon: ListOrdered },
+  { id: "range", label: "Numbers", hint: "1 to N", icon: Hash },
+  { id: "coin", label: "Coin", hint: "Heads or tails", icon: Coins },
+  { id: "dice", label: "Dice", hint: "Roll 1–6", icon: Dices },
 ];
+
+function parseNameList(raw: string): string[] {
+  return raw
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
 
 function readFreeUses(): Record<VrfDrawMode, number> {
   try {
@@ -158,7 +172,7 @@ function DrawInner() {
   const [mode, setMode] = useState<VrfDrawMode>(() =>
     parseMode(searchParams.get("mode")),
   );
-  const [text, setText] = useState("");
+  const [text, setText] = useState(SAMPLE_NAMES);
   const [rangeEnd, setRangeEnd] = useState("10");
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
@@ -172,6 +186,7 @@ function DrawInner() {
   const [muted, setMuted] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Sync mode from URL (/draw?mode=coin, aliases via /flip etc.)
   useEffect(() => {
@@ -287,6 +302,10 @@ function DrawInner() {
     if (busy || spinning) return;
     setMode(m);
     setResult(null);
+    setError("");
+    if (m === "list" && parseNameList(text).length < 2) {
+      setText(SAMPLE_NAMES);
+    }
     router.replace(`/draw?mode=${modeQuery(m)}`, { scroll: false });
   };
 
@@ -307,16 +326,36 @@ function DrawInner() {
       const end = Math.min(500, Math.max(2, Math.floor(Number(rangeEnd) || 10)));
       return Array.from({ length: end }, (_, i) => String(i + 1));
     }
-    return text
-      .split(/[\n,]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
+    return parseNameList(text);
   }, [mode, text, rangeEnd]);
+
+  const canDraw =
+    mode === "coin" ||
+    mode === "dice" ||
+    (mode === "range" && previewEntries.length >= 2) ||
+    (mode === "list" && previewEntries.length >= 2);
+
+  const drawBlockedReason = useMemo(() => {
+    if (mode === "list" && previewEntries.length < 2) {
+      return "Add at least 2 names (one per line)";
+    }
+    if (mode === "range" && previewEntries.length < 2) {
+      return "Pick a number of at least 2";
+    }
+    return null;
+  }, [mode, previewEntries.length]);
 
   const requireConnect = !publicKey && !freeLeft;
 
+  const actionLabel =
+    mode === "coin" ? "Flip coin" : mode === "dice" ? "Roll dice" : "Spin the wheel";
+
   const draw = async () => {
     setError("");
+    if (drawBlockedReason) {
+      setError(drawBlockedReason);
+      return;
+    }
     if (!publicKey && !hasFreeDraw(mode)) {
       setNeedsConnect(true);
       return;
@@ -332,7 +371,7 @@ function DrawInner() {
       else drawSfx.wheelTick();
     });
 
-    // Duration = spin phase + land phase (user-adjustable)
+    // Spin phase first, then land phase (user-adjustable total)
     const totalMs = Math.round(durationSec * 1000);
     const spinPhaseMs = Math.round(totalMs * 0.52);
     const landPhaseMs = totalMs - spinPhaseMs;
@@ -341,13 +380,13 @@ function DrawInner() {
     try {
       const body: Record<string, unknown> = {
         mode,
-        title: title || undefined,
+        title: title.trim() || undefined,
         wallet: publicKey || undefined,
       };
       if (mode === "list") {
-        body.entries = text.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+        body.entries = parseNameList(text);
       } else if (mode === "range") {
-        body.rangeEnd = Number(rangeEnd);
+        body.rangeEnd = Math.min(500, Math.max(2, Math.floor(Number(rangeEnd) || 10)));
       }
 
       const res = await fetch("/api/draw", {
@@ -364,6 +403,7 @@ function DrawInner() {
       };
       if (!res.ok) throw new Error(data.error || "Draw failed");
 
+      // Keep spinning until the API is back AND spin phase has run
       const waitSpin = Math.max(0, spinPhaseMs - (Date.now() - started));
       await new Promise((r) => setTimeout(r, waitSpin));
 
@@ -389,7 +429,7 @@ function DrawInner() {
         ),
       );
 
-      // Result must land before spinning ends so face/segment is correct
+      // Set winner first, then stop spin so the wheel lands on the right segment
       setResult({
         id: data.id,
         winner: data.winner,
@@ -404,7 +444,6 @@ function DrawInner() {
         drawSfx.land();
         setTimeout(() => drawSfx.win(), Math.min(220, landPhaseMs * 0.25));
       });
-      // Let settle animation finish before re-enabling controls
       await new Promise((r) => setTimeout(r, landPhaseMs));
     } catch (e) {
       setSpinning(false);
@@ -414,140 +453,161 @@ function DrawInner() {
     }
   };
 
-  const stageEntries = result?.entries?.length
-    ? result.entries
-    : previewEntries.length
-      ? previewEntries
-      : ["A", "B", "C", "D", "E", "F"];
+  // While spinning or after a result, show the locked entry list from the draw
+  const stageEntries =
+    result?.entries?.length
+      ? result.entries
+      : previewEntries.length
+        ? previewEntries
+        : [];
 
   return (
     <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8 space-y-6 pb-safe">
+      <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8 space-y-5 pb-safe">
         <header className="text-center space-y-2">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-violet-500/10 text-violet-500 mb-1">
             <Dices className="w-7 h-7" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Fair Draw</h1>
-          <p className="text-sm sm:text-base text-gray-500 dark:text-white/40 max-w-md mx-auto">
-            Spin the wheel, flip a coin, or roll the dice. One free try of each. Then connect to keep going.
+          <p className="text-sm text-gray-500 dark:text-white/40 max-w-md mx-auto">
+            1. Choose a mode · 2. Add names or options · 3. Spin. Fair random pick with a shareable
+            receipt.
           </p>
         </header>
 
-        {/* Mode picker */}
-        <div className="grid grid-cols-4 gap-2">
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => selectMode(m.id)}
-              className={`flex flex-col items-center gap-1 py-3 rounded-xl border text-xs font-medium transition active:scale-[0.97] ${
-                mode === m.id
-                  ? "border-violet-400/50 bg-violet-500/10 text-violet-600 dark:text-violet-300"
-                  : "border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] text-gray-600 dark:text-white/50 hover:border-violet-400/30"
-              }`}
-            >
-              <m.icon className="w-4 h-4" />
-              {m.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Animation stage */}
-        <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] overflow-hidden">
-          <VrfStage
-            mode={mode === "range" ? "list" : mode}
-            spinning={spinning}
-            winner={result?.winner ?? null}
-            winnerIndex={result?.winnerIndex ?? 0}
-            entries={stageEntries}
-            durationSec={durationSec}
-          />
-        </div>
-
-        {/* Duration + sound */}
-        <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] px-4 py-3 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <label className="text-sm font-medium text-gray-700 dark:text-white/70" htmlFor="draw-duration">
-              Duration
-            </label>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-mono text-violet-500 tabular-nums w-12 text-right">
-                {durationSec.toFixed(1)}s
-              </span>
+        {/* 1. Mode */}
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-white/35 px-0.5">
+            1 · How do you want to pick?
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {MODES.map((m) => (
               <button
+                key={m.id}
                 type="button"
-                onClick={() => {
-                  setMuted((m) => !m);
-                  if (muted) drawSfx.unlock();
-                }}
-                className="p-2 rounded-lg border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 transition active:scale-[0.97]"
-                title={muted ? "Unmute" : "Mute"}
-                aria-label={muted ? "Unmute sound" : "Mute sound"}
+                onClick={() => selectMode(m.id)}
+                disabled={busy || spinning}
+                className={`flex flex-col items-start gap-0.5 px-3 py-3 rounded-xl border text-left transition active:scale-[0.97] disabled:opacity-50 ${
+                  mode === m.id
+                    ? "border-violet-400/50 bg-violet-500/10 text-violet-700 dark:text-violet-200"
+                    : "border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] text-gray-600 dark:text-white/50 hover:border-violet-400/30"
+                }`}
               >
-                {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                <span className="flex items-center gap-1.5 text-sm font-semibold">
+                  <m.icon className="w-4 h-4 shrink-0" />
+                  {m.label}
+                </span>
+                <span className="text-[11px] opacity-70 font-normal">{m.hint}</span>
               </button>
-            </div>
-          </div>
-          <input
-            id="draw-duration"
-            type="range"
-            min={DURATION_MIN}
-            max={DURATION_MAX}
-            step={0.5}
-            value={durationSec}
-            disabled={busy || spinning}
-            onChange={(e) => setDurationSec(Number(e.target.value))}
-            className="w-full accent-violet-500 disabled:opacity-50"
-          />
-          <div className="flex justify-between text-[11px] text-gray-400 dark:text-white/30">
-            <span>Quick</span>
-            <span>Dramatic</span>
+            ))}
           </div>
         </div>
 
-        {/* Controls */}
-        <div className="space-y-3 rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-4">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Optional title (e.g. Friday giveaway)"
-            disabled={busy}
-            className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-violet-400/50 disabled:opacity-50"
-          />
+        {/* 2. Inputs */}
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-white/35 px-0.5">
+            2 ·{" "}
+            {mode === "list"
+              ? "Who is on the wheel?"
+              : mode === "range"
+                ? "What numbers?"
+                : mode === "coin"
+                  ? "Coin flip"
+                  : "Dice roll"}
+          </p>
+          <div className="space-y-3 rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-4">
+            {mode === "list" && (
+              <>
+                <textarea
+                  value={text}
+                  onChange={(e) => {
+                    setText(e.target.value);
+                    if (result) setResult(null);
+                  }}
+                  placeholder={"Alice\nBob\nCarol\n…"}
+                  rows={5}
+                  disabled={busy || spinning}
+                  className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-violet-400/50 resize-y disabled:opacity-50"
+                />
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-white/40">
+                  <span>
+                    {previewEntries.length}{" "}
+                    {previewEntries.length === 1 ? "name" : "names"} · one per line (or commas)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setText(SAMPLE_NAMES);
+                      setResult(null);
+                    }}
+                    disabled={busy || spinning}
+                    className="text-violet-500 hover:underline disabled:opacity-40"
+                  >
+                    Reset sample names
+                  </button>
+                </div>
+              </>
+            )}
 
-          {mode === "list" && (
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={"alice\nbob\ncarol\n…\nor comma-separated"}
-              rows={5}
-              disabled={busy}
-              className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-black/40 px-3 py-2.5 text-sm font-mono outline-none focus:border-violet-400/50 resize-y disabled:opacity-50"
+            {mode === "range" && (
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm text-gray-600 dark:text-white/60">
+                  Random number from <strong>1</strong> to
+                </span>
+                <input
+                  type="number"
+                  min={2}
+                  max={500}
+                  value={rangeEnd}
+                  onChange={(e) => {
+                    setRangeEnd(e.target.value);
+                    if (result) setResult(null);
+                  }}
+                  disabled={busy || spinning}
+                  className="w-24 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-black/40 px-3 py-2 text-sm font-mono outline-none focus:border-violet-400/50 disabled:opacity-50"
+                />
+                <span className="text-xs text-gray-400">
+                  ({previewEntries.length} options on the wheel)
+                </span>
+              </div>
+            )}
+
+            {mode === "coin" && (
+              <p className="text-sm text-gray-600 dark:text-white/55">
+                Fair coin: <strong>Heads</strong> or <strong>Tails</strong>. No setup needed.
+              </p>
+            )}
+
+            {mode === "dice" && (
+              <p className="text-sm text-gray-600 dark:text-white/55">
+                Standard six-sided die: lands on <strong>1–6</strong>.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* 3. Stage + spin */}
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-white/35 px-0.5">
+            3 · {actionLabel}
+          </p>
+          <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] overflow-hidden">
+            <VrfStage
+              mode={mode === "range" ? "list" : mode}
+              spinning={spinning}
+              winner={result?.winner ?? null}
+              winnerIndex={result?.winnerIndex ?? 0}
+              entries={stageEntries}
+              durationSec={durationSec}
             />
-          )}
-
-          {mode === "range" && (
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-500">Numbers 1 through</span>
-              <input
-                type="number"
-                min={2}
-                max={500}
-                value={rangeEnd}
-                onChange={(e) => setRangeEnd(e.target.value)}
-                disabled={busy}
-                className="w-24 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-black/40 px-3 py-2 text-sm font-mono outline-none focus:border-violet-400/50 disabled:opacity-50"
-              />
-            </div>
-          )}
+          </div>
 
           {!publicKey && (
-            <p className="text-xs text-gray-500 dark:text-white/40">
+            <p className="text-xs text-center text-gray-500 dark:text-white/40">
               {freeLeft
-                ? "1 free draw left for this mode"
-                : "Free draw used for this mode. Connect to continue."}
+                ? "Free try for this mode (no wallet needed)"
+                : "Free try used for this mode. Connect a passkey to continue."}
             </p>
           )}
 
@@ -558,7 +618,7 @@ function DrawInner() {
                 Connect to keep drawing
               </div>
               <p className="text-xs text-gray-500 dark:text-white/40">
-                Passkey wallet with Face ID. No seed phrase.
+                Passkey wallet with Face ID. No seed phrase. Free for unlimited draws after connect.
               </p>
               <input
                 type="text"
@@ -596,25 +656,28 @@ function DrawInner() {
           ) : (
             <button
               type="button"
-              onClick={draw}
-              disabled={busy || spinning}
-              className="w-full touch-target flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-semibold py-3 hover:opacity-90 transition disabled:opacity-60 active:scale-[0.98]"
+              onClick={() => void draw()}
+              disabled={busy || spinning || !canDraw}
+              className="w-full touch-target flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-semibold py-3.5 hover:opacity-90 transition disabled:opacity-50 active:scale-[0.98]"
             >
               {busy || spinning ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Drawing…
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {spinning ? "Spinning…" : "Drawing…"}
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  {mode === "coin"
-                    ? "Flip coin"
-                    : mode === "dice"
-                      ? "Roll dice"
-                      : "Spin"}
+                  {actionLabel}
                 </>
               )}
             </button>
+          )}
+
+          {drawBlockedReason && !requireConnect && (
+            <p className="text-xs text-center text-amber-600 dark:text-amber-400">
+              {drawBlockedReason}
+            </p>
           )}
 
           {error && (
@@ -625,29 +688,39 @@ function DrawInner() {
         </div>
 
         {result && !spinning && (
-          <div className="rounded-3xl border border-violet-400/30 bg-violet-500/5 p-6 space-y-4 text-center animate-[fadeIn_300ms_ease-out]">
+          <div className="rounded-3xl border border-amber-400/35 bg-amber-500/5 p-6 space-y-4 text-center">
             <Trophy className="w-10 h-10 text-amber-400 mx-auto" />
             <div>
               <p className="text-xs uppercase tracking-wider text-gray-500 dark:text-white/40 mb-1">
-                Winner
+                {mode === "coin" || mode === "dice" ? "Result" : "Winner"}
               </p>
               <p className="text-2xl sm:text-3xl font-bold break-all">{result.winner}</p>
-              <p className="text-sm text-gray-500 dark:text-white/40 mt-1">
-                #{result.winnerIndex + 1} of {result.entryCount}
-              </p>
+              {(mode === "list" || mode === "range") && (
+                <p className="text-sm text-gray-500 dark:text-white/40 mt-1">
+                  Slot {result.winnerIndex + 1} of {result.entryCount}
+                </p>
+              )}
             </div>
             <div className="flex flex-col sm:flex-row gap-2 justify-center">
               <button
                 type="button"
+                onClick={() => void draw()}
+                disabled={busy || requireConnect || !canDraw}
+                className="rounded-xl bg-violet-500 hover:bg-violet-400 disabled:opacity-50 text-white font-semibold px-4 py-2.5 text-sm transition active:scale-[0.98]"
+              >
+                {mode === "coin" ? "Flip again" : mode === "dice" ? "Roll again" : "Spin again"}
+              </button>
+              <button
+                type="button"
                 onClick={() => router.push(`/draw/${result.id}`)}
-                className="rounded-xl bg-violet-500 hover:bg-violet-400 text-white font-semibold px-4 py-2.5 text-sm transition active:scale-[0.98]"
+                className="rounded-xl border border-black/10 dark:border-white/10 px-4 py-2.5 text-sm font-medium hover:bg-black/5 dark:hover:bg-white/5 transition active:scale-[0.98]"
               >
                 Open receipt
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  navigator.clipboard.writeText(
+                  void navigator.clipboard.writeText(
                     `${window.location.origin}/draw/${result.id}`,
                   );
                 }}
@@ -659,12 +732,74 @@ function DrawInner() {
           </div>
         )}
 
+        {/* Advanced: title, duration, mute */}
+        <div className="rounded-2xl border border-black/10 dark:border-white/10 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-600 dark:text-white/55 hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition"
+          >
+            <span className="font-medium">Options</span>
+            <span className="text-xs text-gray-400">
+              {showAdvanced ? "Hide" : "Title · duration · sound"}
+            </span>
+          </button>
+          {showAdvanced && (
+            <div className="px-4 pb-4 space-y-3 border-t border-black/5 dark:border-white/5 pt-3">
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Optional title (e.g. Friday giveaway)"
+                disabled={busy || spinning}
+                className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-violet-400/50 disabled:opacity-50"
+              />
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-sm text-gray-600 dark:text-white/60" htmlFor="draw-duration">
+                  Spin length
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-mono text-violet-500 tabular-nums w-12 text-right">
+                    {durationSec.toFixed(1)}s
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMuted((m) => !m);
+                      if (muted) drawSfx.unlock();
+                    }}
+                    className="p-2 rounded-lg border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 transition"
+                    title={muted ? "Unmute" : "Mute"}
+                  >
+                    {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <input
+                id="draw-duration"
+                type="range"
+                min={DURATION_MIN}
+                max={DURATION_MAX}
+                step={0.5}
+                value={durationSec}
+                disabled={busy || spinning}
+                onChange={(e) => setDurationSec(Number(e.target.value))}
+                className="w-full accent-violet-500 disabled:opacity-50"
+              />
+              <div className="flex justify-between text-[11px] text-gray-400 dark:text-white/30">
+                <span>Quick</span>
+                <span>Dramatic</span>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* History */}
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-gray-700 dark:text-white/70 flex items-center gap-1.5">
               <History className="w-4 h-4 text-violet-400" />
-              Your draws
+              Recent results
             </h2>
             {historyLoading && (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
@@ -673,9 +808,7 @@ function DrawInner() {
 
           {history.length === 0 ? (
             <p className="text-xs text-gray-500 dark:text-white/40 rounded-xl border border-black/5 dark:border-white/5 px-3 py-4 text-center">
-              {publicKey
-                ? "No draws yet. Spin, flip, or roll to start your history."
-                : "Draws on this device show up here. Connect to sync across sessions."}
+              Your results show up here after you spin, flip, or roll.
             </p>
           ) : (
             <ul className="space-y-1.5">
@@ -696,14 +829,12 @@ function DrawInner() {
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold truncate">
-                        {h.winner}
-                      </div>
+                      <div className="text-sm font-semibold truncate">{h.winner}</div>
                       <div className="text-[11px] text-gray-500 dark:text-white/40 truncate">
                         {modeLabel(h.mode)}
                         {h.title ? ` · ${h.title}` : ""}
                         {" · "}
-                        {h.entryCount} entries · {formatWhen(h.createdAt)}
+                        {formatWhen(h.createdAt)}
                       </div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
