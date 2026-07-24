@@ -11,14 +11,14 @@ Already configured:
 
 ### 2. Environment Variables
 
-**Vercel (already set):**
+**Env (Cloudflare Worker secrets / .env.local):**
 ```env
 STRIPE_SECRET_KEY=sk_live_51RimVWA0RVyrUFJy...
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_51RimVWA0RVyrUFJy...
 STRIPE_WEBHOOK_SECRET=whsec_fvZUzKwzWofrvrk3YRZ4uKBSuKhpqug8
 ```
 
-**Local development** (add to `.env.local`):
+**Local development** (`.env.local`):
 ```env
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_51RimVWA0RVyrUFJy...
 STRIPE_WEBHOOK_SECRET=whsec_auw2EUgFnEcJZwp5df9vyyyPj3C1Yqry

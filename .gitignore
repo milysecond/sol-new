@@ -1,6 +1,7 @@
 node_modules/
 .next/
 .open-next/
+.vercel/
 .dev.vars
 *.tsbuildinfo
 .DS_Store

@@ -211,22 +211,21 @@ sol.new uses WebAuthn passkeys to create Solana wallets:
 
 ## Deployment
 
-### Vercel (Recommended)
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/metasal1/sol-new)
-
-1. Connect GitHub repo
-2. Add environment variables
-3. Deploy
-
-### Self-Hosted
+sol.new runs on **Cloudflare Workers** via OpenNext (not Vercel).
 
 ```bash
-npm run build
-npm start
+# Production (must be on main)
+npm run deploy
+```
+
+Secrets live in Worker secrets (`wrangler secret put`). Public vars are in `wrangler.jsonc`.
+
+Local:
+
+```bash
+npm run dev
 # or
-docker build -t sol-new .
-docker run -p 3000:3000 sol-new
+npm run preview
 ```
 
 ---

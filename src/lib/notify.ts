@@ -1,6 +1,9 @@
 async function sendWebPush(payload: { title: string; body: string; url?: string; tag?: string; topic: string }) {
   const secret = process.env.PUSH_SECRET;
-  const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
+  const base =
+    process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, "") ||
+    process.env.SITE_URL?.replace(/\/$/, "") ||
+    "https://sol.new";
   try {
     await fetch(`${base}/api/push/send`, {
       method: "POST",
