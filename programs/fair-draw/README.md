@@ -9,13 +9,23 @@ MagicBlock VRF is **program-to-program only**: your program CPIs `RequestRandomn
 ## Deploy
 
 ```bash
-# requires Anchor 0.31+ and Solana CLI
-cd programs/fair-draw
-# fix declare_id! after first keygen
-anchor keys list
-# set declare_id! in src/lib.rs to the program key
-anchor build
-anchor deploy --provider.cluster mainnet
+# Requires Anchor 0.31.1 + Solana CLI 2.2+ (platform-tools ≥ v1.48 for edition2024 crates)
+# From repo root (sol-new/):
+export PATH="$HOME/.local/share/solana/install/releases/2.2.16/solana-release/bin:$PATH"
+anchor build -p fair-draw
+solana program deploy target/deploy/fair_draw.so \
+  --program-id target/deploy/fair_draw-keypair.json \
+  --url devnet   # or mainnet-beta when funded
+```
+
+**Devnet program id:** `EQmor7iQN23PbKEUA9yHjsRujnb4csV9L8stussV3znp`  
+(fee payer: `feeUzA98vep5UvxQhwdQVBGsSFADqcYM7Dt4sLrpiyE`)
+
+Smoke test after deploy:
+
+```bash
+MAGICBLOCK_FAIR_DRAW_PROGRAM_ID=EQmor7iQN23PbKEUA9yHjsRujnb4csV9L8stussV3znp \
+  node --env-file=.env.local scripts/test-magicblock-vrf.mjs
 ```
 
 ## Env for sol.new Worker
@@ -25,6 +35,9 @@ anchor deploy --provider.cluster mainnet
 wrangler secret put MAGICBLOCK_FAIR_DRAW_PROGRAM_ID   # deployed program id
 # Fee payer that pays rent + VRF request (same as other SOL fee flows)
 # SOL_FEE_PAYER_SECRET already used elsewhere
+
+# Cluster for MagicBlock txs (must match where the program is deployed)
+wrangler secret put MAGICBLOCK_CLUSTER   # devnet | mainnet
 
 # Optional force
 # DRAW_PROVIDER=magicblock   # fail if MagicBlock unavailable (default: try then fallback)

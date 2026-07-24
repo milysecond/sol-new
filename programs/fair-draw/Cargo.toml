@@ -18,4 +18,5 @@ idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
 anchor-lang = "0.31.1"
-ephemeral-vrf-sdk = { version = "0.3.0", features = ["anchor"] }
+# anchor-compat = Anchor 0.28–0.31; "anchor" pulls Anchor 1.x and breaks 0.31 builds
+ephemeral-vrf-sdk = { version = "0.4.1", features = ["anchor-compat"] }
