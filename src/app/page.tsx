@@ -367,15 +367,15 @@ export default function Home() {
                   <Link
                     key={p.href}
                     href={p.href}
-                    className="group flex flex-col items-center justify-center gap-2 sm:gap-3 py-6 sm:py-8 md:py-10 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-95 border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150"
+                    className="group relative z-0 flex flex-col items-center justify-center gap-2 sm:gap-3 py-6 sm:py-8 md:py-10 min-h-[120px] bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-[0.98] border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150 touch-manipulation select-none"
                   >
                     <AnimatedIcon
                       icon={p.icon}
-                      size={24}
+                      size={28}
                       className={`${p.color} [&_svg]:w-7 [&_svg]:h-7 sm:[&_svg]:w-9 sm:[&_svg]:h-9`}
                     />
-                    <div className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">{p.title}</div>
-                    <div className="text-[11px] sm:text-xs text-gray-500 dark:text-white/40 px-2 text-center leading-tight">{p.desc}</div>
+                    <div className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white pointer-events-none">{p.title}</div>
+                    <div className="text-[11px] sm:text-xs text-gray-500 dark:text-white/40 px-2 text-center leading-tight pointer-events-none">{p.desc}</div>
                   </Link>
                 ))}
               </div>
@@ -386,11 +386,11 @@ export default function Home() {
                   <Link
                     key={t.href}
                     href={t.href}
-                    className="group flex flex-col items-center justify-center gap-1.5 py-3.5 sm:py-4 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-95 border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150"
+                    className="group relative z-0 flex flex-col items-center justify-center gap-1.5 py-3.5 sm:py-4 min-h-[84px] bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-[0.98] border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150 touch-manipulation select-none"
                   >
-                    <t.icon className={`w-5 h-5 sm:w-5.5 sm:h-5.5 ${t.color}`} />
-                    <div className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">{t.label}</div>
-                    <div className="text-[10px] text-gray-500 dark:text-white/40 leading-tight text-center px-1 hidden sm:block">{t.desc}</div>
+                    <t.icon className={`w-5 h-5 sm:w-6 sm:h-6 ${t.color} pointer-events-none`} />
+                    <div className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white pointer-events-none">{t.label}</div>
+                    <div className="text-[10px] text-gray-500 dark:text-white/40 leading-tight text-center px-1 hidden sm:block pointer-events-none">{t.desc}</div>
                   </Link>
                 ))}
               </div>

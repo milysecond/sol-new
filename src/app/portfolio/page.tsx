@@ -126,11 +126,11 @@ export default function PortfolioPage() {
             </div>
 
             <div className="space-y-2">
-              <div className="relative flex gap-2">
-                <div className="relative flex-1">
+              <div className="flex gap-2 items-stretch">
+                <div className="relative flex-1 min-w-0">
                   <Search
                     size={14}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-0"
                   />
                   <input
                     value={input}
@@ -139,26 +139,31 @@ export default function PortfolioPage() {
                       if (e.key === "Enter") void lookup();
                     }}
                     placeholder="Address or name.sol / .bonk / .skr"
-                    className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm"
+                    className="w-full pl-9 pr-3 py-2.5 min-h-[44px] rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm"
                     spellCheck={false}
                     autoComplete="off"
                   />
-                  {input && (
-                    <button
-                      type="button"
-                      onClick={clearLookup}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer"
-                      aria-label="Clear"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
                 </div>
+                {input.trim().length > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      clearLookup();
+                    }}
+                    className="shrink-0 min-h-[44px] min-w-[44px] px-3 rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 text-gray-600 dark:text-white/70 active:bg-black/10 dark:active:bg-white/10 cursor-pointer touch-manipulation z-10 relative flex items-center justify-center gap-1"
+                    aria-label="Clear"
+                  >
+                    <X size={16} />
+                    <span className="text-xs font-medium sm:inline">Clear</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => void lookup()}
                   disabled={resolving || !input.trim()}
-                  className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-sm font-medium cursor-pointer"
+                  className="shrink-0 min-h-[44px] px-4 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-sm font-medium cursor-pointer touch-manipulation z-10 relative"
                 >
                   {resolving ? <Spinner size={14} /> : "Look up"}
                 </button>
