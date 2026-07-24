@@ -25,12 +25,13 @@ function rateLimited(ip: string): boolean {
 }
 
 function clientIp(req: NextRequest): string | undefined {
-  const xf = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  if (xf) return xf;
+  // Prefer Cloudflare's verified client IP over spoofable X-Forwarded-For.
+  const cf = req.headers.get("cf-connecting-ip")?.trim();
+  if (cf) return cf;
   const real = req.headers.get("x-real-ip")?.trim();
   if (real) return real;
-  const cf = req.headers.get("cf-connecting-ip")?.trim();
-  return cf || undefined;
+  const xf = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return xf || undefined;
 }
 
 /** GET — whether Stripe crypto onramp is ready (secret key is enough for hosted redirect). */
