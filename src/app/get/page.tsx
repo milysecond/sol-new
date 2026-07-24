@@ -45,6 +45,175 @@ function isReady(c: BridgeCustomer | null | undefined) {
   return c?.kycStatus === "approved" && c?.tosStatus === "approved";
 }
 
+function TransakGetSection() {
+  const { publicKey, refreshBalance } = useWallet();
+  const [ok, setOk] = useState<boolean | null>(null);
+  const [amount, setAmount] = useState(50);
+  const [asset, setAsset] = useState<"SOL" | "USDC">("SOL");
+  const [fiat, setFiat] = useState<"AUD" | "USD">("AUD");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/transak/widget", { cache: "no-store" });
+        const data = (await res.json()) as { configured?: boolean };
+        if (!cancelled) setOk(data.configured === true);
+      } catch {
+        if (!cancelled) setOk(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const openBuy = async () => {
+    if (!publicKey) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/transak/widget", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet: publicKey,
+          asset,
+          fiatAmount: amount,
+          fiatCurrency: fiat,
+          countryCode: fiat === "AUD" ? "AU" : undefined,
+        }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        widgetUrl?: string;
+      };
+      if (!res.ok || !data.ok || !data.widgetUrl) {
+        throw new Error(data.error || "Could not open Transak");
+      }
+      openExternal(data.widgetUrl);
+      // Soft refresh balance later; Transak may take minutes
+      setTimeout(() => void refreshBalance(), 30_000);
+    } catch (e) {
+      setError(friendlyError(e, "Could not open buy flow."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (ok === null) {
+    return (
+      <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-5 text-xs text-gray-500 flex items-center gap-2">
+        <Spinner size={14} /> Checking buy options…
+      </div>
+    );
+  }
+  if (!ok) return null;
+
+  return (
+    <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
+          <DollarSign size={16} className="text-purple-500" /> Buy with Apple Pay
+        </p>
+        <span className="text-xs text-purple-600/80 dark:text-purple-400/80">via Transak</span>
+      </div>
+      <p className="text-xs text-gray-500 dark:text-white/40">
+        Apple Pay, card, Google Pay, and local methods (including Australia / AUD). Crypto goes to
+        your locked Solana wallet. Transak handles KYC.
+      </p>
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setAsset("SOL")}
+          className={`flex-1 text-sm font-semibold rounded-lg px-3 py-2 transition cursor-pointer ${
+            asset === "SOL"
+              ? "bg-purple-600 text-white"
+              : "bg-black/5 dark:bg-white/5 text-gray-600 dark:text-white/60"
+          }`}
+        >
+          SOL
+        </button>
+        <button
+          type="button"
+          onClick={() => setAsset("USDC")}
+          className={`flex-1 text-sm font-semibold rounded-lg px-3 py-2 transition cursor-pointer ${
+            asset === "USDC"
+              ? "bg-purple-600 text-white"
+              : "bg-black/5 dark:bg-white/5 text-gray-600 dark:text-white/60"
+          }`}
+        >
+          USDC
+        </button>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setFiat("AUD")}
+          className={`flex-1 text-xs font-semibold rounded-lg px-3 py-2 transition cursor-pointer ${
+            fiat === "AUD"
+              ? "bg-black/10 dark:bg-white/15 text-gray-900 dark:text-white"
+              : "bg-black/5 dark:bg-white/5 text-gray-500"
+          }`}
+        >
+          AUD (AU)
+        </button>
+        <button
+          type="button"
+          onClick={() => setFiat("USD")}
+          className={`flex-1 text-xs font-semibold rounded-lg px-3 py-2 transition cursor-pointer ${
+            fiat === "USD"
+              ? "bg-black/10 dark:bg-white/15 text-gray-900 dark:text-white"
+              : "bg-black/5 dark:bg-white/5 text-gray-500"
+          }`}
+        >
+          USD
+        </button>
+      </div>
+
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+          {fiat === "AUD" ? "A$" : "$"}
+        </span>
+        <input
+          type="number"
+          min={5}
+          max={50000}
+          step={1}
+          value={amount}
+          onChange={(e) => setAmount(Math.max(5, Math.min(50000, parseInt(e.target.value) || 5)))}
+          className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm"
+        />
+      </div>
+
+      <button
+        type="button"
+        onClick={() => void openBuy()}
+        disabled={busy || !publicKey}
+        className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2"
+      >
+        {busy ? <Spinner size={16} /> : null}
+        Continue to Apple Pay / card
+        <ExternalLink className="w-4 h-4 opacity-80" />
+      </button>
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs">
+          {error}
+        </div>
+      )}
+      <p className="text-[11px] text-gray-400 dark:text-white/30">
+        Opens Transak. Destination is locked to your sol.new wallet on Solana.
+      </p>
+    </div>
+  );
+}
+
 function StripeGetSection() {
   const { publicKey, refreshBalance } = useWallet();
   const [stripeOk, setStripeOk] = useState<boolean | null>(null);
@@ -70,8 +239,8 @@ function StripeGetSection() {
 
   if (stripeOk === null) {
     return (
-      <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-5 text-xs text-gray-500 flex items-center gap-2">
-        <Spinner size={14} /> Checking Apple Pay / card…
+      <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-5 text-xs text-gray-500 flex items-center gap-2">
+        <Spinner size={14} /> Checking Stripe (US/EU)…
       </div>
     );
   }
@@ -81,17 +250,15 @@ function StripeGetSection() {
   }
 
   return (
-    <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-5 space-y-4">
+    <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-5 space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
-          <DollarSign size={16} className="text-purple-500" /> Buy with Apple Pay
+          <DollarSign size={16} className="text-indigo-500" /> Buy (US / EU)
         </p>
-        <span className="text-xs text-purple-600/80 dark:text-purple-400/80">via Stripe</span>
+        <span className="text-xs text-indigo-600/80 dark:text-indigo-400/80">via Stripe</span>
       </div>
       <p className="text-xs text-gray-500 dark:text-white/40">
-        Card, Apple Pay, Google Pay, or bank. Stripe handles KYC and sends crypto to your wallet.
-        Usually minutes. Available in the US and EU only (not Hawaii). Everywhere else, use bank
-        deposit below.
+        Stripe Crypto Onramp: Apple Pay / card for US and EU only. For Australia use Transak above.
       </p>
 
       <div className="flex gap-2">
@@ -103,7 +270,7 @@ function StripeGetSection() {
           }}
           className={`flex-1 text-sm font-semibold rounded-lg px-3 py-2 transition cursor-pointer ${
             asset === "usdc"
-              ? "bg-purple-600 text-white"
+              ? "bg-indigo-600 text-white"
               : "bg-black/5 dark:bg-white/5 text-gray-600 dark:text-white/60"
           }`}
         >
@@ -117,7 +284,7 @@ function StripeGetSection() {
           }}
           className={`flex-1 text-sm font-semibold rounded-lg px-3 py-2 transition cursor-pointer ${
             asset === "sol"
-              ? "bg-purple-600 text-white"
+              ? "bg-indigo-600 text-white"
               : "bg-black/5 dark:bg-white/5 text-gray-600 dark:text-white/60"
           }`}
         >
@@ -145,9 +312,9 @@ function StripeGetSection() {
         <button
           type="button"
           onClick={() => setShowCheckout(true)}
-          className="w-full bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer"
+          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer"
         >
-          Continue to Apple Pay / card
+          Continue with Stripe
         </button>
       )}
 
@@ -684,6 +851,7 @@ export default function GetPage() {
             {/* Stripe Apple Pay / card (primary) + Bridge bank (secondary) */}
             {network === "mainnet" && (
               <>
+                <TransakGetSection />
                 <StripeGetSection />
                 {BRIDGE_UI && (
                   <Suspense

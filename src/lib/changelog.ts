@@ -17,8 +17,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-07-24",
     title: "Apple Pay and card onramp",
     items: [
-      "Buy USDC or SOL on /get with Apple Pay, card, Google Pay, or bank via Stripe Crypto Onramp.",
-      "Funds go straight to your passkey wallet on Solana. Stripe handles KYC.",
+      "Buy SOL or USDC on /get via Transak (Apple Pay / card, including Australia AUD).",
+      "Stripe Crypto Onramp still available for US and EU buyers.",
+      "Funds go to your passkey wallet on Solana. KYC is handled by the onramp.",
       "Bridge bank deposit remains available for ACH/wire (usually lower fee, slower).",
     ],
   },
