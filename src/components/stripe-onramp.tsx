@@ -217,12 +217,15 @@ export function StripeOnrampPanel({
         </p>
       )}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs space-y-2">
+        <div className="bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2 text-amber-800 dark:text-amber-200 text-xs space-y-2">
           <p>{error}</p>
+          <p className="text-amber-700/80 dark:text-amber-200/70">
+            Stripe Crypto Onramp is geo-limited. Bank deposit (Bridge) works from more places.
+          </p>
           <button
             type="button"
             onClick={() => void start()}
-            className="underline text-red-300 hover:text-red-200 cursor-pointer"
+            className="underline text-amber-700 dark:text-amber-300 hover:opacity-80 cursor-pointer"
           >
             Try again
           </button>
