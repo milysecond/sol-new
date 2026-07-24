@@ -23,6 +23,13 @@ export const SANCTUM_LSTS: LstOption[] = [
     blurb: "MEV-boosted liquid stake",
   },
   {
+    id: "anzsol",
+    symbol: "anzSOL",
+    name: "Solana ANZ Staked SOL",
+    mint: "ANZvHuXQh5DnBMzJ55MUyMtPxkdphgBwiPeYji2B3kxS",
+    blurb: "ANZ community LST via Sanctum",
+  },
+  {
     id: "msol",
     symbol: "mSOL",
     name: "Marinade Staked SOL",

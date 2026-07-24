@@ -1,6 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Connection,
+  Keypair,
+  Transaction,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import { Droplets } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
@@ -8,22 +14,54 @@ import { PageTransition } from "@/components/page-transition";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { signVersionedAndSend } from "@/lib/passkey-wallet";
+import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { friendlyError } from "@/lib/friendly-errors";
-import {
-  DEFAULT_LST,
-  JUP_SWAP_API,
-  SANCTUM_LSTS,
-  WSOL_MINT,
-  type LstOption,
-} from "@/lib/lsts";
+import { DEFAULT_LST, SANCTUM_LSTS, WSOL_MINT, type LstOption } from "@/lib/lsts";
 
 type Direction = "stake" | "unstake";
+
+type EnrichedLst = LstOption & {
+  apyLabel?: string | null;
+  solValue?: number | null;
+  tvl?: number | null;
+};
+
+type OrderResponse = {
+  inp: string;
+  out: string;
+  inpAmt: string;
+  outAmt: string;
+  swapSrcData: unknown;
+  tx?: string;
+  error?: string;
+};
+
+function solToLamportsStr(sol: number): string {
+  return Math.floor(sol * 1e9).toString();
+}
+
+function lamportsToSol(lamports: string | number): number {
+  return Number(lamports) / 1e9;
+}
+
+async function signOrderTx(txB64: string, keypair: Keypair): Promise<string> {
+  const raw = Buffer.from(txB64, "base64");
+  try {
+    const vtx = VersionedTransaction.deserialize(raw);
+    vtx.sign([keypair]);
+    return Buffer.from(vtx.serialize()).toString("base64");
+  } catch {
+    const tx = Transaction.from(raw);
+    tx.partialSign(keypair);
+    return Buffer.from(tx.serialize()).toString("base64");
+  }
+}
 
 export default function LstPage() {
   const { publicKey, balance, refreshBalance } = useWallet();
   const { rpc, network } = useNetwork();
-  const [lst, setLst] = useState<LstOption>(DEFAULT_LST);
+  const [lsts, setLsts] = useState<EnrichedLst[]>(SANCTUM_LSTS);
+  const [lst, setLst] = useState<EnrichedLst>(DEFAULT_LST);
   const [direction, setDirection] = useState<Direction>("stake");
   const [amount, setAmount] = useState("1");
   const [busy, setBusy] = useState(false);
@@ -31,6 +69,7 @@ export default function LstPage() {
   const [sig, setSig] = useState<string | null>(null);
   const [quoteOut, setQuoteOut] = useState<string | null>(null);
   const [quoting, setQuoting] = useState(false);
+  const [sanctumOk, setSanctumOk] = useState<boolean | null>(null);
 
   const inputMint = direction === "stake" ? WSOL_MINT : lst.mint;
   const outputMint = direction === "stake" ? lst.mint : WSOL_MINT;
@@ -38,30 +77,54 @@ export default function LstPage() {
   const amountAtomic = useMemo(() => {
     const n = parseFloat(amount);
     if (!Number.isFinite(n) || n <= 0) return null;
-    return Math.round(n * 1e9);
+    return solToLamportsStr(n);
   }, [amount]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/lst/meta", { cache: "no-store" });
+        const data = (await res.json()) as {
+          configured?: boolean;
+          lsts?: EnrichedLst[];
+        };
+        if (cancelled) return;
+        setSanctumOk(data.configured === true);
+        if (data.lsts?.length) {
+          setLsts(data.lsts);
+          setLst((prev) => data.lsts!.find((x) => x.id === prev.id) || data.lsts![0]);
+        }
+      } catch {
+        if (!cancelled) setSanctumOk(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const refreshQuote = useCallback(async () => {
-    if (!amountAtomic || amountAtomic < 1_000_000) {
+    if (!amountAtomic) {
       setQuoteOut(null);
       return;
     }
     setQuoting(true);
     try {
       const params = new URLSearchParams({
-        inputMint,
-        outputMint,
-        amount: String(amountAtomic),
+        inp: inputMint,
+        out: outputMint,
+        amt: amountAtomic,
+        mode: "ExactIn",
         slippageBps: "50",
-        swapMode: "ExactIn",
       });
-      const res = await fetch(`${JUP_SWAP_API}/quote?${params}`);
-      const data = (await res.json()) as { outAmount?: string; error?: string };
-      if (!res.ok || !data.outAmount) {
+      const res = await fetch(`/api/lst/order?${params}`, { cache: "no-store" });
+      const data = (await res.json()) as OrderResponse;
+      if (!res.ok || !data.outAmt) {
         setQuoteOut(null);
         return;
       }
-      const out = Number(data.outAmount) / 1e9;
+      const out = lamportsToSol(data.outAmt);
       setQuoteOut(out.toFixed(6).replace(/\.?0+$/, ""));
     } catch {
       setQuoteOut(null);
@@ -71,7 +134,7 @@ export default function LstPage() {
   }, [amountAtomic, inputMint, outputMint]);
 
   useEffect(() => {
-    const t = setTimeout(() => void refreshQuote(), 350);
+    const t = setTimeout(() => void refreshQuote(), 400);
     return () => clearTimeout(t);
   }, [refreshQuote]);
 
@@ -87,46 +150,65 @@ export default function LstPage() {
     try {
       if (direction === "stake") {
         const bal = Math.round((balance ?? 0) * 1e9);
-        if (amountAtomic + 15_000 > bal) {
+        if (Number(amountAtomic) + 15_000 > bal) {
           throw new Error("Not enough SOL (leave a little for fees).");
         }
       }
 
-      const quoteParams = new URLSearchParams({
-        inputMint,
-        outputMint,
-        amount: String(amountAtomic),
+      // Order with signer so Sanctum builds the unsigned tx
+      const params = new URLSearchParams({
+        inp: inputMint,
+        out: outputMint,
+        amt: amountAtomic,
+        mode: "ExactIn",
         slippageBps: "50",
-        swapMode: "ExactIn",
+        signer: publicKey,
       });
-      const qRes = await fetch(`${JUP_SWAP_API}/quote?${quoteParams}`);
-      const quote = await qRes.json();
-      if (!qRes.ok) throw new Error("Quote failed. Try a different amount or LST.");
+      const oRes = await fetch(`/api/lst/order?${params}`, { cache: "no-store" });
+      const order = (await oRes.json()) as OrderResponse;
+      if (!oRes.ok) throw new Error(order.error || "Sanctum quote failed");
+      if (!order.tx) throw new Error("Sanctum did not return a transaction. Try again.");
 
-      const sRes = await fetch(`${JUP_SWAP_API}/swap-instructions`, {
+      const { keypair } = await getPasskeyKeypair();
+      if (keypair.publicKey.toBase58() !== publicKey) {
+        throw new Error("Passkey does not match connected wallet.");
+      }
+      const signedTx = await signOrderTx(order.tx, keypair);
+
+      const eRes = await fetch("/api/lst/execute", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          quoteResponse: quote,
-          userPublicKey: publicKey,
-          wrapAndUnwrapSol: true,
-          useSharedAccounts: true,
-          dynamicComputeUnitLimit: true,
-          prioritizationFeeLamports: "auto",
-        }),
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ signedTx, orderResponse: order }),
       });
-      const swapIxs = await sRes.json();
-      if (!sRes.ok) throw new Error("Could not build swap instructions.");
+      const eData = (await eRes.json()) as {
+        signature?: string;
+        error?: string;
+      };
 
-      const bRes = await fetch("/api/swap/build", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ swapInstructionsResponse: swapIxs }),
-      });
-      const bData = (await bRes.json()) as { ok?: boolean; tx?: string; error?: string };
-      if (!bRes.ok || !bData.tx) throw new Error(bData.error || "Build failed");
+      let signature = eData.signature;
+      if (!eRes.ok || !signature) {
+        // Fallback: broadcast signed tx ourselves if Sanctum execute rejects
+        try {
+          const conn = new Connection(rpc, "confirmed");
+          const raw = Buffer.from(signedTx, "base64");
+          try {
+            const vtx = VersionedTransaction.deserialize(raw);
+            signature = await conn.sendRawTransaction(vtx.serialize(), {
+              skipPreflight: false,
+              maxRetries: 3,
+            });
+          } catch {
+            signature = await conn.sendRawTransaction(raw, {
+              skipPreflight: false,
+              maxRetries: 3,
+            });
+          }
+          await conn.confirmTransaction(signature, "confirmed");
+        } catch {
+          throw new Error(eData.error || "Sanctum execute failed");
+        }
+      }
 
-      const signature = await signVersionedAndSend(bData.tx, rpc, publicKey);
       setSig(signature);
       setTimeout(() => void refreshBalance(), 1500);
     } catch (e) {
@@ -159,8 +241,7 @@ export default function LstPage() {
                 <Droplets className="mx-auto text-cyan-400" size={36} />
                 <h1 className="text-3xl font-bold tracking-tight">Liquid stake</h1>
                 <p className="text-gray-500 dark:text-white/50 text-sm">
-                  Sanctum-ecosystem LSTs. Swap SOL for liquid staked SOL and stay
-                  free to trade while earning.
+                  Sanctum Router. Swap SOL for LSTs (and back) with your passkey.
                 </p>
                 <p className="text-[11px] text-gray-400">
                   Native stake →{" "}
@@ -173,6 +254,11 @@ export default function LstPage() {
                     /earn
                   </a>
                 </p>
+                {sanctumOk === false && (
+                  <p className="text-[11px] text-amber-500">
+                    Sanctum API unavailable — try again shortly.
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-2">
@@ -204,7 +290,7 @@ export default function LstPage() {
                     LST
                   </label>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {SANCTUM_LSTS.map((opt) => (
+                    {lsts.map((opt) => (
                       <button
                         key={opt.id}
                         type="button"
@@ -216,7 +302,14 @@ export default function LstPage() {
                             : "bg-white dark:bg-black border-black/10 dark:border-white/10 text-gray-600 dark:text-white/70"
                         }`}
                       >
-                        <span className="font-semibold block">{opt.symbol}</span>
+                        <span className="font-semibold block">
+                          {opt.symbol}
+                          {opt.apyLabel ? (
+                            <span className="font-normal text-cyan-400/90 ml-1">
+                              {opt.apyLabel}
+                            </span>
+                          ) : null}
+                        </span>
                         <span className="text-[10px] text-gray-400 line-clamp-1">
                           {opt.blurb}
                         </span>
@@ -224,6 +317,13 @@ export default function LstPage() {
                     ))}
                   </div>
                 </div>
+
+                {lst.solValue != null && (
+                  <p className="text-[11px] text-gray-400">
+                    1 {lst.symbol} ≈ {Number(lst.solValue).toFixed(4)} SOL
+                    {lst.apyLabel ? ` · APY ${lst.apyLabel}` : ""}
+                  </p>
+                )}
 
                 <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-white/60 mb-1.5">
@@ -258,7 +358,7 @@ export default function LstPage() {
                 </div>
 
                 <div className="text-xs text-gray-500 dark:text-white/50 min-h-[1.25rem]">
-                  {quoting && "Quoting…"}
+                  {quoting && "Quoting Sanctum…"}
                   {!quoting && quoteOut && (
                     <>
                       Est. receive ≈{" "}
@@ -276,9 +376,7 @@ export default function LstPage() {
                   className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2"
                 >
                   {busy ? <Spinner size={16} /> : null}
-                  {direction === "stake"
-                    ? `Get ${lst.symbol}`
-                    : `Unstake to SOL`}
+                  {direction === "stake" ? `Get ${lst.symbol}` : `Unstake to SOL`}
                 </button>
               </div>
 
@@ -300,16 +398,16 @@ export default function LstPage() {
               )}
 
               <p className="text-[11px] text-gray-400 text-center leading-relaxed">
-                Swaps route through Jupiter for deep LST liquidity in the Sanctum
-                ecosystem. sol.new never holds your funds.{" "}
+                Quotes and execution via{" "}
                 <a
-                  href="https://sanctum.so"
+                  href="https://learn.sanctum.so/docs/for-developers/sanctum-api"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-cyan-400 hover:underline"
                 >
-                  sanctum.so
+                  Sanctum API
                 </a>
+                . sol.new never holds your funds.
               </p>
             </div>
           </PageTransition>
