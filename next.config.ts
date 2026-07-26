@@ -35,6 +35,11 @@ const nextConfig: NextConfig = {
         destination: "https://memes.metasal.xyz",
         permanent: false,
       },
+      {
+        source: "/meme",
+        destination: "https://memes.metasal.xyz",
+        permanent: false,
+      },
 
       // --- GSC indexing cleanup: dead / legacy paths that were returning 404 ---
       { source: "/copyright", destination: "/privacy", permanent: true },
