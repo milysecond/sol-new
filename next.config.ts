@@ -41,6 +41,18 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
 
+      // /rips → Rips protocol (SMB monke rips)
+      {
+        source: "/rips",
+        destination: "https://rips.sol.new",
+        permanent: false,
+      },
+      {
+        source: "/rips/:path*",
+        destination: "https://rips.sol.new/:path*",
+        permanent: false,
+      },
+
       // --- GSC indexing cleanup: dead / legacy paths that were returning 404 ---
       { source: "/copyright", destination: "/privacy", permanent: true },
       { source: "/about", destination: "/", permanent: true },
