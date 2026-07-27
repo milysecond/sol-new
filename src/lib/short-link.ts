@@ -91,3 +91,249 @@ export function isTrustedShortLinkHost(hostname: string): boolean {
   const h = hostname.toLowerCase().replace(/\.$/, "");
   return h === "sol.new" || h.endsWith(".sol.new");
 }
+
+export type ShortLinkDestinationInfo = {
+  hostname: string;
+  host: string;
+  /** Human product / site name when known. */
+  siteName: string;
+  /** Short category label for badges. */
+  kind: string;
+  /** One-line explainer for the interstitial. */
+  summary: string;
+  /** Suggested headline when the creator left title empty. */
+  defaultTitle: string;
+  /** Continue button label. */
+  continueLabel: string;
+  /** Google s2 favicon URL (safe external). */
+  faviconUrl: string;
+};
+
+/**
+ * Infer a human-readable destination profile from a target URL.
+ * Keeps interstitial / OG pages useful even when title is blank.
+ */
+export function describeShortLinkDestination(targetUrl: string): ShortLinkDestinationInfo {
+  let parsed: URL;
+  try {
+    parsed = new URL(targetUrl);
+  } catch {
+    return {
+      hostname: "",
+      host: "",
+      siteName: "External site",
+      kind: "Link",
+      summary: "This short link points to an external destination.",
+      defaultTitle: "Shared link",
+      continueLabel: "Continue",
+      faviconUrl: "https://www.google.com/s2/favicons?domain=sol.new&sz=64",
+    };
+  }
+
+  const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
+  const host = parsed.host;
+  const path = parsed.pathname.toLowerCase();
+  const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=64`;
+
+  const base = (
+    siteName: string,
+    kind: string,
+    summary: string,
+    defaultTitle: string,
+    continueLabel?: string
+  ): ShortLinkDestinationInfo => ({
+    hostname,
+    host,
+    siteName,
+    kind,
+    summary,
+    defaultTitle,
+    continueLabel: continueLabel ?? `Continue to ${siteName}`,
+    faviconUrl,
+  });
+
+  // Google Calendar booking / appointment pages
+  if (
+    hostname === "calendar.app.google" ||
+    hostname === "calendar.google.com" ||
+    (hostname.endsWith(".google.com") && path.includes("/calendar"))
+  ) {
+    return base(
+      "Google Calendar",
+      "Calendar",
+      "Book or open a Google Calendar event from this short link.",
+      "Schedule on Google Calendar",
+      "Open Google Calendar"
+    );
+  }
+
+  if (hostname === "calendly.com" || hostname.endsWith(".calendly.com")) {
+    return base(
+      "Calendly",
+      "Calendar",
+      "Pick a time on a Calendly scheduling page.",
+      "Book a time on Calendly",
+      "Open Calendly"
+    );
+  }
+
+  if (hostname === "cal.com" || hostname.endsWith(".cal.com")) {
+    return base(
+      "Cal.com",
+      "Calendar",
+      "Pick a time on a Cal.com scheduling page.",
+      "Book a time on Cal.com",
+      "Open Cal.com"
+    );
+  }
+
+  if (
+    hostname === "x.com" ||
+    hostname === "twitter.com" ||
+    hostname === "mobile.twitter.com"
+  ) {
+    return base(
+      "X",
+      "Social",
+      "Opens a profile or post on X (Twitter).",
+      "View on X",
+      "Open on X"
+    );
+  }
+
+  if (
+    hostname === "youtube.com" ||
+    hostname === "www.youtube.com" ||
+    hostname === "youtu.be" ||
+    hostname === "m.youtube.com"
+  ) {
+    return base(
+      "YouTube",
+      "Video",
+      "Opens a YouTube video or channel.",
+      "Watch on YouTube",
+      "Open YouTube"
+    );
+  }
+
+  if (hostname === "github.com" || hostname === "www.github.com") {
+    return base(
+      "GitHub",
+      "Code",
+      "Opens a repository, issue, or profile on GitHub.",
+      "View on GitHub",
+      "Open GitHub"
+    );
+  }
+
+  if (
+    hostname === "docs.google.com" ||
+    hostname === "drive.google.com" ||
+    hostname === "sheets.google.com" ||
+    hostname === "forms.gle"
+  ) {
+    return base(
+      "Google Docs",
+      "Document",
+      "Opens a Google Drive / Docs / Forms resource.",
+      "Open Google document",
+      "Open document"
+    );
+  }
+
+  if (hostname === "t.me" || hostname === "telegram.me" || hostname === "telegram.org") {
+    return base(
+      "Telegram",
+      "Chat",
+      "Opens a Telegram chat, channel, or invite.",
+      "Open in Telegram",
+      "Open Telegram"
+    );
+  }
+
+  if (hostname === "discord.gg" || hostname === "discord.com" || hostname.endsWith(".discord.com")) {
+    return base(
+      "Discord",
+      "Chat",
+      "Opens a Discord invite or channel.",
+      "Join on Discord",
+      "Open Discord"
+    );
+  }
+
+  if (hostname === "solscan.io" || hostname === "explorer.solana.com" || hostname === "solana.fm") {
+    return base(
+      siteLabelFromHost(hostname),
+      "Explorer",
+      "Opens a Solana explorer page for a transaction, account, or token.",
+      "View on Solana explorer",
+      `Open ${siteLabelFromHost(hostname)}`
+    );
+  }
+
+  if (isTrustedShortLinkHost(hostname)) {
+    return base(
+      "sol.new",
+      "sol.new",
+      "Internal sol.new destination — safe auto-redirect.",
+      "Continue on sol.new",
+      "Continue"
+    );
+  }
+
+  const siteName = siteLabelFromHost(hostname);
+  return base(
+    siteName,
+    "External",
+    `This short link leaves sol.new and opens ${host}. Only continue if you trust the destination.`,
+    `Link to ${siteName}`,
+    `Continue to ${siteName}`
+  );
+}
+
+function siteLabelFromHost(hostname: string): string {
+  const h = hostname.replace(/^www\./, "");
+  if (!h) return "External site";
+  const parts = h.split(".");
+  // calendar.app.google → prefer meaningful middle when common multi-part TLDs
+  if (parts.length >= 2) {
+    const secondLevel = parts[parts.length - 2] || "";
+    if (secondLevel && secondLevel.length > 2) {
+      return secondLevel.charAt(0).toUpperCase() + secondLevel.slice(1);
+    }
+  }
+  return h;
+}
+
+/** Display title: creator title wins, else destination default. */
+export function shortLinkDisplayTitle(
+  title: string | null | undefined,
+  dest: ShortLinkDestinationInfo
+): string {
+  const t = title?.trim();
+  return t || dest.defaultTitle;
+}
+
+/** Relative-ish created label for interstitial stats. */
+export function formatShortLinkCreated(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return null;
+  const diff = Date.now() - t;
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 48) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 60) return `${days}d ago`;
+  try {
+    return new Date(t).toLocaleDateString("en-AU", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return null;
+  }
+}
