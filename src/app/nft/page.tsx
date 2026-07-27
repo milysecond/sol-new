@@ -2,7 +2,8 @@
 "use client";
 
 import { fastIpfsUrl } from "@/lib/ipfs";
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
+import { PromoInput } from "@/components/promo-input";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { uploadImage, uploadMetadata } from "@/lib/api";
@@ -12,6 +13,7 @@ import { useNetwork } from "@/lib/network";
 import { useImagePaste } from "@/lib/use-image-paste";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { Image, Paperclip, Zap, Coins, Check, ExternalLink, ArrowRight } from "lucide-react";
+import { friendlyError } from "@/lib/friendly-errors";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
 import { PageTransition, FadeIn } from "@/components/page-transition";
@@ -58,6 +60,9 @@ export default function NftPage() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [promoCode, setPromoCode] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState<number>(1);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { publicKey: walletPk, refreshBalance } = useWallet();
   const { network, rpc } = useNetwork();
@@ -81,19 +86,36 @@ export default function NftPage() {
       setStatus("minting");
       const { address, keypair: userKeypair } = await getPasskeyKeypair();
 
-      // Step 1b: Check balance BEFORE uploads so we don't burn storage on a
-      // doomed mint. Standard NFT ≈ 0.02 SOL (rent + 0.005 platform fee);
-      // compressed ≈ 0.001 SOL platform fee + tx fee (Helius covers mint).
-      const balanceCheckConn = new Connection(rpc, "confirmed");
-      const userBalance = await balanceCheckConn.getBalance(new PublicKey(address));
-      const minBalance = (mintType === "standard" ? 0.025 : 0.002) * 1e9;
-      if (userBalance < minBalance) {
-        const need = mintType === "standard" ? "0.025" : "0.002";
-        const where = network === "devnet"
-          ? "Claim devnet SOL from the Get page."
-          : "Add funds from the Get page.";
-        const shortAddr = `${address.slice(0, 4)}...${address.slice(-4)}`;
-        throw new Error(`You need at least ${need} SOL to mint a ${mintType} NFT. Wallet ${shortAddr} has ${(userBalance / 1e9).toFixed(4)} SOL on ${network}. ${where}`);
+      const qty = Math.max(1, Math.min(100, quantity || 1));
+
+      // Fund user's wallet via treasury when a promo code is active
+      if (promoCode) {
+        const fundKind = mintType === "standard" ? "nft_standard" : "nft_compressed";
+        const fundRes = await fetch("/api/promo/fund", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: promoCode, wallet: address, kind: fundKind, quantity: qty }),
+        });
+        if (!fundRes.ok) {
+          const err = await fundRes.json().catch(() => ({}));
+          throw new Error(err.error ?? "Promo funding failed — please try again.");
+        }
+      }
+
+      // Check balance BEFORE uploads so we don't burn storage on a doomed mint.
+      if (!promoCode) {
+        const balanceCheckConn = new Connection(rpc, "confirmed");
+        const userBalance = await balanceCheckConn.getBalance(new PublicKey(address));
+        const perMint = mintType === "standard" ? 0.025 : 0.002;
+        const minBalance = perMint * qty * 1e9;
+        if (userBalance < minBalance) {
+          const need = (perMint * qty).toFixed(3);
+          const where = network === "devnet"
+            ? "Claim devnet SOL from the Get page."
+            : "Add funds from the Get page.";
+          const shortAddr = `${address.slice(0, 4)}...${address.slice(-4)}`;
+          throw new Error(`You need at least ${need} SOL to mint ${qty} ${mintType} NFT${qty > 1 ? "s" : ""}. Wallet ${shortAddr} has ${(userBalance / 1e9).toFixed(4)} SOL on ${network}. ${where}`);
+        }
       }
 
       // Step 2: Upload image + metadata
@@ -118,91 +140,102 @@ export default function NftPage() {
 
       let mintAddress: string | undefined;
       let assetId: string | undefined;
-      let signature: string;
+      let signature: string = "";
 
       const FEE_VAULT = publicKey("Deqi6CBfo2FR2XVZXxSwmcjELy1JdbAXWDNFPzDAbtxW");
+      const allMints: string[] = [];
 
       if (mintType === "standard") {
-        // Standard NFT via Metaplex Token Metadata
         umi.use(mplTokenMetadata());
-        const mint = generateSigner(umi);
+        // Standard NFT pricing: 0.02 SOL total = 0.015 rent + 0.005 platform fee
+        const platformFee = sol(0.005);
 
-        // Dynamic platform fee calculation
-        // Total price: 0.02 SOL
-        // Estimated rent: ~0.015 SOL (mint + metadata accounts)
-        // Platform fee: ~0.005 SOL
-        const TOTAL_PRICE_SOL = 0.02;
-        const ESTIMATED_RENT_SOL = 0.015;
-        const platformFee = sol(TOTAL_PRICE_SOL - ESTIMATED_RENT_SOL);
-
-        const txResult = await createNft(umi, {
-          mint,
-          name,
-          symbol: "NFT",
-          uri: metadataUri,
-          sellerFeeBasisPoints: percentAmount(0),
-          isMutable: false,
-        })
-        .add(transferSol(umi, {
-          source: umi.identity,
-          destination: FEE_VAULT,
-          amount: platformFee,
-        }))
-        .sendAndConfirm(umi);
-
-        mintAddress = mint.publicKey.toString();
-        signature = Buffer.from(txResult.signature).toString("base64");
+        if (qty > 1) setProgress({ done: 0, total: qty });
+        for (let i = 0; i < qty; i++) {
+          const mint = generateSigner(umi);
+          const nftBuilder = createNft(umi, {
+            mint,
+            name: qty > 1 ? `${name} #${i + 1}` : name,
+            symbol: "NFT",
+            uri: metadataUri,
+            sellerFeeBasisPoints: percentAmount(0),
+            isMutable: false,
+          });
+          if (!promoCode) nftBuilder.add(transferSol(umi, { source: umi.identity, destination: FEE_VAULT, amount: platformFee }));
+          const txResult = await nftBuilder.sendAndConfirm(umi);
+          allMints.push(mint.publicKey.toString());
+          if (i === 0) signature = Buffer.from(txResult.signature).toString("base64");
+          if (qty > 1) setProgress({ done: i + 1, total: qty });
+        }
+        mintAddress = allMints[0];
       } else {
-        // Compressed NFT — Helius hosts the Bubblegum tree and pays mint cost.
-        // We still take a 0.001 SOL platform fee onchain.
-        const platformFee = sol(0.001);
-        const feeTx = await transferSol(umi, {
-          source: umi.identity,
-          destination: FEE_VAULT,
-          amount: platformFee,
-        }).sendAndConfirm(umi);
-        const feeSig = Buffer.from(feeTx.signature).toString("base64");
+        // Compressed NFTs via Helius. Single platform fee covers the batch.
+        if (!promoCode) {
+          const platformFee = sol(0.001 * qty);
+          const feeTx = await transferSol(umi, {
+            source: umi.identity,
+            destination: FEE_VAULT,
+            amount: platformFee,
+          }).sendAndConfirm(umi);
+          signature = Buffer.from(feeTx.signature).toString("base64");
+        }
 
-        const res = await fetch("/api/mint-nft", {
+        if (qty > 1) setProgress({ done: 0, total: qty });
+        for (let i = 0; i < qty; i++) {
+          const res = await fetch("/api/mint-nft", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              compressed: true,
+              owner: address,
+              name: qty > 1 ? `${name} #${i + 1}` : name,
+              symbol: "NFT",
+              uri: metadataUri,
+              description,
+              network,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok || data.error) throw new Error(data.error || "Compressed mint failed");
+          allMints.push(data.assetId || "pending");
+          if (i === 0 && !signature) signature = data.signature || "";
+          if (qty > 1) setProgress({ done: i + 1, total: qty });
+        }
+        assetId = allMints[0];
+      }
+      setProgress(null);
+
+      // Save each minted NFT to DB
+      for (let i = 0; i < allMints.length; i++) {
+        fetch("/api/nft", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            compressed: true,
-            owner: address,
-            name,
-            symbol: "NFT",
-            uri: metadataUri,
+            wallet: address,
+            name: qty > 1 ? `${name} #${i + 1}` : name,
             description,
-            network,
+            imageUrl,
+            metadataUri,
+            mintAddress: allMints[i],
           }),
-        });
-        const data = await res.json();
-        if (!res.ok || data.error) throw new Error(data.error || "Compressed mint failed");
-
-        assetId = data.assetId || "pending";
-        signature = data.signature || feeSig;
+        }).catch(() => {});
       }
 
-      // Save to DB
-      fetch("/api/nft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          wallet: address,
-          name,
-          description,
-          imageUrl,
-          metadataUri,
-          mintAddress: mintAddress || assetId,
-        }),
-      }).catch(() => {});
+      if (promoCode) {
+        fetch("/api/promo/redeem", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: promoCode, wallet: address, kind: `nft_${mintType}` }),
+        }).catch(() => {});
+      }
 
       setResult({ imageUrl: displayUrl, metadataUri, mint: mintAddress, assetId, signature, type: mintType });
       setStatus("done");
       await refreshBalance();
     } catch (e: any) {
-      setError(e instanceof Error ? e.message : "Mint failed");
+      setError(friendlyError(e, "We couldn't mint your NFT. Please try again."));
       setStatus("error");
+      setProgress(null);
     }
   };
 
@@ -226,7 +259,7 @@ export default function NftPage() {
               <FadeIn><div className="space-y-4">
                 <div className="bg-black/5 dark:bg-white/5 border border-green-500/30 rounded-xl p-6 space-y-4">
                   <div className="flex items-center gap-2 text-green-400 text-sm font-medium">
-                    <Check className="w-4 h-4 inline" /> {result.type === "compressed" ? "Compressed" : "Standard"} NFT minted!
+                    <Check className="w-4 h-4 inline" /> {quantity > 1 ? `${quantity} ${result.type === "compressed" ? "compressed" : "standard"} NFTs minted!` : `${result.type === "compressed" ? "Compressed" : "Standard"} NFT minted!`}
                   </div>
                   <div className="flex gap-4 items-start">
                     {result.imageUrl && (
@@ -371,11 +404,72 @@ export default function NftPage() {
                     : "Compressed — cheaper, great for collections"}
                 </p>
 
+                {/* Quantity */}
+                <div className="space-y-2">
+                  <label className="text-sm text-gray-500 dark:text-white/40 block">How many copies?</label>
+                  <div className="flex gap-2 items-stretch">
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      className="w-10 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:bg-black/10 dark:hover:bg-white/10 transition cursor-pointer text-lg font-semibold disabled:opacity-30"
+                      disabled={quantity <= 1}
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={quantity}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        if (isNaN(v)) setQuantity(1);
+                        else setQuantity(Math.max(1, Math.min(100, v)));
+                      }}
+                      className="flex-1 text-center text-base font-semibold bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-2 text-gray-900 dark:text-white focus:outline-none focus:border-green-400/50 focus:ring-1 focus:ring-green-400/25 transition tabular-nums"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(Math.min(100, quantity + 1))}
+                      className="w-10 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:bg-black/10 dark:hover:bg-white/10 transition cursor-pointer text-lg font-semibold disabled:opacity-30"
+                      disabled={quantity >= 100}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    {[1, 5, 10, 25, 100].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setQuantity(n)}
+                        className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition cursor-pointer ${
+                          quantity === n
+                            ? "bg-green-500/20 border border-green-400/50 text-green-400"
+                            : "bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-500 dark:text-white/40 hover:text-gray-900 dark:hover:text-white"
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  {quantity > 1 && (
+                    <p className="text-[11px] text-gray-400 dark:text-white/40 text-center">
+                      Each NFT will be named &quot;{name || "Your NFT"} #1&quot;, &quot;#2&quot;, etc.
+                    </p>
+                  )}
+                </div>
+
                 {error && (
                   <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">
                     {error}
                   </div>
                 )}
+
+                <PromoInput
+                  onValidCode={setPromoCode}
+                  onClear={() => setPromoCode(null)}
+                />
 
                 <button
                   onClick={handleMint}
@@ -385,15 +479,45 @@ export default function NftPage() {
                   {status === "uploading"
                     ? <><Spinner size={16} className="inline mr-2" />Uploading...</>
                     : status === "minting"
-                    ? <><Spinner size={16} className="inline mr-2" />Minting onchain...</>
+                    ? progress
+                      ? <><Spinner size={16} className="inline mr-2" />Minting {progress.done}/{progress.total}…</>
+                      : <><Spinner size={16} className="inline mr-2" />Minting onchain...</>
+                    : quantity > 1
+                    ? `Mint ${quantity} ${mintType} NFTs`
                     : `Mint ${mintType} NFT`}
                 </button>
-                <p className="text-center text-xs text-gray-400 dark:text-white/30">{mintType === "standard" ? "0.02 SOL" : "0.001 SOL"}</p>
+                <p className="text-center text-xs text-gray-400 dark:text-white/30">
+                  {promoCode
+                    ? <span className="text-green-400">Free with promo code</span>
+                    : `${((mintType === "standard" ? 0.02 : 0.001) * quantity).toFixed(3)} SOL${quantity > 1 ? ` (${(mintType === "standard" ? 0.02 : 0.001).toFixed(3)} × ${quantity})` : ""}`}
+                </p>
               </div>
             )}
           </div>
           </PageTransition>
         </ConnectGate>
+
+        <div className="w-full sm:max-w-lg pt-6 pb-2 space-y-2">
+          <p className="text-center text-xs text-gray-400 dark:text-white/30">Looking to buy NFTs instead?</p>
+          <div className="grid grid-cols-2 gap-3">
+            <a
+              href="https://magiceden.io/solana"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-medium text-gray-600 dark:text-white/60 hover:text-pink-500 dark:hover:text-pink-400 hover:border-pink-400/40 transition"
+            >
+              Magic Eden <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+            <a
+              href="https://www.tensor.trade"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-medium text-gray-600 dark:text-white/60 hover:text-sky-500 dark:hover:text-sky-400 hover:border-sky-400/40 transition"
+            >
+              Tensor <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
       </main>
     </div>
   );

@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: "What sol.new collects, what it stores, and what stays on your device.",
 };
 
-const UPDATED = "May 8, 2026";
+const UPDATED = "July 19, 2026";
 
 export default function PrivacyPage() {
   return (
@@ -80,6 +80,26 @@ export default function PrivacyPage() {
               you&apos;re visiting, page views are also reported there in
               aggregate.
             </li>
+            <li>
+              <span className="font-medium text-gray-900 dark:text-white">Optional mailing list.</span>{" "}
+              If you join the sol.new mailing list, we store the email address
+              you provide (and optional first name) with our email provider
+              (Resend) so we can send product updates and launch highlights.
+              You can unsubscribe or change preferences at{" "}
+              <Link href="/unsubscribe" className="text-purple-400 hover:underline">
+                sol.new/unsubscribe
+              </Link>
+              .
+            </li>
+            <li>
+              <span className="font-medium text-gray-900 dark:text-white">Optional email ↔ wallet link.</span>{" "}
+              If you request a magic link while a passkey wallet is connected, we
+              store your email with the public wallet address (and optional
+              WebAuthn credential id) so the link can open that wallet on a
+              device that has the passkey. The private key never leaves your
+              device; the link only names which public address to open and still
+              requires Face ID / fingerprint.
+            </li>
           </ul>
         </section>
 
@@ -88,7 +108,10 @@ export default function PrivacyPage() {
             What we don&apos;t collect
           </h2>
           <ul className="list-disc pl-5 space-y-2">
-            <li>Names, emails, phone numbers, or government IDs.</li>
+            <li>
+              Names, emails, phone numbers, or government IDs — unless you
+              voluntarily submit an email for the mailing list.
+            </li>
             <li>
               Private keys, seed phrases, passkey credentials, or any signing
               material.
@@ -104,8 +127,9 @@ export default function PrivacyPage() {
           <p>
             sol.new uses public Solana RPC endpoints to read and submit
             transactions, and uses content-delivery and analytics providers
-            (Vercel, optionally Google Analytics) listed above. Each of these
-            sees the request metadata necessary to do its job.
+            (Vercel, optionally Google Analytics) listed above. Email for the
+            optional mailing list is handled by Resend. Each of these sees the
+            request metadata necessary to do its job.
           </p>
         </section>
 
@@ -122,6 +146,13 @@ export default function PrivacyPage() {
             <li>
               Public on-chain records (token mints, transactions) are part of
               Solana itself and cannot be erased by us.
+            </li>
+            <li>
+              Mailing list: use{" "}
+              <Link href="/unsubscribe" className="text-purple-400 hover:underline">
+                /unsubscribe
+              </Link>{" "}
+              to leave or adjust topics (product updates, launch highlights).
             </li>
             <li>
               For questions or requests, email{" "}
@@ -150,6 +181,10 @@ export default function PrivacyPage() {
           See also{" "}
           <Link href="/terms" className="text-purple-400 hover:underline">
             Terms of Use
+          </Link>
+          {" · "}
+          <Link href="/changelog" className="text-purple-400 hover:underline">
+            Changelog
           </Link>
           .
         </footer>

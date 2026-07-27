@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Connection, PublicKey } from "@solana/web3.js";
+import { mainnetRpcUrl, devnetRpcUrl } from "@/lib/rpc-server";
 
-const HELIUS_KEY = process.env.HELIUS_API_KEY;
 const NETWORKS = {
-  mainnet: HELIUS_KEY
-    ? `https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`
-    : "https://api.mainnet-beta.solana.com",
-  devnet: HELIUS_KEY
-    ? `https://devnet.helius-rpc.com/?api-key=${HELIUS_KEY}`
-    : "https://api.devnet.solana.com",
+  mainnet: mainnetRpcUrl(),
+  devnet: devnetRpcUrl(),
 };
 
 // Squads v4 program id
@@ -26,7 +22,7 @@ async function existsOn(rpcUrl: string, addr: PublicKey): Promise<{ exists: bool
 //   network is the cluster where the account exists; null if neither.
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = (await req.json()) as { addresses?: unknown };
     const addresses: string[] = Array.isArray(body?.addresses) ? body.addresses.slice(0, 50) : [];
     const results: Record<string, "mainnet" | "devnet" | null> = {};
 

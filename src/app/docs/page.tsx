@@ -12,7 +12,7 @@ export default function DocsPage() {
 
   useEffect(() => {
     fetch("/api/costs", { cache: "no-store" })
-      .then((r) => r.json())
+      .then((r) => r.json() as Promise<Costs>)
       .then(setCosts)
       .catch(() => {});
   }, []);
@@ -30,6 +30,11 @@ export default function DocsPage() {
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">sol.new — docs</h1>
           <p className="text-gray-500 dark:text-white/40">
             What it costs to use, what we store, and where things live.
+          </p>
+          <p className="text-sm">
+            <a href="/features" className="text-violet-500 hover:underline">
+              Features at a glance →
+            </a>
           </p>
         </header>
 

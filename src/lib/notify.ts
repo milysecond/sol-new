@@ -1,3 +1,20 @@
+async function sendWebPush(payload: { title: string; body: string; url?: string; tag?: string; topic: string }) {
+  const secret = process.env.PUSH_SECRET;
+  const base =
+    process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, "") ||
+    process.env.SITE_URL?.replace(/\/$/, "") ||
+    "https://sol.new";
+  try {
+    await fetch(`${base}/api/push/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(secret ? { "x-push-secret": secret } : {}) },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // non-fatal
+  }
+}
+
 const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN;
 const TG_CHANNEL = "@soldotnew";
 
@@ -84,7 +101,7 @@ export async function notifyEvent(evt: LogEvent): Promise<void> {
       }
     );
     if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
+      const j = (await res.json().catch(() => ({}))) as { description?: string };
       console.warn('[notifyEvent] failed:', j.description || res.status);
     }
   } catch (err) {
@@ -164,7 +181,7 @@ export async function notifyTokenLaunch(data: {
           reply_markup,
         }),
       });
-      const photoJson = await photoRes.json();
+      const photoJson = (await photoRes.json()) as { ok?: boolean; description?: string };
       if (photoJson.ok) {
         console.log('[notify] ✓ Token launch posted to', TG_CHANNEL, '(with photo)');
         return;
@@ -186,7 +203,7 @@ export async function notifyTokenLaunch(data: {
         reply_markup,
       }),
     });
-    const textJson = await textRes.json();
+    const textJson = (await textRes.json()) as { ok?: boolean; description?: string };
     if (textJson.ok) {
       console.log('[notify] ✓ Token launch posted to', TG_CHANNEL, '(text-only)');
     } else {
@@ -196,4 +213,13 @@ export async function notifyTokenLaunch(data: {
     // Log error but don't break token creation
     console.error('[notify] Telegram notification failed:', err);
   }
+
+  // Push notification to subscribed users
+  await sendWebPush({
+    title: `${data.name} ($${data.symbol}) just launched`,
+    body: data.description?.slice(0, 100) || "New token live on sol.new",
+    url: `/token/${data.mintAddress}`,
+    tag: `launch-${data.mintAddress}`,
+    topic: "launch",
+  });
 }

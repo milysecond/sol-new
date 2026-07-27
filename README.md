@@ -11,13 +11,15 @@
 
 sol.new removes the complexity from Solana. No wallet downloads, no seed phrases, no gas management. Just create and go.
 
-**Features:**
-- 🪙 **Token Launcher** — Deploy SPL tokens with Meteora bonding curves
-- 🖼️ **NFT Minter** — Standard or compressed NFTs via Metaplex
-- 👥 **Multisig Creator** — Squads v4 multisig wallets
-- 💳 **Instant Wallet** — WebAuthn passkey-secured wallets
-- 💰 **SOL Onramp** — Fund wallets instantly
-- 🔄 **Auto-swap** — Built-in Jupiter integration
+**Features at a glance:** see [FEATURES.md](./FEATURES.md) and [https://sol.new/features](https://sol.new/features).
+
+**Highlights:**
+- **Token launcher** — Deploy SPL tokens with Meteora bonding curves
+- **NFT minter** — Standard or compressed NFTs via Metaplex
+- **Multisig** — Squads v4 shared wallets
+- **Passkey wallet** — WebAuthn Face ID wallets
+- **Pay / split / gift** — Links and Solana Pay
+- **Receipt / Fair Draw / Scan** — Verify, raffle, explore
 
 ---
 
@@ -117,9 +119,11 @@ All platform fees are collected to this treasury address. Fees fund:
 Create `.env.local`:
 
 ```env
-# RPC (Helius recommended for compressed NFTs)
-NEXT_PUBLIC_RPC_URL=https://api.mainnet-beta.solana.com
+# RPC — paid Helius Fast + Flux only (never free public Solana RPC)
+NEXT_PUBLIC_RPC_URL=https://cassandra-bq5oqs-fast-mainnet.helius-rpc.com/
+# Server pool also uses viviyan-bkj12u-fast-mainnet + FLUXRPC_URL secret
 HELIUS_API_KEY=your_helius_key
+FLUXRPC_URL=https://eu.fluxrpc.com?key=your_flux_key
 
 # Meteora Partner Config (mainnet/devnet)
 NEXT_PUBLIC_DBC_PARTNER_CONFIG=your_config_pubkey
@@ -207,22 +211,21 @@ sol.new uses WebAuthn passkeys to create Solana wallets:
 
 ## Deployment
 
-### Vercel (Recommended)
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/metasal1/sol-new)
-
-1. Connect GitHub repo
-2. Add environment variables
-3. Deploy
-
-### Self-Hosted
+sol.new runs on **Cloudflare Workers** via OpenNext (not Vercel).
 
 ```bash
-npm run build
-npm start
+# Production (must be on main)
+npm run deploy
+```
+
+Secrets live in Worker secrets (`wrangler secret put`). Public vars are in `wrangler.jsonc`.
+
+Local:
+
+```bash
+npm run dev
 # or
-docker build -t sol-new .
-docker run -p 3000:3000 sol-new
+npm run preview
 ```
 
 ---

@@ -5,8 +5,11 @@
 body {
   background: #fff;
   color: #111;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-bricolage), "Bricolage Grotesque", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-tap-highlight-color: transparent;
+  /* Notch / Dynamic Island / home indicator */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 html.dark body {
@@ -19,15 +22,101 @@ html.dark body {
   touch-action: manipulation;
 }
 
-/* Mobile bottom nav safe area */
+/* iOS Safari auto-zooms focused inputs whose font-size < 16px.
+   Force the minimum on phones so Safari skips the zoom; tablet+ keep design size. */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Safe areas */
+.safe-top {
+  padding-top: max(0px, env(safe-area-inset-top));
+}
 .safe-bottom {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
 
-/* Add bottom padding on mobile so content isn't hidden behind fixed nav */
+/* Content clearance for fixed mobile bottom nav (phones only) */
 @media (max-width: 639px) {
   main {
-    padding-bottom: 5rem !important;
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* iPad / tablet: roomy page gutters without phone bottom bar */
+@media (min-width: 640px) and (max-width: 1023px) {
+  main {
+    padding-left: max(1.25rem, env(safe-area-inset-left));
+    padding-right: max(1.25rem, env(safe-area-inset-right));
+  }
+}
+
+/* Touch-friendly minimum target (Apple HIG ~44px) */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Image load shimmer (used by ImageWithPlaceholder) */
+.img-skeleton {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(128, 128, 128, 0.12) 40%,
+    rgba(128, 128, 128, 0.22) 50%,
+    rgba(128, 128, 128, 0.12) 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: img-shimmer 1.2s ease-in-out infinite;
+}
+html.dark .img-skeleton {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 40%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.06) 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+}
+@keyframes img-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* Horizontal scroll strip without ugly scrollbar (list tabs, chips) */
+.scroll-x-strip {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.scroll-x-strip::-webkit-scrollbar {
+  display: none;
+}
+
+/* Print: sol.new/receipt card only */
+@media print {
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    max-width: none !important;
   }
 }
 
@@ -132,5 +221,41 @@ a, button {
   }
   50% {
     box-shadow: 0 0 12px 2px rgba(251, 146, 60, 0.45);
+  }
+}
+
+/* Fair Draw wheel: Edge-safe CSS spin (transform, not Motion infinite). */
+@keyframes vrf-wheel-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.vrf-wheel-spinning {
+  animation: vrf-wheel-spin var(--vrf-spin-dur, 0.6s) linear infinite;
+  transform-origin: 50% 50%;
+  -webkit-transform-origin: 50% 50%;
+}
+
+/* Respect reduced motion, but keep loaders and Fair Draw wheel motion. */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-spin):not(.vrf-wheel-spinning),
+  *:not(.animate-spin):not(.vrf-wheel-spinning)::before,
+  *:not(.animate-spin):not(.vrf-wheel-spinning)::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .vrf-allow-motion,
+  .vrf-allow-motion *,
+  .vrf-wheel-spinning {
+    animation-duration: revert !important;
+    animation-iteration-count: revert !important;
+    transition-duration: revert !important;
   }
 }

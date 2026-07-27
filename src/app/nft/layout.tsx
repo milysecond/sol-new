@@ -1,23 +1,12 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Mint an NFT — sol.new",
-  description: "Turn any image into an NFT on Solana. Standard or compressed, passkey-secured. Upload, name it, and mint instantly.",
-  openGraph: {
-    title: "Mint an NFT — sol.new",
-    description: "Turn any image into an NFT on Solana. Standard or compressed, passkey-secured.",
-    url: "https://sol.new/nft",
-    siteName: "sol.new",
-    images: [{ url: "https://sol.new/og-nft.png", width: 1200, height: 630 }],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Mint an NFT — sol.new",
-    description: "Turn any image into an NFT on Solana. Passkey-secured, low fees.",
-    images: ["https://sol.new/og-nft.png"],
-    creator: "@soldotnew",
-  },
-};
+  description:
+    "Turn any image into an NFT on Solana. Standard or compressed, passkey-secured. Upload, name it, and mint instantly.",
+  path: "/nft",
+});
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return children;

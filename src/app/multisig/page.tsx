@@ -13,6 +13,8 @@ import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { Connection, Keypair, PublicKey, TransactionMessage, VersionedTransaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
+import { PromoInput } from "@/components/promo-input";
+import { friendlyError } from "@/lib/friendly-errors";
 
 export default function MultisigPage() {
   const [name, setName] = useState("");
@@ -22,6 +24,7 @@ export default function MultisigPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ multisigPda: string; vault: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [promoCode, setPromoCode] = useState<string | null>(null);
   const { publicKey, refreshBalance } = useWallet();
   const { network, rpc } = useNetwork();
   const router = useRouter();
@@ -58,11 +61,26 @@ export default function MultisigPage() {
 
       const connection = new Connection(rpc, "confirmed");
 
+      // Fund user's wallet via treasury when a promo code is active
+      if (promoCode) {
+        const fundRes = await fetch("/api/promo/fund", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: promoCode, wallet: address, kind: "multisig" }),
+        });
+        if (!fundRes.ok) {
+          const err = (await fundRes.json().catch(() => ({}))) as { error?: string };
+          throw new Error(err.error ?? "Promo funding failed — please try again.");
+        }
+      }
+
       // Check balance (0.05 total + small tx fee buffer)
-      const balance = await connection.getBalance(new PublicKey(address));
-      const MIN_BALANCE = 0.051 * 1e9; // 0.05 + small buffer for tx fees
-      if (balance < MIN_BALANCE) {
-        throw new Error(`You need at least 0.051 SOL. Your balance is ${(balance / 1e9).toFixed(4)} SOL.`);
+      if (!promoCode) {
+        const balance = await connection.getBalance(new PublicKey(address));
+        const MIN_BALANCE = 0.051 * 1e9;
+        if (balance < MIN_BALANCE) {
+          throw new Error(`You need at least 0.051 SOL. Your balance is ${(balance / 1e9).toFixed(4)} SOL.`);
+        }
       }
 
       setStatus("creating");
@@ -120,7 +138,7 @@ export default function MultisigPage() {
       const message = new TransactionMessage({
         payerKey: creator,
         recentBlockhash: blockhash,
-        instructions: [createIx, feeIx],
+        instructions: promoCode ? [createIx] : [createIx, feeIx],
       }).compileToV0Message();
 
       const tx = new VersionedTransaction(message);
@@ -140,6 +158,14 @@ export default function MultisigPage() {
 
       // Derive vault
       const [vaultPda] = multisig.getVaultPda({ multisigPda, index: 0 });
+
+      if (promoCode) {
+        fetch("/api/promo/redeem", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: promoCode, wallet: address, kind: "multisig" }),
+        }).catch(() => {});
+      }
 
       await refreshBalance();
       const resultData = {
@@ -165,20 +191,7 @@ export default function MultisigPage() {
 
       setStatus("done");
     } catch (e: unknown) {
-      let msg = "Something went wrong. Please try again.";
-      if (e instanceof Error) {
-        const m = e.message;
-        if (m.includes("insufficient lamports") || m.includes("0x1")) {
-          msg = "Not enough SOL in your wallet.";
-        } else if (m.includes("User cancelled") || m.includes("NotAllowedError")) {
-          msg = "Sign-in was cancelled.";
-        } else if (m.startsWith("You need at least")) {
-          msg = m;
-        } else {
-          msg = m.length > 120 ? "Something went wrong. Please try again." : m;
-        }
-      }
-      setError(msg);
+      setError(friendlyError(e, "We couldn't create your multisig. Please try again."));
       setStatus("error");
     }
   };
@@ -337,6 +350,11 @@ export default function MultisigPage() {
                   </div>
                 </div>
 
+                <PromoInput
+                  onValidCode={(c) => setPromoCode(c)}
+                  onClear={() => setPromoCode(null)}
+                />
+
                 {error && (
                   <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">{error}</div>
                 )}
@@ -379,7 +397,9 @@ export default function MultisigPage() {
                     Create Multisig
                   </button>
                 )}
-                <p className="text-center text-xs text-gray-400 dark:text-white/30">~0.05 SOL</p>
+                <p className="text-center text-xs text-gray-400 dark:text-white/30">
+                  {promoCode ? <span className="text-green-400">Free with promo code</span> : "~0.05 SOL"}
+                </p>
               </div>
             )}
           </div>

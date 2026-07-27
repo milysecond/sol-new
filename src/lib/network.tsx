@@ -5,9 +5,23 @@ import { analytics } from "./analytics";
 
 export type Network = "mainnet" | "devnet";
 
-const RPC: Record<Network, string> = {
-  mainnet: "https://viviyan-bkj12u-fast-mainnet.helius-rpc.com",
-  devnet: "https://api.devnet.solana.com",
+/**
+ * Client-safe mainnet RPCs — Helius Fast dedicated endpoints only.
+ * Never fall back to free public Solana RPC (api.mainnet-beta.solana.com, etc.).
+ * Flux (keyed) stays server-only via `@/lib/rpc-server`.
+ */
+export const MAINNET_RPC_POOL = [
+  "https://cassandra-bq5oqs-fast-mainnet.helius-rpc.com/",
+  "https://viviyan-bkj12u-fast-mainnet.helius-rpc.com",
+] as const;
+
+export const RPC: Record<Network, string> = {
+  mainnet:
+    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_RPC_URL) ||
+    MAINNET_RPC_POOL[0],
+  devnet:
+    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_RPC_DEVNET) ||
+    "https://api.devnet.solana.com",
 };
 
 const EXPLORER: Record<Network, string> = {

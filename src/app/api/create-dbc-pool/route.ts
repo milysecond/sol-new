@@ -6,14 +6,16 @@ import {
   deriveDbcPoolAddress,
 } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { notifyEvent } from "@/lib/notify";
+import { initDb, claimGroundKey } from "@/lib/db";
+import { rpcUrlFor } from "@/lib/rpc-server";
 
 const WRAPPED_SOL = new PublicKey("So11111111111111111111111111111111111111112");
 
 function getConnection(network: string) {
-  if (network === "mainnet") {
-    return new Connection("https://viviyan-bkj12u-fast-mainnet.helius-rpc.com", "confirmed");
-  }
-  return new Connection("https://api.devnet.solana.com", "confirmed");
+  return new Connection(
+    rpcUrlFor(network === "devnet" ? "devnet" : "mainnet"),
+    "confirmed"
+  );
 }
 
 function getPartnerConfigKey(): PublicKey {
@@ -35,8 +37,16 @@ export async function POST(req: NextRequest) {
     const client = new DynamicBondingCurveClient(connection, "confirmed");
     const creator = new PublicKey(creatorWallet);
 
-    // Generate fresh mint keypair
-    const baseMintKeypair = Keypair.generate();
+    // Use a pre-ground NEW... vanity keypair; fall back to random if pool is empty
+    await initDb().catch(() => {});
+    const groundKey = await claimGroundKey("NEW").catch(() => null);
+    let baseMintKeypair: Keypair;
+    if (groundKey) {
+      const { default: bs58 } = await import("bs58");
+      baseMintKeypair = Keypair.fromSecretKey(bs58.decode(groundKey.secretKey));
+    } else {
+      baseMintKeypair = Keypair.generate();
+    }
 
     // Create pool using existing partner config
     const tx: Transaction = await client.pool.createPool({

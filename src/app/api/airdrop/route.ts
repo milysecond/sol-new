@@ -9,7 +9,12 @@ import {
 } from "@solana/web3.js";
 import { notifyEvent } from "@/lib/notify";
 
-const DEVNET_RPC = "https://api.devnet.solana.com";
+// api.devnet.solana.com 403s from Cloudflare Workers — prefer Helius devnet.
+const DEVNET_RPC =
+  process.env.DEVNET_RPC ||
+  (process.env.HELIUS_API_KEY
+    ? `https://devnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
+    : "https://api.devnet.solana.com");
 const AIRDROP_AMOUNT = 0.1 * LAMPORTS_PER_SOL;
 
 function getFaucetKeypair(): Keypair {
@@ -36,7 +41,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { address } = await req.json();
+    const { address } = (await req.json()) as { address?: string };
     if (!address) return NextResponse.json({ error: "Missing address" }, { status: 400 });
 
     const recipient = new PublicKey(address);
@@ -56,8 +61,20 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    const sig = await conn.sendTransaction(tx, [faucet]);
-    await conn.confirmTransaction(sig);
+    // "finalized" so the hash is visible to whichever node simulates the tx
+    const { blockhash } = await conn.getLatestBlockhash("finalized");
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = faucet.publicKey;
+    tx.sign(faucet);
+    const sig = await conn.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
+    // WebSocket confirmTransaction hangs in Workers — poll instead.
+    for (let i = 0; i < 20; i++) {
+      const st = await conn.getSignatureStatuses([sig]);
+      const v = st.value[0];
+      if (v?.err) throw new Error(`airdrop tx failed: ${JSON.stringify(v.err)}`);
+      if (v?.confirmationStatus === "confirmed" || v?.confirmationStatus === "finalized") break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
 
     notifyEvent({
       kind: 'airdrop',

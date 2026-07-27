@@ -24,7 +24,15 @@ export async function POST(req: NextRequest) {
 
   try {
     await initDb();
-    const data = await req.json();
+    const data = (await req.json()) as {
+      wallet: string;
+      name: string;
+      multisigPda: string;
+      vault: string;
+      threshold: number;
+      memberCount: number;
+      network?: string;
+    };
     if (!data.wallet || !data.name || !data.multisigPda || !data.vault) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }

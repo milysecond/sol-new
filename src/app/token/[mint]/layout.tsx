@@ -8,7 +8,7 @@ export async function generateMetadata({ params }: { params: Promise<{ mint: str
   try {
     const res = await fetch(`${API_BASE}/api/token/${mint}`, { next: { revalidate: 60 } });
     if (res.ok) {
-      const token = await res.json();
+      const token = (await res.json()) as { name: string; symbol: string; description?: string | null };
       // Title: target 50–60 chars
       const title = `${token.name} ($${token.symbol}) just launched on sol.new — Solana memecoin`;
       // Description: target 110–160 chars
@@ -43,6 +43,47 @@ export async function generateMetadata({ params }: { params: Promise<{ mint: str
   };
 }
 
-export default function LaunchLayout({ children }: { children: React.ReactNode }) {
-  return children;
+export default async function TokenLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ mint: string }>;
+}) {
+  const { mint } = await params;
+  let jsonLd: object | null = null;
+  try {
+    const res = await fetch(`${API_BASE}/api/token/${mint}`, { next: { revalidate: 60 } });
+    if (res.ok) {
+      const token = (await res.json()) as { name: string; symbol: string; description?: string | null; image_url?: string | null };
+      jsonLd = {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: token.name,
+        description: token.description ?? `${token.name} ($${token.symbol}) — Solana token launched on sol.new`,
+        url: `https://sol.new/token/${mint}`,
+        image: token.image_url ?? undefined,
+        identifier: mint,
+        brand: { "@type": "Brand", name: "sol.new" },
+        offers: {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "USD",
+          availability: "https://schema.org/InStock",
+        },
+      };
+    }
+  } catch {}
+
+  return (
+    <>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      {children}
+    </>
+  );
 }

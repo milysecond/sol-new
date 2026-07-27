@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { Copy, Check, ArrowRight, Sparkles, Pencil } from 'lucide-react';
 import { Navbar } from '@/components/navbar';
 import { Spinner } from '@/components/spinner';
+import { StarTokenButton } from '@/components/star-token-button';
 import { useWallet } from '@/lib/wallet-context';
 import Link from 'next/link';
 
@@ -52,7 +53,7 @@ export default function LaunchPage() {
         const res = await fetch(`/api/token/${mint}`);
         if (cancelled) return;
         if (res.ok) {
-          const data = await res.json();
+          const data = (await res.json()) as TokenData | null;
           if (data && data.mint_address) {
             setToken(data);
             setLoading(false);
@@ -141,6 +142,12 @@ export default function LaunchPage() {
                 {token.description}
               </p>
             )}
+            <StarTokenButton
+              mint={token.mint_address}
+              name={token.name}
+              symbol={token.symbol}
+              imageUrl={token.image_url}
+            />
           </div>
 
           {/* Mint address */}
@@ -183,6 +190,17 @@ export default function LaunchPage() {
               <span className="text-sm font-medium">Edit metadata</span>
             </Link>
           )}
+
+          {/* MetaDAO governance */}
+          <a
+            href={`https://metadao.fi`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full bg-green-500/5 hover:bg-green-500/10 border border-green-400/20 hover:border-green-400/40 text-green-500 dark:text-green-400 rounded-xl px-4 py-2.5 transition"
+          >
+            <ArrowRight className="w-4 h-4" />
+            <span className="text-sm font-medium">Govern on MetaDAO</span>
+          </a>
 
           {/* Share links */}
           {(() => {

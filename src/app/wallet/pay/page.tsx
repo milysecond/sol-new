@@ -6,11 +6,12 @@ import { WalletShell } from "@/components/wallet-shell";
 import { PageTransition } from "@/components/page-transition";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
+import { useDefaultToken } from "@/lib/currency-pref";
 import QRCode from "qrcode";
 
 const USDC_DEVNET = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
 const USDC_MAINNET = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-const PAY_TOKENS = ["SOL", "USDC"];
+const PAY_TOKENS = ["SOL", "USDC"] as const;
 
 function buildSolanaPayUrl(recipient: string, amount: string, token: string, label: string, network: string) {
   const base = `solana:${recipient}`;
@@ -25,12 +26,17 @@ function buildSolanaPayUrl(recipient: string, amount: string, token: string, lab
 export default function WalletPayPage() {
   const { publicKey } = useWallet();
   const { network } = useNetwork();
+  const [defaultToken] = useDefaultToken();
   const [amount, setAmount] = useState("");
   const [label, setLabel] = useState("");
   const [selected, setSelected] = useState("SOL");
   const [payUrl, setPayUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    setSelected(defaultToken);
+  }, [defaultToken]);
 
   const handleCreate = () => {
     if (!amount || !publicKey) return;
@@ -39,7 +45,7 @@ export default function WalletPayPage() {
 
   useEffect(() => {
     if (!payUrl || !canvasRef.current) return;
-    QRCode.toCanvas(canvasRef.current, payUrl, { width: 256, margin: 2, color: { dark: "#ffffffee", light: "#00000000" } });
+    QRCode.toCanvas(canvasRef.current, payUrl, { width: 256, margin: 2, color: { dark: "#000000", light: "#ffffff" } });
   }, [payUrl]);
 
   const copyLink = () => {

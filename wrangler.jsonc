@@ -1,0 +1,42 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "sol-new",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-05-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "4e8d1e0f981ddd5939a1e74aa536d38b",
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "sol.new", "custom_domain": true },
+    // Zone route (not custom_domain) — www already has DNS records in the zone.
+    // Middleware redirects www → apex.
+    { "pattern": "www.sol.new/*", "zone_name": "sol.new" }
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "NEXT_PUBLIC_RPC_URL": "https://cassandra-bq5oqs-fast-mainnet.helius-rpc.com/",
+    "NEXT_PUBLIC_BRIDGE_ENABLED": "1",
+    // BRIDGE_API_KEY + BRIDGE_API_BASE are Worker secrets (prod live key + api.bridge.xyz/v0)
+    "CROSSMINT_PROJECT_ID": "659bb4f5-36d6-49a6-aee0-acedfd4eabf0",
+    "RESEND_FROM": "sol.new <noreply@sol.new>",
+    "RESEND_SEGMENT_ID": "483bc3e7-ddd2-4ca4-8b05-82dcd0ff6996",
+    "RESEND_TOPIC_PRODUCT": "6375d8d7-abd5-409d-8bc9-e7cb2c449cb4",
+    "RESEND_TOPIC_LAUNCHES": "76a07e10-b2da-46d9-86c0-f88b2cb15b68"
+  },
+  "r2_buckets": [
+    {
+      "binding": "IMAGES_BUCKET",
+      "bucket_name": "sol-new-images"
+    }
+  ]
+  // TODO: re-add `"triggers": { "crons": ["0 17 * * *"] }` once we have a
+  // custom worker entry that wraps OpenNext and adds a `scheduled` handler
+  // for /api/cron/reengage. OpenNext's default worker.js only exports fetch.
+}
