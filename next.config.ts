@@ -29,6 +29,22 @@ const nextConfig: NextConfig = {
         destination: "https://playbook.sol.new",
         permanent: false,
       },
+      // Memes caption app
+      {
+        source: "/memes",
+        destination: "https://memes.sal.fun",
+        permanent: false,
+      },
+      {
+        source: "/meme",
+        destination: "https://memes.sal.fun",
+        permanent: false,
+      },
+      {
+        source: "/memes/:path*",
+        destination: "https://memes.sal.fun/:path*",
+        permanent: false,
+      },
 
       // --- GSC indexing cleanup: dead / legacy paths that were returning 404 ---
       { source: "/copyright", destination: "/privacy", permanent: true },
