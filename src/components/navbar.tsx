@@ -163,8 +163,7 @@ export function Navbar() {
       <div className="sticky top-0 z-30 border-b border-black/10 dark:border-white/10 bg-white/80 dark:bg-black/80 backdrop-blur-md safe-top">
         <div className="flex items-center justify-between gap-2 px-2 sm:px-5 lg:px-6 py-2 sm:py-3 max-w-[1400px] mx-auto w-full">
           <div className="flex items-center gap-1 sm:gap-2 min-w-0">
-            <PageBack className="shrink-0 -ml-0.5 sm:hidden" />
-            <PageBack className="shrink-0 hidden sm:inline-flex lg:hidden" />
+            <PageBack className="shrink-0 -ml-0.5" />
 
             <Link
               href="/"
@@ -216,7 +215,6 @@ export function Navbar() {
             </div>
 
             <div className="hidden lg:flex items-center gap-0.5 ml-1">
-              <PageBack className="mr-1" />
               {NAV_ITEMS.map((item) => {
                 const active = isActive(item.href);
                 return (
