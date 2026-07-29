@@ -25,16 +25,20 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  // /link/<code> → same short-link resolver as /l/<code>
-  // Keep /link (no segment) as the create-link page.
-  const linkAlias = path.match(/^\/link\/([^/]+)(\/opengraph-image)?\/?$/);
-  if (linkAlias) {
-    const code = linkAlias[1];
-    // Don't swallow accidental nested static paths if added later
-    if (code && code !== "_next") {
-      url.pathname = `/l/${code}${linkAlias[2] || ""}`;
-      return NextResponse.rewrite(url);
-    }
+  // Canonical short links: /link/<code>
+  // Legacy /l/<code> → permanent redirect to /link/<code>
+  const legacyL = path.match(/^\/l\/([^/]+)(\/opengraph-image)?\/?$/);
+  if (legacyL?.[1]) {
+    url.pathname = `/link/${legacyL[1]}${legacyL[2] || ""}`;
+    return NextResponse.redirect(url, 308);
+  }
+
+  // Serve /link/<code> via the existing /l/[code] App Router page (+ OG image)
+  // Bare /link stays the create page (no rewrite).
+  const linkCode = path.match(/^\/link\/([^/]+)(\/opengraph-image)?\/?$/);
+  if (linkCode?.[1] && linkCode[1] !== "_next") {
+    url.pathname = `/l/${linkCode[1]}${linkCode[2] || ""}`;
+    return NextResponse.rewrite(url);
   }
 
   return NextResponse.next();

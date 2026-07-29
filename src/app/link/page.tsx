@@ -277,7 +277,7 @@ function LinkPageInner() {
         recipient: LINK_FEE_VAULT,
         amount: String(CUSTOM_LINK_FEE_SOL),
         label: "sol.new",
-        message: `Custom short link /l/${code}`,
+        message: `Custom short link /link/${code}`,
         reference,
       });
       setQrPay({ payUrl, reference, startedAt: Date.now() });
@@ -355,7 +355,7 @@ function LinkPageInner() {
           <AnimatedIcon icon={Link2} size={40} className="text-sky-400" />
           <h1 className="text-3xl font-bold tracking-tight">Short links</h1>
           <p className="text-gray-500 dark:text-white/50">
-            Turn any URL into <span className="font-mono text-sky-500">sol.new/l/…</span>
+            Turn any URL into <span className="font-mono text-sky-500">sol.new/link/…</span>
           </p>
         </div>
 
@@ -374,7 +374,7 @@ function LinkPageInner() {
           <div className="flex gap-2">
             <div className="relative flex-1">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-white/30 font-mono">
-                /l/
+                /link/
               </span>
               <input
                 type="text"
@@ -384,7 +384,7 @@ function LinkPageInner() {
                   setCustom(e.target.value.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32))
                 }
                 disabled={busy || !!qrPay}
-                className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl pl-10 pr-3 py-2.5 text-sm font-mono focus:outline-none focus:border-sky-400/50 focus:ring-1 focus:ring-sky-400/25 transition disabled:opacity-50"
+                className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl pl-14 pr-3 py-2.5 text-sm font-mono focus:outline-none focus:border-sky-400/50 focus:ring-1 focus:ring-sky-400/25 transition disabled:opacity-50"
               />
             </div>
             <input
@@ -418,7 +418,7 @@ function LinkPageInner() {
                   Scan to pay {CUSTOM_LINK_FEE_SOL} SOL
                 </p>
                 <p className="text-xs text-gray-500 dark:text-white/45">
-                  Phantom, Solflare, or any Solana Pay wallet · /l/{custom.trim().toLowerCase()}
+                  Phantom, Solflare, or any Solana Pay wallet · /link/{custom.trim().toLowerCase()}
                 </p>
               </div>
               <div className="flex justify-center">

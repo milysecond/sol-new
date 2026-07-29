@@ -95,7 +95,7 @@ const SECTIONS: Section[] = [
       { href: "/split", title: "Split", blurb: "Split a bill and track who paid.", icon: Users },
       { href: "/gift", title: "Gift", blurb: "Send SOL or USDC as a claimable link.", icon: Gift },
       { href: "/claim", title: "Claim gift", blurb: "Open a gift link and claim with Face ID.", icon: Gift },
-      { href: "/link", title: "Short links", blurb: "Create sol.new/l/… short URLs. Custom codes 0.01 SOL.", icon: Link2 },
+      { href: "/link", title: "Short links", blurb: "Create sol.new/link/… short URLs. Custom codes 0.01 SOL.", icon: Link2 },
       { href: "/receipt", title: "Receipt", blurb: "Beautiful shareable tx receipt from a signature.", icon: Receipt },
     ],
   },

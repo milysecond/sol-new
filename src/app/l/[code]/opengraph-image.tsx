@@ -4,6 +4,7 @@ import {
   describeShortLinkDestination,
   normalizeCode,
   shortLinkDisplayTitle,
+  shortPath,
 } from "@/lib/short-link";
 
 export const alt = "sol.new short link";
@@ -17,7 +18,7 @@ export default async function Image({ params }: { params: Promise<{ code: string
 
   let title = "Short link";
   let subtitle = "Shared via sol.new";
-  let path = code ? `sol.new/l/${code}` : "sol.new/link";
+  let path = code ? `sol.new${shortPath(code)}` : "sol.new/link";
 
   try {
     if (code) {
@@ -29,7 +30,7 @@ export default async function Image({ params }: { params: Promise<{ code: string
         const opens =
           link.clicks > 0 ? ` · ${link.clicks.toLocaleString()} opens` : "";
         subtitle = `${dest.siteName} · ${dest.kind}${opens}`.slice(0, 120);
-        path = `sol.new/l/${code}`;
+        path = `sol.new${shortPath(code)}`;
       }
     }
   } catch {
