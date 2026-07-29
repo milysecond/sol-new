@@ -348,6 +348,20 @@ export async function initDb() {
       UNIQUE(proposal_id, wallet)
     )`,
   ]);
+
+  // Usernames (global, unique) — one per wallet
+  try {
+    await db.execute("ALTER TABLE creator_profiles ADD COLUMN username TEXT");
+  } catch {
+    /* already exists */
+  }
+  try {
+    await db.execute(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_creator_profiles_username ON creator_profiles(username) WHERE username IS NOT NULL"
+    );
+  } catch {
+    /* ok */
+  }
 }
 
 export async function saveMetadata(id: string, json: string, wallet?: string | null) {
@@ -927,9 +941,69 @@ export async function upsertCreatorProfile(data: {
   });
 }
 
+/** Set or clear username for a wallet. Enforces uniqueness. */
+export async function setWalletUsername(
+  wallet: string,
+  username: string | null
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Ensure profile row
+  await db.execute({
+    sql: `INSERT INTO creator_profiles (wallet) VALUES (?)
+          ON CONFLICT(wallet) DO NOTHING`,
+    args: [wallet],
+  });
+
+  if (username === null) {
+    await db.execute({
+      sql: `UPDATE creator_profiles SET username = NULL, updated_at = datetime('now') WHERE wallet = ?`,
+      args: [wallet],
+    });
+    return { ok: true };
+  }
+
+  try {
+    await db.execute({
+      sql: `UPDATE creator_profiles SET username = ?, updated_at = datetime('now') WHERE wallet = ?`,
+      args: [username, wallet],
+    });
+    return { ok: true };
+  } catch (e) {
+    const msg = String(e);
+    if (msg.toLowerCase().includes("unique") || msg.includes("SQLITE_CONSTRAINT")) {
+      return { ok: false, error: "That username is taken" };
+    }
+    return { ok: false, error: "Could not save username" };
+  }
+}
+
 export async function getCreatorProfile(wallet: string) {
   const r = await db.execute({ sql: "SELECT * FROM creator_profiles WHERE wallet = ? LIMIT 1", args: [wallet] });
   return r.rows[0] ?? null;
+}
+
+export async function getCreatorByUsername(username: string) {
+  const r = await db.execute({
+    sql: "SELECT * FROM creator_profiles WHERE lower(username) = lower(?) LIMIT 1",
+    args: [username],
+  });
+  return r.rows[0] ?? null;
+}
+
+export async function isUsernameTaken(username: string, exceptWallet?: string): Promise<boolean> {
+  if (exceptWallet) {
+    const r = await db.execute({
+      sql: `SELECT wallet FROM creator_profiles
+            WHERE lower(username) = lower(?) AND wallet != ?
+            LIMIT 1`,
+      args: [username, exceptWallet],
+    });
+    return r.rows.length > 0;
+  }
+  const r = await db.execute({
+    sql: "SELECT 1 FROM creator_profiles WHERE lower(username) = lower(?) LIMIT 1",
+    args: [username],
+  });
+  return r.rows.length > 0;
 }
 
 export async function followCreator(follower: string, creator: string) {

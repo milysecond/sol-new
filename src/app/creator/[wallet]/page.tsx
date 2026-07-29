@@ -8,7 +8,14 @@ import { useWallet } from "@/lib/wallet-context";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { ExternalLink, Edit2 } from "lucide-react";
 
-type Profile = { wallet: string; bio: string | null; avatar_url: string | null; twitter: string | null; website: string | null };
+type Profile = {
+  wallet: string;
+  bio: string | null;
+  avatar_url: string | null;
+  twitter: string | null;
+  website: string | null;
+  username?: string | null;
+};
 type TokenRow = { mint_address: string | null; name: string; symbol: string; image_url: string | null; created_at: string };
 
 export default function CreatorPage() {
@@ -88,6 +95,13 @@ export default function CreatorPage() {
             )}
           </div>
           <div className="flex-1 min-w-0">
+            {profile?.username ? (
+              <p className="font-semibold text-lg tracking-tight">
+                <Link href={`/u/${profile.username}`} className="text-purple-500 hover:text-purple-400">
+                  @{profile.username}
+                </Link>
+              </p>
+            ) : null}
             <p className="font-mono text-sm text-gray-500 dark:text-white/40 truncate">{creatorWallet}</p>
             {profile?.bio && <p className="text-sm text-gray-700 dark:text-white/70 mt-1">{profile.bio}</p>}
             <div className="flex items-center gap-3 mt-2">

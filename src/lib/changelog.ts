@@ -14,6 +14,14 @@ export type ChangelogEntry = {
 /** Newest first. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-07-29",
+    title: "Usernames and short link pay",
+    items: [
+      "Claim a unique @username per wallet at /creator/edit — public at sol.new/u/name.",
+      "Custom short links: pay with Solana Pay QR or connected wallet; canonical URLs are sol.new/link/…",
+    ],
+  },
+  {
     date: "2026-07-24",
     title: "Apple Pay and card onramp",
     items: [
