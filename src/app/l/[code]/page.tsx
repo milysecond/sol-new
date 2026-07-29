@@ -10,6 +10,7 @@ import {
   isTrustedShortLinkHost,
   normalizeCode,
   shortLinkDisplayTitle,
+  shortPath,
 } from "@/lib/short-link";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ export async function generateMetadata({
 
   if (!link) {
     return {
-      title: `Short link /l/${code || "…"} — sol.new`,
+      title: `Short link ${shortPath(code || "…")} — sol.new`,
       description: "sol.new short link. Create free short URLs for Solana tools and the open web.",
     };
   }
@@ -57,7 +58,7 @@ export async function generateMetadata({
 
   const url = absoluteShortUrl(code);
   return {
-    title: `${title} — sol.new/l/${code}`,
+    title: `${title} — sol.new${shortPath(code)}`,
     description,
     alternates: { canonical: url },
     openGraph: {
@@ -125,7 +126,7 @@ export default async function ShortLinkPage({
             <KindIcon className="w-3.5 h-3.5 text-sky-500" aria-hidden />
             {dest.kind}
             <span className="text-black/20 dark:text-white/20">·</span>
-            <span className="font-mono">/l/{code}</span>
+            <span className="font-mono">{shortPath(code)}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-balance">
             {displayTitle}
@@ -203,7 +204,7 @@ export default async function ShortLinkPage({
 
         <div className="flex flex-col gap-2">
           <Link
-            href={`/l/${code}?go=1`}
+            href={`${shortPath(code)}?go=1`}
             className="w-full bg-sky-500 hover:bg-sky-400 text-white font-semibold rounded-xl px-4 py-3.5 transition text-center inline-flex items-center justify-center gap-2"
           >
             {dest.continueLabel}

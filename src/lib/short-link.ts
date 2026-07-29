@@ -78,6 +78,11 @@ export function normalizeTargetUrl(raw: string): { ok: true; url: string } | { o
 }
 
 export function shortPath(code: string): string {
+  return `/link/${code}`;
+}
+
+/** Legacy path still resolved by middleware → canonical /link/… */
+export function legacyShortPath(code: string): string {
   return `/l/${code}`;
 }
 
