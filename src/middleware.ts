@@ -25,6 +25,18 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
+  // /link/<code> → same short-link resolver as /l/<code>
+  // Keep /link (no segment) as the create-link page.
+  const linkAlias = path.match(/^\/link\/([^/]+)(\/opengraph-image)?\/?$/);
+  if (linkAlias) {
+    const code = linkAlias[1];
+    // Don't swallow accidental nested static paths if added later
+    if (code && code !== "_next") {
+      url.pathname = `/l/${code}${linkAlias[2] || ""}`;
+      return NextResponse.rewrite(url);
+    }
+  }
+
   return NextResponse.next();
 }
 
