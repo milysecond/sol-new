@@ -14,6 +14,14 @@ export type ChangelogEntry = {
 /** Newest first. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-07-30",
+    title: "Lend & borrow",
+    items: [
+      "New /loan: supply assets to earn yield or borrow against collateral (passkey-signed).",
+      "Live rates, positions, deposit/withdraw, and borrow/repay flows.",
+    ],
+  },
+  {
     date: "2026-07-29",
     title: "Usernames and short link pay",
     items: [

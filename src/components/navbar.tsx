@@ -81,6 +81,7 @@ const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
       { href: "/split", label: "Split", icon: Users },
       { href: "/gift", label: "Gift", icon: Gift },
       { href: "/earn", label: "Earn", icon: TrendingUp },
+      { href: "/loan", label: "Loan", icon: Landmark },
       { href: "/stake", label: "Stake", icon: Landmark },
       { href: "/lst", label: "Liquid", icon: Droplets },
     ],

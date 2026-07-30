@@ -30,6 +30,7 @@ import {
   TrendingUp,
   Layers,
   LineChart,
+  Landmark,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -68,6 +69,7 @@ const SECTIONS: Section[] = [
       { href: "/nfts", title: "Browse NFTs", blurb: "On-chain NFTs by address. Tensor and Magic Eden links.", icon: Layers },
       { href: "/burn", title: "Burn / reclaim", blurb: "Close empty token accounts, reclaim SOL rent.", icon: Flame },
       { href: "/earn", title: "Earn", blurb: "Protected USDC yield. Deposit and withdraw with Face ID.", icon: TrendingUp },
+      { href: "/loan", title: "Loan", blurb: "Supply assets to earn, or borrow against collateral.", icon: Landmark },
       { href: "/stake", title: "Stake SOL", blurb: "Native validator staking. Delegate, deactivate, withdraw.", icon: TrendingUp },
       { href: "/lst", title: "Liquid stake", blurb: "LSTs: jitoSOL, mSOL, INF, and more.", icon: TrendingUp },
       { href: "/id", title: ".sol name", blurb: "Check and register a Solana name.", icon: AtSign },
