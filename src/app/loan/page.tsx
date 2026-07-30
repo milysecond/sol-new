@@ -27,10 +27,13 @@ import {
   type EarnToken,
   type BorrowVault,
 } from "@/lib/jup-lend";
+import { isWsolMint, unwrapAllWsol, wrapSol, WSOL_MINT } from "@/lib/wsol";
 
-const WSOL = "So11111111111111111111111111111111111111112";
+const WSOL = WSOL_MINT;
 const SOL_FEE_RESERVE = 0.01; // leave SOL for fees
 const PRESETS = [0.25, 0.5, 0.75, 1] as const;
+/** Extra lamports when wrapping for borrow collateral (Jupiter rounding). */
+const WRAP_EXTRA_LAMPORTS = 2_000;
 
 async function signAndSendBase64(
   connection: Connection,
@@ -267,6 +270,7 @@ export default function LoanPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sig, setSig] = useState<string | null>(null);
+  const [statusHint, setStatusHint] = useState<string | null>(null);
   const [walletMintBal, setWalletMintBal] = useState<number | null>(null);
   const [balLoading, setBalLoading] = useState(false);
   const selectedEarnRef = useRef(selectedEarn);
@@ -485,6 +489,16 @@ export default function LoanPage() {
       if (keypair.publicKey.toBase58() !== publicKey) {
         throw new Error("Passkey does not match connected wallet");
       }
+      const connection = new Connection(rpc, "confirmed");
+      const mint = earnToken.assetAddress;
+
+      // Deposit SOL → wrap to WSOL ATA first
+      if (action === "deposit" && isWsolMint(mint)) {
+        setStatusHint("Wrapping SOL…");
+        await wrapSol(connection, keypair, parseAmt(amount), 0);
+      }
+
+      setStatusHint(action === "deposit" ? "Depositing…" : "Withdrawing…");
       const res = await fetch("/api/loan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -492,7 +506,7 @@ export default function LoanPage() {
           mode: "earn",
           action,
           wallet: publicKey,
-          asset: earnToken.assetAddress,
+          asset: mint,
           amount: base,
         }),
       });
@@ -502,18 +516,30 @@ export default function LoanPage() {
         error?: string;
       };
       if (!res.ok || !data.transaction) throw new Error(data.error || "Build failed");
-      const connection = new Connection(rpc, "confirmed");
       const signature = await signAndSendBase64(
         connection,
         data.transaction,
         keypair,
         keypair.publicKey
       );
+
+      // Withdraw WSOL → unwrap to native SOL
+      if (action === "withdraw" && isWsolMint(mint)) {
+        setStatusHint("Unwrapping SOL…");
+        try {
+          await unwrapAllWsol(connection, keypair);
+        } catch {
+          /* leave as WSOL if unwrap fails */
+        }
+      }
+
       setSig(signature);
+      setStatusHint(null);
       await refreshBalance();
       await load();
     } catch (e) {
       setError(friendlyError(e, "Transaction failed"));
+      setStatusHint(null);
     } finally {
       setBusy(false);
     }
@@ -529,6 +555,8 @@ export default function LoanPage() {
     const debtDec = vault.borrowToken.decimals;
     let col = "0";
     let debt = "0";
+    const colIsWsol = isWsolMint(vault.supplyToken.address);
+    const debtIsWsol = isWsolMint(vault.borrowToken.address);
 
     if (borrowAction === "deposit" || borrowAction === "withdraw") {
       const balErr = ensureBalance(
@@ -546,10 +574,6 @@ export default function LoanPage() {
         return;
       }
       col = borrowAction === "withdraw" ? `-${b}` : b;
-      if (vault.supplyToken.address === WSOL && borrowAction === "deposit") {
-        setError("SOL collateral needs WSOL first. Prefer non-SOL markets, or wrap SOL.");
-        return;
-      }
     } else if (borrowAction === "repay") {
       const balErr = ensureBalance(debtAmount, maxAvailable, "repay");
       if (balErr) {
@@ -563,7 +587,6 @@ export default function LoanPage() {
       }
       debt = `-${b}`;
     } else {
-      // borrow — check minimum only
       const b = toBaseUnits(debtAmount, debtDec);
       if (!b || b === "0") {
         setError("Enter borrow amount");
@@ -590,6 +613,19 @@ export default function LoanPage() {
       if (keypair.publicKey.toBase58() !== publicKey) {
         throw new Error("Passkey does not match connected wallet");
       }
+      const connection = new Connection(rpc, "confirmed");
+
+      // Wrap native SOL when depositing WSOL collateral or repaying WSOL debt
+      if (borrowAction === "deposit" && colIsWsol) {
+        setStatusHint("Wrapping SOL…");
+        await wrapSol(connection, keypair, parseAmt(colAmount), WRAP_EXTRA_LAMPORTS);
+      }
+      if (borrowAction === "repay" && debtIsWsol) {
+        setStatusHint("Wrapping SOL…");
+        await wrapSol(connection, keypair, parseAmt(debtAmount), WRAP_EXTRA_LAMPORTS);
+      }
+
+      setStatusHint("Submitting…");
       const res = await fetch("/api/loan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -609,26 +645,42 @@ export default function LoanPage() {
         error?: string;
       };
       if (!res.ok || !data.transaction) throw new Error(data.error || "Build failed");
-      const connection = new Connection(rpc, "confirmed");
       const signature = await signAndSendBase64(
         connection,
         data.transaction,
         keypair,
         keypair.publicKey
       );
+
+      // Unwrap WSOL after withdraw collateral or borrow WSOL debt
+      if (
+        (borrowAction === "withdraw" && colIsWsol) ||
+        (borrowAction === "borrow" && debtIsWsol)
+      ) {
+        setStatusHint("Unwrapping SOL…");
+        try {
+          await unwrapAllWsol(connection, keypair);
+        } catch {
+          /* keep WSOL */
+        }
+      }
+
       setSig(signature);
+      setStatusHint(null);
       if (data.nftId != null) setPositionId(String(data.nftId));
       await refreshBalance();
       await load();
     } catch (e) {
       setError(friendlyError(e, "Transaction failed"));
+      setStatusHint(null);
     } finally {
       setBusy(false);
     }
   };
 
   const primaryLabel =
-    tab === "lend"
+    statusHint ||
+    (tab === "lend"
       ? busy
         ? "Working…"
         : `${action === "deposit" ? "Supply" : "Withdraw"} ${
@@ -636,7 +688,7 @@ export default function LoanPage() {
           }`
       : busy
         ? "Working…"
-        : borrowAction.charAt(0).toUpperCase() + borrowAction.slice(1);
+        : borrowAction.charAt(0).toUpperCase() + borrowAction.slice(1));
 
   const amountOver =
     tab === "lend"
