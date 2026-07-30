@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Connection,
+  LAMPORTS_PER_SOL,
   PublicKey,
   Transaction,
   VersionedTransaction,
   type Keypair,
 } from "@solana/web3.js";
+import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Landmark, Loader2 } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
@@ -27,6 +29,8 @@ import {
 } from "@/lib/jup-lend";
 
 const WSOL = "So11111111111111111111111111111111111111112";
+const SOL_FEE_RESERVE = 0.01; // leave SOL for fees
+const PRESETS = [0.25, 0.5, 0.75, 1] as const;
 
 async function signAndSendBase64(
   connection: Connection,
@@ -67,6 +71,47 @@ async function signAndSendBase64(
   }
 }
 
+async function fetchMintUiBalance(
+  conn: Connection,
+  owner: string,
+  mint: string
+): Promise<number> {
+  try {
+    const ownerPk = new PublicKey(owner);
+    if (mint === WSOL) {
+      const lamports = await conn.getBalance(ownerPk, "confirmed");
+      return Math.max(0, lamports / LAMPORTS_PER_SOL - SOL_FEE_RESERVE);
+    }
+    const mintPk = new PublicKey(mint);
+    const ata = getAssociatedTokenAddressSync(mintPk, ownerPk, true, TOKEN_PROGRAM_ID);
+    const res = await conn.getTokenAccountBalance(ata, "confirmed");
+    return Number(res.value.uiAmount ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+function fmtBal(n: number | null | undefined, digits = 4): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  if (n === 0) return "0";
+  if (n >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (n >= 1) return n.toFixed(Math.min(digits, 4));
+  return n.toFixed(Math.min(digits, 6));
+}
+
+function parseAmt(s: string): number {
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function clampAmt(n: number, max: number): string {
+  if (!Number.isFinite(n) || n < 0) return "0";
+  const v = Math.min(n, Math.max(0, max));
+  // trim trailing zeros
+  const s = v >= 1 ? v.toFixed(6) : v.toFixed(8);
+  return s.replace(/\.?0+$/, "") || "0";
+}
+
 type Tab = "lend" | "borrow";
 
 type PosRow = {
@@ -74,13 +119,129 @@ type PosRow = {
   vaultId?: number | string;
   supply?: string;
   borrow?: string;
-  token?: { asset?: { uiSymbol?: string; symbol?: string; decimals?: number }; decimals?: number };
+  token?: {
+    assetAddress?: string;
+    asset?: { address?: string; uiSymbol?: string; symbol?: string; decimals?: number };
+    decimals?: number;
+  };
   underlyingAssets?: string;
   shares?: string;
+  dustBorrow?: string;
 };
 
 function asPosRows(raw: unknown[]): PosRow[] {
   return raw.map((r) => (r && typeof r === "object" ? (r as PosRow) : {}));
+}
+
+function posUnderlyingUi(p: PosRow): number {
+  const dec = p.token?.asset?.decimals ?? p.token?.decimals ?? 6;
+  const raw = p.underlyingAssets ?? p.shares;
+  if (raw == null) return 0;
+  const n = Number(formatBaseUnits(raw, dec));
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Amount input + slider + % presets. max=0 disables slider. */
+function AmountControl({
+  label,
+  value,
+  onChange,
+  max,
+  symbol,
+  balanceLabel,
+  loadingBal,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  max: number;
+  symbol?: string;
+  balanceLabel?: string;
+  loadingBal?: boolean;
+}) {
+  const num = parseAmt(value);
+  const safeMax = Math.max(0, max);
+  const pct = safeMax > 0 ? Math.min(100, Math.max(0, (num / safeMax) * 100)) : 0;
+  const over = safeMax > 0 && num > safeMax + 1e-12;
+  const empty = safeMax <= 0;
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between gap-2 text-xs text-gray-500 dark:text-white/40 px-0.5">
+        <span>{label}</span>
+        <button
+          type="button"
+          disabled={empty || loadingBal}
+          onClick={() => onChange(clampAmt(safeMax, safeMax))}
+          className="tabular-nums text-right disabled:opacity-50 hover:text-emerald-600 dark:hover:text-emerald-400 transition"
+        >
+          {loadingBal ? (
+            "Balance…"
+          ) : (
+            <>
+              Bal {fmtBal(safeMax)}
+              {symbol ? ` ${symbol}` : ""}
+              {!empty && <span className="ml-1 text-emerald-600 dark:text-emerald-400">Max</span>}
+            </>
+          )}
+        </button>
+      </div>
+
+      <input
+        type="text"
+        inputMode="decimal"
+        enterKeyHint="done"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`w-full rounded-2xl border bg-black/5 dark:bg-white/5 px-4 py-3.5 font-mono text-base sm:text-lg focus:outline-none ${
+          over
+            ? "border-red-500/50 focus:border-red-500"
+            : "border-black/10 dark:border-white/10 focus:border-emerald-500/50"
+        }`}
+      />
+
+      <input
+        type="range"
+        min={0}
+        max={1000}
+        step={1}
+        disabled={empty}
+        value={Math.round(pct * 10)}
+        onChange={(e) => {
+          const p = Number(e.target.value) / 1000;
+          onChange(clampAmt(safeMax * p, safeMax));
+        }}
+        className="w-full h-2 accent-emerald-500 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+        aria-label={`${label} slider`}
+      />
+
+      <div className="grid grid-cols-4 gap-1.5">
+        {PRESETS.map((p) => (
+          <button
+            key={p}
+            type="button"
+            disabled={empty}
+            onClick={() => onChange(clampAmt(safeMax * p, safeMax))}
+            className="min-h-[40px] rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] text-xs font-semibold tabular-nums text-gray-600 dark:text-white/70 active:scale-[0.98] disabled:opacity-40 cursor-pointer"
+          >
+            {p === 1 ? "Max" : `${p * 100}%`}
+          </button>
+        ))}
+      </div>
+
+      {over && (
+        <p className="text-xs text-red-500 px-0.5">
+          Exceeds balance ({fmtBal(safeMax)}
+          {symbol ? ` ${symbol}` : ""})
+        </p>
+      )}
+      {empty && !loadingBal && (
+        <p className="text-xs text-amber-600 dark:text-amber-400 px-0.5">
+          {balanceLabel || "No balance available"}
+        </p>
+      )}
+    </div>
+  );
 }
 
 export default function LoanPage() {
@@ -106,6 +267,8 @@ export default function LoanPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sig, setSig] = useState<string | null>(null);
+  const [walletMintBal, setWalletMintBal] = useState<number | null>(null);
+  const [balLoading, setBalLoading] = useState(false);
   const selectedEarnRef = useRef(selectedEarn);
   const selectedVaultRef = useRef(selectedVault);
   selectedEarnRef.current = selectedEarn;
@@ -175,10 +338,137 @@ export default function LoanPage() {
     [borrowVaults, selectedVault]
   );
 
+  // Mint to check for wallet balance (deposit side)
+  const activeMint = useMemo(() => {
+    if (tab === "lend") return earnToken?.assetAddress || null;
+    if (!vault) return null;
+    if (borrowAction === "deposit" || borrowAction === "withdraw") return vault.supplyToken.address;
+    if (borrowAction === "repay") return vault.borrowToken.address;
+    return null; // borrow debt — no wallet max
+  }, [tab, earnToken, vault, borrowAction]);
+
+  // Max available for current action
+  const maxAvailable = useMemo(() => {
+    if (tab === "lend") {
+      if (action === "withdraw") {
+        const mint = earnToken?.assetAddress;
+        const pos = earnPositions.find((p) => {
+          const a = p.token?.assetAddress || p.token?.asset?.address;
+          return a === mint;
+        });
+        return pos ? posUnderlyingUi(pos) : 0;
+      }
+      // deposit from wallet
+      if (earnToken?.assetAddress === WSOL && balance != null) {
+        return Math.max(0, balance - SOL_FEE_RESERVE);
+      }
+      if (earnToken?.assetAddress?.includes("EPjF") && usdcBalance != null) {
+        return usdcBalance;
+      }
+      return walletMintBal ?? 0;
+    }
+    // borrow tab
+    if (borrowAction === "withdraw") {
+      const pos = borrowPositions.find((p) => String(p.id) === positionId);
+      if (pos?.supply) {
+        const n = Number(formatBaseUnits(pos.supply, vault?.supplyToken.decimals ?? 9));
+        return Number.isFinite(n) ? n : 0;
+      }
+      return 0;
+    }
+    if (borrowAction === "repay") {
+      const pos = borrowPositions.find((p) => String(p.id) === positionId);
+      const raw = pos?.dustBorrow ?? pos?.borrow;
+      if (raw) {
+        const n = Number(formatBaseUnits(raw, vault?.borrowToken.decimals ?? 6));
+        // repay limited by min(debt, wallet)
+        const debt = Number.isFinite(n) ? n : 0;
+        const wallet =
+          vault?.borrowToken.address === WSOL
+            ? Math.max(0, (balance ?? 0) - SOL_FEE_RESERVE)
+            : vault?.borrowToken.address?.includes("EPjF")
+              ? usdcBalance ?? 0
+              : walletMintBal ?? 0;
+        return Math.min(debt, wallet);
+      }
+      return walletMintBal ?? 0;
+    }
+    if (borrowAction === "deposit") {
+      if (vault?.supplyToken.address === WSOL && balance != null) {
+        return Math.max(0, balance - SOL_FEE_RESERVE);
+      }
+      if (vault?.supplyToken.address?.includes("EPjF") && usdcBalance != null) {
+        return usdcBalance;
+      }
+      return walletMintBal ?? 0;
+    }
+    // borrow: no hard wallet max for debt size
+    return 0;
+  }, [
+    tab,
+    action,
+    earnToken,
+    earnPositions,
+    walletMintBal,
+    balance,
+    usdcBalance,
+    borrowAction,
+    borrowPositions,
+    positionId,
+    vault,
+  ]);
+
+  // Fetch SPL balance when mint changes
+  useEffect(() => {
+    let cancelled = false;
+    if (!publicKey || !activeMint || network === "devnet") {
+      setWalletMintBal(null);
+      return;
+    }
+    // Prefer context for SOL/USDC
+    if (activeMint === WSOL) {
+      setWalletMintBal(balance != null ? Math.max(0, balance - SOL_FEE_RESERVE) : null);
+      return;
+    }
+    if (activeMint.includes("EPjF")) {
+      setWalletMintBal(usdcBalance);
+      return;
+    }
+    setBalLoading(true);
+    const conn = new Connection(rpc, "confirmed");
+    fetchMintUiBalance(conn, publicKey, activeMint)
+      .then((b) => {
+        if (!cancelled) setWalletMintBal(b);
+      })
+      .finally(() => {
+        if (!cancelled) setBalLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicKey, activeMint, rpc, network, balance, usdcBalance]);
+
+  const ensureBalance = (amtStr: string, max: number, label: string): string | null => {
+    const n = parseAmt(amtStr);
+    if (!(n > 0)) return `Enter a valid ${label}`;
+    if (max <= 0) return `No ${label} balance`;
+    if (n > max + 1e-10) return `Insufficient balance (have ${fmtBal(max)})`;
+    return null;
+  };
+
   const submitEarn = async () => {
     if (!publicKey || !earnToken) return;
     if (network === "devnet") {
       setError("Loan markets are mainnet only. Switch to live.");
+      return;
+    }
+    const balErr = ensureBalance(
+      amount,
+      maxAvailable,
+      action === "deposit" ? "wallet" : "position"
+    );
+    if (balErr) {
+      setError(balErr);
       return;
     }
     const decimals = earnToken.asset?.decimals ?? earnToken.decimals ?? 6;
@@ -241,6 +531,15 @@ export default function LoanPage() {
     let debt = "0";
 
     if (borrowAction === "deposit" || borrowAction === "withdraw") {
+      const balErr = ensureBalance(
+        colAmount,
+        maxAvailable,
+        borrowAction === "deposit" ? "collateral" : "position collateral"
+      );
+      if (balErr) {
+        setError(balErr);
+        return;
+      }
       const b = toBaseUnits(colAmount, colDec);
       if (!b || b === "0") {
         setError("Enter collateral amount");
@@ -251,13 +550,35 @@ export default function LoanPage() {
         setError("SOL collateral needs WSOL first. Prefer non-SOL markets, or wrap SOL.");
         return;
       }
-    } else {
-      const b = toBaseUnits(debtAmount, debtDec);
-      if (!b || b === "0") {
-        setError("Enter borrow/repay amount");
+    } else if (borrowAction === "repay") {
+      const balErr = ensureBalance(debtAmount, maxAvailable, "repay");
+      if (balErr) {
+        setError(balErr);
         return;
       }
-      debt = borrowAction === "repay" ? `-${b}` : b;
+      const b = toBaseUnits(debtAmount, debtDec);
+      if (!b || b === "0") {
+        setError("Enter repay amount");
+        return;
+      }
+      debt = `-${b}`;
+    } else {
+      // borrow — check minimum only
+      const b = toBaseUnits(debtAmount, debtDec);
+      if (!b || b === "0") {
+        setError("Enter borrow amount");
+        return;
+      }
+      const minB = Number(vault.minimumBorrowing || 0);
+      if (minB > 0 && Number(b) < minB) {
+        setError(
+          `Minimum borrow is ${formatBaseUnits(String(minB), debtDec)} ${
+            vault.borrowToken.uiSymbol || vault.borrowToken.symbol
+          }`
+        );
+        return;
+      }
+      debt = b;
     }
 
     const pos = Number(positionId);
@@ -317,10 +638,20 @@ export default function LoanPage() {
         ? "Working…"
         : borrowAction.charAt(0).toUpperCase() + borrowAction.slice(1);
 
+  const amountOver =
+    tab === "lend"
+      ? parseAmt(amount) > maxAvailable + 1e-10
+      : borrowAction === "borrow"
+        ? false
+        : borrowAction === "deposit" || borrowAction === "withdraw"
+          ? parseAmt(colAmount) > maxAvailable + 1e-10
+          : parseAmt(debtAmount) > maxAvailable + 1e-10;
+
   const primaryDisabled =
     busy ||
     network === "devnet" ||
-    (tab === "lend" ? !earnToken : !vault) ||
+    amountOver ||
+    (tab === "lend" ? !earnToken || maxAvailable <= 0 && action === "deposit" : !vault) ||
     configured === false;
 
   const onPrimary = () => {
@@ -328,13 +659,16 @@ export default function LoanPage() {
     else void submitBorrow();
   };
 
+  const earnSym = earnToken?.asset?.uiSymbol || earnToken?.symbol;
+  const colSym = vault?.supplyToken.uiSymbol || vault?.supplyToken.symbol;
+  const debtSym = vault?.borrowToken.uiSymbol || vault?.borrowToken.symbol;
+
   return (
     <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
       <main className="flex-1 flex flex-col w-full max-w-lg mx-auto px-3 sm:px-4 pt-4 sm:pt-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-10">
         <PageTransition>
           <div className="w-full space-y-4 sm:space-y-6">
-            {/* Header — compact on phone */}
             <div className="text-center space-y-1.5 sm:space-y-2 px-1">
               <AnimatedIcon icon={Landmark} size={32} className="text-emerald-500 sm:hidden" />
               <div className="hidden sm:block">
@@ -346,7 +680,6 @@ export default function LoanPage() {
               </p>
             </div>
 
-            {/* Main tabs */}
             <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
               {(["lend", "borrow"] as const).map((t) => (
                 <button
@@ -392,7 +725,6 @@ export default function LoanPage() {
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40 px-0.5">
                         Asset
                       </p>
-                      {/* Horizontal chip scroller on mobile */}
                       <div className="-mx-3 px-3 flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1 overscroll-x-contain">
                         {earnTokens.map((t) => {
                           const mint = t.assetAddress;
@@ -496,26 +828,17 @@ export default function LoanPage() {
                       ))}
                     </div>
 
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-xs text-gray-500 dark:text-white/40 px-0.5">
-                        <span>Amount</span>
-                        <span className="tabular-nums">
-                          {earnToken?.assetAddress?.includes("EPjF")
-                            ? `${usdcBalance?.toFixed(2) ?? "—"} USDC`
-                            : earnToken?.assetAddress === WSOL
-                              ? `${balance?.toFixed(4) ?? "—"} SOL`
-                              : "—"}
-                        </span>
-                      </div>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        enterKeyHint="done"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        className="w-full rounded-2xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-4 py-3.5 font-mono text-base sm:text-lg focus:outline-none focus:border-emerald-500/50"
-                      />
-                    </div>
+                    <AmountControl
+                      label={action === "deposit" ? "Supply amount" : "Withdraw amount"}
+                      value={amount}
+                      onChange={setAmount}
+                      max={maxAvailable}
+                      symbol={earnSym}
+                      balanceLabel={
+                        action === "withdraw" ? "Nothing supplied in this vault" : "No wallet balance"
+                      }
+                      loadingBal={balLoading}
+                    />
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -616,50 +939,83 @@ export default function LoanPage() {
                       ))}
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="space-y-1.5">
-                        <label className="text-xs text-gray-500 dark:text-white/40 px-0.5">
-                          Position id <span className="text-gray-400">(0 = new)</span>
-                        </label>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-gray-500 dark:text-white/40 px-0.5">
+                        Position id <span className="text-gray-400">(0 = new)</span>
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={positionId}
+                        onChange={(e) => setPositionId(e.target.value.replace(/[^\d]/g, ""))}
+                        className="w-full rounded-2xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-4 py-3.5 font-mono text-base focus:outline-none focus:border-emerald-500/50"
+                      />
+                    </div>
+
+                    {(borrowAction === "deposit" || borrowAction === "withdraw") && (
+                      <AmountControl
+                        label={`Collateral (${colSym || "—"})`}
+                        value={colAmount}
+                        onChange={setColAmount}
+                        max={maxAvailable}
+                        symbol={colSym}
+                        balanceLabel={
+                          borrowAction === "withdraw"
+                            ? "Select a position with collateral"
+                            : "No collateral token balance"
+                        }
+                        loadingBal={balLoading}
+                      />
+                    )}
+
+                    {borrowAction === "repay" && (
+                      <AmountControl
+                        label={`Repay (${debtSym || "—"})`}
+                        value={debtAmount}
+                        onChange={setDebtAmount}
+                        max={maxAvailable}
+                        symbol={debtSym}
+                        balanceLabel="Select a position with debt"
+                        loadingBal={balLoading}
+                      />
+                    )}
+
+                    {borrowAction === "borrow" && (
+                      <div className="space-y-2.5">
+                        <div className="flex justify-between text-xs text-gray-500 dark:text-white/40 px-0.5">
+                          <span>Borrow ({debtSym || "—"})</span>
+                          {vault?.minimumBorrowing && (
+                            <span className="tabular-nums">
+                              Min{" "}
+                              {formatBaseUnits(
+                                vault.minimumBorrowing,
+                                vault.borrowToken.decimals
+                              )}
+                            </span>
+                          )}
+                        </div>
                         <input
                           type="text"
-                          inputMode="numeric"
-                          value={positionId}
-                          onChange={(e) => setPositionId(e.target.value.replace(/[^\d]/g, ""))}
+                          inputMode="decimal"
+                          enterKeyHint="done"
+                          value={debtAmount}
+                          onChange={(e) => setDebtAmount(e.target.value)}
                           className="w-full rounded-2xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-4 py-3.5 font-mono text-base focus:outline-none focus:border-emerald-500/50"
                         />
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {["5", "10", "25", "50"].map((p) => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => setDebtAmount(p)}
+                              className="min-h-[40px] rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] text-xs font-semibold tabular-nums cursor-pointer active:scale-[0.98]"
+                            >
+                              {p}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      {(borrowAction === "deposit" || borrowAction === "withdraw") && (
-                        <div className="space-y-1.5">
-                          <label className="text-xs text-gray-500 dark:text-white/40 px-0.5">
-                            Collateral ({vault?.supplyToken.uiSymbol || "—"})
-                          </label>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            enterKeyHint="done"
-                            value={colAmount}
-                            onChange={(e) => setColAmount(e.target.value)}
-                            className="w-full rounded-2xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-4 py-3.5 font-mono text-base focus:outline-none focus:border-emerald-500/50"
-                          />
-                        </div>
-                      )}
-                      {(borrowAction === "borrow" || borrowAction === "repay") && (
-                        <div className="space-y-1.5">
-                          <label className="text-xs text-gray-500 dark:text-white/40 px-0.5">
-                            Debt ({vault?.borrowToken.uiSymbol || "—"})
-                          </label>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            enterKeyHint="done"
-                            value={debtAmount}
-                            onChange={(e) => setDebtAmount(e.target.value)}
-                            className="w-full rounded-2xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-4 py-3.5 font-mono text-base focus:outline-none focus:border-emerald-500/50"
-                          />
-                        </div>
-                      )}
-                    </div>
+                    )}
 
                     <p className="text-[11px] text-center text-gray-400 dark:text-white/30 px-2">
                       NFT positions · liquidation risk · not financial advice
@@ -686,7 +1042,6 @@ export default function LoanPage() {
               </div>
             )}
 
-            {/* Desktop CTA (mobile uses sticky bar) */}
             {!loading && configured !== false && publicKey && (
               <button
                 type="button"
@@ -702,7 +1057,6 @@ export default function LoanPage() {
         </PageTransition>
       </main>
 
-      {/* Sticky mobile action bar above bottom nav */}
       {!loading && configured !== false && publicKey && (
         <div className="sm:hidden fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-20 px-3 pb-2 pt-2 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-black dark:via-black/95 pointer-events-none">
           <button
