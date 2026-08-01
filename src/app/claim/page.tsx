@@ -42,7 +42,6 @@ export default function ClaimPage() {
     signature: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [username, setUsername] = useState("sol.new ");
 
   const { publicKey, walletLabel, connect, recover, loading: walletLoading, error: walletError, refreshBalance } = useWallet();
 
@@ -320,37 +319,28 @@ export default function ClaimPage() {
               ) : (
                 <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-5 space-y-3 text-center">
                   <KeyRound className="w-7 h-7 text-amber-400 mx-auto" />
-                  <h2 className="font-semibold">Create a sol.new wallet to claim</h2>
+                  <h2 className="font-semibold">Create a wallet to claim</h2>
                   <p className="text-gray-500 dark:text-white/40 text-sm">
-                    Takes seconds with Face ID. Network fee covered by sol.new.
+                    Face ID · name is your address · network fee covered by sol.new
                   </p>
-                  <input
-                    type="text"
-                    placeholder="sol.new · your name"
-                    value={username}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (!v.startsWith("sol.new")) {
-                        setUsername(
-                          v ? `sol.new ${v.replace(/^sol\.new\s*/i, "")}` : "sol.new "
-                        );
-                      } else {
-                        setUsername(v);
-                      }
-                    }}
-                    className="w-full bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/25 transition text-sm"
-                  />
                   {walletError && (
                     <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-500 dark:text-red-400 text-sm text-left">
                       {walletError}
                     </div>
                   )}
                   <button
-                    onClick={() => username.trim() && connect(username.trim())}
-                    disabled={walletLoading || !username.trim()}
+                    onClick={() => void connect()}
+                    disabled={walletLoading}
                     className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-black font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
                   >
-                    {walletLoading ? <><Spinner size={16} className="inline mr-2" />Setting up…</> : "Create wallet & claim"}
+                    {walletLoading ? (
+                      <>
+                        <Spinner size={16} className="inline mr-2" />
+                        Setting up…
+                      </>
+                    ) : (
+                      "Create wallet & claim"
+                    )}
                   </button>
                   <button
                     onClick={() => void recover({ forcePicker: true })}

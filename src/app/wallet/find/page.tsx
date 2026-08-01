@@ -72,14 +72,7 @@ export default function WalletFindPage() {
       const hit = await identify();
       setLast(hit);
       setTried((t) => (t.includes(hit.publicKey) ? t : [...t, hit.publicKey]));
-      const existing = wallets.find((w) => w.pubkey === hit.publicKey);
-      setLabelDraft(
-        existing?.label && !existing.label.startsWith("Wallet ")
-          ? existing.label
-          : hit.sol > 0.001
-            ? `Wallet ${short(hit.publicKey)} · ${hit.sol.toFixed(3)} SOL`
-            : short(hit.publicKey)
-      );
+      setLabelDraft(hit.publicKey);
     } catch (e) {
       setLocalError(friendlyError(e, "Couldn't read that passkey."));
     }
@@ -87,13 +80,11 @@ export default function WalletFindPage() {
 
   const onUse = () => {
     if (!last) return;
-    const label = labelDraft.trim() || short(last.publicKey);
     activateWallet({
       pubkey: last.publicKey,
       credentialId: last.credentialId,
-      label,
+      label: last.publicKey,
     });
-    renameWallet(last.publicKey, label);
   };
 
   const copy = async (text: string) => {
@@ -194,13 +185,10 @@ export default function WalletFindPage() {
                 </div>
               </div>
               <div>
-                <label className="text-xs text-gray-500">Name this wallet</label>
-                <input
-                  value={labelDraft}
-                  onChange={(e) => setLabelDraft(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-2.5 text-sm"
-                  placeholder="e.g. Main · trading · cold"
-                />
+                <p className="text-xs text-gray-500">Wallet address (name)</p>
+                <p className="mt-1 font-mono text-xs break-all rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-2.5">
+                  {last.publicKey}
+                </p>
               </div>
               <button
                 type="button"
@@ -257,17 +245,9 @@ export default function WalletFindPage() {
                     <div className="flex items-start gap-2">
                       <WalletIcon className="w-4 h-4 text-purple-400 mt-1 shrink-0" />
                       <div className="min-w-0 flex-1">
-                        <input
-                          defaultValue={w.label}
-                          key={w.label + w.pubkey}
-                          onBlur={(e) => {
-                            if (e.target.value.trim() && e.target.value !== w.label) {
-                              renameWallet(w.pubkey, e.target.value);
-                            }
-                          }}
-                          className="w-full bg-transparent font-semibold text-sm outline-none border-b border-transparent focus:border-purple-400/40"
-                        />
-                        <p className="font-mono text-[11px] text-gray-400 break-all">{w.pubkey}</p>
+                        <p className="font-mono font-semibold text-sm break-all" title={w.pubkey}>
+                          {w.pubkey}
+                        </p>
                         <p className="text-xs text-gray-500 mt-0.5 tabular-nums">
                           {bal
                             ? `${bal.sol.toFixed(4)} SOL · $${bal.usdc.toFixed(2)} USDC`

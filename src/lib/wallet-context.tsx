@@ -118,11 +118,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const saved = localStorage.getItem("sol.new.wallet");
-    const savedLabel = localStorage.getItem("sol.new.walletLabel");
-    const savedWallets = loadWallets();
+    const savedWallets = loadWallets().map((w) => ({ ...w, label: w.pubkey }));
+    if (savedWallets.length) saveWallets(savedWallets);
     if (saved) {
       setPublicKey(saved);
-      setWalletLabel(savedLabel || null);
+      setWalletLabel(saved);
+      localStorage.setItem("sol.new.walletLabel", saved);
     }
     setWallets(savedWallets);
   }, []);
@@ -193,30 +194,31 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, [wallets.length, network]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const activateWallet = (entry: WalletEntry) => {
-    const updated = upsertWallet(entry);
+    // Wallet name === address (product rule)
+    const labeled: WalletEntry = { ...entry, label: entry.pubkey };
+    const updated = upsertWallet(labeled);
     setWallets(updated);
-    setPublicKey(entry.pubkey);
-    setWalletLabel(entry.label);
+    setPublicKey(labeled.pubkey);
+    setWalletLabel(labeled.pubkey);
     setBalance(null);
     setUsdcBalance(null);
-    localStorage.setItem("sol.new.wallet", entry.pubkey);
-    localStorage.setItem("sol.new.credentialId", entry.credentialId);
-    localStorage.setItem("sol.new.walletLabel", entry.label);
+    localStorage.setItem("sol.new.wallet", labeled.pubkey);
+    localStorage.setItem("sol.new.credentialId", labeled.credentialId);
+    localStorage.setItem("sol.new.walletLabel", labeled.pubkey);
   };
 
-  const connect = async (username?: string) => {
+  const connect = async (_username?: string) => {
     setError(null);
     setLoading(true);
     try {
       if (!window.PublicKeyCredential) {
         throw new Error("Passkeys require HTTPS.");
       }
-      const label = username?.trim() || `Wallet ${Date.now()}`;
-      const result = await createPasskeyWallet(label);
+      const result = await createPasskeyWallet();
       activateWallet({
         pubkey: result.publicKey,
         credentialId: result.credentialId,
-        label,
+        label: result.publicKey,
         userId: result.userId,
       });
       fetch("/api/wallet", {
@@ -241,15 +243,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         throw new Error("Passkeys require HTTPS.");
       }
       const result = await recoverPasskeyWallet({ forcePicker: opts?.forcePicker });
-      const existing = loadWallets().find(
-        (w) => w.credentialId === result.credentialId || w.pubkey === result.publicKey
-      );
-      const label =
-        existing?.label || `Wallet ${result.publicKey.slice(0, 4)}…${result.publicKey.slice(-4)}`;
       activateWallet({
         pubkey: result.publicKey,
         credentialId: result.credentialId,
-        label,
+        label: result.publicKey,
       });
       fetch("/api/wallet", {
         method: "POST",
@@ -284,14 +281,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         ...prev,
         [result.publicKey]: { sol, usdc },
       }));
-      // Upsert with temporary label so list grows while scanning
-      const existing = loadWallets().find((w) => w.pubkey === result.publicKey);
-      const label =
-        existing?.label || `${result.publicKey.slice(0, 4)}…${result.publicKey.slice(-4)}`;
       const updated = upsertWallet({
         pubkey: result.publicKey,
         credentialId: result.credentialId,
-        label,
+        label: result.publicKey,
       });
       setWallets(updated);
       return { publicKey: result.publicKey, credentialId: result.credentialId, sol, usdc };
@@ -304,27 +297,24 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const renameWallet = (pubkey: string, label: string) => {
-    const trimmed = label.trim();
-    if (!trimmed) return;
+  const renameWallet = (pubkey: string, _label: string) => {
+    // Name is always the address
     const list = loadWallets();
     const idx = list.findIndex((w) => w.pubkey === pubkey);
     if (idx < 0) return;
-    list[idx] = { ...list[idx], label: trimmed };
+    list[idx] = { ...list[idx], label: pubkey };
     saveWallets(list);
     setWallets([...list]);
     if (publicKey === pubkey) {
-      setWalletLabel(trimmed);
-      localStorage.setItem("sol.new.walletLabel", trimmed);
+      setWalletLabel(pubkey);
+      localStorage.setItem("sol.new.walletLabel", pubkey);
     }
-    // Push name into browser passkey manager when we have userId (Chrome)
     const entry = list[idx];
     if (entry.userId) {
-      const short = `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`;
       void signalPasskeyUserDetails({
         userId: entry.userId,
-        name: `${trimmed} · ${short}`,
-        displayName: `${trimmed} · ${short}`,
+        name: pubkey,
+        displayName: pubkey,
       });
     }
   };
@@ -347,13 +337,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const switchWallet = (pubkey: string) => {
     const entry = loadWallets().find((w) => w.pubkey === pubkey);
     if (!entry) return;
-    setPublicKey(entry.pubkey);
-    setWalletLabel(entry.label);
-    setBalance(null);
-    setUsdcBalance(null);
-    localStorage.setItem("sol.new.wallet", entry.pubkey);
-    if (entry.credentialId) localStorage.setItem("sol.new.credentialId", entry.credentialId);
-    localStorage.setItem("sol.new.walletLabel", entry.label);
+    activateWallet({ ...entry, label: entry.pubkey });
   };
 
   const [airdropping, setAirdropping] = useState(false);
