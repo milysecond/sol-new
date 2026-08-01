@@ -15,16 +15,12 @@ function short(pk: string) {
  * e.g. "Main · sol.new" or "AbC1…xYz9 · Send · sol.new"
  */
 export function WalletBrowserTitle() {
-  const { publicKey, walletLabel } = useWallet();
+  const { publicKey } = useWallet();
   const pathname = usePathname() || "/";
 
   useEffect(() => {
     const pathBit = pathTitle(pathname);
-    const walletBit = walletLabel?.trim()
-      ? walletLabel.trim()
-      : publicKey
-        ? short(publicKey)
-        : null;
+    const walletBit = publicKey ? short(publicKey) : null;
 
     const parts = [walletBit, pathBit, SITE].filter(Boolean);
     // Dedupe if path is home
@@ -32,7 +28,7 @@ export function WalletBrowserTitle() {
     document.title = title;
 
     // PWA / iOS home screen name stays site-level; only tab title changes
-  }, [publicKey, walletLabel, pathname]);
+  }, [publicKey, pathname]);
 
   return null;
 }

@@ -70,13 +70,14 @@ async function sha256(data: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(hash);
 }
 
-export async function createPasskeyWallet(username: string): Promise<{
+export async function createPasskeyWallet(_username?: string): Promise<{
   publicKey: string;
   credentialId: string;
   userId: string;
 }> {
   ensureDocumentFocusForPasskey();
-  const label = (username || "sol.new user").trim().slice(0, 64);
+  // Provisional WebAuthn name until we derive the Solana address
+  const provisional = `sol.new-${Date.now().toString(36)}`;
   // Stable random user handle — needed later to rename the passkey in the browser via Signal API
   const userIdBytes = crypto.getRandomValues(new Uint8Array(32));
   const userId = btoa(String.fromCharCode(...userIdBytes));
@@ -87,9 +88,9 @@ export async function createPasskeyWallet(username: string): Promise<{
       rp: { name: "sol.new", id: window.location.hostname },
       user: {
         id: userIdBytes,
-        // Browser passkey list shows name + displayName (Chrome/Safari settings)
-        name: `${label}@sol.new`,
-        displayName: label,
+        // Browser passkey list — updated to full address after PRF derive
+        name: provisional,
+        displayName: "sol.new wallet",
       },
       pubKeyCredParams: [
         { alg: -7, type: "public-key" },
@@ -125,13 +126,12 @@ export async function createPasskeyWallet(username: string): Promise<{
   const keypair = Keypair.fromSeed(seed.slice(0, 32));
   const publicKey = keypair.publicKey.toBase58();
   const credentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
-  const short = `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`;
 
-  // Best-effort: put address into the browser passkey name (Chrome Signal API)
+  // Wallet name === address (browser passkey list + UI)
   await signalPasskeyUserDetails({
     userId,
-    name: `${label} · ${short}`,
-    displayName: `${label} · ${short}`,
+    name: publicKey,
+    displayName: publicKey,
   });
 
   return {
