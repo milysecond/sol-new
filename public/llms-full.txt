@@ -1,0 +1,173 @@
+# sol.new — full product map for LLMs and agents
+
+> Source of truth for routes and APIs on https://sol.new  
+> Short summary: https://sol.new/llms.txt  
+> Human features: https://sol.new/features · https://sol.new/dir · https://sol.new/docs  
+> Repo: https://github.com/milysecond/sol-new
+
+## Identity
+
+- **Name:** sol.new  
+- **Tagline:** Zero-friction Solana — passkey wallets, create, pay, gift, lend, explore  
+- **Wallet model:** WebAuthn passkey → deterministic ed25519 keypair (client-held seed; not custodial)  
+- **Hosting:** Cloudflare Workers (OpenNext)  
+- **DB:** Turso for app state (profiles, gift registry metadata, short links, draws) — not private keys  
+- **Networks:** `mainnet` (live) and `devnet`  
+
+## User-facing routes
+
+### Create
+| Path | Description |
+|------|-------------|
+| /token | Launch SPL token (Meteora DBC on mainnet) |
+| /token/[mint] | Token landing |
+| /nft | Mint standard or compressed NFT |
+| /multisig | Create Squads-style multisig |
+| /multisig/[address] | Multisig detail |
+| /id | .sol name check/register |
+| /launch | Live launches feed |
+| /launch/[mint] | Launch detail |
+
+### Wallet
+| Path | Description |
+|------|-------------|
+| /wallet | Passkey wallet hub |
+| /get · /wallet/get | Fund / onramp |
+| /wallet/send | Send SOL/USDC |
+| /portfolio | Holdings |
+| /burn | Close empty ATAs / reclaim rent |
+| /message | Sign message |
+| /magic | Magic link open |
+
+### Money
+| Path | Description |
+|------|-------------|
+| /pay | Solana Pay QR/link |
+| /split | Bill split |
+| /gift | Create gift link (uses /api/gift/create) |
+| /claim | Claim gift (#secret fragment) |
+| /link | Short link creator |
+| /link/[code] | Short link landing (canonical) |
+| /l/[code] | Legacy short link → 308 to /link/[code] |
+| /receipt · /receipt/[sig] | Tx receipt |
+
+### Yield
+| Path | Description |
+|------|-------------|
+| /earn | USDC protected yield |
+| /loan | Jupiter Lend supply + borrow (mainnet) |
+| /stake | Native stake |
+| /lst | Liquid staking tokens |
+
+### Social / explore
+| Path | Description |
+|------|-------------|
+| /creator/edit | Edit profile + claim username |
+| /creator/[wallet] | Creator by wallet |
+| /u/[username] | Username → creator profile |
+| /scan · /track | Explorer |
+| /lists | Watchlists |
+| /stocks | Tokenized stocks |
+| /gallery · /compare | Gallery / compare |
+| /news · /pods · /punt | Content + free picks |
+| /whats-new · /changelog | Product news |
+
+### Meta
+| Path | Description |
+|------|-------------|
+| / · /home | Landing / product grid |
+| /features · /dir · /docs | Overview, directory, costs |
+| /privacy · /terms · /copyright | Legal |
+| /llms.txt · /llms-full.txt | This map |
+
+### Play
+| Path | Description |
+|------|-------------|
+| /draw · /wheel · /flip · /dice | Fair draws |
+| /draw/[id] | Draw receipt |
+| /vrf | Alias → /draw |
+
+## APIs
+
+### Gift
+**POST /api/gift/create**  
+Body: `{ wallet, amount, token?: "SOL"|"USDC", network?: "mainnet"|"devnet", message? }`  
+Returns: `{ transaction (base64 unsigned), giftPubkey, secret, claimUrl, amountLamports, register }`  
+- Secret is returned once and **never stored** server-side.  
+- Client signs `transaction`, sends on-chain, then **POST /api/gift** with `register.body`.  
+
+**POST /api/gift** — register `{ publicKey, sender, amountLamports, network, token }`  
+**GET /api/gift?pk=** — status (`found`, `status`, `amountLamports`, `token`, …)  
+**PATCH /api/gift** — `{ publicKey, claimedBy, reclaim? }`  
+
+**GET /api/gift/create** — JSON docs for integrators (`Accept: application/json`)
+
+### Loan (Jupiter Lend)
+**GET /api/loan?mode=earn|borrow&wallet?** — markets + optional positions  
+**POST /api/loan**  
+- Earn: `{ mode:"earn", action:"deposit"|"withdraw", wallet, asset, amount }` → tx base64  
+- Borrow: `{ mode:"borrow", wallet, vaultId, positionId, colAmount, debtAmount }` → tx base64  
+SOL markets: client auto wraps/unwraps WSOL.
+
+### Short links
+**POST /api/link** — create (optional custom code + paymentSig for 0.01 SOL fee)  
+**GET /api/link?code=** — resolve  
+Canonical URL: `https://sol.new/link/<code>`
+
+### Creator / username
+**GET /api/creator/profile?wallet=** | `?username=` | `?check=<name>`  
+**POST /api/creator/profile** — signed profile upsert / username claim  
+Public: `/u/<username>`
+
+### Other selected
+| Endpoint | Use |
+|----------|-----|
+| GET /api/costs | Fee table for /docs |
+| GET /api/stats | Counts |
+| POST /api/draw · GET /api/draw/[id] | Fair draw |
+| GET /api/receipt?signature= | Receipt parse |
+| POST /api/swap/build | Swap build |
+| GET/POST /api/lst/* | Liquid stake |
+| GET/POST /api/earn/lulo | Earn backend |
+| Token/NFT/multisig/launch APIs | Create surfaces |
+
+## Gift security model
+
+1. Server (or client historically) generates random 32-byte seed → gift keypair.  
+2. Claim URL is `/claim#<base64url-seed>` — fragment never sent to HTTP servers.  
+3. Funding is on-chain to gift pubkey.  
+4. Claim sweeps gift → recipient; possession of link = authority.  
+5. DB only stores public gift pubkey + sender + amount metadata.
+
+## Loan security / product notes
+
+- Mainnet only in UI.  
+- Rates and liquidations from Jupiter Lend protocols.  
+- Passkey signs; balance checked before submit.  
+- Not financial advice.
+
+## Short link payments
+
+- Random codes: free.  
+- Custom vanity: 0.01 SOL to vault; pay via connected passkey **or** Solana Pay QR.  
+
+## Usernames
+
+- 3–20 chars, `^[a-z][a-z0-9_]{2,19}$`, reserved words blocked.  
+- One username per wallet; claim via signed POST.
+
+## Agent tips
+
+- Prefer canonical `/link/` over `/l/`.  
+- For gifts, always use create → sign → register; never log `secret`.  
+- For loan, require mainnet + passkey; handle WSOL automatically on /loan UI.  
+- Costs: cache `GET /api/costs` briefly.  
+- Passkey flows need a real browser (not pure Telegram WebView without open-in-browser).
+
+## Contact
+
+- X: https://x.com/soldotnew  
+- Telegram: https://t.me/soldotnew  
+- Security: security@sol.new  
+
+Last updated: 2026-07-30 (gift create API, loan/WSOL, short links, usernames).
