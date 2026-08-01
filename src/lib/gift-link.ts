@@ -248,10 +248,16 @@ export async function sweepGift(
   connection: Connection,
   gift: Keypair,
   destination: PublicKey,
-  network: Network
-): Promise<{ signature: string; lamports: number; usdcBase: number }> {
+  network: Network,
+  opts?: {
+    /** When set, sol.new (or other) pays fees + ATA rent; gift still signs transfers */
+    feePayer?: PublicKey;
+  }
+): Promise<{ signature: string; lamports: number; usdcBase: number; sponsored?: boolean }> {
   const contents = await inspectGift(connection, gift.publicKey, network);
   const ixs: TransactionInstruction[] = [];
+  const payer = opts?.feePayer || gift.publicKey;
+  const sponsored = Boolean(opts?.feePayer);
 
   for (const t of contents.tokens) {
     const mint = new PublicKey(t.mint);
@@ -269,7 +275,7 @@ export async function sweepGift(
     );
     ixs.push(
       createAssociatedTokenAccountIdempotentInstruction(
-        gift.publicKey,
+        payer,
         destAta,
         destination,
         mint,
@@ -295,7 +301,9 @@ export async function sweepGift(
     );
   }
 
-  const lamports = contents.lamports - CLAIM_FEE_LAMPORTS;
+  // Leave a fee only when gift pays for itself
+  const reserve = sponsored ? 0 : CLAIM_FEE_LAMPORTS;
+  const lamports = contents.lamports - reserve;
   if (lamports <= 0 && contents.tokens.length === 0) {
     throw new Error("This gift is empty — it may have already been claimed.");
   }
@@ -309,12 +317,28 @@ export async function sweepGift(
     );
   }
 
+  if (!ixs.length) {
+    throw new Error("Nothing to claim");
+  }
+
   const tx = new Transaction().add(...ixs);
   const { blockhash, lastValidBlockHeight } =
     await connection.getLatestBlockhash("confirmed");
   tx.recentBlockhash = blockhash;
-  tx.feePayer = gift.publicKey;
-  tx.sign(gift);
+  tx.feePayer = payer;
+  tx.partialSign(gift);
+
+  if (sponsored) {
+    // Return unsigned-by-fee-payer tx for /api/sponsor
+    return {
+      signature: Buffer.from(
+        tx.serialize({ requireAllSignatures: false, verifySignatures: false })
+      ).toString("base64"),
+      lamports: Math.max(lamports, 0),
+      usdcBase: contents.usdcBase,
+      sponsored: true,
+    };
+  }
 
   const signature = await connection.sendRawTransaction(tx.serialize(), {
     skipPreflight: false,
@@ -328,6 +352,7 @@ export async function sweepGift(
     signature,
     lamports: Math.max(lamports, 0),
     usdcBase: contents.usdcBase,
+    sponsored: false,
   };
 }
 
@@ -337,6 +362,8 @@ export interface GiftLinkEntry {
   amount: number;
   token?: GiftToken;
   symbol?: string;
+  /** @deprecated use symbol */
+  tokenSymbol?: string;
   decimals?: number;
   network: Network;
   createdAt: string;

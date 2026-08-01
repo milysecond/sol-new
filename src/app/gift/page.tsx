@@ -308,12 +308,10 @@ export default function GiftPage() {
     const payload = giftSharePayload({
       amount: amount || giftEntry?.amount || "",
       assetLabel:
+        giftEntry?.symbol ||
         giftEntry?.tokenSymbol ||
-        (giftEntry?.token === "SOL" || !giftEntry?.token
-          ? "SOL"
-          : giftEntry?.token === usdcMain
-            ? "USDC"
-            : assetLabel),
+        giftTokenLabel(giftEntry?.token) ||
+        tokenSymbol,
       giftUrl,
       message,
       senderLabel: walletLabel || null,
