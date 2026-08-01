@@ -1,0 +1,112 @@
+/**
+ * Web Share / social intent copy for sol.new.
+ * Prefer concrete amounts + short context — never empty chrome.
+ */
+
+export type SharePayload = {
+  title: string;
+  text: string;
+  url: string;
+};
+
+export function giftSharePayload(opts: {
+  amount: string | number;
+  /** SOL | USDC | WSOL | ticker */
+  assetLabel: string;
+  giftUrl: string;
+  message?: string | null;
+  senderLabel?: string | null;
+}): SharePayload {
+  const amount = String(opts.amount).trim();
+  const asset = opts.assetLabel.trim() || "crypto";
+  const isUsd = /usdc|usd/i.test(asset);
+  const amountBit = isUsd ? `$${amount} ${asset}` : `${amount} ${asset}`;
+  const from = opts.senderLabel?.trim();
+  const note = opts.message?.trim();
+
+  const title = `You received ${amountBit}`;
+  const lines = [
+    from ? `${from} sent you ${amountBit} on Solana.` : `You've been sent ${amountBit} on Solana.`,
+    note ? `“${note.slice(0, 80)}”` : null,
+    "Open the link and claim with Face ID / passkey — no app install.",
+    opts.giftUrl,
+  ].filter(Boolean) as string[];
+
+  return {
+    title,
+    text: lines.join("\n"),
+    url: opts.giftUrl,
+  };
+}
+
+export function receiptSharePayload(opts: {
+  amount: string;
+  symbol: string;
+  signature: string;
+  direction?: "sent" | "received" | null;
+  counterparty?: string | null;
+  origin?: string;
+}): SharePayload {
+  const origin = opts.origin || (typeof window !== "undefined" ? window.location.origin : "https://sol.new");
+  const url = `${origin}/receipt/${opts.signature}`;
+  const amt = `${opts.amount} ${opts.symbol}`.trim();
+  const who = opts.counterparty
+    ? opts.counterparty.length > 12
+      ? `${opts.counterparty.slice(0, 4)}…${opts.counterparty.slice(-4)}`
+      : opts.counterparty
+    : null;
+
+  let line1 = `Solana payment: ${amt}`;
+  if (opts.direction === "sent" && who) line1 = `Sent ${amt} to ${who}`;
+  if (opts.direction === "received" && who) line1 = `Received ${amt} from ${who}`;
+
+  return {
+    title: `${amt} on Solana`,
+    text: [
+      line1,
+      "Verified receipt on sol.new",
+      url,
+    ].join("\n"),
+    url,
+  };
+}
+
+export function tokenLaunchSharePayload(opts: {
+  name: string;
+  symbol: string;
+  mint: string;
+  origin?: string;
+}): SharePayload {
+  const origin = opts.origin || "https://sol.new";
+  const url = `${origin}/token/${opts.mint}`;
+  const ticker = opts.symbol?.startsWith("$") ? opts.symbol : `$${opts.symbol}`;
+  return {
+    title: `${opts.name} (${ticker}) on sol.new`,
+    text: [
+      `Just launched ${opts.name} (${ticker}) on Solana via sol.new.`,
+      `Mint: ${opts.mint}`,
+      "Passkey wallet · no seed phrase",
+      url,
+    ].join("\n"),
+    url,
+  };
+}
+
+/** navigator.share with clipboard fallback */
+export async function shareOrCopy(payload: SharePayload): Promise<"shared" | "copied"> {
+  try {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      await navigator.share({
+        title: payload.title,
+        text: payload.text,
+        url: payload.url,
+      });
+      return "shared";
+    }
+  } catch (e) {
+    // user cancel → rethrow silence
+    if (e instanceof Error && /abort|cancel/i.test(e.message)) throw e;
+  }
+  await navigator.clipboard.writeText(payload.text.includes(payload.url) ? payload.text : `${payload.text}\n${payload.url}`);
+  return "copied";
+}

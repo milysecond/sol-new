@@ -308,10 +308,29 @@ export default function GiftPage() {
 
   const shareLink = async () => {
     if (!giftUrl) return;
+    const { giftSharePayload, shareOrCopy } = await import("@/lib/share-copy");
+    const payload = giftSharePayload({
+      amount: amount || giftEntry?.amount || "",
+      assetLabel:
+        giftEntry?.tokenSymbol ||
+        (giftEntry?.token === "SOL" || !giftEntry?.token
+          ? "SOL"
+          : giftEntry?.token === usdcMain
+            ? "USDC"
+            : assetLabel),
+      giftUrl,
+      message,
+      senderLabel: walletLabel || null,
+    });
     try {
-      await navigator.share({ title: "You've been sent crypto", url: giftUrl });
+      const how = await shareOrCopy(payload);
+      if (how === "copied") {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+      analytics.shareClicked("gift", giftUrl);
     } catch {
-      copyLink();
+      /* cancelled */
     }
   };
 

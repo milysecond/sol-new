@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
-  title: "Send SOL or USDC with a Link — sol.new",
+  title: "Send any Solana token with a link — sol.new",
   description:
-    "Gift SOL or dollars (USDC) to anyone with just a link — even if they don't have a wallet. They claim it in seconds with Face ID. No app, no seed phrase, no signup.",
+    "Gift SOL, USDC, WSOL, or any SPL token with a claimable link. Recipient claims with Face ID — no app, no seed phrase.",
   path: "/gift",
 });
 

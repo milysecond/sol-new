@@ -8,7 +8,7 @@ export default async function Image() {
   return featureOgImage({
     eyebrow: "Gift",
     title: "Send with a link",
-    subtitle: "SOL or USDC as a claimable gift. Recipient claims with Face ID.",
+    subtitle: "Any SPL token as a claimable gift. Face ID claim — no app.",
     cta: "Send a gift",
     accent: "pink",
     path: "sol.new/gift",
