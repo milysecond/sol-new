@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
     const net = network === "devnet" ? "devnet" : "mainnet";
-    const tok = token === "USDC" ? "USDC" : "SOL";
+    const tok = token === "USDC" || (typeof token === "string" && token.length > 10) ? token : "SOL";
     await saveClaimLink({ publicKey, sender, amountLamports: lamports, network: net, token: tok });
 
     after(async () => {
@@ -52,7 +52,8 @@ export async function POST(req: NextRequest) {
         fields: {
           sender,
           gift: publicKey,
-          amount: tok === "USDC" ? `$${(lamports / 1e6).toFixed(2)} USDC` : `${(lamports / 1e9).toFixed(4)} SOL`,
+          amount: String(lamports),
+          token: tok,
           network: net,
         },
       });
