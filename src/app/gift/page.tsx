@@ -33,6 +33,7 @@ import {
   formatTokenUi,
   type WalletToken,
 } from "@/lib/wallet-tokens";
+import { AmountUsdHint, TokenMetaRow } from "@/components/token-meta";
 
 type Status = "idle" | "auth" | "sending" | "confirming" | "done" | "error";
 
@@ -523,25 +524,21 @@ export default function GiftPage() {
                   type="button"
                   disabled={busy}
                   onClick={() => setPickerOpen(true)}
-                  className="w-full flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-3 text-left"
+                  className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-3 text-left"
                 >
-                  {selected?.icon ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={selected.icon} alt="" className="w-9 h-9 rounded-full" />
+                  {selected ? (
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <TokenMetaRow token={selected} dense />
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+                    </div>
                   ) : (
-                    <span className="w-9 h-9 rounded-full bg-amber-500/20 flex items-center justify-center text-xs font-bold">
-                      {(selected?.symbol || "◎").slice(0, 2)}
-                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Select token</span>
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                    </div>
                   )}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-sm">{selected?.symbol || "Select token"}</p>
-                    <p className="text-[11px] text-gray-500">
-                      {selected
-                        ? `${formatTokenUi(selected.uiAmount, selected.decimals)} available`
-                        : "—"}
-                    </p>
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
                 </button>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-white/30 font-mono text-sm">
@@ -558,6 +555,7 @@ export default function GiftPage() {
                     } pr-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/25 transition font-mono text-2xl disabled:opacity-50`}
                   />
                 </div>
+                <AmountUsdHint amount={amount} priceUsd={selected?.priceUsd} />
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex gap-1.5 flex-wrap">
                     {presets.map((preset) => (
@@ -686,25 +684,23 @@ export default function GiftPage() {
                     setAmount("");
                     setPickerOpen(false);
                   }}
-                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left hover:bg-black/5 dark:hover:bg-white/5 ${
+                  className={`w-full px-3 py-3 rounded-xl text-left hover:bg-black/5 dark:hover:bg-white/5 ${
                     selected?.mint === t.mint ? "bg-amber-500/10" : ""
                   }`}
                 >
-                  {t.icon ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={t.icon} alt="" className="w-9 h-9 rounded-full" />
-                  ) : (
-                    <span className="w-9 h-9 rounded-full bg-amber-500/20 flex items-center justify-center text-xs font-bold">
-                      {t.symbol.slice(0, 2)}
-                    </span>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-sm">{t.symbol}</p>
-                    <p className="text-xs text-gray-500 truncate">{t.name}</p>
-                  </div>
-                  <p className="font-mono text-xs tabular-nums">
-                    {formatTokenUi(t.uiAmount, t.decimals)}
-                  </p>
+                  <TokenMetaRow
+                    token={t}
+                    right={
+                      <span className="font-mono text-xs tabular-nums text-right shrink-0">
+                        {formatTokenUi(t.uiAmount, t.decimals)}
+                        {t.valueUsd != null && t.valueUsd >= 0.01 && (
+                          <span className="block text-[10px] text-gray-400">
+                            ${t.valueUsd.toFixed(2)}
+                          </span>
+                        )}
+                      </span>
+                    }
+                  />
                 </button>
               ))}
               {holdings.length === 0 && (
