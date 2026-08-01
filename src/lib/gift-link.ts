@@ -362,6 +362,8 @@ export interface GiftLinkEntry {
   amount: number;
   token?: GiftToken;
   symbol?: string;
+  /** @deprecated use symbol */
+  tokenSymbol?: string;
   decimals?: number;
   network: Network;
   createdAt: string;
