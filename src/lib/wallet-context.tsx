@@ -7,6 +7,7 @@ import {
   createPasskeyWallet,
   recoverPasskeyWallet,
   identifyPasskeyWallet,
+  signalPasskeyUserDetails,
 } from "./passkey-wallet";
 import { useNetwork } from "./network";
 import { analytics } from "./analytics";
@@ -16,6 +17,8 @@ export interface WalletEntry {
   pubkey: string;
   credentialId: string;
   label: string;
+  /** WebAuthn user handle (base64) — enables renaming the passkey in browser settings */
+  userId?: string;
 }
 
 export type WalletBalances = Record<string, { sol: number; usdc: number }>;
@@ -95,6 +98,7 @@ function upsertWallet(entry: WalletEntry): WalletEntry[] {
       ...entry,
       label: entry.label || wallets[idx].label,
       credentialId: entry.credentialId || wallets[idx].credentialId,
+      userId: entry.userId || wallets[idx].userId,
     };
   } else wallets.push(entry);
   saveWallets(wallets);
@@ -213,6 +217,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         pubkey: result.publicKey,
         credentialId: result.credentialId,
         label,
+        userId: result.userId,
       });
       fetch("/api/wallet", {
         method: "POST",
@@ -311,6 +316,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     if (publicKey === pubkey) {
       setWalletLabel(trimmed);
       localStorage.setItem("sol.new.walletLabel", trimmed);
+    }
+    // Push name into browser passkey manager when we have userId (Chrome)
+    const entry = list[idx];
+    if (entry.userId) {
+      const short = `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`;
+      void signalPasskeyUserDetails({
+        userId: entry.userId,
+        name: `${trimmed} · ${short}`,
+        displayName: `${trimmed} · ${short}`,
+      });
     }
   };
 
