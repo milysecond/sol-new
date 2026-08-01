@@ -703,7 +703,7 @@ export async function saveClaimLink(data: {
 
 export async function getClaimLink(publicKey: string) {
   const r = await db.execute({
-    sql: "SELECT public_key, sender, amount_lamports, network, status, claimed_at, created_at FROM claim_links WHERE public_key = ? LIMIT 1",
+    sql: "SELECT public_key, sender, amount_lamports, network, token, status, claimed_at, created_at FROM claim_links WHERE public_key = ? LIMIT 1",
     args: [publicKey],
   });
   return r.rows[0] ?? null;

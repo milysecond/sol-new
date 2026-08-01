@@ -14,11 +14,8 @@ import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import {
   CLAIM_FEE_LAMPORTS,
   USDC_GIFT_FUND_LAMPORTS,
-  createGiftKeypair,
   keypairFromSecret,
   parseGiftSecret,
-  buildGiftUrl,
-  buildUsdcGiftInstructions,
   sweepGift,
   loadGiftLinks,
   saveGiftLink,
@@ -27,7 +24,7 @@ import {
   type GiftToken,
 } from "@/lib/gift-link";
 import { analytics } from "@/lib/analytics";
-import { Connection, PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Connection, PublicKey, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import QRCode from "qrcode";
 
 type Status = "idle" | "auth" | "sending" | "confirming" | "done" | "error";
@@ -135,15 +132,13 @@ export default function GiftPage() {
       if (isNaN(parsed) || parsed <= 0) throw new Error("Enter an amount");
 
       const balanceLamports = balance ? balance * LAMPORTS_PER_SOL : 0;
-      let amountBase: number;
 
       if (token === "SOL") {
-        amountBase = Math.round(parsed * LAMPORTS_PER_SOL);
+        const amountBase = Math.round(parsed * LAMPORTS_PER_SOL);
         if (amountBase + CLAIM_FEE_LAMPORTS * 2 > balanceLamports) {
           throw new Error(`Not enough SOL. You have ${balance?.toFixed(4) ?? 0} SOL`);
         }
       } else {
-        amountBase = Math.round(parsed * 1e6);
         if ((usdcBalance ?? 0) < parsed) {
           throw new Error(`Not enough USDC. You have $${(usdcBalance ?? 0).toFixed(2)}`);
         }
@@ -161,37 +156,54 @@ export default function GiftPage() {
       }
 
       setStatus("sending");
-      const { keypair: gift, secret } = createGiftKeypair();
-      const connection = new Connection(rpc, "confirmed");
-      const senderPk = new PublicKey(publicKey);
-
-      const tx = new Transaction();
-      if (token === "SOL") {
-        tx.add(
-          SystemProgram.transfer({
-            fromPubkey: senderPk,
-            toPubkey: gift.publicKey,
-            lamports: amountBase + CLAIM_FEE_LAMPORTS,
-          })
-        );
-      } else {
-        tx.add(...buildUsdcGiftInstructions(senderPk, gift.publicKey, amountBase, network));
+      const createRes = await fetch("/api/gift/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet: publicKey,
+          amount: parsed,
+          token,
+          network,
+          message: message || undefined,
+        }),
+      });
+      const created = (await createRes.json()) as {
+        ok?: boolean;
+        error?: string;
+        transaction?: string;
+        giftPubkey?: string;
+        claimUrl?: string;
+        amountLamports?: number;
+        blockhash?: string;
+        lastValidBlockHeight?: number;
+        register?: { body: Record<string, unknown> };
+      };
+      if (!createRes.ok || !created.transaction || !created.claimUrl || !created.giftPubkey) {
+        throw new Error(created.error || "Could not build gift");
       }
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = senderPk;
-      tx.sign(sender);
 
+      const connection = new Connection(rpc, "confirmed");
+      const tx = Transaction.from(Buffer.from(created.transaction, "base64"));
+      tx.partialSign(sender);
       const signature = await connection.sendRawTransaction(tx.serialize(), {
         skipPreflight: false,
         maxRetries: 3,
       });
       setStatus("confirming");
-      await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
+      const bh = created.blockhash;
+      const lv = created.lastValidBlockHeight;
+      if (bh && lv != null) {
+        await connection.confirmTransaction(
+          { signature, blockhash: bh, lastValidBlockHeight: lv },
+          "confirmed"
+        );
+      } else {
+        await connection.confirmTransaction(signature, "confirmed");
+      }
 
-      const url = buildGiftUrl(secret, network, message);
+      const url = created.claimUrl;
       const entry: GiftLinkEntry = {
-        pubkey: gift.publicKey.toBase58(),
+        pubkey: created.giftPubkey,
         url,
         amount: parsed,
         token,
@@ -203,13 +215,15 @@ export default function GiftPage() {
       fetch("/api/gift", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          publicKey: entry.pubkey,
-          sender: publicKey,
-          amountLamports: amountBase,
-          network,
-          token,
-        }),
+        body: JSON.stringify(
+          created.register?.body || {
+            publicKey: entry.pubkey,
+            sender: publicKey,
+            amountLamports: created.amountLamports,
+            network,
+            token,
+          }
+        ),
       }).catch(() => {});
       analytics.giftLinkCreated(parsed);
 

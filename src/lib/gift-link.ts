@@ -51,17 +51,30 @@ export function keypairFromSecret(secret: string): Keypair | null {
 
 // ─── URL codec ────────────────────────────────────────────────────────────────
 
-export function buildGiftUrl(secret: string, network: Network, message?: string): string {
+export function buildGiftUrl(
+  secret: string,
+  network: Network,
+  message?: string,
+  origin = "https://sol.new"
+): string {
   const params = new URLSearchParams();
   if (network === "devnet") params.set("n", "d");
   if (message?.trim()) params.set("m", message.trim().slice(0, 80));
   const qs = params.toString();
-  return `${window.location.origin}/claim${qs ? `?${qs}` : ""}#${secret}`;
+  const base = origin.replace(/\/$/, "");
+  return `${base}/claim${qs ? `?${qs}` : ""}#${secret}`;
 }
 
 export function parseGiftSecret(hash: string): string | null {
   const secret = hash.replace(/^#/, "").trim();
   return secret.length > 0 ? secret : null;
+}
+
+/** Parse UI amount → base units (lamports or USDC 6dp). */
+export function giftAmountToBase(amountUi: number, token: GiftToken): number {
+  if (!Number.isFinite(amountUi) || amountUi <= 0) return 0;
+  if (token === "USDC") return Math.round(amountUi * 1e6);
+  return Math.round(amountUi * 1e9);
 }
 
 // ─── Gift contents ────────────────────────────────────────────────────────────
@@ -87,9 +100,23 @@ export async function inspectGift(
   return { lamports, usdcBase };
 }
 
-// ─── Funding (USDC) ──────────────────────────────────────────────────────────
-// SOL gifts are a plain transfer built inline by the send page; USDC gifts
-// need a token account for the gift wallet plus a SOL float for claim costs.
+// ─── Funding ──────────────────────────────────────────────────────────────────
+// SOL: transfer gift amount + claim fee reserve.
+// USDC: ATA + transfer + SOL float for claim costs.
+
+export function buildSolGiftInstructions(
+  sender: PublicKey,
+  giftPubkey: PublicKey,
+  amountLamports: number
+): TransactionInstruction[] {
+  return [
+    SystemProgram.transfer({
+      fromPubkey: sender,
+      toPubkey: giftPubkey,
+      lamports: amountLamports + CLAIM_FEE_LAMPORTS,
+    }),
+  ];
+}
 
 export function buildUsdcGiftInstructions(
   sender: PublicKey,
@@ -102,9 +129,36 @@ export function buildUsdcGiftInstructions(
   const giftAta = getAssociatedTokenAddressSync(mint, giftPubkey, false, TOKEN_PROGRAM_ID);
   return [
     createAssociatedTokenAccountIdempotentInstruction(sender, giftAta, giftPubkey, mint, TOKEN_PROGRAM_ID),
-    createTransferCheckedInstruction(senderAta, mint, giftAta, sender, amountBase, USDC_DECIMALS, [], TOKEN_PROGRAM_ID),
-    SystemProgram.transfer({ fromPubkey: sender, toPubkey: giftPubkey, lamports: USDC_GIFT_FUND_LAMPORTS }),
+    createTransferCheckedInstruction(
+      senderAta,
+      mint,
+      giftAta,
+      sender,
+      amountBase,
+      USDC_DECIMALS,
+      [],
+      TOKEN_PROGRAM_ID
+    ),
+    SystemProgram.transfer({
+      fromPubkey: sender,
+      toPubkey: giftPubkey,
+      lamports: USDC_GIFT_FUND_LAMPORTS,
+    }),
   ];
+}
+
+/** Build unsigned funding tx (no recentBlockhash — set by caller / API). */
+export function buildGiftFundingInstructions(
+  sender: PublicKey,
+  giftPubkey: PublicKey,
+  amountBase: number,
+  token: GiftToken,
+  network: Network
+): TransactionInstruction[] {
+  if (token === "USDC") {
+    return buildUsdcGiftInstructions(sender, giftPubkey, amountBase, network);
+  }
+  return buildSolGiftInstructions(sender, giftPubkey, amountBase);
 }
 
 // ─── Claim / reclaim sweep ────────────────────────────────────────────────────
