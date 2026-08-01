@@ -4,10 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Connection,
   PublicKey,
-  Keypair,
   StakeProgram,
-  Authorized,
-  Lockup,
   LAMPORTS_PER_SOL,
   Transaction,
 } from "@solana/web3.js";
@@ -18,8 +15,10 @@ import { PageTransition } from "@/components/page-transition";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { getPasskeyKeypair } from "@/lib/passkey-wallet";
-import { friendlyError } from "@/lib/friendly-errors";
+import {
+  getPasskeyKeypair,
+  signVersionedAndSend,
+} from "@/lib/passkey-wallet";
 import {
   DEFAULT_VOTE,
   MIN_STAKE_SOL,
@@ -37,22 +36,14 @@ type StakeRow = {
   deactivationEpoch: string | null;
 };
 
-function simErrorMessage(err: unknown, logs?: string[] | null): string {
-  const tail = logs?.filter(Boolean).slice(-6).join(" · ") || "";
-  const e =
-    typeof err === "string"
-      ? err
-      : err && typeof err === "object"
-        ? JSON.stringify(err)
-        : String(err);
-  if (/insufficient|0x1\b/i.test(e + tail)) {
-    return "Not enough SOL for stake + rent + fees. Try a smaller amount or Max.";
+function errText(e: unknown): string {
+  if (e instanceof Error && e.message) return e.message;
+  if (typeof e === "string") return e;
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return "Unknown error";
   }
-  if (/blockhash/i.test(e + tail)) {
-    return "Network was slow — try again.";
-  }
-  if (tail) return `Stake failed: ${tail.slice(0, 220)}`;
-  return `Stake failed: ${e.slice(0, 180)}`;
 }
 
 export default function StakePage() {
@@ -66,6 +57,15 @@ export default function StakePage() {
   const [stakes, setStakes] = useState<StakeRow[]>([]);
   const [loadingStakes, setLoadingStakes] = useState(false);
   const [rentLamports, setRentLamports] = useState(STAKE_RENT_LAMPORTS);
+  const [sponsored, setSponsored] = useState(false);
+  const [liveBal, setLiveBal] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/api/stake/build", { cache: "no-store" })
+      .then((r) => r.json() as Promise<{ sponsored?: boolean }>)
+      .then((d) => setSponsored(!!d.sponsored))
+      .catch(() => setSponsored(false));
+  }, []);
 
   useEffect(() => {
     const connection = new Connection(rpc, "confirmed");
@@ -74,6 +74,18 @@ export default function StakePage() {
       .then((r) => setRentLamports(r))
       .catch(() => setRentLamports(STAKE_RENT_LAMPORTS));
   }, [rpc]);
+
+  useEffect(() => {
+    if (!publicKey) {
+      setLiveBal(null);
+      return;
+    }
+    const connection = new Connection(rpc, "confirmed");
+    connection
+      .getBalance(new PublicKey(publicKey), "confirmed")
+      .then((l) => setLiveBal(l / LAMPORTS_PER_SOL))
+      .catch(() => setLiveBal(balance));
+  }, [publicKey, rpc, balance]);
 
   const loadStakes = useCallback(async () => {
     if (!publicKey) {
@@ -84,7 +96,6 @@ export default function StakePage() {
     try {
       const connection = new Connection(rpc, "confirmed");
       const owner = new PublicKey(publicKey);
-      // Staker authority offset 12 in StakeStateV2 meta.authorized.staker
       const accounts = await connection.getParsedProgramAccounts(StakeProgram.programId, {
         commitment: "confirmed",
         filters: [
@@ -130,39 +141,6 @@ export default function StakePage() {
     void loadStakes();
   }, [loadStakes]);
 
-  const sendTx = async (tx: Transaction, extraSigners: Keypair[] = []) => {
-    if (!publicKey) throw new Error("Connect wallet first");
-    const { keypair } = await getPasskeyKeypair(publicKey);
-    if (keypair.publicKey.toBase58() !== publicKey) {
-      throw new Error(
-        "Passkey does not match connected wallet. Open Find wallet and pick the right one."
-      );
-    }
-    const connection = new Connection(rpc, "confirmed");
-    const { blockhash, lastValidBlockHeight } =
-      await connection.getLatestBlockhash("confirmed");
-    tx.recentBlockhash = blockhash;
-    tx.feePayer = keypair.publicKey;
-    // Fresh Transaction — sign fee payer + any stake account keys
-    tx.sign(keypair, ...extraSigners);
-
-    const sim = await connection.simulateTransaction(tx);
-    if (sim.value.err) {
-      console.error("[stake] sim", sim.value.err, sim.value.logs);
-      throw new Error(simErrorMessage(sim.value.err, sim.value.logs));
-    }
-
-    const signature = await connection.sendRawTransaction(tx.serialize(), {
-      skipPreflight: true, // already simulated
-      maxRetries: 3,
-    });
-    await connection.confirmTransaction(
-      { signature, blockhash, lastValidBlockHeight },
-      "confirmed"
-    );
-    return signature;
-  };
-
   const handleStake = async () => {
     if (!publicKey) return;
     if (network !== "mainnet") {
@@ -177,53 +155,100 @@ export default function StakePage() {
       if (!Number.isFinite(sol) || sol < MIN_STAKE_SOL) {
         throw new Error(`Minimum stake is ${MIN_STAKE_SOL} SOL`);
       }
-      const stakeLamports = Math.round(sol * LAMPORTS_PER_SOL);
-      const connection = new Connection(rpc, "confirmed");
-      let rent = rentLamports;
-      try {
-        rent = await connection.getMinimumBalanceForRentExemption(StakeProgram.space);
-        setRentLamports(rent);
-      } catch {
-        /* use cached */
-      }
 
-      const totalNeeded = stakeLamports + rent + STAKE_FEE_BUFFER_LAMPORTS;
-      const balLamports = Math.round((balance ?? 0) * LAMPORTS_PER_SOL);
-      if (totalNeeded > balLamports) {
-        throw new Error(
-          `Not enough SOL. Need ~${(totalNeeded / LAMPORTS_PER_SOL).toFixed(4)} SOL (stake + rent ${((rent) / LAMPORTS_PER_SOL).toFixed(4)} + fees).`
+      // Unique seed for createWithSeed (alnum, ≤32)
+      const seed = `sn${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.slice(
+        0,
+        32
+      );
+
+      const bRes = await fetch("/api/stake/build", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet: publicKey,
+          amountSol: sol,
+          vote,
+          seed,
+        }),
+      });
+      const bData = (await bRes.json()) as {
+        ok?: boolean;
+        error?: string;
+        tx?: string;
+        sponsored?: boolean;
+        rentLamports?: number;
+      };
+      if (!bRes.ok || !bData.tx) {
+        throw new Error(bData.error || "Could not build stake transaction");
+      }
+      if (bData.rentLamports) setRentLamports(bData.rentLamports);
+
+      // Single Face ID at send time
+      let signature: string;
+      if (bData.sponsored) {
+        signature = await signVersionedAndSend(bData.tx, rpc, publicKey);
+      } else {
+        const { keypair } = await getPasskeyKeypair(publicKey);
+        const tx = Transaction.from(Buffer.from(bData.tx, "base64"));
+        const connection = new Connection(rpc, "confirmed");
+        const { blockhash, lastValidBlockHeight } =
+          await connection.getLatestBlockhash("confirmed");
+        tx.recentBlockhash = blockhash;
+        tx.feePayer = keypair.publicKey;
+        tx.sign(keypair);
+        signature = await connection.sendRawTransaction(tx.serialize(), {
+          skipPreflight: false,
+          maxRetries: 3,
+        });
+        await connection.confirmTransaction(
+          { signature, blockhash, lastValidBlockHeight },
+          "confirmed"
         );
       }
 
-      const from = new PublicKey(publicKey);
-      const votePubkey = new PublicKey(vote);
-
-      // New stake account keypair (standard path — avoids createWithSeed base/seed quirks)
-      const stakeAccount = Keypair.generate();
-      const createIx = StakeProgram.createAccount({
-        fromPubkey: from,
-        stakePubkey: stakeAccount.publicKey,
-        authorized: new Authorized(from, from),
-        lockup: new Lockup(0, 0, PublicKey.default),
-        lamports: stakeLamports + rent,
-      });
-      const delegateIx = StakeProgram.delegate({
-        stakePubkey: stakeAccount.publicKey,
-        authorizedPubkey: from,
-        votePubkey,
-      });
-
-      const tx = new Transaction().add(...createIx.instructions, ...delegateIx.instructions);
-      const signature = await sendTx(tx, [stakeAccount]);
       setSig(signature);
       await refreshBalance();
       await loadStakes();
     } catch (e) {
       console.error("[stake]", e);
-      setError(friendlyError(e, "Couldn't stake. Try again."));
+      const msg = errText(e);
+      // Passkey focus
+      if (/not focused|notallowed|cancelled|aborted/i.test(msg)) {
+        setError("Face ID cancelled or page lost focus — tap Stake SOL again.");
+      } else if (/insufficient|not enough sol/i.test(msg)) {
+        setError(msg);
+      } else {
+        // Always surface real cause (was getting swallowed)
+        setError(msg.length > 280 ? `${msg.slice(0, 280)}…` : msg);
+      }
     } finally {
       setBusy(false);
     }
+  };
+
+  const sendAuthTx = async (build: () => Transaction) => {
+    if (!publicKey) throw new Error("Connect wallet first");
+    const { keypair } = await getPasskeyKeypair(publicKey);
+    if (keypair.publicKey.toBase58() !== publicKey) {
+      throw new Error("Passkey does not match connected wallet.");
+    }
+    const connection = new Connection(rpc, "confirmed");
+    const tx = build();
+    const { blockhash, lastValidBlockHeight } =
+      await connection.getLatestBlockhash("confirmed");
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = keypair.publicKey;
+    tx.sign(keypair);
+    const signature = await connection.sendRawTransaction(tx.serialize(), {
+      skipPreflight: false,
+      maxRetries: 3,
+    });
+    await connection.confirmTransaction(
+      { signature, blockhash, lastValidBlockHeight },
+      "confirmed"
+    );
+    return signature;
   };
 
   const handleDeactivate = async (stakeAddress: string) => {
@@ -234,16 +259,17 @@ export default function StakePage() {
     try {
       const from = new PublicKey(publicKey);
       const stakePubkey = new PublicKey(stakeAddress);
-      const deact = StakeProgram.deactivate({
-        stakePubkey,
-        authorizedPubkey: from,
+      const signature = await sendAuthTx(() => {
+        const deact = StakeProgram.deactivate({
+          stakePubkey,
+          authorizedPubkey: from,
+        });
+        return new Transaction().add(...deact.instructions);
       });
-      const tx = new Transaction().add(...deact.instructions);
-      const signature = await sendTx(tx);
       setSig(signature);
       await loadStakes();
     } catch (e) {
-      setError(friendlyError(e, "Couldn't deactivate stake."));
+      setError(errText(e));
     } finally {
       setBusy(false);
     }
@@ -257,26 +283,29 @@ export default function StakePage() {
     try {
       const from = new PublicKey(publicKey);
       const stakePubkey = new PublicKey(stakeAddress);
-      const wd = StakeProgram.withdraw({
-        stakePubkey,
-        authorizedPubkey: from,
-        toPubkey: from,
-        lamports,
+      const signature = await sendAuthTx(() => {
+        const wd = StakeProgram.withdraw({
+          stakePubkey,
+          authorizedPubkey: from,
+          toPubkey: from,
+          lamports,
+        });
+        return new Transaction().add(...wd.instructions);
       });
-      const tx = new Transaction().add(...wd.instructions);
-      const signature = await sendTx(tx);
       setSig(signature);
       await refreshBalance();
       await loadStakes();
     } catch (e) {
-      setError(friendlyError(e, "Couldn't withdraw stake."));
+      setError(errText(e));
     } finally {
       setBusy(false);
     }
   };
 
+  const balShown = liveBal ?? balance ?? 0;
   const maxStake = () => {
-    const bal = Math.round((balance ?? 0) * LAMPORTS_PER_SOL);
+    const bal = Math.round(balShown * LAMPORTS_PER_SOL);
+    // When sponsored, still need stake+rent from user
     const sendable = Math.max(0, bal - rentLamports - STAKE_FEE_BUFFER_LAMPORTS);
     if (sendable < MIN_STAKE_SOL * LAMPORTS_PER_SOL) {
       setError("Not enough SOL to stake after rent and fees.");
@@ -288,10 +317,8 @@ export default function StakePage() {
 
   const neverDeactivated = (s: StakeRow) =>
     !s.deactivationEpoch || s.deactivationEpoch === "18446744073709551615";
-
   const canWithdraw = (s: StakeRow) =>
     s.state === "inactive" || s.state === "initialized";
-
   const canDeactivate = (s: StakeRow) =>
     (s.state === "active" || s.state === "activating" || s.state === "delegated") &&
     neverDeactivated(s);
@@ -321,6 +348,11 @@ export default function StakePage() {
                     /lst
                   </a>
                 </p>
+                {sponsored && (
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                    Network fee paid by sol.new
+                  </p>
+                )}
               </div>
 
               <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-4 space-y-3">
@@ -348,7 +380,7 @@ export default function StakePage() {
                     </button>
                   </div>
                   <p className="text-[11px] text-gray-400 mt-1">
-                    Balance: {(balance ?? 0).toFixed(4)} SOL · min {MIN_STAKE_SOL} SOL · +
+                    Balance: {balShown.toFixed(4)} SOL · min {MIN_STAKE_SOL} · +
                     {(rentLamports / LAMPORTS_PER_SOL).toFixed(4)} rent
                   </p>
                 </div>
@@ -463,7 +495,7 @@ export default function StakePage() {
               )}
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-red-400 text-xs">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-red-400 text-xs whitespace-pre-wrap break-words">
                   {error}
                 </div>
               )}
