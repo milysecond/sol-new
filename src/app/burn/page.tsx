@@ -111,7 +111,7 @@ export default function BurnPage() {
     setError(null);
     setDoneSigs([]);
     try {
-      const { keypair } = await getPasskeyKeypair();
+      const { keypair } = await getPasskeyKeypair(publicKey);
       const connection = new Connection(rpc, "confirmed");
       const owner = new PublicKey(publicKey);
       const sigs: string[] = [];

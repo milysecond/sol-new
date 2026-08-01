@@ -153,7 +153,7 @@ export default function SendPage() {
       }
 
       setStatus("sending");
-      const { keypair: userKeypair } = await getPasskeyKeypair();
+      const { keypair: userKeypair } = await getPasskeyKeypair(publicKey);
       const connection = new Connection(rpc, "confirmed");
       const from = new PublicKey(publicKey);
       const tx = new Transaction();

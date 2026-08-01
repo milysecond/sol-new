@@ -169,10 +169,7 @@ export default function LstPage() {
       if (!oRes.ok) throw new Error(order.error || "Quote failed");
       if (!order.tx) throw new Error("No transaction returned. Try again.");
 
-      const { keypair } = await getPasskeyKeypair();
-      if (keypair.publicKey.toBase58() !== publicKey) {
-        throw new Error("Passkey does not match connected wallet.");
-      }
+      const { keypair } = await getPasskeyKeypair(publicKey);
       const signedTx = await signOrderTx(order.tx, keypair);
 
       const eRes = await fetch("/api/lst/execute", {

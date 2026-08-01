@@ -485,7 +485,7 @@ export default function LoanPage() {
     setError(null);
     setSig(null);
     try {
-      const { keypair } = await getPasskeyKeypair();
+      const { keypair } = await getPasskeyKeypair(publicKey);
       if (keypair.publicKey.toBase58() !== publicKey) {
         throw new Error("Passkey does not match connected wallet");
       }
@@ -609,7 +609,7 @@ export default function LoanPage() {
     setError(null);
     setSig(null);
     try {
-      const { keypair } = await getPasskeyKeypair();
+      const { keypair } = await getPasskeyKeypair(publicKey);
       if (keypair.publicKey.toBase58() !== publicKey) {
         throw new Error("Passkey does not match connected wallet");
       }

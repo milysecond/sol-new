@@ -186,7 +186,7 @@ function LinkPageInner() {
         setStatusLabel("Paying for custom code…");
         const { getPasskeyKeypair } = await import("@/lib/passkey-wallet");
         const { Connection, PublicKey, SystemProgram, Transaction } = await import("@solana/web3.js");
-        const { keypair } = await getPasskeyKeypair();
+        const { keypair } = await getPasskeyKeypair(publicKey);
         if (keypair.publicKey.toBase58() !== publicKey) {
           throw new Error("Passkey does not match the connected wallet.");
         }
