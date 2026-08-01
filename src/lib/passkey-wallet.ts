@@ -73,15 +73,23 @@ async function sha256(data: Uint8Array): Promise<Uint8Array> {
 export async function createPasskeyWallet(username: string): Promise<{
   publicKey: string;
   credentialId: string;
+  userId: string;
 }> {
+  ensureDocumentFocusForPasskey();
+  const label = (username || "sol.new user").trim().slice(0, 64);
+  // Stable random user handle — needed later to rename the passkey in the browser via Signal API
+  const userIdBytes = crypto.getRandomValues(new Uint8Array(32));
+  const userId = btoa(String.fromCharCode(...userIdBytes));
+
   const credential = (await navigator.credentials.create({
     publicKey: {
       challenge: CHALLENGE,
       rp: { name: "sol.new", id: window.location.hostname },
       user: {
-        id: crypto.getRandomValues(new Uint8Array(32)),
-        name: username || "sol.new user",
-        displayName: username || "sol.new user",
+        id: userIdBytes,
+        // Browser passkey list shows name + displayName (Chrome/Safari settings)
+        name: `${label}@sol.new`,
+        displayName: label,
       },
       pubKeyCredParams: [
         { alg: -7, type: "public-key" },
@@ -93,7 +101,6 @@ export async function createPasskeyWallet(username: string): Promise<{
         userVerification: "required",
       },
       extensions: {
-        
         prf: {
           eval: {
             first: CHALLENGE,
@@ -105,7 +112,6 @@ export async function createPasskeyWallet(username: string): Promise<{
 
   if (!credential) throw new Error("Passkey creation cancelled");
 
-  
   const prfResult = credential.getClientExtensionResults()?.prf?.results?.first;
 
   let seed: Uint8Array;
@@ -117,12 +123,51 @@ export async function createPasskeyWallet(username: string): Promise<{
   }
 
   const keypair = Keypair.fromSeed(seed.slice(0, 32));
+  const publicKey = keypair.publicKey.toBase58();
   const credentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+  const short = `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`;
+
+  // Best-effort: put address into the browser passkey name (Chrome Signal API)
+  await signalPasskeyUserDetails({
+    userId,
+    name: `${label} · ${short}`,
+    displayName: `${label} · ${short}`,
+  });
 
   return {
-    publicKey: keypair.publicKey.toBase58(),
+    publicKey,
     credentialId,
+    userId,
   };
+}
+
+/** Update browser passkey account name when supported (Chrome). */
+export async function signalPasskeyUserDetails(opts: {
+  userId: string;
+  name: string;
+  displayName: string;
+}): Promise<boolean> {
+  try {
+    const PK = PublicKeyCredential as unknown as {
+      signalCurrentUserDetails?: (o: {
+        rpId: string;
+        userId: BufferSource;
+        name: string;
+        displayName: string;
+      }) => Promise<void>;
+    };
+    if (typeof PK.signalCurrentUserDetails !== "function") return false;
+    const raw = Uint8Array.from(atob(opts.userId), (c) => c.charCodeAt(0));
+    await PK.signalCurrentUserDetails({
+      rpId: window.location.hostname,
+      userId: raw,
+      name: opts.name.slice(0, 64),
+      displayName: opts.displayName.slice(0, 64),
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function recoverPasskeyWallet(opts?: {

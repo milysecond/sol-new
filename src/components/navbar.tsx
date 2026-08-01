@@ -280,10 +280,22 @@ export function Navbar() {
                     <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
                     <div className="absolute right-0 top-full mt-2 z-50 bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-xl overflow-hidden min-w-[220px] max-w-[min(100vw-1.5rem,320px)] shadow-lg">
                       <div className="px-4 py-3 border-b border-black/10 dark:border-white/10">
-                        {walletLabel && (
-                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                            {walletLabel}
-                          </p>
+                        {publicKey && (
+                          <input
+                            key={walletLabel || publicKey}
+                            defaultValue={walletLabel || ""}
+                            placeholder="Name this wallet"
+                            onBlur={(e) => {
+                              const v = e.target.value.trim();
+                              if (v && v !== walletLabel) renameWallet(publicKey, v);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                (e.target as HTMLInputElement).blur();
+                              }
+                            }}
+                            className="w-full text-sm font-semibold text-gray-900 dark:text-white bg-transparent outline-none border-b border-transparent focus:border-purple-400/50 placeholder:text-gray-400 placeholder:font-normal mb-1"
+                          />
                         )}
                         <p className="text-xs font-mono text-gray-500 dark:text-white/40 break-all mt-0.5">
                           {publicKey}
@@ -297,6 +309,9 @@ export function Navbar() {
                             <Spinner size={12} /> fetching…
                           </p>
                         )}
+                        <p className="text-[10px] text-gray-400 mt-1.5">
+                          Tab title shows this name · rename above
+                        </p>
                       </div>
                       <Link
                         href="/wallet"
