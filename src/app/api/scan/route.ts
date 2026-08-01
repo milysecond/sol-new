@@ -246,8 +246,43 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Wallet: tell the client to call /api/track
-    return NextResponse.json({ type: "wallet", address });
+    // Wallet: native SOL + USDC balance on first paint; client may enrich via /api/track
+    const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    let sol = 0;
+    let usdc: number | null = null;
+    try {
+      const bal = await rpc<{ value: number }>("getBalance", [address]);
+      sol = (bal?.value ?? 0) / 1e9;
+    } catch {
+      /* leave 0 */
+    }
+    try {
+      // ATA for USDC (allow owner off-curve false)
+      const { PublicKey } = await import("@solana/web3.js");
+      const { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } = await import("@solana/spl-token");
+      const owner = new PublicKey(address);
+      const ata = getAssociatedTokenAddressSync(new PublicKey(USDC), owner, true, TOKEN_PROGRAM_ID);
+      const tb = await rpc<{ value?: { uiAmount?: number | null; uiAmountString?: string } }>(
+        "getTokenAccountBalance",
+        [ata.toBase58()]
+      );
+      const ui = tb?.value?.uiAmount;
+      usdc = typeof ui === "number" ? ui : tb?.value?.uiAmountString != null ? Number(tb.value.uiAmountString) : 0;
+      if (!Number.isFinite(usdc)) usdc = 0;
+    } catch {
+      usdc = 0;
+    }
+
+    return NextResponse.json(
+      {
+        type: "wallet",
+        address,
+        sol,
+        usdc,
+        balances: { sol, usdc },
+      },
+      { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } }
+    );
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }

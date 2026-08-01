@@ -448,117 +448,211 @@ function StatCard({ label, value, accent, sub }: { label: string; value: string;
   );
 }
 
-function WalletView({ address }: { address: string }) {
+function WalletView({
+  address,
+  sol: initialSol,
+  usdc: initialUsdc,
+}: {
+  address: string;
+  sol?: number;
+  usdc?: number | null;
+}) {
   const [data, setData] = useState<TrackData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sol, setSol] = useState<number | null>(initialSol ?? null);
+  const [usdc, setUsdc] = useState<number | null>(initialUsdc ?? null);
 
   useEffect(() => {
+    setSol(initialSol ?? null);
+    setUsdc(initialUsdc ?? null);
+  }, [address, initialSol, initialUsdc]);
+
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
+    setError(null);
+    // If scan didn't already give SOL, fetch quickly via RPC-backed track is slow — keep scan balances.
     fetch(`/api/track?wallet=${encodeURIComponent(address)}`)
       .then((r) => r.json())
       .then((d) => {
-        const td = d as TrackData & { error?: string };
+        if (cancelled) return;
+        const td = d as TrackData & { error?: string; sol?: number; usdc?: number };
         if (td.error) throw new Error(td.error);
         setData(td);
-        analytics.walletTracked(td.wallet, td.analyze?.total_net_worth_usd ?? 0, td.analyze?.active_protocols?.length ?? 0);
+        analytics.walletTracked(
+          td.wallet,
+          td.analyze?.total_net_worth_usd ?? 0,
+          td.analyze?.active_protocols?.length ?? 0
+        );
       })
-      .catch((e) => setError(e.message || "Failed to load wallet"))
-      .finally(() => setLoading(false));
+      .catch((e) => {
+        if (!cancelled) setError(e.message || "Failed to load wallet");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [address]);
 
-  if (loading) return <div className="text-center text-gray-400 dark:text-white/30 py-10">Analyzing wallet…</div>;
-  if (error) return <div className="text-center text-rose-500 py-6 text-sm">{error}</div>;
-  if (!data) return null;
-
-  const a = data.analyze;
-  const pnl = data.pnl;
+  const a = data?.analyze;
+  const pnl = data?.pnl;
   const netPnl = pnl?.total_pnl_usd;
+  const fmtSol = (n: number | null) =>
+    n == null ? "—" : `${n.toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL`;
+  const fmtUsdcBal = (n: number | null) =>
+    n == null ? "—" : `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <WalletIcon className="w-4 h-4 text-purple-500" />
-        <a href={`https://solscan.io/account/${address}`} target="_blank" rel="noopener noreferrer"
-          className="font-mono text-xs text-gray-500 dark:text-white/40 hover:text-purple-500 inline-flex items-center gap-1">
+        <a
+          href={`https://solscan.io/account/${address}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-xs text-gray-500 dark:text-white/40 hover:text-purple-500 inline-flex items-center gap-1"
+        >
           {short(address)} <ArrowUpRight className="w-3 h-3" />
         </a>
-        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-500/10 text-purple-500">Wallet</span>
-        {a.active_protocols.length > 0 && (
-          <span className="text-xs text-gray-400 dark:text-white/30 ml-auto">{a.active_protocols.length} active protocols</span>
+        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-500/10 text-purple-500">
+          Wallet
+        </span>
+        {a && a.active_protocols.length > 0 && (
+          <span className="text-xs text-gray-400 dark:text-white/30 ml-auto">
+            {a.active_protocols.length} active protocols
+          </span>
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatCard label="Net Worth" value={fmtUsd(a.total_net_worth_usd)} accent="purple" />
-        <StatCard label="Total PnL" value={fmtPnl(netPnl)}
+      {/* Balances on first paint */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard label="SOL" value={fmtSol(sol)} accent="purple" sub="Native balance" />
+        <StatCard label="USDC" value={fmtUsdcBal(usdc)} sub="Spot" />
+        <StatCard
+          label="Net Worth"
+          value={a ? fmtUsd(a.total_net_worth_usd) : loading ? "…" : "—"}
+          accent="purple"
+          sub={loading && !a ? "Loading portfolio…" : undefined}
+        />
+        <StatCard
+          label="Total PnL"
+          value={a ? fmtPnl(netPnl) : loading ? "…" : "—"}
           accent={netPnl == null ? undefined : netPnl >= 0 ? "green" : "red"}
-          sub={pnl ? `Unrealized ${fmtPnl(pnl.unrealized.pnl_usd)}` : undefined} />
-        <StatCard label="Realized (7d)" value={pnl ? fmtPnl(pnl.realized_7d.pnl_usd) : "—"}
-          accent={pnl == null ? undefined : pnl.realized_7d.pnl_usd >= 0 ? "green" : "red"} />
+          sub={pnl ? `Unrealized ${fmtPnl(pnl.unrealized.pnl_usd)}` : undefined}
+        />
       </div>
 
-      <div className="space-y-2">
-        {CATEGORY_META.map(({ key, label, icon: Icon, value, sub }) => {
-          const c = a.categories?.[key];
-          const v = value(c);
-          if (v == null || v === 0) return null;
-          const subText = sub?.(c);
-          const protocols: any[] = c?.protocols || [];
-          return (
-            <div key={key} className="flex items-center gap-3 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl px-4 py-3">
-              <div className="w-9 h-9 rounded-lg bg-purple-500/15 flex items-center justify-center shrink-0">
-                <Icon size={17} className="text-purple-500 dark:text-purple-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{label}</p>
-                {(subText || protocols.length > 0) && (
-                  <p className="text-xs text-gray-500 dark:text-white/40 truncate">
-                    {subText || protocols.map((p: any) => pretty(p.protocol)).join(", ")}
-                  </p>
-                )}
-              </div>
-              <p className="text-sm font-semibold tabular-nums">{fmtUsd(v)}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      {a.active_protocols.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {a.active_protocols.map((p: string) => (
-            <span key={p} className="text-[11px] px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/50">
-              {pretty(p)}
+      {error && !data && (
+        <div className="text-center text-rose-500 py-2 text-sm">
+          {error}
+          {(sol != null || usdc != null) && (
+            <span className="block text-xs text-gray-400 dark:text-white/30 mt-1">
+              Spot balances still shown above.
             </span>
-          ))}
+          )}
         </div>
       )}
 
-      {data.holdings && data.holdings.holdings.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-gray-500 dark:text-white/50 flex items-center gap-1.5">
-            <Coins size={14} /> Token Holdings · {fmtUsd(data.holdings.total_value_usd)}
-          </h2>
-          {data.holdings.holdings.slice(0, 25).map((h) => (
-            <div key={h.mint} className="flex items-center gap-3 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl px-4 py-2.5">
-              <div className="flex-1 min-w-0">
-                <a href={`https://solscan.io/token/${h.mint}`} target="_blank" className="text-sm font-medium hover:text-purple-500 dark:hover:text-purple-400">
-                  {h.symbol || `${h.mint.slice(0, 4)}…${h.mint.slice(-4)}`}
-                </a>
-                <p className="text-xs text-gray-500 dark:text-white/40 tabular-nums">
-                  {h.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })} @ {fmtUsd(h.price_usd)}
-                </p>
-              </div>
-              <p className="text-sm font-semibold tabular-nums">{fmtUsd(h.value_usd)}</p>
+      {loading && !data && (
+        <div className="flex items-center justify-center gap-2 py-4 text-gray-400 dark:text-white/30 text-sm">
+          <Loader2 className="w-4 h-4 animate-spin text-purple-500" />
+          Analyzing portfolio…
+        </div>
+      )}
+
+      {data && a && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <StatCard
+              label="Realized (7d)"
+              value={pnl ? fmtPnl(pnl.realized_7d.pnl_usd) : "—"}
+              accent={pnl == null ? undefined : pnl.realized_7d.pnl_usd >= 0 ? "green" : "red"}
+            />
+          </div>
+
+          <div className="space-y-2">
+            {CATEGORY_META.map(({ key, label, icon: Icon, value, sub }) => {
+              const c = a.categories?.[key];
+              const v = value(c);
+              if (v == null || v === 0) return null;
+              const subText = sub?.(c);
+              const protocols: any[] = c?.protocols || [];
+              return (
+                <div
+                  key={key}
+                  className="flex items-center gap-3 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl px-4 py-3"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-purple-500/15 flex items-center justify-center shrink-0">
+                    <Icon size={17} className="text-purple-500 dark:text-purple-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{label}</p>
+                    {(subText || protocols.length > 0) && (
+                      <p className="text-xs text-gray-500 dark:text-white/40 truncate">
+                        {subText || protocols.map((p: any) => pretty(p.protocol)).join(", ")}
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-sm font-semibold tabular-nums">{fmtUsd(v)}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          {a.active_protocols.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {a.active_protocols.map((p: string) => (
+                <span
+                  key={p}
+                  className="text-[11px] px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/50"
+                >
+                  {pretty(p)}
+                </span>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )}
 
-      {a.total_net_worth_usd === 0 && a.active_protocols.length === 0 && (
-        <div className="text-center text-gray-400 dark:text-white/30 py-6 text-sm">
-          No DeFi positions or tracked holdings found for this wallet.
-        </div>
+          {data.holdings && data.holdings.holdings.length > 0 && (
+            <div className="space-y-2">
+              <h2 className="text-sm font-semibold text-gray-500 dark:text-white/50 flex items-center gap-1.5">
+                <Coins size={14} /> Token Holdings · {fmtUsd(data.holdings.total_value_usd)}
+              </h2>
+              {data.holdings.holdings.slice(0, 25).map((h) => (
+                <div
+                  key={h.mint}
+                  className="flex items-center gap-3 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl px-4 py-2.5"
+                >
+                  <div className="flex-1 min-w-0">
+                    <a
+                      href={`https://solscan.io/token/${h.mint}`}
+                      target="_blank"
+                      className="text-sm font-medium hover:text-purple-500 dark:hover:text-purple-400"
+                    >
+                      {h.symbol || `${h.mint.slice(0, 4)}…${h.mint.slice(-4)}`}
+                    </a>
+                    <p className="text-xs text-gray-500 dark:text-white/40 tabular-nums">
+                      {h.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })} @{" "}
+                      {fmtUsd(h.price_usd)}
+                    </p>
+                  </div>
+                  <p className="text-sm font-semibold tabular-nums">{fmtUsd(h.value_usd)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {a.total_net_worth_usd === 0 &&
+            a.active_protocols.length === 0 &&
+            (sol == null || sol === 0) &&
+            (usdc == null || usdc === 0) && (
+              <div className="text-center text-gray-400 dark:text-white/30 py-6 text-sm">
+                No DeFi positions or tracked holdings found for this wallet.
+              </div>
+            )}
+        </>
       )}
     </div>
   );
@@ -569,7 +663,7 @@ function WalletView({ address }: { address: string }) {
 type ScanResult =
   | ({ type: "program" } & ProgramData)
   | ({ type: "token" } & TokenData)
-  | { type: "wallet"; address: string };
+  | { type: "wallet"; address: string; sol?: number; usdc?: number | null; balances?: { sol: number; usdc: number | null } };
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -687,7 +781,13 @@ function ScanInner() {
             <div className="bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-2xl p-4 sm:p-6">
               {result.type === "program" && <ProgramView data={result as ProgramData} />}
               {result.type === "token" && <TokenView data={result as TokenData} />}
-              {result.type === "wallet" && <WalletView address={result.address} />}
+              {result.type === "wallet" && (
+                <WalletView
+                  address={result.address}
+                  sol={result.sol ?? result.balances?.sol}
+                  usdc={result.usdc ?? result.balances?.usdc}
+                />
+              )}
             </div>
           )}
         </div>
