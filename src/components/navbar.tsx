@@ -124,6 +124,7 @@ export function Navbar() {
     recover,
     switchWallet,
     disconnect,
+    renameWallet,
     loading,
     airdropping,
     airdropDone,
