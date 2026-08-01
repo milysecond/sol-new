@@ -10,7 +10,7 @@ import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { PrivateSendSheet } from "@/components/private-send-sheet";
 import { SlideToSend } from "@/components/slide-to-send";
-import { useDefaultToken, type DefaultToken } from "@/lib/currency-pref";
+import { useDefaultToken } from "@/lib/currency-pref";
 import { resolveRecipient, looksLikeDomain } from "@/lib/resolve-name";
 import {
   Connection,
@@ -21,32 +21,40 @@ import {
 } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
   createTransferCheckedInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { usdcMint } from "@/lib/usdc";
 import { friendlyError } from "@/lib/friendly-errors";
+import {
+  fetchWalletTokens,
+  formatTokenAmount,
+  tokenLabel,
+  type WalletToken,
+} from "@/lib/wallet-tokens";
 
-type Tab = "transfer" | "token" | "nft";
+type Tab = "transfer" | "nft";
 
-/** Base fee for a 1-sig system transfer is 5_000 lamports; pad for prioritization. */
+/** Asset key: "SOL" or mint address */
+type AssetKey = string;
+
 const SOL_FEE_RESERVE_LAMPORTS = 10_000;
 
-/** Max SOL that can leave the wallet after reserving network fee (lamports → display string). */
 function maxSendableSol(balanceSol: number | null | undefined): string {
   const bal = Math.round((balanceSol ?? 0) * LAMPORTS_PER_SOL);
   const sendable = Math.max(0, bal - SOL_FEE_RESERVE_LAMPORTS);
   if (sendable <= 0) return "";
-  // Avoid floating noise; trim trailing zeros
-  const s = (sendable / LAMPORTS_PER_SOL).toFixed(9).replace(/\.?0+$/, "");
-  return s;
+  return (sendable / LAMPORTS_PER_SOL).toFixed(9).replace(/\.?0+$/, "");
 }
 
 export default function SendPage() {
   const [tab, setTab] = useState<Tab>("transfer");
   const [defaultToken] = useDefaultToken();
-  const [token, setToken] = useState<DefaultToken>("SOL");
+  const [asset, setAsset] = useState<AssetKey>("SOL");
+  const [tokens, setTokens] = useState<WalletToken[]>([]);
+  const [tokensLoading, setTokensLoading] = useState(false);
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState<"idle" | "auth" | "sending" | "confirming" | "done" | "error">("idle");
@@ -60,9 +68,44 @@ export default function SendPage() {
   const { publicKey, balance, usdcBalance, refreshBalance } = useWallet();
   const { network, rpc } = useNetwork();
 
+  const selectedToken = asset === "SOL" ? null : tokens.find((t) => t.mint === asset) || null;
+
+  const loadTokens = useCallback(async () => {
+    if (!publicKey) {
+      setTokens([]);
+      return;
+    }
+    setTokensLoading(true);
+    try {
+      const conn = new Connection(rpc, "confirmed");
+      const list = await fetchWalletTokens(conn, publicKey);
+      setTokens(list);
+    } catch {
+      setTokens([]);
+    } finally {
+      setTokensLoading(false);
+    }
+  }, [publicKey, rpc]);
+
   useEffect(() => {
-    setToken(defaultToken);
-  }, [defaultToken]);
+    void loadTokens();
+  }, [loadTokens]);
+
+  useEffect(() => {
+    if (defaultToken === "USDC") {
+      const mint = usdcMint(network).toBase58();
+      setAsset(mint);
+    } else {
+      setAsset("SOL");
+    }
+  }, [defaultToken, network]);
+
+  // If selected mint no longer held, fall back to SOL
+  useEffect(() => {
+    if (asset !== "SOL" && tokens.length && !tokens.some((t) => t.mint === asset)) {
+      setAsset("SOL");
+    }
+  }, [tokens, asset]);
 
   const runResolve = useCallback(async (value: string) => {
     const trimmed = value.trim();
@@ -72,31 +115,24 @@ export default function SendPage() {
       setResolving(false);
       return;
     }
-
-    // Short input: still typing
     if (trimmed.length < 3) {
       setResolved(null);
       setAddressValid(null);
       setResolving(false);
       return;
     }
-
     setResolving(true);
     const result = await resolveRecipient(trimmed);
     setResolving(false);
     if (result.ok) {
       setResolved({
         owner: result.owner,
-        label:
-          result.kind !== "pubkey"
-            ? result.domain || trimmed.toLowerCase()
-            : undefined,
+        label: result.kind !== "pubkey" ? result.domain || trimmed.toLowerCase() : undefined,
       });
       setAddressValid(true);
       setError(null);
     } else {
       setResolved(null);
-      // Only show invalid when it looks complete
       if (looksLikeDomain(trimmed) || trimmed.length >= 32) {
         setAddressValid(false);
         setError(result.error);
@@ -158,9 +194,8 @@ export default function SendPage() {
       const from = new PublicKey(publicKey);
       const tx = new Transaction();
 
-      if (token === "SOL") {
+      if (asset === "SOL") {
         const amountLamports = Math.round(parsed * LAMPORTS_PER_SOL);
-        // Use integer lamports for balance so toFixed(4) rounding never over-sends
         const balanceLamports = Math.round((balance ?? 0) * LAMPORTS_PER_SOL);
         if (amountLamports <= 0) throw new Error("Invalid amount");
         if (amountLamports + SOL_FEE_RESERVE_LAMPORTS > balanceLamports) {
@@ -179,34 +214,41 @@ export default function SendPage() {
             fromPubkey: from,
             toPubkey: recipientPubkey,
             lamports: amountLamports,
-          })
+          }),
         );
       } else {
-        const amountBase = Math.round(parsed * 1e6);
-        if ((usdcBalance ?? 0) < parsed) {
-          throw new Error(`Not enough USDC. You have $${(usdcBalance ?? 0).toFixed(2)}`);
+        const tok = tokens.find((t) => t.mint === asset);
+        if (!tok) throw new Error("Token not found in wallet");
+        const amountBase = Math.round(parsed * 10 ** tok.decimals);
+        if (amountBase <= 0) throw new Error("Invalid amount");
+        if (BigInt(amountBase) > BigInt(tok.amount)) {
+          throw new Error(
+            `Not enough ${tokenLabel(tok)}. You have ${formatTokenAmount(tok.uiAmount, tok.decimals)}`,
+          );
         }
-        const mint = usdcMint(network);
-        const fromAta = getAssociatedTokenAddressSync(mint, from, false, TOKEN_PROGRAM_ID);
-        const toAta = getAssociatedTokenAddressSync(mint, recipientPubkey, false, TOKEN_PROGRAM_ID);
+        const mint = new PublicKey(tok.mint);
+        const programId =
+          tok.program === "token2022" ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+        const fromAta = getAssociatedTokenAddressSync(mint, from, false, programId);
+        const toAta = getAssociatedTokenAddressSync(mint, recipientPubkey, false, programId);
         tx.add(
           createAssociatedTokenAccountIdempotentInstruction(
             from,
             toAta,
             recipientPubkey,
             mint,
-            TOKEN_PROGRAM_ID
+            programId,
           ),
           createTransferCheckedInstruction(
             fromAta,
             mint,
             toAta,
             from,
-            amountBase,
-            6,
+            BigInt(amountBase),
+            tok.decimals,
             [],
-            TOKEN_PROGRAM_ID
-          )
+            programId,
+          ),
         );
       }
 
@@ -225,6 +267,7 @@ export default function SendPage() {
       setTxId(signature);
       setStatus("done");
       await refreshBalance();
+      await loadTokens();
       const { toast } = await import("sonner");
       toast.success("Transfer successful!");
       try {
@@ -251,8 +294,11 @@ export default function SendPage() {
     !!resolved?.owner &&
     !busy;
 
+  const assetLabel =
+    asset === "SOL" ? "SOL" : selectedToken ? tokenLabel(selectedToken) : "token";
+
   const maxAmount = () => {
-    if (token === "SOL") {
+    if (asset === "SOL") {
       const max = maxSendableSol(balance);
       if (!max) {
         setError("Not enough SOL left after the network fee. Add a little more SOL first.");
@@ -260,10 +306,13 @@ export default function SendPage() {
       }
       setError(null);
       setAmount(max);
-    } else {
-      setAmount(usdcBalance != null ? String(Math.floor(usdcBalance * 100) / 100) : "");
+    } else if (selectedToken) {
+      setError(null);
+      setAmount(String(selectedToken.uiAmount));
     }
   };
+
+  const usdcMain = usdcMint(network).toBase58();
 
   return (
     <WalletShell>
@@ -272,7 +321,6 @@ export default function SendPage() {
           {(
             [
               ["transfer", "Send", Coins],
-              ["token", "Token", Coins],
               ["nft", "NFT", ImageIcon],
             ] as const
           ).map(([id, label, Icon]) => (
@@ -294,21 +342,53 @@ export default function SendPage() {
         {tab === "transfer" && (
           <div className="space-y-3">
             <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-4 space-y-3">
-              <div className="flex gap-2">
-                {(["SOL", "USDC"] as const).map((t) => (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-white/60 mb-1.5">
+                  Asset
+                </label>
+                <div className="flex flex-wrap gap-2">
                   <button
-                    key={t}
-                    onClick={() => setToken(t)}
+                    type="button"
+                    onClick={() => setAsset("SOL")}
                     disabled={busy}
-                    className={`flex-1 border rounded-xl px-3 py-2 text-xs font-medium transition cursor-pointer ${
-                      token === t
+                    className={`border rounded-xl px-3 py-2 text-xs font-medium transition cursor-pointer ${
+                      asset === "SOL"
                         ? "bg-purple-500/20 border-purple-400/50 text-purple-300"
                         : "bg-white dark:bg-black border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60"
                     }`}
                   >
-                    {t}
+                    SOL · {solBalance}
                   </button>
-                ))}
+                  {tokensLoading && (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-gray-400">
+                      <Spinner size={12} /> tokens…
+                    </span>
+                  )}
+                  {tokens.map((t) => {
+                    const label = t.mint === usdcMain ? "USDC" : tokenLabel(t);
+                    return (
+                      <button
+                        key={t.mint}
+                        type="button"
+                        onClick={() => setAsset(t.mint)}
+                        disabled={busy}
+                        className={`border rounded-xl px-3 py-2 text-xs font-medium transition cursor-pointer max-w-[140px] truncate ${
+                          asset === t.mint
+                            ? "bg-purple-500/20 border-purple-400/50 text-purple-300"
+                            : "bg-white dark:bg-black border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60"
+                        }`}
+                        title={t.mint}
+                      >
+                        {label} · {formatTokenAmount(t.uiAmount, t.decimals)}
+                      </button>
+                    );
+                  })}
+                </div>
+                {asset !== "SOL" && selectedToken?.isWsol && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5">
+                    Sending wrapped SOL (WSOL). Native SOL is the other button.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -345,32 +425,22 @@ export default function SendPage() {
                   {!resolving && addressValid === true && (
                     <Check className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
                   )}
-                  {!resolving && addressValid === false && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 text-xs">
-                      ✕
-                    </span>
-                  )}
                 </div>
                 {resolved?.label && (
                   <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-mono truncate">
                     {resolved.label} → {resolved.owner.slice(0, 4)}…{resolved.owner.slice(-4)}
                   </p>
                 )}
-                {addressValid === false && !error && (
-                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                    Could not resolve address
-                  </p>
-                )}
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-white/60 mb-1.5">
-                  Amount ({token})
+                  Amount ({assetLabel})
                 </label>
                 <div className="relative">
                   <input
                     type="number"
-                    step={token === "SOL" ? "0.001" : "0.01"}
+                    step="any"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.00"
@@ -387,9 +457,14 @@ export default function SendPage() {
                 </div>
                 <p className="text-[11px] text-gray-400 dark:text-white/30 mt-1">
                   Balance:{" "}
-                  {token === "SOL"
+                  {asset === "SOL"
                     ? `${solBalance} SOL`
-                    : `$${(usdcBalance ?? 0).toFixed(2)} USDC`}
+                    : selectedToken
+                      ? `${formatTokenAmount(selectedToken.uiAmount, selectedToken.decimals)} ${assetLabel}`
+                      : "—"}
+                  {asset !== "SOL" && usdcBalance != null && asset === usdcMain
+                    ? ` (wallet USDC $${usdcBalance.toFixed(2)})`
+                    : ""}
                 </p>
               </div>
 
@@ -424,7 +499,7 @@ export default function SendPage() {
                 onConfirm={handleSend}
                 disabled={!canSend}
                 loading={busy}
-                label={`Slide to send ${token}`}
+                label={`Slide to send ${assetLabel}`}
                 loadingLabel={
                   status === "auth"
                     ? "Authenticating…"
@@ -435,18 +510,6 @@ export default function SendPage() {
                 tone="purple"
               />
             </div>
-          </div>
-        )}
-
-        {tab === "token" && (
-          <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-8 text-center">
-            <Coins size={32} className="mx-auto mb-3 text-gray-400 dark:text-white/40" />
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
-              Other tokens
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-white/40">
-              SOL and USDC are on Send. More tokens coming soon.
-            </p>
           </div>
         )}
 
