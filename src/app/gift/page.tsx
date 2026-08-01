@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
-import { Gift, Check, Share2, Undo2, ExternalLink, X } from "lucide-react";
+import { Gift, Check, Share2, Undo2, ExternalLink, X, ChevronDown } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
 import { SlideToSend } from "@/components/slide-to-send";
@@ -14,33 +14,30 @@ import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import {
   CLAIM_FEE_LAMPORTS,
   SPL_GIFT_FUND_LAMPORTS,
-  createGiftKeypair,
   keypairFromSecret,
   parseGiftSecret,
-  buildGiftUrl,
-  buildSplGiftInstructions,
   sweepGift,
   loadGiftLinks,
   saveGiftLink,
   removeGiftLink,
+  giftTokenLabel,
+  isNativeGiftToken,
   type GiftLinkEntry,
   type GiftToken,
-  WSOL_MINT,
 } from "@/lib/gift-link";
 import { analytics } from "@/lib/analytics";
-import { Connection, PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import { Connection, PublicKey, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import QRCode from "qrcode";
 import {
   fetchWalletTokens,
-  formatTokenAmount,
-  tokenLabel,
+  formatTokenUi,
   type WalletToken,
 } from "@/lib/wallet-tokens";
-import { usdcMint } from "@/lib/usdc";
 
 type Status = "idle" | "auth" | "sending" | "confirming" | "done" | "error";
 
+const PRESETS_SOL = ["0.05", "0.1", "0.5", "1"];
+const PRESETS_USDC = ["5", "10", "20", "50"];
 const SPL_GIFT_SENDER_LAMPORTS = SPL_GIFT_FUND_LAMPORTS + 2_100_000;
 
 /** Seconds after create during which cancel is prominently offered. */
@@ -49,8 +46,9 @@ const CANCEL_WINDOW_SEC = 30;
 export default function GiftPage() {
   const [defaultToken] = useDefaultToken();
   const [amount, setAmount] = useState("");
-  const [token, setToken] = useState<GiftToken>("SOL");
-  const [walletTokens, setWalletTokens] = useState<WalletToken[]>([]);
+  const [holdings, setHoldings] = useState<WalletToken[]>([]);
+  const [selected, setSelected] = useState<WalletToken | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -68,55 +66,51 @@ export default function GiftPage() {
   const { publicKey, walletLabel, balance, usdcBalance, refreshBalance } = useWallet();
   const { network, rpc } = useNetwork();
 
-  const selectedTok = token === "SOL" ? null : walletTokens.find((t) => t.mint === token) || null;
-  const usdcMain = usdcMint(network).toBase58();
-
-  useEffect(() => {
-    if (defaultToken === "USDC") setToken(usdcMint(network).toBase58());
-    else setToken("SOL");
-  }, [defaultToken, network]);
+  const token: GiftToken = selected
+    ? selected.isNativeSol
+      ? "SOL"
+      : selected.symbol === "USDC"
+        ? "USDC"
+        : selected.mint
+    : "SOL";
+  const tokenSymbol = selected?.symbol || "SOL";
 
   useEffect(() => {
     if (!publicKey) {
-      setWalletTokens([]);
+      setHoldings([]);
+      setSelected(null);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const list = await fetchWalletTokens(new Connection(rpc, "confirmed"), publicKey);
-        if (!cancelled) setWalletTokens(list);
+        const conn = new Connection(rpc, "confirmed");
+        const list = await fetchWalletTokens(conn, publicKey, { solBalance: balance });
+        if (cancelled) return;
+        setHoldings(list);
+        setSelected((prev) => {
+          if (prev) {
+            const again = list.find((t) => t.mint === prev.mint);
+            if (again) return again;
+          }
+          if (defaultToken === "USDC") {
+            return list.find((t) => t.symbol === "USDC") || list[0] || null;
+          }
+          return list[0] || null;
+        });
       } catch {
-        if (!cancelled) setWalletTokens([]);
+        if (!cancelled) setHoldings([]);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [publicKey, rpc, status]);
+  }, [publicKey, rpc, balance, defaultToken]);
 
   const refreshLinks = useCallback(() => setLinks(loadGiftLinks()), []);
   useEffect(() => {
     refreshLinks();
   }, [refreshLinks]);
-
-  const presets =
-    token === "SOL"
-      ? ["0.05", "0.1", "0.5", "1"]
-      : token === usdcMain || selectedTok?.symbol === "USDC"
-        ? ["5", "10", "20", "50"]
-        : ["1", "10", "100", "1000"];
-
-  const assetLabel =
-    token === "SOL"
-      ? "SOL"
-      : selectedTok
-        ? selectedTok.mint === usdcMain
-          ? "USDC"
-          : tokenLabel(selectedTok)
-        : token === usdcMain
-          ? "USDC"
-          : "token";
 
   // Fetch claim status for listed links
   useEffect(() => {
@@ -171,7 +165,7 @@ export default function GiftPage() {
   };
 
   const handleCreate = async () => {
-    if (!publicKey) return;
+    if (!publicKey || !selected) return;
     setError(null);
 
     try {
@@ -179,26 +173,16 @@ export default function GiftPage() {
       if (isNaN(parsed) || parsed <= 0) throw new Error("Enter an amount");
 
       const balanceLamports = balance ? balance * LAMPORTS_PER_SOL : 0;
-      let amountBase: number;
-      let decimals = 9;
-      let symbol = "SOL";
-      let programId = TOKEN_PROGRAM_ID;
 
-      if (token === "SOL") {
-        amountBase = Math.round(parsed * LAMPORTS_PER_SOL);
+      if (selected.isNativeSol) {
+        const amountBase = Math.round(parsed * LAMPORTS_PER_SOL);
         if (amountBase + CLAIM_FEE_LAMPORTS * 2 > balanceLamports) {
           throw new Error(`Not enough SOL. You have ${balance?.toFixed(4) ?? 0} SOL`);
         }
       } else {
-        const tok = walletTokens.find((t) => t.mint === token);
-        if (!tok) throw new Error("Token not in wallet");
-        decimals = tok.decimals;
-        symbol = tok.mint === usdcMain ? "USDC" : tokenLabel(tok);
-        programId = tok.program === "token2022" ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
-        amountBase = Math.round(parsed * 10 ** decimals);
-        if (BigInt(amountBase) > BigInt(tok.amount)) {
+        if (parsed > selected.uiAmount + 1e-12) {
           throw new Error(
-            `Not enough ${symbol}. You have ${formatTokenAmount(tok.uiAmount, decimals)}`,
+            `Not enough ${selected.symbol}. You have ${formatTokenUi(selected.uiAmount, selected.decimals)}`
           );
         }
         if (balanceLamports < SPL_GIFT_SENDER_LAMPORTS + CLAIM_FEE_LAMPORTS) {
@@ -207,59 +191,70 @@ export default function GiftPage() {
       }
 
       setStatus("auth");
-      const { keypair: sender } = await getPasskeyKeypair();
+      const { keypair: sender } = await getPasskeyKeypair(publicKey);
       if (sender.publicKey.toBase58() !== publicKey) {
         throw new Error(
-          `That passkey belongs to a different wallet. Pick the passkey for ${walletLabel || `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`}, or switch wallets in the menu.`,
+          `That passkey belongs to a different wallet. Pick the passkey for ${walletLabel || `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`}, or switch wallets in the menu.`
         );
       }
 
       setStatus("sending");
-      const { keypair: gift, secret } = createGiftKeypair();
-      const connection = new Connection(rpc, "confirmed");
-      const senderPk = new PublicKey(publicKey);
-
-      const tx = new Transaction();
-      if (token === "SOL") {
-        tx.add(
-          SystemProgram.transfer({
-            fromPubkey: senderPk,
-            toPubkey: gift.publicKey,
-            lamports: amountBase + CLAIM_FEE_LAMPORTS,
-          }),
-        );
-      } else {
-        tx.add(
-          ...buildSplGiftInstructions(
-            senderPk,
-            gift.publicKey,
-            new PublicKey(token),
-            amountBase,
-            decimals,
-            programId,
-          ),
-        );
+      const createRes = await fetch("/api/gift/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet: publicKey,
+          amount: parsed,
+          token,
+          decimals: selected.decimals,
+          programId: selected.isNativeSol ? undefined : selected.programId,
+          symbol: selected.symbol,
+          network,
+          message: message || undefined,
+        }),
+      });
+      const created = (await createRes.json()) as {
+        ok?: boolean;
+        error?: string;
+        transaction?: string;
+        giftPubkey?: string;
+        claimUrl?: string;
+        amountLamports?: number;
+        blockhash?: string;
+        lastValidBlockHeight?: number;
+        register?: { body: Record<string, unknown> };
+      };
+      if (!createRes.ok || !created.transaction || !created.claimUrl || !created.giftPubkey) {
+        throw new Error(created.error || "Could not build gift");
       }
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = senderPk;
-      tx.sign(sender);
 
+      const connection = new Connection(rpc, "confirmed");
+      const tx = Transaction.from(Buffer.from(created.transaction, "base64"));
+      tx.partialSign(sender);
       const signature = await connection.sendRawTransaction(tx.serialize(), {
         skipPreflight: false,
         maxRetries: 3,
       });
       setStatus("confirming");
-      await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
+      const bh = created.blockhash;
+      const lv = created.lastValidBlockHeight;
+      if (bh && lv != null) {
+        await connection.confirmTransaction(
+          { signature, blockhash: bh, lastValidBlockHeight: lv },
+          "confirmed"
+        );
+      } else {
+        await connection.confirmTransaction(signature, "confirmed");
+      }
 
-      const url = buildGiftUrl(secret, network, message);
+      const url = created.claimUrl;
       const entry: GiftLinkEntry = {
-        pubkey: gift.publicKey.toBase58(),
+        pubkey: created.giftPubkey,
         url,
         amount: parsed,
         token,
-        tokenSymbol: symbol,
-        decimals,
+        symbol: selected.symbol,
+        decimals: selected.decimals,
         network,
         createdAt: new Date().toISOString(),
       };
@@ -268,15 +263,15 @@ export default function GiftPage() {
       fetch("/api/gift", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          publicKey: entry.pubkey,
-          sender: publicKey,
-          amountLamports: amountBase,
-          network,
-          token,
-          tokenSymbol: symbol,
-          decimals,
-        }),
+        body: JSON.stringify(
+          created.register?.body || {
+            publicKey: entry.pubkey,
+            sender: publicKey,
+            amountLamports: created.amountLamports,
+            network,
+            token,
+          }
+        ),
       }).catch(() => {});
       analytics.giftLinkCreated(parsed);
 
@@ -324,7 +319,7 @@ export default function GiftPage() {
       const gift = secret ? keypairFromSecret(secret) : null;
       if (!gift) throw new Error("Couldn't read this link");
       const connection = new Connection(rpc, "confirmed");
-      const { lamports, usdcBase, tokens } = await sweepGift(
+      const { lamports, usdcBase } = await sweepGift(
         connection,
         gift,
         new PublicKey(publicKey),
@@ -339,8 +334,8 @@ export default function GiftPage() {
       refreshLinks();
       await refreshBalance();
       toast.success(
-        usdcBase > 0 || tokens.length
-          ? `Reclaimed gift contents`
+        usdcBase > 0
+          ? `Reclaimed $${(usdcBase / 1e6).toFixed(2)} USDC`
           : `Reclaimed ${(lamports / LAMPORTS_PER_SOL).toFixed(4)} SOL`
       );
       return true;
@@ -390,18 +385,26 @@ export default function GiftPage() {
       l.pubkey !== giftEntry?.pubkey
   );
   const fmtEntry = (l: GiftLinkEntry) => {
-    if (l.token === "SOL" || !l.token) return `${l.amount} SOL`;
-    if (l.tokenSymbol === "USDC" || l.token === usdcMain) return `$${l.amount} USDC`;
-    return `${l.amount} ${l.tokenSymbol || "token"}`;
+    const sym = giftTokenLabel(l.token, l.symbol);
+    if (sym === "USDC") return `$${l.amount} USDC`;
+    if (sym === "SOL") return `${l.amount} SOL`;
+    return `${l.amount} ${sym}`;
   };
   const setMax = () => {
-    if (token === "SOL") {
+    if (!selected) return;
+    if (selected.isNativeSol) {
       const max = Math.max(0, (balance ?? 0) - 0.0001);
       setAmount(max > 0 ? String(Math.floor(max * 10000) / 10000) : "");
-      return;
+    } else {
+      setAmount(formatTokenUi(selected.uiAmount, selected.decimals));
     }
-    const tok = walletTokens.find((t) => t.mint === token);
-    setAmount(tok ? String(tok.uiAmount) : "");
+  };
+  const presets =
+    token === "SOL" ? PRESETS_SOL : token === "USDC" ? PRESETS_USDC : [];
+  const displayAmountLabel = () => {
+    if (token === "USDC") return `$${amount} USDC`;
+    if (isNativeGiftToken(token)) return `${amount} SOL`;
+    return `${amount} ${tokenSymbol}`;
   };
 
   return (
@@ -460,11 +463,7 @@ export default function GiftPage() {
                   <canvas ref={canvasRef} className="rounded-xl" />
                   <div className="text-center">
                     <p className="text-gray-900 dark:text-white font-semibold text-lg">
-                      {token === "SOL"
-                        ? `${amount} SOL`
-                        : assetLabel === "USDC"
-                          ? `$${amount} USDC`
-                          : `${amount} ${assetLabel}`}
+                      {displayAmountLabel()}
                     </p>
                     {message && (
                       <p className="text-gray-500 dark:text-white/40 text-sm">&ldquo;{message}&rdquo;</p>
@@ -520,9 +519,33 @@ export default function GiftPage() {
               </div>
             ) : (
               <div className="space-y-4">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setPickerOpen(true)}
+                  className="w-full flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-3 text-left"
+                >
+                  {selected?.icon ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={selected.icon} alt="" className="w-9 h-9 rounded-full" />
+                  ) : (
+                    <span className="w-9 h-9 rounded-full bg-amber-500/20 flex items-center justify-center text-xs font-bold">
+                      {(selected?.symbol || "◎").slice(0, 2)}
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-sm">{selected?.symbol || "Select token"}</p>
+                    <p className="text-[11px] text-gray-500">
+                      {selected
+                        ? `${formatTokenUi(selected.uiAmount, selected.decimals)} available`
+                        : "—"}
+                    </p>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                </button>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-white/30 font-mono text-sm">
-                    {token === "SOL" ? "◎" : assetLabel === "USDC" ? "$" : ""}
+                    {token === "USDC" ? "$" : token === "SOL" ? "◎" : ""}
                   </span>
                   <input
                     type="text"
@@ -530,7 +553,9 @@ export default function GiftPage() {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
                     disabled={busy}
-                    className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl pl-8 pr-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/25 transition font-mono text-2xl disabled:opacity-50"
+                    className={`w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl ${
+                      token === "SOL" || token === "USDC" ? "pl-8" : "pl-4"
+                    } pr-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/25 transition font-mono text-2xl disabled:opacity-50`}
                   />
                 </div>
                 <div className="flex items-center justify-between gap-2">
@@ -538,6 +563,7 @@ export default function GiftPage() {
                     {presets.map((preset) => (
                       <button
                         key={preset}
+                        type="button"
                         onClick={() => setAmount(preset)}
                         disabled={busy}
                         className={`px-3 py-1.5 rounded-lg text-xs font-mono transition cursor-pointer border ${
@@ -546,64 +572,20 @@ export default function GiftPage() {
                             : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:border-amber-400/40"
                         }`}
                       >
-                        {token === "SOL"
-                          ? `◎${preset}`
-                          : assetLabel === "USDC"
-                            ? `$${preset}`
-                            : preset}
+                        {token === "SOL" ? `◎${preset}` : token === "USDC" ? `$${preset}` : preset}
                       </button>
                     ))}
                   </div>
                   <button
+                    type="button"
                     onClick={setMax}
-                    disabled={busy}
+                    disabled={busy || !selected}
                     className="text-xs text-gray-400 dark:text-white/40 hover:text-amber-500 dark:hover:text-amber-400 transition cursor-pointer font-mono whitespace-nowrap"
                     title="Use full balance"
                   >
-                    {token === "SOL"
-                      ? `◎ ${(balance ?? 0).toFixed(4)}`
-                      : selectedTok
-                        ? formatTokenAmount(selectedTok.uiAmount, selectedTok.decimals)
-                        : "—"}{" "}
                     max
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setToken("SOL")}
-                    disabled={busy}
-                    className={`border rounded-xl px-3 py-2 text-xs transition cursor-pointer ${
-                      token === "SOL"
-                        ? "bg-amber-500/20 border-amber-400/50 text-amber-600 dark:text-amber-300"
-                        : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60"
-                    }`}
-                  >
-                    SOL
-                  </button>
-                  {walletTokens.map((t) => {
-                    const label = t.mint === usdcMain ? "USDC" : tokenLabel(t);
-                    return (
-                      <button
-                        key={t.mint}
-                        onClick={() => setToken(t.mint)}
-                        disabled={busy}
-                        title={t.mint}
-                        className={`border rounded-xl px-3 py-2 text-xs transition cursor-pointer max-w-[120px] truncate ${
-                          token === t.mint
-                            ? "bg-amber-500/20 border-amber-400/50 text-amber-600 dark:text-amber-300"
-                            : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {token === WSOL_MINT && (
-                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                    Gifting WSOL (wrapped). Use SOL for native.
-                  </p>
-                )}
                 <input
                   type="text"
                   placeholder="Add a message (optional)"
@@ -622,9 +604,9 @@ export default function GiftPage() {
 
                 <SlideToSend
                   onConfirm={handleCreate}
-                  disabled={!amount || busy}
+                  disabled={!amount || busy || !selected}
                   loading={busy}
-                  label={`Slide to create ${token} gift`}
+                  label={`Slide to create ${tokenSymbol} gift`}
                   loadingLabel={
                     status === "auth"
                       ? "Authenticating…"
@@ -636,7 +618,7 @@ export default function GiftPage() {
                 />
                 <p className="text-center text-xs text-gray-400 dark:text-white/30">
                   After create you get {CANCEL_WINDOW_SEC}s to cancel. Unclaimed gifts can be reclaimed
-                  anytime.
+                  anytime. Any SPL token works.
                 </p>
               </div>
             )}
@@ -681,6 +663,57 @@ export default function GiftPage() {
           </div>
         </ConnectGate>
       </main>
+
+      {pickerOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center sm:items-center bg-black/50 backdrop-blur-sm">
+          <button
+            type="button"
+            className="absolute inset-0"
+            aria-label="Close"
+            onClick={() => setPickerOpen(false)}
+          />
+          <div className="relative w-full sm:max-w-md max-h-[75dvh] rounded-t-3xl sm:rounded-3xl bg-white dark:bg-zinc-950 border border-black/10 dark:border-white/10 shadow-xl flex flex-col">
+            <div className="p-4 border-b border-black/5 dark:border-white/10">
+              <p className="text-sm font-semibold">Gift any token</p>
+            </div>
+            <div className="overflow-y-auto p-2 pb-6">
+              {holdings.map((t) => (
+                <button
+                  key={t.mint}
+                  type="button"
+                  onClick={() => {
+                    setSelected(t);
+                    setAmount("");
+                    setPickerOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left hover:bg-black/5 dark:hover:bg-white/5 ${
+                    selected?.mint === t.mint ? "bg-amber-500/10" : ""
+                  }`}
+                >
+                  {t.icon ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={t.icon} alt="" className="w-9 h-9 rounded-full" />
+                  ) : (
+                    <span className="w-9 h-9 rounded-full bg-amber-500/20 flex items-center justify-center text-xs font-bold">
+                      {t.symbol.slice(0, 2)}
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-sm">{t.symbol}</p>
+                    <p className="text-xs text-gray-500 truncate">{t.name}</p>
+                  </div>
+                  <p className="font-mono text-xs tabular-nums">
+                    {formatTokenUi(t.uiAmount, t.decimals)}
+                  </p>
+                </button>
+              ))}
+              {holdings.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-8">No tokens in this wallet</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

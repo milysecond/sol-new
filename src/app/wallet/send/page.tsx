@@ -3,14 +3,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { WalletShell } from "@/components/wallet-shell";
 import { PageTransition } from "@/components/page-transition";
-import { Coins, Image as ImageIcon, Check, ExternalLink } from "lucide-react";
+import { Coins, Image as ImageIcon, Check, ExternalLink, ChevronDown } from "lucide-react";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair, ensureDocumentFocusForPasskey } from "@/lib/passkey-wallet";
 import { PrivateSendSheet } from "@/components/private-send-sheet";
 import { SlideToSend } from "@/components/slide-to-send";
-import { useDefaultToken } from "@/lib/currency-pref";
 import { resolveRecipient, looksLikeDomain } from "@/lib/resolve-name";
 import {
   Connection,
@@ -21,24 +20,19 @@ import {
 } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
-  TOKEN_2022_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
   createTransferCheckedInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { usdcMint } from "@/lib/usdc";
 import { friendlyError } from "@/lib/friendly-errors";
 import {
   fetchWalletTokens,
-  formatTokenAmount,
-  tokenLabel,
+  formatTokenUi,
+  uiToRawAmount,
   type WalletToken,
 } from "@/lib/wallet-tokens";
 
 type Tab = "transfer" | "nft";
-
-/** Asset key: "SOL" or mint address */
-type AssetKey = string;
 
 const SOL_FEE_RESERVE_LAMPORTS = 10_000;
 
@@ -51,13 +45,15 @@ function maxSendableSol(balanceSol: number | null | undefined): string {
 
 export default function SendPage() {
   const [tab, setTab] = useState<Tab>("transfer");
-  const [defaultToken] = useDefaultToken();
-  const [asset, setAsset] = useState<AssetKey>("SOL");
   const [tokens, setTokens] = useState<WalletToken[]>([]);
-  const [tokensLoading, setTokensLoading] = useState(false);
+  const [selected, setSelected] = useState<WalletToken | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [loadingTokens, setLoadingTokens] = useState(false);
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
-  const [status, setStatus] = useState<"idle" | "auth" | "sending" | "confirming" | "done" | "error">("idle");
+  const [status, setStatus] = useState<
+    "idle" | "auth" | "sending" | "confirming" | "done" | "error"
+  >("idle");
   const [error, setError] = useState<string | null>(null);
   const [txId, setTxId] = useState<string | null>(null);
   const [resolved, setResolved] = useState<{ owner: string; label?: string } | null>(null);
@@ -68,44 +64,57 @@ export default function SendPage() {
   const { publicKey, balance, usdcBalance, refreshBalance } = useWallet();
   const { network, rpc } = useNetwork();
 
-  const selectedToken = asset === "SOL" ? null : tokens.find((t) => t.mint === asset) || null;
-
   const loadTokens = useCallback(async () => {
     if (!publicKey) {
       setTokens([]);
+      setSelected(null);
       return;
     }
-    setTokensLoading(true);
+    setLoadingTokens(true);
     try {
       const conn = new Connection(rpc, "confirmed");
-      const list = await fetchWalletTokens(conn, publicKey);
+      const list = await fetchWalletTokens(conn, publicKey, { solBalance: balance });
       setTokens(list);
+      setSelected((prev) => {
+        if (prev) {
+          const again = list.find((t) => t.mint === prev.mint);
+          if (again) return again;
+        }
+        return list[0] || null;
+      });
     } catch {
       setTokens([]);
     } finally {
-      setTokensLoading(false);
+      setLoadingTokens(false);
     }
-  }, [publicKey, rpc]);
+  }, [publicKey, rpc, balance]);
 
   useEffect(() => {
     void loadTokens();
   }, [loadTokens]);
 
+  // Keep SOL/USDC balances fresh from context
   useEffect(() => {
-    if (defaultToken === "USDC") {
-      const mint = usdcMint(network).toBase58();
-      setAsset(mint);
-    } else {
-      setAsset("SOL");
-    }
-  }, [defaultToken, network]);
-
-  // If selected mint no longer held, fall back to SOL
-  useEffect(() => {
-    if (asset !== "SOL" && tokens.length && !tokens.some((t) => t.mint === asset)) {
-      setAsset("SOL");
-    }
-  }, [tokens, asset]);
+    setTokens((prev) =>
+      prev.map((t) => {
+        if (t.isNativeSol && balance != null) {
+          return {
+            ...t,
+            uiAmount: balance,
+            amount: String(Math.round(balance * LAMPORTS_PER_SOL)),
+          };
+        }
+        if (t.symbol === "USDC" && usdcBalance != null) {
+          return {
+            ...t,
+            uiAmount: usdcBalance,
+            amount: String(Math.round(usdcBalance * 1e6)),
+          };
+        }
+        return t;
+      })
+    );
+  }, [balance, usdcBalance]);
 
   const runResolve = useCallback(async (value: string) => {
     const trimmed = value.trim();
@@ -127,7 +136,8 @@ export default function SendPage() {
     if (result.ok) {
       setResolved({
         owner: result.owner,
-        label: result.kind !== "pubkey" ? result.domain || trimmed.toLowerCase() : undefined,
+        label:
+          result.kind !== "pubkey" ? result.domain || trimmed.toLowerCase() : undefined,
       });
       setAddressValid(true);
       setError(null);
@@ -161,16 +171,13 @@ export default function SendPage() {
   }, []);
 
   const handleSend = async () => {
-    if (!publicKey) return;
+    if (!publicKey || !selected) return;
     setError(null);
     setStatus("auth");
 
     try {
-      // Passkey MUST run in the same user-gesture turn as slide-complete.
-      // Any await before WebAuthn drops iOS/Safari activation → "document is not focused".
       ensureDocumentFocusForPasskey();
       const { keypair: userKeypair } = await getPasskeyKeypair(publicKey);
-
       setStatus("sending");
 
       let owner = resolved?.owner;
@@ -199,7 +206,7 @@ export default function SendPage() {
       const from = new PublicKey(publicKey);
       const tx = new Transaction();
 
-      if (asset === "SOL") {
+      if (selected.isNativeSol) {
         const amountLamports = Math.round(parsed * LAMPORTS_PER_SOL);
         const balanceLamports = Math.round((balance ?? 0) * LAMPORTS_PER_SOL);
         if (amountLamports <= 0) throw new Error("Invalid amount");
@@ -207,11 +214,11 @@ export default function SendPage() {
           const max = maxSendableSol(balance);
           if (!max) {
             throw new Error(
-              "Not enough SOL to cover the network fee. Add a little more SOL, then try again.",
+              "Not enough SOL to cover the network fee. Add a little more SOL, then try again."
             );
           }
           throw new Error(
-            `Not enough SOL after the network fee. Max you can send is ${max} SOL (use Max).`,
+            `Not enough SOL after the network fee. Max you can send is ${max} SOL (use Max).`
           );
         }
         tx.add(
@@ -219,45 +226,51 @@ export default function SendPage() {
             fromPubkey: from,
             toPubkey: recipientPubkey,
             lamports: amountLamports,
-          }),
+          })
         );
       } else {
-        const tok = tokens.find((t) => t.mint === asset);
-        if (!tok) throw new Error("Token not found in wallet");
-        const amountBase = Math.round(parsed * 10 ** tok.decimals);
-        if (amountBase <= 0) throw new Error("Invalid amount");
-        if (BigInt(amountBase) > BigInt(tok.amount)) {
+        if (parsed > selected.uiAmount + 1e-12) {
           throw new Error(
-            `Not enough ${tokenLabel(tok)}. You have ${formatTokenAmount(tok.uiAmount, tok.decimals)}`,
+            `Not enough ${selected.symbol}. You have ${formatTokenUi(selected.uiAmount, selected.decimals)}`
           );
         }
-        const mint = new PublicKey(tok.mint);
-        const programId =
-          tok.program === "token2022" ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+        if ((balance ?? 0) < 0.002) {
+          throw new Error("Need a little SOL for network fees");
+        }
+        const raw = uiToRawAmount(parsed, selected.decimals);
+        if (raw <= BigInt(0)) throw new Error("Invalid amount");
+        const mint = new PublicKey(selected.mint);
+        const programId = new PublicKey(selected.programId);
         const fromAta = getAssociatedTokenAddressSync(mint, from, false, programId);
-        const toAta = getAssociatedTokenAddressSync(mint, recipientPubkey, false, programId);
+        const toAta = getAssociatedTokenAddressSync(
+          mint,
+          recipientPubkey,
+          false,
+          programId
+        );
         tx.add(
           createAssociatedTokenAccountIdempotentInstruction(
             from,
             toAta,
             recipientPubkey,
             mint,
-            programId,
+            programId
           ),
           createTransferCheckedInstruction(
             fromAta,
             mint,
             toAta,
             from,
-            BigInt(amountBase),
-            tok.decimals,
+            raw,
+            selected.decimals,
             [],
-            programId,
-          ),
+            programId
+          )
         );
       }
 
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+      const { blockhash, lastValidBlockHeight } =
+        await connection.getLatestBlockhash("confirmed");
       tx.recentBlockhash = blockhash;
       tx.feePayer = from;
       tx.sign(userKeypair);
@@ -267,12 +280,15 @@ export default function SendPage() {
         maxRetries: 3,
       });
       setStatus("confirming");
-      await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
+      await connection.confirmTransaction(
+        { signature, blockhash, lastValidBlockHeight },
+        "confirmed"
+      );
 
       setTxId(signature);
       setStatus("done");
       await refreshBalance();
-      await loadTokens();
+      void loadTokens();
       const { toast } = await import("sonner");
       toast.success("Transfer successful!");
       try {
@@ -290,34 +306,32 @@ export default function SendPage() {
     }
   };
 
-  const solBalance = balance != null ? balance.toFixed(4) : "0";
   const busy = status === "auth" || status === "sending" || status === "confirming";
   const canSend =
     !!recipient &&
     !!amount &&
     addressValid === true &&
     !!resolved?.owner &&
+    !!selected &&
     !busy;
 
-  const assetLabel =
-    asset === "SOL" ? "SOL" : selectedToken ? tokenLabel(selectedToken) : "token";
-
   const maxAmount = () => {
-    if (asset === "SOL") {
+    if (!selected) return;
+    if (selected.isNativeSol) {
       const max = maxSendableSol(balance);
       if (!max) {
-        setError("Not enough SOL left after the network fee. Add a little more SOL first.");
+        setError("Not enough SOL left after the network fee.");
         return;
       }
       setError(null);
       setAmount(max);
-    } else if (selectedToken) {
+    } else {
       setError(null);
-      setAmount(String(selectedToken.uiAmount));
+      setAmount(formatTokenUi(selected.uiAmount, selected.decimals));
     }
   };
 
-  const usdcMain = usdcMint(network).toBase58();
+  const symbol = selected?.symbol || "Token";
 
   return (
     <WalletShell>
@@ -331,7 +345,8 @@ export default function SendPage() {
           ).map(([id, label, Icon]) => (
             <button
               key={id}
-              onClick={() => setTab(id as Tab)}
+              type="button"
+              onClick={() => setTab(id)}
               className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer active:scale-95 ${
                 tab === id
                   ? "bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-400/50"
@@ -349,51 +364,34 @@ export default function SendPage() {
             <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-4 space-y-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-white/60 mb-1.5">
-                  Asset
+                  Token
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setAsset("SOL")}
-                    disabled={busy}
-                    className={`border rounded-xl px-3 py-2 text-xs font-medium transition cursor-pointer ${
-                      asset === "SOL"
-                        ? "bg-purple-500/20 border-purple-400/50 text-purple-300"
-                        : "bg-white dark:bg-black border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60"
-                    }`}
-                  >
-                    SOL · {solBalance}
-                  </button>
-                  {tokensLoading && (
-                    <span className="inline-flex items-center gap-1 text-[11px] text-gray-400">
-                      <Spinner size={12} /> tokens…
+                <button
+                  type="button"
+                  disabled={busy || loadingTokens}
+                  onClick={() => setPickerOpen(true)}
+                  className="w-full flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-black px-3 py-2.5 text-left"
+                >
+                  {selected?.icon ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={selected.icon} alt="" className="w-8 h-8 rounded-full" />
+                  ) : (
+                    <span className="w-8 h-8 rounded-full bg-purple-500/15 flex items-center justify-center text-xs font-bold">
+                      {(selected?.symbol || "?").slice(0, 2)}
                     </span>
                   )}
-                  {tokens.map((t) => {
-                    const label = t.mint === usdcMain ? "USDC" : tokenLabel(t);
-                    return (
-                      <button
-                        key={t.mint}
-                        type="button"
-                        onClick={() => setAsset(t.mint)}
-                        disabled={busy}
-                        className={`border rounded-xl px-3 py-2 text-xs font-medium transition cursor-pointer max-w-[140px] truncate ${
-                          asset === t.mint
-                            ? "bg-purple-500/20 border-purple-400/50 text-purple-300"
-                            : "bg-white dark:bg-black border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60"
-                        }`}
-                        title={t.mint}
-                      >
-                        {label} · {formatTokenAmount(t.uiAmount, t.decimals)}
-                      </button>
-                    );
-                  })}
-                </div>
-                {asset !== "SOL" && selectedToken?.isWsol && (
-                  <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5">
-                    Sending wrapped SOL (WSOL). Native SOL is the other button.
-                  </p>
-                )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-sm">
+                      {loadingTokens && !selected ? "Loading…" : selected?.symbol || "Select"}
+                    </p>
+                    <p className="text-[11px] text-gray-500 truncate">
+                      {selected
+                        ? `${formatTokenUi(selected.uiAmount, selected.decimals)} available`
+                        : "—"}
+                    </p>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                </button>
               </div>
 
               <div>
@@ -440,12 +438,12 @@ export default function SendPage() {
 
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-white/60 mb-1.5">
-                  Amount ({assetLabel})
+                  Amount ({symbol})
                 </label>
                 <div className="relative">
                   <input
-                    type="number"
-                    step="any"
+                    type="text"
+                    inputMode="decimal"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.00"
@@ -453,24 +451,14 @@ export default function SendPage() {
                     className="w-full px-3 py-2.5 pr-16 bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400/50 disabled:opacity-50"
                   />
                   <button
+                    type="button"
                     onClick={maxAmount}
-                    disabled={busy}
+                    disabled={busy || !selected}
                     className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-purple-500 hover:bg-purple-400 text-white text-xs font-medium rounded transition disabled:opacity-50 cursor-pointer"
                   >
                     Max
                   </button>
                 </div>
-                <p className="text-[11px] text-gray-400 dark:text-white/30 mt-1">
-                  Balance:{" "}
-                  {asset === "SOL"
-                    ? `${solBalance} SOL`
-                    : selectedToken
-                      ? `${formatTokenAmount(selectedToken.uiAmount, selectedToken.decimals)} ${assetLabel}`
-                      : "—"}
-                  {asset !== "SOL" && usdcBalance != null && asset === usdcMain
-                    ? ` (wallet USDC $${usdcBalance.toFixed(2)})`
-                    : ""}
-                </p>
               </div>
 
               <PrivateSendSheet />
@@ -490,12 +478,10 @@ export default function SendPage() {
                     </p>
                   </div>
                   <a
-                    href={`https://explorer.solana.com/tx/${txId}${network === "devnet" ? "?cluster=devnet" : ""}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={`https://sol.new/receipt/${txId}`}
                     className="text-xs text-green-600 dark:text-green-400 hover:underline flex items-center gap-1"
                   >
-                    View transaction <ExternalLink size={10} />
+                    View receipt <ExternalLink size={10} />
                   </a>
                 </div>
               )}
@@ -504,7 +490,7 @@ export default function SendPage() {
                 onConfirm={handleSend}
                 disabled={!canSend}
                 loading={busy}
-                label={`Slide to send ${assetLabel}`}
+                label={`Slide to send ${symbol}`}
                 loadingLabel={
                   status === "auth"
                     ? "Authenticating…"
@@ -528,6 +514,69 @@ export default function SendPage() {
           </div>
         )}
       </PageTransition>
+
+      {pickerOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center sm:items-center bg-black/50 backdrop-blur-sm">
+          <button
+            type="button"
+            className="absolute inset-0"
+            aria-label="Close"
+            onClick={() => setPickerOpen(false)}
+          />
+          <div className="relative w-full sm:max-w-md max-h-[75dvh] rounded-t-3xl sm:rounded-3xl bg-white dark:bg-zinc-950 border border-black/10 dark:border-white/10 shadow-xl flex flex-col">
+            <div className="p-4 border-b border-black/5 dark:border-white/10 flex items-center justify-between">
+              <p className="text-sm font-semibold">Your tokens</p>
+              <button
+                type="button"
+                onClick={() => void loadTokens()}
+                className="text-xs text-purple-500"
+              >
+                Refresh
+              </button>
+            </div>
+            <div className="overflow-y-auto p-2 pb-6">
+              {loadingTokens && (
+                <div className="flex justify-center py-8">
+                  <Spinner size={20} />
+                </div>
+              )}
+              {!loadingTokens && tokens.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-8">No tokens found</p>
+              )}
+              {tokens.map((t) => (
+                <button
+                  key={t.mint}
+                  type="button"
+                  onClick={() => {
+                    setSelected(t);
+                    setAmount("");
+                    setPickerOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left hover:bg-black/5 dark:hover:bg-white/5 ${
+                    selected?.mint === t.mint ? "bg-purple-500/10" : ""
+                  }`}
+                >
+                  {t.icon ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={t.icon} alt="" className="w-9 h-9 rounded-full" />
+                  ) : (
+                    <span className="w-9 h-9 rounded-full bg-purple-500/15 flex items-center justify-center text-xs font-bold">
+                      {t.symbol.slice(0, 2)}
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-sm">{t.symbol}</p>
+                    <p className="text-xs text-gray-500 truncate">{t.name}</p>
+                  </div>
+                  <p className="font-mono text-xs tabular-nums">
+                    {formatTokenUi(t.uiAmount, t.decimals)}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </WalletShell>
   );
 }

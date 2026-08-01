@@ -9,7 +9,6 @@ import {
 import {
   TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
-  NATIVE_MINT,
   createAssociatedTokenAccountIdempotentInstruction,
   createCloseAccountInstruction,
   createTransferCheckedInstruction,
@@ -17,14 +16,15 @@ import {
 } from "@solana/spl-token";
 import { usdcMint } from "./usdc";
 import type { Network } from "./network";
+import { NATIVE_SOL_MINT, USDC_MAINNET, USDC_DEVNET } from "./wallet-tokens";
 
-/** "SOL" or an SPL mint address */
+/** "SOL" | "USDC" | mint address */
 export type GiftToken = string;
-
 export const USDC_DECIMALS = 6;
-export const WSOL_MINT = NATIVE_MINT.toBase58();
 
 export const CLAIM_FEE_LAMPORTS = 5000;
+
+/** SOL float on gift wallet for SPL gifts (ATA rent + fees; rent refunded on close). */
 export const SPL_GIFT_FUND_LAMPORTS = 2_100_000;
 /** @deprecated use SPL_GIFT_FUND_LAMPORTS */
 export const USDC_GIFT_FUND_LAMPORTS = SPL_GIFT_FUND_LAMPORTS;
@@ -60,15 +60,13 @@ export function buildGiftUrl(
   secret: string,
   network: Network,
   message?: string,
-  origin?: string,
+  origin = "https://sol.new"
 ): string {
   const params = new URLSearchParams();
   if (network === "devnet") params.set("n", "d");
   if (message?.trim()) params.set("m", message.trim().slice(0, 80));
   const qs = params.toString();
-  const base =
-    origin ||
-    (typeof window !== "undefined" ? window.location.origin : "https://sol.new");
+  const base = origin.replace(/\/$/, "");
   return `${base}/claim${qs ? `?${qs}` : ""}#${secret}`;
 }
 
@@ -77,12 +75,35 @@ export function parseGiftSecret(hash: string): string | null {
   return secret.length > 0 ? secret : null;
 }
 
-export type GiftTokenHolding = {
+export function isNativeGiftToken(token: GiftToken | undefined): boolean {
+  return !token || token === "SOL" || token === NATIVE_SOL_MINT;
+}
+
+export function isUsdcGiftToken(token: GiftToken | undefined, network: Network = "mainnet"): boolean {
+  if (!token || token === "USDC") return token === "USDC";
+  const u = usdcMint(network).toBase58();
+  return token === u || token === USDC_MAINNET || token === USDC_DEVNET;
+}
+
+/** Parse UI amount → base units. */
+export function giftAmountToBase(
+  amountUi: number,
+  token: GiftToken,
+  decimals = 9
+): number {
+  if (!Number.isFinite(amountUi) || amountUi <= 0) return 0;
+  if (isNativeGiftToken(token)) return Math.round(amountUi * 1e9);
+  if (token === "USDC") return Math.round(amountUi * 1e6);
+  const f = 10 ** decimals;
+  return Math.round(amountUi * f);
+}
+
+export interface GiftTokenHolding {
   mint: string;
   amount: bigint;
   decimals: number;
   programId: PublicKey;
-};
+}
 
 export interface GiftContents {
   lamports: number;
@@ -90,64 +111,66 @@ export interface GiftContents {
   tokens: GiftTokenHolding[];
 }
 
-async function loadGiftTokenHoldings(
-  connection: Connection,
-  giftPubkey: PublicKey,
-): Promise<GiftTokenHolding[]> {
-  const [spl, t22] = await Promise.all([
-    connection.getParsedTokenAccountsByOwner(giftPubkey, { programId: TOKEN_PROGRAM_ID }),
-    connection.getParsedTokenAccountsByOwner(giftPubkey, { programId: TOKEN_2022_PROGRAM_ID }),
-  ]);
-  const out: GiftTokenHolding[] = [];
-  for (const { account } of [...spl.value, ...t22.value]) {
-    const parsed = account.data.parsed as {
-      info?: {
-        mint?: string;
-        tokenAmount?: { amount?: string; decimals?: number };
-      };
-    };
-    const info = parsed?.info;
-    if (!info?.mint || !info.tokenAmount) continue;
-    const amount = BigInt(info.tokenAmount.amount || "0");
-    if (amount <= BigInt(0)) continue;
-    const isT22 = account.owner.equals(TOKEN_2022_PROGRAM_ID);
-    out.push({
-      mint: info.mint,
-      amount,
-      decimals: info.tokenAmount.decimals ?? 0,
-      programId: isT22 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID,
-    });
-  }
-  return out;
-}
-
 export async function inspectGift(
   connection: Connection,
   giftPubkey: PublicKey,
-  network: Network,
+  network: Network
 ): Promise<GiftContents> {
-  const [lamports, tokens] = await Promise.all([
-    connection.getBalance(giftPubkey, "confirmed"),
-    loadGiftTokenHoldings(connection, giftPubkey),
-  ]);
+  const lamports = await connection.getBalance(giftPubkey, "confirmed");
+  const tokens: GiftTokenHolding[] = [];
+
+  for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
+    try {
+      const res = await connection.getParsedTokenAccountsByOwner(giftPubkey, { programId });
+      for (const { account } of res.value) {
+        const info = account.data.parsed?.info;
+        if (!info) continue;
+        const mint = info.mint as string;
+        const ta = info.tokenAmount as { amount: string; decimals: number };
+        const amount = BigInt(ta.amount || "0");
+        if (amount <= BigInt(0)) continue;
+        tokens.push({
+          mint,
+          amount,
+          decimals: ta.decimals,
+          programId,
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   const usdc = usdcMint(network).toBase58();
   const usdcHold = tokens.find((t) => t.mint === usdc);
-  return {
-    lamports,
-    usdcBase: usdcHold ? Number(usdcHold.amount) : 0,
-    tokens,
-  };
+  const usdcBase = usdcHold ? Number(usdcHold.amount) : 0;
+
+  return { lamports, usdcBase, tokens };
+}
+
+export function buildSolGiftInstructions(
+  sender: PublicKey,
+  giftPubkey: PublicKey,
+  amountLamports: number
+): TransactionInstruction[] {
+  return [
+    SystemProgram.transfer({
+      fromPubkey: sender,
+      toPubkey: giftPubkey,
+      lamports: amountLamports + CLAIM_FEE_LAMPORTS,
+    }),
+  ];
 }
 
 export function buildSplGiftInstructions(
   sender: PublicKey,
   giftPubkey: PublicKey,
-  mint: PublicKey,
   amountBase: number | bigint,
+  mint: PublicKey,
   decimals: number,
-  programId: PublicKey = TOKEN_PROGRAM_ID,
+  programId: PublicKey = TOKEN_PROGRAM_ID
 ): TransactionInstruction[] {
-  const amount = typeof amountBase === "bigint" ? amountBase : BigInt(Math.trunc(amountBase));
+  const amount = typeof amountBase === "bigint" ? amountBase : BigInt(amountBase);
   const senderAta = getAssociatedTokenAddressSync(mint, sender, false, programId);
   const giftAta = getAssociatedTokenAddressSync(mint, giftPubkey, false, programId);
   return [
@@ -156,7 +179,7 @@ export function buildSplGiftInstructions(
       giftAta,
       giftPubkey,
       mint,
-      programId,
+      programId
     ),
     createTransferCheckedInstruction(
       senderAta,
@@ -166,7 +189,7 @@ export function buildSplGiftInstructions(
       amount,
       decimals,
       [],
-      programId,
+      programId
     ),
     SystemProgram.transfer({
       fromPubkey: sender,
@@ -180,73 +203,77 @@ export function buildUsdcGiftInstructions(
   sender: PublicKey,
   giftPubkey: PublicKey,
   amountBase: number,
-  network: Network,
+  network: Network
 ): TransactionInstruction[] {
   return buildSplGiftInstructions(
     sender,
     giftPubkey,
-    usdcMint(network),
     amountBase,
+    usdcMint(network),
     USDC_DECIMALS,
-    TOKEN_PROGRAM_ID,
+    TOKEN_PROGRAM_ID
   );
 }
 
-/** UI amount → base units for SOL or USDC (legacy API helper). */
-export function giftAmountToBase(amountUi: number, token: string): number {
-  if (!Number.isFinite(amountUi) || amountUi <= 0) return 0;
-  if (token === "USDC") return Math.round(amountUi * 1e6);
-  return Math.round(amountUi * 1e9);
-}
-
-/**
- * Build funding ixs for SOL or USDC gifts (server-side /api/gift/create).
- * amountBase is lamports (SOL) or USDC base units.
- */
 export function buildGiftFundingInstructions(
   sender: PublicKey,
   giftPubkey: PublicKey,
-  amountBase: number,
-  token: string,
+  amountBase: number | bigint,
+  token: GiftToken,
   network: Network,
+  opts?: { decimals?: number; programId?: string }
 ): TransactionInstruction[] {
-  if (token === "USDC") {
-    return buildUsdcGiftInstructions(sender, giftPubkey, amountBase, network);
+  if (isNativeGiftToken(token)) {
+    return buildSolGiftInstructions(sender, giftPubkey, Number(amountBase));
   }
-  return [
-    SystemProgram.transfer({
-      fromPubkey: sender,
-      toPubkey: giftPubkey,
-      lamports: amountBase + CLAIM_FEE_LAMPORTS,
-    }),
-  ];
+  if (token === "USDC") {
+    return buildUsdcGiftInstructions(sender, giftPubkey, Number(amountBase), network);
+  }
+  const mint = new PublicKey(token);
+  const decimals = opts?.decimals ?? 6;
+  const programId = opts?.programId
+    ? new PublicKey(opts.programId)
+    : TOKEN_PROGRAM_ID;
+  return buildSplGiftInstructions(
+    sender,
+    giftPubkey,
+    amountBase,
+    mint,
+    decimals,
+    programId
+  );
 }
 
 export async function sweepGift(
   connection: Connection,
   gift: Keypair,
   destination: PublicKey,
-  network: Network,
-): Promise<{
-  signature: string;
-  lamports: number;
-  usdcBase: number;
-  tokens: GiftTokenHolding[];
-}> {
+  network: Network
+): Promise<{ signature: string; lamports: number; usdcBase: number }> {
   const contents = await inspectGift(connection, gift.publicKey, network);
   const ixs: TransactionInstruction[] = [];
 
   for (const t of contents.tokens) {
     const mint = new PublicKey(t.mint);
-    const giftAta = getAssociatedTokenAddressSync(mint, gift.publicKey, false, t.programId);
-    const destAta = getAssociatedTokenAddressSync(mint, destination, false, t.programId);
+    const giftAta = getAssociatedTokenAddressSync(
+      mint,
+      gift.publicKey,
+      false,
+      t.programId
+    );
+    const destAta = getAssociatedTokenAddressSync(
+      mint,
+      destination,
+      false,
+      t.programId
+    );
     ixs.push(
       createAssociatedTokenAccountIdempotentInstruction(
         gift.publicKey,
         destAta,
         destination,
         mint,
-        t.programId,
+        t.programId
       ),
       createTransferCheckedInstruction(
         giftAta,
@@ -256,9 +283,15 @@ export async function sweepGift(
         t.amount,
         t.decimals,
         [],
-        t.programId,
+        t.programId
       ),
-      createCloseAccountInstruction(giftAta, destination, gift.publicKey, [], t.programId),
+      createCloseAccountInstruction(
+        giftAta,
+        destination,
+        gift.publicKey,
+        [],
+        t.programId
+      )
     );
   }
 
@@ -272,12 +305,13 @@ export async function sweepGift(
         fromPubkey: gift.publicKey,
         toPubkey: destination,
         lamports,
-      }),
+      })
     );
   }
 
   const tx = new Transaction().add(...ixs);
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+  const { blockhash, lastValidBlockHeight } =
+    await connection.getLatestBlockhash("confirmed");
   tx.recentBlockhash = blockhash;
   tx.feePayer = gift.publicKey;
   tx.sign(gift);
@@ -288,13 +322,12 @@ export async function sweepGift(
   });
   await connection.confirmTransaction(
     { signature, blockhash, lastValidBlockHeight },
-    "confirmed",
+    "confirmed"
   );
   return {
     signature,
     lamports: Math.max(lamports, 0),
     usdcBase: contents.usdcBase,
-    tokens: contents.tokens,
   };
 }
 
@@ -303,7 +336,7 @@ export interface GiftLinkEntry {
   url: string;
   amount: number;
   token?: GiftToken;
-  tokenSymbol?: string;
+  symbol?: string;
   decimals?: number;
   network: Network;
   createdAt: string;
@@ -328,6 +361,12 @@ export function saveGiftLink(entry: GiftLinkEntry) {
 export function removeGiftLink(pubkey: string) {
   localStorage.setItem(
     STORAGE_KEY,
-    JSON.stringify(loadGiftLinks().filter((l) => l.pubkey !== pubkey)),
+    JSON.stringify(loadGiftLinks().filter((l) => l.pubkey !== pubkey))
   );
+}
+
+export function giftTokenLabel(token?: GiftToken, symbol?: string): string {
+  if (!token || isNativeGiftToken(token)) return "SOL";
+  if (token === "USDC") return "USDC";
+  return symbol || `${token.slice(0, 4)}…`;
 }
