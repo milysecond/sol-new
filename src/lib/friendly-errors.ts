@@ -72,7 +72,9 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
     }
     // Prefer the original message if it already explains the failure
     if (msg.length < 200 && msg.toLowerCase().includes("stake")) return msg;
-    return "The transaction couldn't be built. Refresh the page and try again.";
+    if (m.includes("insufficient") || m.includes("lamports")) return "Not enough SOL for rent + fees. Lower amount or add SOL.";
+    if (m.includes("already exists") || m.includes("already in use")) return "That stake account already exists. Tap Stake again.";
+    return "The transaction failed simulation. Check balance/fees, refresh, and try again.";
   }
 
   // Promo
