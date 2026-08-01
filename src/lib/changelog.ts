@@ -14,6 +14,14 @@ export type ChangelogEntry = {
 /** Newest first. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-01",
+    title: "Token swap",
+    items: [
+      "New /swap: Jupiter Ultra routing for SOL, USDC, and any mint (passkey-signed).",
+      "Balance presets, token search, live quotes.",
+    ],
+  },
+  {
     date: "2026-07-30",
     title: "Docs, gift API, loan",
     items: [
