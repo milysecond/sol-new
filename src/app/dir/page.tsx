@@ -39,6 +39,7 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
       { label: "pay someone", href: "/pay" },
       { label: "split a bill", href: "/split" },
       { label: "short links", href: "/link" },
+      { label: "find wallet", href: "/wallet/find" },
       { label: "get SOL", href: "/get" },
       { label: "earn USDC", href: "/earn" },
       { label: "lend & borrow", href: "/loan" },

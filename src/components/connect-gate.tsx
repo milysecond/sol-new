@@ -131,7 +131,7 @@ export function ConnectGate({
 
                 <button
                   type="button"
-                  onClick={() => void recover()}
+                  onClick={() => void recover({ forcePicker: true })}
                   disabled={loading}
                   className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
                 >
@@ -146,6 +146,13 @@ export function ConnectGate({
                     "I already have a passkey wallet"
                   )}
                 </button>
+
+                <a
+                  href="/wallet/find"
+                  className="block w-full text-center text-sm font-medium text-purple-600 dark:text-purple-400 py-1"
+                >
+                  Many passkeys? Find correct wallet →
+                </a>
 
                 {!showCreate ? (
                   <button
