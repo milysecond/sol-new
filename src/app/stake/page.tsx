@@ -49,7 +49,7 @@ function errText(e: unknown): string {
 export default function StakePage() {
   const { publicKey, balance, refreshBalance } = useWallet();
   const { rpc, network } = useNetwork();
-  const [amount, setAmount] = useState("0.01");
+  const [amount, setAmount] = useState("1");
   const [vote, setVote] = useState(DEFAULT_VOTE);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -384,9 +384,15 @@ export default function StakePage() {
                     </button>
                   </div>
                   <p className="text-[11px] text-gray-400 mt-1">
-                    Balance: {balShown.toFixed(4)} SOL · min {MIN_STAKE_SOL} · +
-                    {(rentLamports / LAMPORTS_PER_SOL).toFixed(4)} rent
+                    Balance: {balShown.toFixed(4)} SOL · min {MIN_STAKE_SOL} SOL
+                    (network) · +{(rentLamports / LAMPORTS_PER_SOL).toFixed(4)} rent
                   </p>
+                  {balShown < MIN_STAKE_SOL + rentLamports / LAMPORTS_PER_SOL && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+                      Need at least ~{(MIN_STAKE_SOL + rentLamports / LAMPORTS_PER_SOL).toFixed(2)} SOL
+                      to stake (Solana requires ≥{MIN_STAKE_SOL} SOL delegated).
+                    </p>
+                  )}
                 </div>
 
                 <div>

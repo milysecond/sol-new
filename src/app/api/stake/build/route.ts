@@ -4,7 +4,7 @@ import {
   buildSelfPaidStakeTx,
   stakeSponsorConfigured,
 } from "@/lib/stake-build";
-import { STAKE_VALIDATORS } from "@/lib/stake-validators";
+import { STAKE_VALIDATORS, MIN_STAKE_SOL } from "@/lib/stake-validators";
 
 export const dynamic = "force-dynamic";
 
@@ -38,8 +38,11 @@ export async function POST(req: NextRequest) {
     if (!seed || seed.length > 32 || !/^[a-zA-Z0-9]+$/.test(seed)) {
       return NextResponse.json({ error: "Invalid seed" }, { status: 400 });
     }
-    if (!Number.isFinite(amountSol) || amountSol < 0.01) {
-      return NextResponse.json({ error: "Minimum stake is 0.01 SOL" }, { status: 400 });
+    if (!Number.isFinite(amountSol) || amountSol < MIN_STAKE_SOL) {
+      return NextResponse.json(
+        { error: `Minimum stake is ${MIN_STAKE_SOL} SOL (Solana network rule)` },
+        { status: 400 }
+      );
     }
     if (amountSol > 1_000_000) {
       return NextResponse.json({ error: "Amount too large" }, { status: 400 });

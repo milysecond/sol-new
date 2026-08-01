@@ -30,5 +30,10 @@ export const DEFAULT_VOTE = STAKE_VALIDATORS[0].vote;
 /** Stake account rent-exempt minimum ~0.00228288 SOL; keep buffer for fees. */
 export const STAKE_RENT_LAMPORTS = 2_282_880;
 export const STAKE_FEE_BUFFER_LAMPORTS = 15_000;
-/** Practical minimum stake above rent (user-facing). */
-export const MIN_STAKE_SOL = 0.01;
+/**
+ * Mainnet minimum delegation (getStakeMinimumDelegation) = 1 SOL.
+ * Amount the user enters is the stake; rent is added on top when funding the account.
+ */
+export const MIN_STAKE_SOL = 1;
+/** Lamports equivalent — used server-side. */
+export const MIN_STAKE_LAMPORTS = 1_000_000_000;
