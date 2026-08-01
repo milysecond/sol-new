@@ -42,7 +42,7 @@ export default function ClaimPage() {
     signature: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState("sol.new ");
 
   const { publicKey, walletLabel, connect, recover, loading: walletLoading, error: walletError, refreshBalance } = useWallet();
 
@@ -93,12 +93,59 @@ export default function ClaimPage() {
     setError(null);
     try {
       const connection = new Connection(RPC[network], "confirmed");
-      const { signature, lamports, usdcBase } = await sweepGift(
+
+      // Prefer sol.new-sponsored claim (no SOL needed on recipient)
+      let feePayer: PublicKey | undefined;
+      try {
+        const sRes = await fetch("/api/sponsor", { cache: "no-store" });
+        const sData = (await sRes.json()) as {
+          configured?: boolean;
+          feePayer?: string;
+        };
+        if (sData.configured && sData.feePayer) {
+          feePayer = new PublicKey(sData.feePayer);
+        }
+      } catch {
+        /* fall back to gift-pays */
+      }
+
+      const result = await sweepGift(
         connection,
         state.gift,
         new PublicKey(publicKey),
-        network
+        network,
+        feePayer ? { feePayer } : undefined
       );
+
+      let signature = result.signature;
+      if (result.sponsored) {
+        const sp = await fetch("/api/sponsor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            transaction: result.signature,
+            network,
+          }),
+        });
+        const sj = (await sp.json()) as {
+          ok?: boolean;
+          signature?: string;
+          error?: string;
+        };
+        if (!sp.ok || !sj.signature) {
+          // Fallback: gift pays its own fee
+          const fallback = await sweepGift(
+            connection,
+            state.gift,
+            new PublicKey(publicKey),
+            network
+          );
+          signature = fallback.signature;
+        } else {
+          signature = sj.signature;
+        }
+      }
+
       fetch("/api/gift", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -108,15 +155,15 @@ export default function ClaimPage() {
         }),
       }).catch(() => {});
       analytics.giftClaimed(
-        usdcBase > 0
-          ? usdcBase / 1e6
+        result.usdcBase > 0
+          ? result.usdcBase / 1e6
           : state.tokens.length
             ? Number(state.tokens[0].amount) / 10 ** state.tokens[0].decimals
-            : lamports / LAMPORTS_PER_SOL
+            : result.lamports / LAMPORTS_PER_SOL
       );
       setClaimed({
-        lamports,
-        usdcBase,
+        lamports: result.lamports,
+        usdcBase: result.usdcBase,
         tokens: state.tokens.map((t) => ({
           mint: t.mint,
           amount: t.amount.toString(),
@@ -127,7 +174,9 @@ export default function ClaimPage() {
       await refreshBalance();
       const { toast } = await import("sonner");
       toast.success("Gift claimed!");
-      try { new Audio("/chaching.mp3").play(); } catch {}
+      try {
+        new Audio("/chaching.mp3").play();
+      } catch {}
     } catch (err) {
       const { friendlyError } = await import("@/lib/friendly-errors");
       setError(friendlyError(err, "We couldn't claim this gift. Try again."));
@@ -261,22 +310,34 @@ export default function ClaimPage() {
                         <Spinner size={16} /> Claiming…
                       </>
                     ) : (
-                      "Claim gift"
+                      "Claim gift — free network fee"
                     )}
                   </button>
+                  <p className="text-[11px] text-center text-gray-400">
+                    sol.new pays the claim network fee
+                  </p>
                 </div>
               ) : (
                 <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-5 space-y-3 text-center">
                   <KeyRound className="w-7 h-7 text-amber-400 mx-auto" />
-                  <h2 className="font-semibold">Create a wallet to claim it</h2>
+                  <h2 className="font-semibold">Create a sol.new wallet to claim</h2>
                   <p className="text-gray-500 dark:text-white/40 text-sm">
-                    Takes seconds with Face ID or fingerprint. No app, no seed phrase.
+                    Takes seconds with Face ID. Network fee covered by sol.new.
                   </p>
                   <input
                     type="text"
-                    placeholder="Name your wallet (e.g. Alex)"
+                    placeholder="sol.new · your name"
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (!v.startsWith("sol.new")) {
+                        setUsername(
+                          v ? `sol.new ${v.replace(/^sol\.new\s*/i, "")}` : "sol.new "
+                        );
+                      } else {
+                        setUsername(v);
+                      }
+                    }}
                     className="w-full bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/25 transition text-sm"
                   />
                   {walletError && (

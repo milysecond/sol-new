@@ -16,7 +16,7 @@ import { Spinner } from "@/components/spinner";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { getPasskeyKeypair } from "@/lib/passkey-wallet";
+import { getPasskeyKeypair, signVersionedAndSend } from "@/lib/passkey-wallet";
 import { friendlyError } from "@/lib/friendly-errors";
 import { SOL_MINT, USDC_MINT } from "@/lib/jup-ultra";
 
@@ -88,7 +88,7 @@ function fmtUi(n: number | null | undefined, d = 4): string {
 
 export default function SwapPage() {
   const { publicKey, walletLabel, balance, usdcBalance, refreshBalance } = useWallet();
-  const { network } = useNetwork();
+  const { network, rpc } = useNetwork();
   const [from, setFrom] = useState<TokenOpt>(PRESETS[0]);
   const [to, setTo] = useState<TokenOpt>(PRESETS[1]);
   const [amount, setAmount] = useState("0.1");
@@ -103,7 +103,15 @@ export default function SwapPage() {
   const [hits, setHits] = useState<TokenOpt[]>([]);
   const [searching, setSearching] = useState(false);
   const [fromBal, setFromBal] = useState<number | null>(null);
+  const [sponsored, setSponsored] = useState(false);
   const quoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    fetch("/api/sponsor", { cache: "no-store" })
+      .then((r) => r.json() as Promise<{ configured?: boolean }>)
+      .then((d) => setSponsored(!!d.configured))
+      .catch(() => setSponsored(false));
+  }, []);
 
   const maxFrom = useMemo(() => {
     if (from.mint === SOL_MINT) {
@@ -286,51 +294,118 @@ export default function SwapPage() {
     setError(null);
     setSig(null);
     try {
-      const q = new URLSearchParams({
-        inputMint: from.mint,
-        outputMint: to.mint,
-        amount: atomic,
-        taker: publicKey,
-      });
-      const oRes = await fetch(`/api/swap/order?${q}`, { cache: "no-store" });
-      const oData = (await oRes.json()) as {
-        ok?: boolean;
-        error?: string;
-        order?: { transaction?: string; requestId?: string; outAmount?: string };
-      };
-      if (!oRes.ok || !oData.order?.transaction || !oData.order.requestId) {
-        throw new Error(oData.error || "Could not build swap");
+      // Sponsored path: lite-api quote + swap-instructions + fee-payer build
+      // (sol.new pays network fee). Fall back to Ultra if unavailable.
+      let signature: string | null = null;
+
+      if (sponsored) {
+        try {
+          const JUP = "https://lite-api.jup.ag/swap/v1";
+          const quoteParams = new URLSearchParams({
+            inputMint: from.mint,
+            outputMint: to.mint,
+            amount: atomic,
+            slippageBps: "50",
+            swapMode: "ExactIn",
+          });
+          const qRes = await fetch(`${JUP}/quote?${quoteParams}`);
+          const quote = (await qRes.json()) as {
+            error?: string;
+            outAmount?: string;
+            [k: string]: unknown;
+          };
+          if (!qRes.ok) throw new Error(quote?.error || "Quote failed");
+
+          const sRes = await fetch(`${JUP}/swap-instructions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              quoteResponse: quote,
+              userPublicKey: publicKey,
+              wrapAndUnwrapSol: true,
+              useSharedAccounts: true,
+              dynamicComputeUnitLimit: true,
+              prioritizationFeeLamports: "auto",
+            }),
+          });
+          const swapIxs = (await sRes.json()) as {
+            error?: string;
+            swapInstruction?: unknown;
+            [k: string]: unknown;
+          };
+          if (!sRes.ok || !swapIxs?.swapInstruction) {
+            throw new Error(swapIxs?.error || "Swap instructions failed");
+          }
+
+          const bRes = await fetch("/api/swap/build", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ swapInstructionsResponse: swapIxs }),
+          });
+          const bData = (await bRes.json()) as {
+            ok?: boolean;
+            tx?: string;
+            error?: string;
+          };
+          if (!bRes.ok || !bData.tx) throw new Error(bData.error || "Build failed");
+
+          signature = await signVersionedAndSend(bData.tx, rpc, publicKey);
+          if (quote.outAmount) {
+            setQuoteOut(fromAtomic(String(quote.outAmount), to.decimals));
+          }
+        } catch (e) {
+          console.warn("Sponsored swap failed, trying Ultra", e);
+          signature = null;
+        }
       }
 
-      const { keypair } = await getPasskeyKeypair(publicKey);
+      if (!signature) {
+        const q = new URLSearchParams({
+          inputMint: from.mint,
+          outputMint: to.mint,
+          amount: atomic,
+          taker: publicKey,
+        });
+        const oRes = await fetch(`/api/swap/order?${q}`, { cache: "no-store" });
+        const oData = (await oRes.json()) as {
+          ok?: boolean;
+          error?: string;
+          order?: { transaction?: string; requestId?: string; outAmount?: string };
+        };
+        if (!oRes.ok || !oData.order?.transaction || !oData.order.requestId) {
+          throw new Error(oData.error || "Could not build swap");
+        }
 
-      const tx = VersionedTransaction.deserialize(
-        Buffer.from(oData.order.transaction, "base64")
-      );
-      tx.sign([keypair]);
-      const signedTransaction = Buffer.from(tx.serialize()).toString("base64");
+        const { keypair } = await getPasskeyKeypair(publicKey);
+        const tx = VersionedTransaction.deserialize(
+          Buffer.from(oData.order.transaction, "base64")
+        );
+        tx.sign([keypair]);
+        const signedTransaction = Buffer.from(tx.serialize()).toString("base64");
 
-      const eRes = await fetch("/api/swap/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          signedTransaction,
-          requestId: oData.order.requestId,
-        }),
-      });
-      const eData = (await eRes.json()) as {
-        ok?: boolean;
-        error?: string;
-        result?: { signature?: string; status?: string; code?: number };
-      };
-      if (!eRes.ok || !eData.ok) {
-        throw new Error(eData.error || "Swap execute failed");
+        const eRes = await fetch("/api/swap/execute", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            signedTransaction,
+            requestId: oData.order.requestId,
+          }),
+        });
+        const eData = (await eRes.json()) as {
+          ok?: boolean;
+          error?: string;
+          result?: { signature?: string; status?: string };
+        };
+        if (!eRes.ok || !eData.ok) {
+          throw new Error(eData.error || "Swap execute failed");
+        }
+        signature =
+          eData.result?.signature ||
+          (typeof eData.result?.status === "string" ? eData.result.status : null);
+        setQuoteOut(fromAtomic(oData.order.outAmount, to.decimals));
       }
-      const signature =
-        eData.result?.signature ||
-        (typeof eData.result?.status === "string" ? eData.result.status : null);
+
       setSig(typeof signature === "string" ? signature : "confirmed");
-      setQuoteOut(fromAtomic(oData.order.outAmount, to.decimals));
       await refreshBalance();
     } catch (e) {
       setError(friendlyError(e, "Swap failed"));
@@ -391,7 +466,8 @@ export default function SwapPage() {
               <AnimatedIcon icon={ArrowLeftRight} size={32} className="text-purple-500" />
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Swap</h1>
               <p className="text-xs sm:text-sm text-gray-500 dark:text-white/50">
-                Any token · your passkey wallet · Jupiter Ultra
+                Any token · your passkey wallet
+                {sponsored ? " · sol.new pays network fee" : " · Jupiter Ultra"}
               </p>
               {publicKey && (
                 <p className="inline-flex items-center gap-1.5 text-[11px] font-mono text-purple-600 dark:text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-full px-2.5 py-1">
@@ -516,7 +592,8 @@ export default function SwapPage() {
                 </button>
 
                 <p className="text-[11px] text-center text-gray-400 dark:text-white/30">
-                  Routed via Jupiter Ultra · network + protocol fees apply
+                  Routed via Jupiter
+                  {sponsored ? " · network fee paid by sol.new" : " · network + protocol fees apply"}
                 </p>
               </div>
             </ConnectGate>
