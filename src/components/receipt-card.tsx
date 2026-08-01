@@ -113,23 +113,26 @@ export const ReceiptCard = forwardRef<HTMLDivElement, { tx: ReceiptData }>(
         const file = new File([blob], `sol-new-receipt-${tx.signature.slice(0, 8)}.png`, {
           type: "image/png",
         });
-        const shareUrl =
-          typeof window !== "undefined"
-            ? `${window.location.origin}/receipt/${tx.signature}`
-            : `https://sol.new/receipt/${tx.signature}`;
+        const { receiptSharePayload } = await import("@/lib/share-copy");
+        const payload = receiptSharePayload({
+          amount,
+          symbol,
+          signature: tx.signature,
+          counterparty: tx.to || tx.from || null,
+        });
 
         if (navigator.share && navigator.canShare?.({ files: [file] })) {
           await navigator.share({
-            title: "Solana transaction receipt",
-            text: `${amount} ${symbol} · verified on sol.new`,
-            url: shareUrl,
+            title: payload.title,
+            text: payload.text,
+            url: payload.url,
             files: [file],
           });
         } else if (navigator.share) {
           await navigator.share({
-            title: "Solana transaction receipt",
-            text: `${amount} ${symbol} · verified on sol.new`,
-            url: shareUrl,
+            title: payload.title,
+            text: payload.text,
+            url: payload.url,
           });
         } else {
           const url = URL.createObjectURL(blob);
@@ -140,15 +143,21 @@ export const ReceiptCard = forwardRef<HTMLDivElement, { tx: ReceiptData }>(
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
-          await navigator.clipboard.writeText(shareUrl);
-          toast.success("Image saved · link copied");
+          await navigator.clipboard.writeText(payload.text);
+          toast.success("Image saved · share text copied");
         }
       } catch (e) {
         if ((e as Error)?.name !== "AbortError") {
           try {
-            const shareUrl = `${window.location.origin}/receipt/${tx.signature}`;
-            await navigator.clipboard.writeText(shareUrl);
-            toast.success("Link copied");
+            const { receiptSharePayload } = await import("@/lib/share-copy");
+            const p = receiptSharePayload({
+              amount,
+              symbol,
+              signature: tx.signature,
+              counterparty: tx.to || tx.from || null,
+            });
+            await navigator.clipboard.writeText(p.text);
+            toast.success("Share text copied");
           } catch {
             toast.error("Share failed");
           }
