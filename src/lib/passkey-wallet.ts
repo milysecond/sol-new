@@ -4,24 +4,48 @@ import { Keypair, Transaction, VersionedTransaction, Connection } from "@solana/
 const CHALLENGE = new TextEncoder().encode("sol.new-wallet-creation");
 
 /**
- * Resolve which credential to allow for auth prompts. Prefers the active
- * credentialId; falls back to the saved wallet list keyed by the connected
- * address (heals sessions from before credentialId tracking existed, where
- * the browser would otherwise list every sol.new passkey on the device).
+ * Resolve which credential to allow for auth prompts.
+ * Always prefer the credential bound to `forAddress` (connected wallet).
+ * Never fall back to a different wallet's credentialId.
  */
 function getAllowCredentials(forAddress?: string | null) {
-  let credId = localStorage.getItem("sol.new.credentialId");
+  const pubkey = forAddress || (typeof localStorage !== "undefined" ? localStorage.getItem("sol.new.wallet") : null);
   try {
-    const pubkey = forAddress || localStorage.getItem("sol.new.wallet");
-    const wallets = JSON.parse(localStorage.getItem("sol.new.wallets") || "[]");
+    const wallets = JSON.parse(localStorage.getItem("sol.new.wallets") || "[]") as {
+      pubkey?: string;
+      credentialId?: string;
+    }[];
     if (pubkey) {
-      const fromList = wallets.find((w: { pubkey?: string }) => w.pubkey === pubkey)?.credentialId;
-      if (fromList) credId = fromList;
+      const fromList = wallets.find((w) => w.pubkey === pubkey)?.credentialId;
+      if (fromList) {
+        return [
+          {
+            id: Uint8Array.from(atob(fromList), (c) => c.charCodeAt(0)),
+            type: "public-key" as const,
+          },
+        ];
+      }
     }
-  } catch {}
-  return credId
-    ? [{ id: Uint8Array.from(atob(credId), (c) => c.charCodeAt(0)), type: "public-key" as const }]
-    : undefined;
+  } catch {
+    /* ignore */
+  }
+  // Global credential only if it belongs to the same active wallet
+  try {
+    const active = localStorage.getItem("sol.new.wallet");
+    const credId = localStorage.getItem("sol.new.credentialId");
+    if (credId && pubkey && active === pubkey) {
+      return [
+        {
+          id: Uint8Array.from(atob(credId), (c) => c.charCodeAt(0)),
+          type: "public-key" as const,
+        },
+      ];
+    }
+  } catch {
+    /* ignore */
+  }
+  // No pin → browser may list passkeys; caller must verify derived address
+  return undefined;
 }
 
 /**
@@ -31,18 +55,26 @@ function getAllowCredentials(forAddress?: string | null) {
 function rememberCredential(address: string, rawId: ArrayBuffer) {
   try {
     const credentialId = btoa(String.fromCharCode(...new Uint8Array(rawId)));
-    const wallets = JSON.parse(localStorage.getItem("sol.new.wallets") || "[]");
+    const wallets = JSON.parse(localStorage.getItem("sol.new.wallets") || "[]") as {
+      pubkey: string;
+      credentialId?: string;
+      label?: string;
+    }[];
     const idx = wallets.findIndex((w) => w.pubkey === address);
     if (idx >= 0) {
-      if (!wallets[idx].credentialId) wallets[idx].credentialId = credentialId;
+      wallets[idx].credentialId = credentialId;
+      wallets[idx].label = address;
     } else {
-      wallets.push({ pubkey: address, credentialId, label: `Wallet ${address.slice(0, 4)}…${address.slice(-4)}` });
+      wallets.push({ pubkey: address, credentialId, label: address });
     }
     localStorage.setItem("sol.new.wallets", JSON.stringify(wallets));
-    if (localStorage.getItem("sol.new.wallet") === address && !localStorage.getItem("sol.new.credentialId")) {
+    // Keep active session credential in sync when this is the connected wallet
+    if (localStorage.getItem("sol.new.wallet") === address) {
       localStorage.setItem("sol.new.credentialId", credentialId);
     }
-  } catch {}
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
@@ -380,6 +412,52 @@ export async function signAndSendTransaction(
   }, "confirmed");
   
   return sig;
+}
+
+/**
+ * Sign a fee-payer-pre-signed VersionedTransaction with an already-derived keypair.
+ * No second Face ID — pair with getPasskeyKeypair(publicKey) first.
+ */
+export async function signVersionedWithKeypairAndSend(
+  serializedTx: string,
+  rpc: string,
+  keypair: Keypair,
+  expectedPublicKey?: string,
+): Promise<string> {
+  if (expectedPublicKey && keypair.publicKey.toBase58() !== expectedPublicKey) {
+    throw new Error(
+      `Passkey mismatch: expected ${expectedPublicKey.slice(0, 4)}…, got ${keypair.publicKey.toBase58().slice(0, 4)}…`
+    );
+  }
+  const tx = VersionedTransaction.deserialize(Buffer.from(serializedTx, "base64"));
+  tx.sign([keypair]);
+
+  const conn = new Connection(rpc, "confirmed");
+  try {
+    const sig = await conn.sendRawTransaction(tx.serialize(), {
+      skipPreflight: false,
+      maxRetries: 3,
+    });
+    await conn.confirmTransaction(sig, "confirmed");
+    return sig;
+  } catch (e: unknown) {
+    const anyE = e as {
+      message?: string;
+      logs?: string[];
+      getLogs?: () => Promise<string[]>;
+    };
+    let logs: string[] | undefined = anyE.logs;
+    try {
+      if (!logs && typeof anyE.getLogs === "function") {
+        logs = await anyE.getLogs();
+      }
+    } catch {
+      /* ignore */
+    }
+    const tail = logs?.slice(-6).join(" · ");
+    const base = anyE.message || String(e);
+    throw new Error(tail ? `${base} — ${tail}` : base);
+  }
 }
 
 /**
