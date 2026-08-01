@@ -11,6 +11,7 @@ import {
 import { Navbar } from "@/components/navbar";
 import { useWallet } from "@/lib/wallet-context";
 import { analytics } from "@/lib/analytics";
+import { PortfolioDefiPanel } from "@/components/portfolio-defi-panel";
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 
@@ -401,261 +402,16 @@ function TokenView({ data }: { data: TokenData }) {
   );
 }
 
-// ── Wallet View (reuses /api/track) ───────────────────────────────────────────
-
-interface TrackData {
-  wallet: string;
-  analyze: {
-    wallet: string;
-    total_net_worth_usd: number;
-    categories: Record<string, any>;
-    active_protocols: string[];
-  };
-  pnl: {
-    total_pnl_usd: number;
-    unrealized: { pnl_usd: number; pnl_pct: number; position_count: number };
-    realized_7d: { pnl_usd: number };
-  } | null;
-  holdings: {
-    total_value_usd: number;
-    holdings_count: number;
-    holdings: { mint: string; symbol?: string; name?: string; balance: number; price_usd: number; value_usd: number }[];
-  } | null;
-}
-
-const CATEGORY_META = [
-  { key: "holdings", label: "Token Holdings", icon: Coins, value: (c: any) => c?.value_usd, sub: (c: any) => (c?.token_count ? `${c.token_count} tokens` : "") },
-  { key: "lending", label: "Lending", icon: Landmark, value: (c: any) => c?.net_usd, sub: (c: any) => (c?.borrow_usd ? `${fmtUsd(c.deposit_usd)} supplied · ${fmtUsd(c.borrow_usd)} borrowed` : "") },
-  { key: "perpetuals", label: "Perpetuals", icon: LineChart, value: (c: any) => c?.collateral_usd, sub: (c: any) => (c?.positions ? `${c.positions} open · PnL ${fmtPnl(c.pnl_usd)}` : "") },
-  { key: "lp_positions", label: "LP Positions", icon: Layers, value: (c: any) => c?.value_usd, sub: (c: any) => (c?.positions ? `${c.positions} positions` : "") },
-  { key: "staking", label: "Staking", icon: Sprout, value: (c: any) => c?.value_usd },
-  { key: "yield", label: "Yield", icon: Sprout, value: (c: any) => c?.value_usd },
-  { key: "rewards", label: "Pending Rewards", icon: Gift, value: (c: any) => c?.pending_usd },
-  { key: "governance", label: "Governance", icon: Vote, value: (c: any) => c?.value_usd },
-];
-
-function StatCard({ label, value, accent, sub }: { label: string; value: string; accent?: "green" | "red" | "purple"; sub?: string }) {
-  const color =
-    accent === "green" ? "text-emerald-500 dark:text-emerald-400"
-    : accent === "red" ? "text-rose-500 dark:text-rose-400"
-    : "text-gray-900 dark:text-white";
-  return (
-    <div className="bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl px-4 py-3">
-      <p className="text-xs text-gray-500 dark:text-white/40">{label}</p>
-      <p className={`text-xl font-bold tracking-tight ${color}`}>{value}</p>
-      {sub && <p className="text-[11px] text-gray-400 dark:text-white/30 mt-0.5">{sub}</p>}
-    </div>
-  );
-}
+// ── Wallet View ───────────────────────────────────────────────────────────────
 
 function WalletView({
   address,
-  sol: initialSol,
-  usdc: initialUsdc,
 }: {
   address: string;
   sol?: number;
   usdc?: number | null;
 }) {
-  const [data, setData] = useState<TrackData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [sol, setSol] = useState<number | null>(initialSol ?? null);
-  const [usdc, setUsdc] = useState<number | null>(initialUsdc ?? null);
-
-  useEffect(() => {
-    setSol(initialSol ?? null);
-    setUsdc(initialUsdc ?? null);
-  }, [address, initialSol, initialUsdc]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    // If scan didn't already give SOL, fetch quickly via RPC-backed track is slow — keep scan balances.
-    fetch(`/api/track?wallet=${encodeURIComponent(address)}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        const td = d as TrackData & { error?: string; sol?: number; usdc?: number };
-        if (td.error) throw new Error(td.error);
-        setData(td);
-        analytics.walletTracked(
-          td.wallet,
-          td.analyze?.total_net_worth_usd ?? 0,
-          td.analyze?.active_protocols?.length ?? 0
-        );
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e.message || "Failed to load wallet");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [address]);
-
-  const a = data?.analyze;
-  const pnl = data?.pnl;
-  const netPnl = pnl?.total_pnl_usd;
-  const fmtSol = (n: number | null) =>
-    n == null ? "—" : `${n.toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL`;
-  const fmtUsdcBal = (n: number | null) =>
-    n == null ? "—" : `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-2 flex-wrap">
-        <WalletIcon className="w-4 h-4 text-purple-500" />
-        <a
-          href={`https://solscan.io/account/${address}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-mono text-xs text-gray-500 dark:text-white/40 hover:text-purple-500 inline-flex items-center gap-1"
-        >
-          {short(address)} <ArrowUpRight className="w-3 h-3" />
-        </a>
-        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-500/10 text-purple-500">
-          Wallet
-        </span>
-        {a && a.active_protocols.length > 0 && (
-          <span className="text-xs text-gray-400 dark:text-white/30 ml-auto">
-            {a.active_protocols.length} active protocols
-          </span>
-        )}
-      </div>
-
-      {/* Balances on first paint */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="SOL" value={fmtSol(sol)} accent="purple" sub="Native balance" />
-        <StatCard label="USDC" value={fmtUsdcBal(usdc)} sub="Spot" />
-        <StatCard
-          label="Net Worth"
-          value={a ? fmtUsd(a.total_net_worth_usd) : loading ? "…" : "—"}
-          accent="purple"
-          sub={loading && !a ? "Loading portfolio…" : undefined}
-        />
-        <StatCard
-          label="Total PnL"
-          value={a ? fmtPnl(netPnl) : loading ? "…" : "—"}
-          accent={netPnl == null ? undefined : netPnl >= 0 ? "green" : "red"}
-          sub={pnl ? `Unrealized ${fmtPnl(pnl.unrealized.pnl_usd)}` : undefined}
-        />
-      </div>
-
-      {error && !data && (
-        <div className="text-center text-rose-500 py-2 text-sm">
-          {error}
-          {(sol != null || usdc != null) && (
-            <span className="block text-xs text-gray-400 dark:text-white/30 mt-1">
-              Spot balances still shown above.
-            </span>
-          )}
-        </div>
-      )}
-
-      {loading && !data && (
-        <div className="flex items-center justify-center gap-2 py-4 text-gray-400 dark:text-white/30 text-sm">
-          <Loader2 className="w-4 h-4 animate-spin text-purple-500" />
-          Analyzing portfolio…
-        </div>
-      )}
-
-      {data && a && (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <StatCard
-              label="Realized (7d)"
-              value={pnl ? fmtPnl(pnl.realized_7d.pnl_usd) : "—"}
-              accent={pnl == null ? undefined : pnl.realized_7d.pnl_usd >= 0 ? "green" : "red"}
-            />
-          </div>
-
-          <div className="space-y-2">
-            {CATEGORY_META.map(({ key, label, icon: Icon, value, sub }) => {
-              const c = a.categories?.[key];
-              const v = value(c);
-              if (v == null || v === 0) return null;
-              const subText = sub?.(c);
-              const protocols: any[] = c?.protocols || [];
-              return (
-                <div
-                  key={key}
-                  className="flex items-center gap-3 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl px-4 py-3"
-                >
-                  <div className="w-9 h-9 rounded-lg bg-purple-500/15 flex items-center justify-center shrink-0">
-                    <Icon size={17} className="text-purple-500 dark:text-purple-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{label}</p>
-                    {(subText || protocols.length > 0) && (
-                      <p className="text-xs text-gray-500 dark:text-white/40 truncate">
-                        {subText || protocols.map((p: any) => pretty(p.protocol)).join(", ")}
-                      </p>
-                    )}
-                  </div>
-                  <p className="text-sm font-semibold tabular-nums">{fmtUsd(v)}</p>
-                </div>
-              );
-            })}
-          </div>
-
-          {a.active_protocols.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {a.active_protocols.map((p: string) => (
-                <span
-                  key={p}
-                  className="text-[11px] px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/50"
-                >
-                  {pretty(p)}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {data.holdings && data.holdings.holdings.length > 0 && (
-            <div className="space-y-2">
-              <h2 className="text-sm font-semibold text-gray-500 dark:text-white/50 flex items-center gap-1.5">
-                <Coins size={14} /> Token Holdings · {fmtUsd(data.holdings.total_value_usd)}
-              </h2>
-              {data.holdings.holdings.slice(0, 25).map((h) => (
-                <div
-                  key={h.mint}
-                  className="flex items-center gap-3 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl px-4 py-2.5"
-                >
-                  <div className="flex-1 min-w-0">
-                    <a
-                      href={`https://solscan.io/token/${h.mint}`}
-                      target="_blank"
-                      className="text-sm font-medium hover:text-purple-500 dark:hover:text-purple-400"
-                    >
-                      {h.symbol || `${h.mint.slice(0, 4)}…${h.mint.slice(-4)}`}
-                    </a>
-                    <p className="text-xs text-gray-500 dark:text-white/40 tabular-nums">
-                      {h.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })} @{" "}
-                      {fmtUsd(h.price_usd)}
-                    </p>
-                  </div>
-                  <p className="text-sm font-semibold tabular-nums">{fmtUsd(h.value_usd)}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {a.total_net_worth_usd === 0 &&
-            a.active_protocols.length === 0 &&
-            (sol == null || sol === 0) &&
-            (usdc == null || usdc === 0) && (
-              <div className="text-center text-gray-400 dark:text-white/30 py-6 text-sm">
-                No DeFi positions or tracked holdings found for this wallet.
-              </div>
-            )}
-        </>
-      )}
-    </div>
-  );
+  return <PortfolioDefiPanel address={address} compact />;
 }
 
 // ── Main scan result ──────────────────────────────────────────────────────────
@@ -663,7 +419,13 @@ function WalletView({
 type ScanResult =
   | ({ type: "program" } & ProgramData)
   | ({ type: "token" } & TokenData)
-  | { type: "wallet"; address: string; sol?: number; usdc?: number | null; balances?: { sol: number; usdc: number | null } };
+  | {
+      type: "wallet";
+      address: string;
+      sol?: number;
+      usdc?: number | null;
+      balances?: { sol: number; usdc: number | null };
+    };
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 

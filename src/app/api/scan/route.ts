@@ -246,31 +246,54 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Wallet: native SOL + USDC balance on first paint; client may enrich via /api/track
-    const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    // Wallet: prefer Jupiter holdings for SOL/USDC, fall back to RPC
     let sol = 0;
-    let usdc: number | null = null;
+    let usdc: number | null = 0;
     try {
-      const bal = await rpc<{ value: number }>("getBalance", [address]);
-      sol = (bal?.value ?? 0) / 1e9;
+      const { jupConfigured, jupHoldings } = await import("@/lib/jup-portfolio");
+      if (jupConfigured()) {
+        const h = await jupHoldings(address);
+        sol = (h.uiAmount ?? Number(h.uiAmountString)) || 0;
+        const usdcAccounts = h.tokens?.["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"];
+        if (usdcAccounts?.length) {
+          usdc = usdcAccounts.reduce(
+            (s, a) => s + ((a.uiAmount ?? Number(a.uiAmountString)) || 0),
+            0
+          );
+        } else usdc = 0;
+      } else {
+        throw new Error("no jup");
+      }
     } catch {
-      /* leave 0 */
-    }
-    try {
-      // ATA for USDC (allow owner off-curve false)
-      const { PublicKey } = await import("@solana/web3.js");
-      const { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } = await import("@solana/spl-token");
-      const owner = new PublicKey(address);
-      const ata = getAssociatedTokenAddressSync(new PublicKey(USDC), owner, true, TOKEN_PROGRAM_ID);
-      const tb = await rpc<{ value?: { uiAmount?: number | null; uiAmountString?: string } }>(
-        "getTokenAccountBalance",
-        [ata.toBase58()]
-      );
-      const ui = tb?.value?.uiAmount;
-      usdc = typeof ui === "number" ? ui : tb?.value?.uiAmountString != null ? Number(tb.value.uiAmountString) : 0;
-      if (!Number.isFinite(usdc)) usdc = 0;
-    } catch {
-      usdc = 0;
+      try {
+        const bal = await rpc<{ value: number }>("getBalance", [address]);
+        sol = (bal?.value ?? 0) / 1e9;
+      } catch {
+        sol = 0;
+      }
+      try {
+        const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+        const { PublicKey } = await import("@solana/web3.js");
+        const { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } = await import(
+          "@solana/spl-token"
+        );
+        const owner = new PublicKey(address);
+        const ata = getAssociatedTokenAddressSync(new PublicKey(USDC), owner, true, TOKEN_PROGRAM_ID);
+        const tb = await rpc<{ value?: { uiAmount?: number | null; uiAmountString?: string } }>(
+          "getTokenAccountBalance",
+          [ata.toBase58()]
+        );
+        const ui = tb?.value?.uiAmount;
+        usdc =
+          typeof ui === "number"
+            ? ui
+            : tb?.value?.uiAmountString != null
+              ? Number(tb.value.uiAmountString)
+              : 0;
+        if (!Number.isFinite(usdc)) usdc = 0;
+      } catch {
+        usdc = 0;
+      }
     }
 
     return NextResponse.json(

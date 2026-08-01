@@ -69,10 +69,12 @@ export default function PortfolioPage() {
     }
   }, []);
 
-  // Default to connected wallet
+  // Default to connected wallet → pretty portfolio URL
   useEffect(() => {
     if (!publicKey) return;
     if (!owner) {
+      // stay on /portfolio with connected wallet for create history;
+      // offer deep link to DeFi portfolio
       setOwner(publicKey);
       setInput(publicKey);
       setOwnerLabel(null);
@@ -95,11 +97,8 @@ export default function PortfolioPage() {
         setError(result.error);
         return;
       }
-      setOwner(result.owner);
-      setOwnerLabel(
-        result.kind !== "pubkey" ? result.domain || raw.toLowerCase() : null,
-      );
-      setInput(result.kind !== "pubkey" ? raw : result.owner);
+      // Canonical portfolio URL with DeFi
+      window.location.href = `/portfolio/${encodeURIComponent(result.owner)}`;
     } finally {
       setResolving(false);
     }
@@ -121,8 +120,16 @@ export default function PortfolioPage() {
             <div className="text-center space-y-2">
               <h1 className="text-3xl font-bold tracking-tight">Portfolio</h1>
               <p className="text-gray-500 dark:text-white/40 text-sm">
-                Look up any wallet, or use your passkey wallet.
+                Look up any wallet for DeFi + tokens, or browse what you created.
               </p>
+              {publicKey && (
+                <a
+                  href={`/portfolio/${encodeURIComponent(publicKey)}`}
+                  className="inline-block text-sm text-purple-600 dark:text-purple-400 hover:underline"
+                >
+                  Open my DeFi portfolio →
+                </a>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -197,6 +204,12 @@ export default function PortfolioPage() {
 
             {owner && (
               <>
+                <a
+                  href={`/portfolio/${encodeURIComponent(owner)}`}
+                  className="block text-center text-sm font-medium text-purple-600 dark:text-purple-400 hover:underline"
+                >
+                  View token balances & DeFi positions →
+                </a>
                 <div className="flex gap-2 justify-center">
                   <button
                     onClick={() => setTab("nfts")}
