@@ -96,15 +96,9 @@ export async function buildSponsoredStakeTx(opts: {
   const vtx = new VersionedTransaction(msg);
   vtx.sign([feePayer]);
 
-  // Sim with sigVerify false (user hasn't signed yet)
-  const sim = await conn.simulateTransaction(vtx, {
-    sigVerify: false,
-    replaceRecentBlockhash: false,
-  });
-  if (sim.value.err) {
-    const logs = sim.value.logs?.slice(-8).join(" | ") || JSON.stringify(sim.value.err);
-    throw new Error(`Stake simulation failed: ${logs}`);
-  }
+  // Do NOT simulate here: user hasn't signed yet (base authority). RPC often
+  // returns AccountNotFound on partially-signed createAccountWithSeed.
+  // Client preflight runs after passkey sign.
 
   return {
     tx: Buffer.from(vtx.serialize()).toString("base64"),

@@ -423,7 +423,30 @@ export async function signVersionedAndSend(
   tx.sign([keypair]);
 
   const conn = new Connection(rpc, "confirmed");
-  const sig = await conn.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
-  await conn.confirmTransaction(sig, "confirmed");
-  return sig;
+  try {
+    const sig = await conn.sendRawTransaction(tx.serialize(), {
+      skipPreflight: false,
+      maxRetries: 3,
+    });
+    await conn.confirmTransaction(sig, "confirmed");
+    return sig;
+  } catch (e: unknown) {
+    // Prefer simulation logs when available
+    const anyE = e as {
+      message?: string;
+      logs?: string[];
+      getLogs?: () => Promise<string[]>;
+    };
+    let logs: string[] | undefined = anyE.logs;
+    try {
+      if (!logs && typeof anyE.getLogs === "function") {
+        logs = await anyE.getLogs();
+      }
+    } catch {
+      /* ignore */
+    }
+    const tail = logs?.slice(-6).join(" · ");
+    const base = anyE.message || String(e);
+    throw new Error(tail ? `${base} — ${tail}` : base);
+  }
 }
