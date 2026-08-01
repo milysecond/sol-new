@@ -21,11 +21,17 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
     return "No passkey found on this device. Create a new wallet, or restore from another device.";
   }
 
+  if (m.includes("0xc") || m.includes("insufficientdelegation") || m.includes("insufficient delegation")) {
+    return "Solana requires at least 1 SOL delegated. Add more SOL and try again.";
+  }
+  if (m.includes("no record of a prior credit") || m.includes("attempt to debit an account")) {
+    return "A wallet in this transaction has 0 SOL (often the network-fee payer). Try again — fees may come from your balance.";
+  }
+
   // Insufficient SOL (system program 0x1 / simulation logs)
   if (
     m.includes("insufficient lamports") ||
     m.includes("insufficient funds") ||
-    m.includes("attempt to debit an account but found no record") ||
     (m.includes("0x1") && (m.includes("transfer") || m.includes("simulation") || m.includes("custom program error")))
   ) {
     if (m.includes("insufficient lamports") || m.includes("need ")) {
@@ -56,24 +62,17 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
     return "Couldn't read that transaction. Refresh and try again.";
   }
 
-  // Slot / preflight — keep a short actionable hint; append log snippet if present
-  if (m.includes("simulation failed") || m.includes("preflight") || m.includes("transaction simulation")) {
-    if (m.includes("insufficient") || m.includes("lamports")) {
-      return "Not enough SOL for this action (rent + network fee). Lower the amount or add SOL.";
+  // Slot / preflight
+  if (m.includes("simulation failed") || m.includes("preflight")) {
+    if (m.includes("no record of a prior credit") || m.includes("attempt to debit")) {
+      return "Network fee wallet is empty — retry (app will charge fees from your wallet).";
     }
-    if (m.includes("already in use") || m.includes("already exists")) {
-      return "That stake account already exists. Refresh and try again.";
+    if (m.includes("insufficient") || m.includes("0x1")) {
+      return "Not enough SOL for fees. Keep a little spare and try again.";
     }
-    if (m.includes("vote") || m.includes("invalid account data")) {
-      return "Validator vote account looks invalid. Pick another validator.";
-    }
-    // Surface first useful log line if the error carries it
-    const logMatch = msg.match(/Error processing Instruction[^:]*:\s*([^\n]+)/i)
-      || msg.match(/Program log:\s*([^\n]+)/i);
-    if (logMatch?.[1] && logMatch[1].length < 100) {
-      return `Transaction failed: ${logMatch[1].trim()}`;
-    }
-    return "The transaction failed simulation. Check balance/fees, refresh, and try again.";
+    // Prefer the original message if it already explains the failure
+    if (msg.length < 200 && msg.toLowerCase().includes("stake")) return msg;
+    return "The transaction couldn't be built. Refresh the page and try again.";
   }
 
   // Promo
