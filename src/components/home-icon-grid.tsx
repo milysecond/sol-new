@@ -24,6 +24,7 @@ import {
   Check,
   Pencil,
   Star,
+  ArrowLeftRight,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
@@ -57,6 +58,8 @@ const ALL_TILES: Tile[] = [
   { href: "/receipt", title: "Receipt", desc: "Tx receipt", icon: Receipt, color: "text-orange-600 dark:text-orange-400" },
   { href: "/draw", title: "Draw", desc: "Fair raffle", icon: Dices, color: "text-violet-600 dark:text-violet-400" },
   { href: "/earn", title: "Earn", desc: "USDC yield", icon: TrendingUp, color: "text-emerald-600 dark:text-emerald-400" },
+  { href: "/loan", title: "Loan", desc: "Lend & borrow", icon: Landmark, color: "text-lime-600 dark:text-lime-400" },
+  { href: "/swap", title: "Swap", desc: "Trade tokens", icon: ArrowLeftRight, color: "text-fuchsia-600 dark:text-fuchsia-400" },
   { href: "/stake", title: "Stake", desc: "Stake SOL", icon: Landmark, color: "text-purple-600 dark:text-purple-400" },
   { href: "/lst", title: "LST", desc: "Liquid stake", icon: Droplets, color: "text-cyan-600 dark:text-cyan-400" },
   { href: "/burn", title: "Burn", desc: "Reclaim rent", icon: Flame, color: "text-rose-600 dark:text-rose-400" },

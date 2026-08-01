@@ -91,7 +91,7 @@ export default function AdminPage() {
   };
 
   const deleteLink = async (code: string) => {
-    if (!confirm(`Delete short link /l/${code}?`)) return;
+    if (!confirm(`Delete short link /link/${code}?`)) return;
     setDeletingCode(code);
     try {
       const res = await fetch("/api/admin/links", {
@@ -365,7 +365,7 @@ export default function AdminPage() {
                   <tr key={l.code} className="border-b border-black/5 dark:border-white/5 hover:bg-black/2 dark:hover:bg-white/2">
                     <td className="px-6 py-3 font-mono text-sky-500">
                       <a href={l.shortUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                        /l/{l.code}
+                        /link/{l.code}
                       </a>
                     </td>
                     <td className="px-4 py-3 text-gray-500 dark:text-white/50 max-w-[220px] truncate" title={l.targetUrl}>

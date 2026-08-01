@@ -11,6 +11,7 @@ import {
 import { Navbar } from "@/components/navbar";
 import { useWallet } from "@/lib/wallet-context";
 import { analytics } from "@/lib/analytics";
+import { PortfolioDefiPanel } from "@/components/portfolio-defi-panel";
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 
@@ -401,167 +402,16 @@ function TokenView({ data }: { data: TokenData }) {
   );
 }
 
-// ── Wallet View (reuses /api/track) ───────────────────────────────────────────
+// ── Wallet View ───────────────────────────────────────────────────────────────
 
-interface TrackData {
-  wallet: string;
-  analyze: {
-    wallet: string;
-    total_net_worth_usd: number;
-    categories: Record<string, any>;
-    active_protocols: string[];
-  };
-  pnl: {
-    total_pnl_usd: number;
-    unrealized: { pnl_usd: number; pnl_pct: number; position_count: number };
-    realized_7d: { pnl_usd: number };
-  } | null;
-  holdings: {
-    total_value_usd: number;
-    holdings_count: number;
-    holdings: { mint: string; symbol?: string; name?: string; balance: number; price_usd: number; value_usd: number }[];
-  } | null;
-}
-
-const CATEGORY_META = [
-  { key: "holdings", label: "Token Holdings", icon: Coins, value: (c: any) => c?.value_usd, sub: (c: any) => (c?.token_count ? `${c.token_count} tokens` : "") },
-  { key: "lending", label: "Lending", icon: Landmark, value: (c: any) => c?.net_usd, sub: (c: any) => (c?.borrow_usd ? `${fmtUsd(c.deposit_usd)} supplied · ${fmtUsd(c.borrow_usd)} borrowed` : "") },
-  { key: "perpetuals", label: "Perpetuals", icon: LineChart, value: (c: any) => c?.collateral_usd, sub: (c: any) => (c?.positions ? `${c.positions} open · PnL ${fmtPnl(c.pnl_usd)}` : "") },
-  { key: "lp_positions", label: "LP Positions", icon: Layers, value: (c: any) => c?.value_usd, sub: (c: any) => (c?.positions ? `${c.positions} positions` : "") },
-  { key: "staking", label: "Staking", icon: Sprout, value: (c: any) => c?.value_usd },
-  { key: "yield", label: "Yield", icon: Sprout, value: (c: any) => c?.value_usd },
-  { key: "rewards", label: "Pending Rewards", icon: Gift, value: (c: any) => c?.pending_usd },
-  { key: "governance", label: "Governance", icon: Vote, value: (c: any) => c?.value_usd },
-];
-
-function StatCard({ label, value, accent, sub }: { label: string; value: string; accent?: "green" | "red" | "purple"; sub?: string }) {
-  const color =
-    accent === "green" ? "text-emerald-500 dark:text-emerald-400"
-    : accent === "red" ? "text-rose-500 dark:text-rose-400"
-    : "text-gray-900 dark:text-white";
-  return (
-    <div className="bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl px-4 py-3">
-      <p className="text-xs text-gray-500 dark:text-white/40">{label}</p>
-      <p className={`text-xl font-bold tracking-tight ${color}`}>{value}</p>
-      {sub && <p className="text-[11px] text-gray-400 dark:text-white/30 mt-0.5">{sub}</p>}
-    </div>
-  );
-}
-
-function WalletView({ address }: { address: string }) {
-  const [data, setData] = useState<TrackData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setLoading(true);
-    fetch(`/api/track?wallet=${encodeURIComponent(address)}`)
-      .then((r) => r.json())
-      .then((d) => {
-        const td = d as TrackData & { error?: string };
-        if (td.error) throw new Error(td.error);
-        setData(td);
-        analytics.walletTracked(td.wallet, td.analyze?.total_net_worth_usd ?? 0, td.analyze?.active_protocols?.length ?? 0);
-      })
-      .catch((e) => setError(e.message || "Failed to load wallet"))
-      .finally(() => setLoading(false));
-  }, [address]);
-
-  if (loading) return <div className="text-center text-gray-400 dark:text-white/30 py-10">Analyzing wallet…</div>;
-  if (error) return <div className="text-center text-rose-500 py-6 text-sm">{error}</div>;
-  if (!data) return null;
-
-  const a = data.analyze;
-  const pnl = data.pnl;
-  const netPnl = pnl?.total_pnl_usd;
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-2">
-        <WalletIcon className="w-4 h-4 text-purple-500" />
-        <a href={`https://solscan.io/account/${address}`} target="_blank" rel="noopener noreferrer"
-          className="font-mono text-xs text-gray-500 dark:text-white/40 hover:text-purple-500 inline-flex items-center gap-1">
-          {short(address)} <ArrowUpRight className="w-3 h-3" />
-        </a>
-        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-500/10 text-purple-500">Wallet</span>
-        {a.active_protocols.length > 0 && (
-          <span className="text-xs text-gray-400 dark:text-white/30 ml-auto">{a.active_protocols.length} active protocols</span>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatCard label="Net Worth" value={fmtUsd(a.total_net_worth_usd)} accent="purple" />
-        <StatCard label="Total PnL" value={fmtPnl(netPnl)}
-          accent={netPnl == null ? undefined : netPnl >= 0 ? "green" : "red"}
-          sub={pnl ? `Unrealized ${fmtPnl(pnl.unrealized.pnl_usd)}` : undefined} />
-        <StatCard label="Realized (7d)" value={pnl ? fmtPnl(pnl.realized_7d.pnl_usd) : "—"}
-          accent={pnl == null ? undefined : pnl.realized_7d.pnl_usd >= 0 ? "green" : "red"} />
-      </div>
-
-      <div className="space-y-2">
-        {CATEGORY_META.map(({ key, label, icon: Icon, value, sub }) => {
-          const c = a.categories?.[key];
-          const v = value(c);
-          if (v == null || v === 0) return null;
-          const subText = sub?.(c);
-          const protocols: any[] = c?.protocols || [];
-          return (
-            <div key={key} className="flex items-center gap-3 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl px-4 py-3">
-              <div className="w-9 h-9 rounded-lg bg-purple-500/15 flex items-center justify-center shrink-0">
-                <Icon size={17} className="text-purple-500 dark:text-purple-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{label}</p>
-                {(subText || protocols.length > 0) && (
-                  <p className="text-xs text-gray-500 dark:text-white/40 truncate">
-                    {subText || protocols.map((p: any) => pretty(p.protocol)).join(", ")}
-                  </p>
-                )}
-              </div>
-              <p className="text-sm font-semibold tabular-nums">{fmtUsd(v)}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      {a.active_protocols.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {a.active_protocols.map((p: string) => (
-            <span key={p} className="text-[11px] px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/50">
-              {pretty(p)}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {data.holdings && data.holdings.holdings.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-gray-500 dark:text-white/50 flex items-center gap-1.5">
-            <Coins size={14} /> Token Holdings · {fmtUsd(data.holdings.total_value_usd)}
-          </h2>
-          {data.holdings.holdings.slice(0, 25).map((h) => (
-            <div key={h.mint} className="flex items-center gap-3 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-xl px-4 py-2.5">
-              <div className="flex-1 min-w-0">
-                <a href={`https://solscan.io/token/${h.mint}`} target="_blank" className="text-sm font-medium hover:text-purple-500 dark:hover:text-purple-400">
-                  {h.symbol || `${h.mint.slice(0, 4)}…${h.mint.slice(-4)}`}
-                </a>
-                <p className="text-xs text-gray-500 dark:text-white/40 tabular-nums">
-                  {h.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })} @ {fmtUsd(h.price_usd)}
-                </p>
-              </div>
-              <p className="text-sm font-semibold tabular-nums">{fmtUsd(h.value_usd)}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {a.total_net_worth_usd === 0 && a.active_protocols.length === 0 && (
-        <div className="text-center text-gray-400 dark:text-white/30 py-6 text-sm">
-          No DeFi positions or tracked holdings found for this wallet.
-        </div>
-      )}
-    </div>
-  );
+function WalletView({
+  address,
+}: {
+  address: string;
+  sol?: number;
+  usdc?: number | null;
+}) {
+  return <PortfolioDefiPanel address={address} compact />;
 }
 
 // ── Main scan result ──────────────────────────────────────────────────────────
@@ -569,7 +419,13 @@ function WalletView({ address }: { address: string }) {
 type ScanResult =
   | ({ type: "program" } & ProgramData)
   | ({ type: "token" } & TokenData)
-  | { type: "wallet"; address: string };
+  | {
+      type: "wallet";
+      address: string;
+      sol?: number;
+      usdc?: number | null;
+      balances?: { sol: number; usdc: number | null };
+    };
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -611,7 +467,7 @@ function ScanInner() {
     e.preventDefault();
     const a = input.trim();
     if (!a) return;
-    router.push(`/scan?address=${encodeURIComponent(a)}`);
+    router.push(`/address/${encodeURIComponent(a)}`);
     scan(a);
   };
 
@@ -626,7 +482,10 @@ function ScanInner() {
               <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Scan</h1>
             </div>
             <p className="text-gray-500 dark:text-white/40 text-sm">
-              Paste any Solana address — wallet, token, or program.
+              Paste any Solana address — wallet, token, or program.{" "}
+              <span className="hidden sm:inline text-gray-400 dark:text-white/30">
+                sol.new/address/…
+              </span>
             </p>
           </div>
 
@@ -656,7 +515,11 @@ function ScanInner() {
 
           {publicKey && !result && !loading && (
             <button
-              onClick={() => { setInput(publicKey); router.push(`/scan?address=${encodeURIComponent(publicKey)}`); scan(publicKey); }}
+              onClick={() => {
+                setInput(publicKey);
+                router.push(`/address/${encodeURIComponent(publicKey)}`);
+                scan(publicKey);
+              }}
               className="mx-auto block text-xs text-purple-500 dark:text-purple-400 hover:underline"
             >
               Scan my connected wallet →
@@ -680,7 +543,13 @@ function ScanInner() {
             <div className="bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-2xl p-4 sm:p-6">
               {result.type === "program" && <ProgramView data={result as ProgramData} />}
               {result.type === "token" && <TokenView data={result as TokenData} />}
-              {result.type === "wallet" && <WalletView address={result.address} />}
+              {result.type === "wallet" && (
+                <WalletView
+                  address={result.address}
+                  sol={result.sol ?? result.balances?.sol}
+                  usdc={result.usdc ?? result.balances?.usdc}
+                />
+              )}
             </div>
           )}
         </div>

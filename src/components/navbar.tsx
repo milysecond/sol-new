@@ -36,6 +36,7 @@ import {
   FolderOpen,
   Flame,
   Users,
+  ArrowLeftRight,
 } from "lucide-react";
 import { getPushPermission, subscribePush, unsubscribePush, type PushPermission } from "@/lib/push-client";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -81,6 +82,8 @@ const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
       { href: "/split", label: "Split", icon: Users },
       { href: "/gift", label: "Gift", icon: Gift },
       { href: "/earn", label: "Earn", icon: TrendingUp },
+      { href: "/loan", label: "Loan", icon: Landmark },
+      { href: "/swap", label: "Swap", icon: ArrowLeftRight },
       { href: "/stake", label: "Stake", icon: Landmark },
       { href: "/lst", label: "Liquid", icon: Droplets },
     ],
@@ -121,6 +124,7 @@ export function Navbar() {
     recover,
     switchWallet,
     disconnect,
+    renameWallet,
     loading,
     airdropping,
     airdropDone,
@@ -163,8 +167,7 @@ export function Navbar() {
       <div className="sticky top-0 z-30 border-b border-black/10 dark:border-white/10 bg-white/80 dark:bg-black/80 backdrop-blur-md safe-top">
         <div className="flex items-center justify-between gap-2 px-2 sm:px-5 lg:px-6 py-2 sm:py-3 max-w-[1400px] mx-auto w-full">
           <div className="flex items-center gap-1 sm:gap-2 min-w-0">
-            <PageBack className="shrink-0 -ml-0.5 sm:hidden" />
-            <PageBack className="shrink-0 hidden sm:inline-flex lg:hidden" />
+            <PageBack className="shrink-0 -ml-0.5" />
 
             <Link
               href="/"
@@ -216,7 +219,6 @@ export function Navbar() {
             </div>
 
             <div className="hidden lg:flex items-center gap-0.5 ml-1">
-              <PageBack className="mr-1" />
               {NAV_ITEMS.map((item) => {
                 const active = isActive(item.href);
                 return (
@@ -279,10 +281,22 @@ export function Navbar() {
                     <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
                     <div className="absolute right-0 top-full mt-2 z-50 bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-xl overflow-hidden min-w-[220px] max-w-[min(100vw-1.5rem,320px)] shadow-lg">
                       <div className="px-4 py-3 border-b border-black/10 dark:border-white/10">
-                        {walletLabel && (
-                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                            {walletLabel}
-                          </p>
+                        {publicKey && (
+                          <input
+                            key={walletLabel || publicKey}
+                            defaultValue={walletLabel || ""}
+                            placeholder="Name this wallet"
+                            onBlur={(e) => {
+                              const v = e.target.value.trim();
+                              if (v && v !== walletLabel) renameWallet(publicKey, v);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                (e.target as HTMLInputElement).blur();
+                              }
+                            }}
+                            className="w-full text-sm font-semibold text-gray-900 dark:text-white bg-transparent outline-none border-b border-transparent focus:border-purple-400/50 placeholder:text-gray-400 placeholder:font-normal mb-1"
+                          />
                         )}
                         <p className="text-xs font-mono text-gray-500 dark:text-white/40 break-all mt-0.5">
                           {publicKey}
@@ -296,6 +310,9 @@ export function Navbar() {
                             <Spinner size={12} /> fetching…
                           </p>
                         )}
+                        <p className="text-[10px] text-gray-400 mt-1.5">
+                          Tab title shows this name · rename above
+                        </p>
                       </div>
                       <Link
                         href="/wallet"
@@ -402,12 +419,12 @@ export function Navbar() {
                           )}
                         </button>
                       )}
-                      {wallets.length > 1 && (
+                      {wallets.length > 0 && (
                         <div className="border-t border-black/10 dark:border-white/10">
                           <p className="text-[10px] uppercase tracking-wider text-gray-400 px-4 pt-2.5 pb-1">
                             Switch wallet
                           </p>
-                          {wallets.map((w) => (
+                          {wallets.slice(0, 12).map((w) => (
                             <button
                               key={w.pubkey}
                               type="button"
@@ -427,7 +444,23 @@ export function Navbar() {
                               </span>
                             </button>
                           ))}
+                          <Link
+                            href="/wallet/find"
+                            onClick={() => setShowMenu(false)}
+                            className="block w-full text-left px-4 py-2.5 text-sm text-purple-600 dark:text-purple-400 hover:bg-black/5 dark:hover:bg-white/5"
+                          >
+                            Find correct wallet…
+                          </Link>
                         </div>
+                      )}
+                      {wallets.length === 0 && (
+                        <Link
+                          href="/wallet/find"
+                          onClick={() => setShowMenu(false)}
+                          className="block w-full text-left px-4 py-2.5 text-sm text-purple-600 dark:text-purple-400 hover:bg-black/5 dark:hover:bg-white/5 border-t border-black/10 dark:border-white/10"
+                        >
+                          Find correct wallet…
+                        </Link>
                       )}
                       <button
                         type="button"
@@ -455,12 +488,18 @@ export function Navbar() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => recover()}
+                  onClick={() => recover({ forcePicker: true })}
                   disabled={loading}
                   className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 text-sm rounded-xl px-3 py-2 min-h-[40px] transition cursor-pointer disabled:opacity-50 hidden sm:block"
                 >
                   Recover
                 </button>
+                <Link
+                  href="/wallet/find"
+                  className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 text-sm rounded-xl px-3 py-2 min-h-[40px] transition hidden sm:flex items-center"
+                >
+                  Find
+                </Link>
               </div>
             )}
           </div>

@@ -49,11 +49,12 @@ const PRODUCTS: Product[] = [
   { index: "05", href: "/pay", title: "Payments", blurb: "Create a Solana Pay link or QR anyone can pay with, in SOL or USDC.", icon: CreditCard, accent: "#a855f7" },
   { index: "06", href: "/gift", title: "Gifts", blurb: "Send SOL with a link — even to people without a wallet. They claim it with Face ID.", icon: Gift, accent: "#f59e0b" },
   { index: "07", href: "/earn", title: "Earn", blurb: "Protected USDC yield. Deposit and withdraw with your passkey.", icon: TrendingUp, accent: "#34d399" },
-  { index: "08", href: "/stake", title: "Stake", blurb: "Native SOL staking to validators. Delegate, deactivate, withdraw.", icon: Landmark, accent: "#a78bfa" },
-  { index: "09", href: "/lst", title: "Liquid stake", blurb: "Stay liquid while staked — jitoSOL, mSOL, INF, and more.", icon: Droplets, accent: "#22d3ee" },
-  { index: "10", href: "/punt", title: "Punt", blurb: "Live odds, free picks, and prediction markets. Link out to more boards.", icon: Trophy, accent: "#4ade80" },
-  { index: "11", href: "/receipt", title: "Receipts", blurb: "Turn any Solana signature into a clean, shareable payment receipt.", icon: Receipt, accent: "#fb923c" },
-  { index: "12", href: "/draw", title: "Fair Draw", blurb: "Provably fair raffles and random picks with verifiable entropy.", icon: Dices, accent: "#a78bfa" },
+  { index: "08", href: "/loan", title: "Loan", blurb: "Supply assets to earn yield, or borrow against collateral.", icon: Landmark, accent: "#84cc16" },
+  { index: "09", href: "/stake", title: "Stake", blurb: "Native SOL staking to validators. Delegate, deactivate, withdraw.", icon: Landmark, accent: "#a78bfa" },
+  { index: "10", href: "/lst", title: "Liquid stake", blurb: "Stay liquid while staked — jitoSOL, mSOL, INF, and more.", icon: Droplets, accent: "#22d3ee" },
+  { index: "11", href: "/punt", title: "Punt", blurb: "Live odds, free picks, and prediction markets. Link out to more boards.", icon: Trophy, accent: "#4ade80" },
+  { index: "12", href: "/receipt", title: "Receipts", blurb: "Turn any Solana signature into a clean, shareable payment receipt.", icon: Receipt, accent: "#fb923c" },
+  { index: "13", href: "/draw", title: "Fair Draw", blurb: "Provably fair raffles and random picks with verifiable entropy.", icon: Dices, accent: "#a78bfa" },
 ];
 
 const MARQUEE = [

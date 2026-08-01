@@ -78,6 +78,7 @@ export async function GET(req: NextRequest) {
       found: true,
       status: row.status,
       amountLamports: Number(row.amount_lamports),
+      token: (row as { token?: string }).token || "SOL",
       network: row.network,
       createdAt: row.created_at,
       claimedAt: row.claimed_at,

@@ -1,31 +1,63 @@
 # sol.new
 
-> sol.new is the fastest way for everyday people to create tokens, NFTs, wallets, payments, and DAOs on Solana. Wallets are secured by passkeys (Face ID / Touch ID) — no seed phrases, no installs, no signup. It runs entirely in the browser as a progressive web app.
+> sol.new is the fastest way for everyday people to create tokens, NFTs, wallets, payments, gifts, short links, and DeFi actions on Solana. Wallets are secured by passkeys (Face ID / Touch ID) — no seed phrases, no installs, no signup. Progressive web app in the browser.
 
-## What you can do on sol.new
+Full product map for agents: https://sol.new/llms-full.txt · Features: https://sol.new/features · Directory: https://sol.new/dir · Docs: https://sol.new/docs
 
-- [Create a Token](https://sol.new/token): Launch your own SPL token / Solana memecoin in seconds. Upload an image, pick a name and symbol, and go live instantly. Low fees.
-- [Mint an NFT](https://sol.new/nft): Turn any image into an NFT on Solana — standard or compressed (cNFT).
-- [Multisig](https://sol.new/multisig): Create shared wallets with multiple required signers for couples, teams, and DAOs.
-- [Wallet](https://sol.new/wallet): A passkey-secured Solana wallet. Get SOL, send payments, and manage tokens and NFTs.
-- [Get SOL](https://sol.new/get): Fund a wallet with Apple Pay, Google Pay, or a card — no exchange account needed.
-- [Payment Links](https://sol.new/pay): Create a Solana Pay link or QR anyone can pay with, in SOL or USDC.
-- [Split a Bill](https://sol.new/split): Split a bill or invoice between friends and get paid in SOL or USDC. Add a tip, set the number of people, and share a link or QR per person with paid-tracking.
-- [Track a Wallet](https://sol.new/track): Paste any Solana address to view its tokens, NFTs, and balances.
-- [Portfolio](https://sol.new/portfolio): See your Solana tokens, NFTs, and balances in one place.
+## What you can do
 
-## Content
+### Create
+- [Token](https://sol.new/token): Launch an SPL token with a bonding curve in seconds.
+- [NFT](https://sol.new/nft): Mint standard or compressed NFTs from an image.
+- [Multisig](https://sol.new/multisig): Shared wallets with multiple signers.
+- [.sol name](https://sol.new/id): Check and register a Solana name.
 
-- [What's New](https://sol.new/whats-new): The newest tokens launched on sol.new, in real time.
-- [News](https://sol.new/news): Latest Solana and crypto headlines, aggregated from top sources.
-- [Podcasts](https://sol.new/pods): Hand-picked Solana and crypto podcasts.
-- [Docs & Guides](https://sol.new/docs): How to create tokens, mint NFTs, set up multisig, and accept payments.
-- [Compare](https://sol.new/compare): How sol.new compares to pump.fun, Bags, and Bonk.
+### Wallet
+- [Wallet](https://sol.new/wallet): Passkey-secured Solana wallet.
+- [Get SOL](https://sol.new/get): Fund with card / Apple Pay / Google Pay where available.
+- [Send](https://sol.new/wallet/send): Transfer SOL or USDC.
+- [Portfolio](https://sol.new/portfolio): Tokens, NFTs, balances.
+- [Burn](https://sol.new/burn): Close empty accounts, reclaim rent.
+
+### Payments & links
+- [Pay](https://sol.new/pay): Solana Pay link or QR (SOL / USDC).
+- [Split](https://sol.new/split): Split a bill; share per-person links.
+- [Gift](https://sol.new/gift): Send SOL/USDC via claimable link (`/claim#secret`).
+- [Short links](https://sol.new/link): `sol.new/link/<code>` — free random; custom 0.01 SOL.
+- [Receipt](https://sol.new/receipt): Shareable transaction receipt.
+
+### Yield
+- [Earn](https://sol.new/earn): Protected USDC yield.
+- [Loan](https://sol.new/loan): Supply assets or borrow against collateral (mainnet).
+- [Stake](https://sol.new/stake): Native SOL staking.
+- [Liquid stake](https://sol.new/lst): jitoSOL, mSOL, INF, more.
+
+### Explore & social
+- [Scan](https://sol.new/scan) / [Address](https://sol.new/address) / [Track](https://sol.new/track): Lookup wallets and tokens (`sol.new/address/<pubkey>`).
+- [Lists](https://sol.new/lists): Watchlists.
+- [Stocks](https://sol.new/stocks): Stocks on Solana.
+- [Username](https://sol.new/creator/edit): Claim `@username` → https://sol.new/u/<name>
+- [Creator](https://sol.new/creator/edit): Profile bio, links, avatar.
+- [News](https://sol.new/news) · [Pods](https://sol.new/pods) · [Punt](https://sol.new/punt)
+
+### Play
+- [Fair Draw](https://sol.new/draw): Wheel, coin, dice, 1–N with verifiable entropy.
+
+## Key APIs
+
+- `POST /api/gift/create` — unsigned gift funding tx + claim secret (never stored server-side)
+- `POST /api/gift` — register gift after funding
+- `GET /api/gift?pk=` — gift status
+- `GET|POST /api/loan` — lend/borrow markets and txs
+- `GET|POST /api/link` — short links
+- `GET|POST /api/creator/profile` — profile + username (`?check=name`)
+- `GET /api/costs` — live fees
+- `GET /llms-full.txt` — extended machine-readable map
 
 ## Key facts
 
-- Network: Solana (mainnet and devnet).
-- Security: passkey-based (WebAuthn) wallets — no seed phrases to lose.
-- Access: no install and no signup required; works in any modern browser and installs as a PWA.
-- Token launch fee: 1%.
-- Links: X/Twitter https://x.com/soldotnew · Telegram https://t.me/soldotnew
+- Network: Solana mainnet + devnet (toggle in UI). Loan is mainnet-only.
+- Security: WebAuthn passkeys; gift secrets are bearer URL fragments.
+- Access: no install; works in modern browsers; PWA.
+- Links: https://x.com/soldotnew · https://t.me/soldotnew
+- Repo docs: https://github.com/milysecond/sol-new

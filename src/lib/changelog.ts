@@ -14,6 +14,39 @@ export type ChangelogEntry = {
 /** Newest first. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-01",
+    title: "Token swap",
+    items: [
+      "New /swap: Jupiter Ultra routing for SOL, USDC, and any mint (passkey-signed).",
+      "Balance presets, token search, live quotes.",
+    ],
+  },
+  {
+    date: "2026-07-30",
+    title: "Docs, gift API, loan",
+    items: [
+      "POST /api/gift/create for gift funding txs; /gift uses it.",
+      "/loan lend & borrow with WSOL wrap, balance slider.",
+      "Updated README, FEATURES, docs, llms.txt + llms-full.txt.",
+    ],
+  },
+  {
+    date: "2026-07-30",
+    title: "Lend & borrow",
+    items: [
+      "New /loan: supply assets to earn yield or borrow against collateral (passkey-signed).",
+      "Live rates, positions, deposit/withdraw, and borrow/repay flows.",
+    ],
+  },
+  {
+    date: "2026-07-29",
+    title: "Usernames and short link pay",
+    items: [
+      "Claim a unique @username per wallet at /creator/edit — public at sol.new/u/name.",
+      "Custom short links: pay with Solana Pay QR or connected wallet; canonical URLs are sol.new/link/…",
+    ],
+  },
+  {
     date: "2026-07-24",
     title: "Apple Pay and card onramp",
     items: [

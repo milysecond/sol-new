@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Short links — sol.new",
-  description: "Create short sol.new/l/… links. Random codes free; custom codes 0.01 SOL.",
+  description: "Create short sol.new/link/… links. Random codes free; custom codes 0.01 SOL.",
   openGraph: {
     title: "Short links — sol.new",
-    description: "Turn any URL into a short sol.new link.",
+    description: "Turn any URL into a short sol.new/link/… URL.",
     url: "https://sol.new/link",
   },
 };

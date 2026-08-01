@@ -18,6 +18,8 @@ export const HOME_DEFAULT_ORDER = [
   "/receipt",
   "/draw",
   "/earn",
+  "/loan",
+  "/swap",
   "/stake",
   "/lst",
   "/burn",

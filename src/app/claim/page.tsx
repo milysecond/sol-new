@@ -248,7 +248,7 @@ export default function ClaimPage() {
                     {walletLoading ? <><Spinner size={16} className="inline mr-2" />Setting up…</> : "Create wallet & claim"}
                   </button>
                   <button
-                    onClick={recover}
+                    onClick={() => void recover({ forcePicker: true })}
                     disabled={walletLoading}
                     className="w-full bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white font-medium rounded-xl px-4 py-3 transition text-sm cursor-pointer"
                   >

@@ -30,6 +30,8 @@ import {
   TrendingUp,
   Layers,
   LineChart,
+  Landmark,
+  ArrowLeftRight,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -68,6 +70,8 @@ const SECTIONS: Section[] = [
       { href: "/nfts", title: "Browse NFTs", blurb: "On-chain NFTs by address. Tensor and Magic Eden links.", icon: Layers },
       { href: "/burn", title: "Burn / reclaim", blurb: "Close empty token accounts, reclaim SOL rent.", icon: Flame },
       { href: "/earn", title: "Earn", blurb: "Protected USDC yield. Deposit and withdraw with Face ID.", icon: TrendingUp },
+      { href: "/loan", title: "Loan", blurb: "Supply assets to earn, or borrow against collateral.", icon: Landmark },
+      { href: "/swap", title: "Swap", blurb: "Trade SOL, USDC, and any token with Face ID.", icon: ArrowLeftRight },
       { href: "/stake", title: "Stake SOL", blurb: "Native validator staking. Delegate, deactivate, withdraw.", icon: TrendingUp },
       { href: "/lst", title: "Liquid stake", blurb: "LSTs: jitoSOL, mSOL, INF, and more.", icon: TrendingUp },
       { href: "/id", title: ".sol name", blurb: "Check and register a Solana name.", icon: AtSign },
@@ -95,7 +99,7 @@ const SECTIONS: Section[] = [
       { href: "/split", title: "Split", blurb: "Split a bill and track who paid.", icon: Users },
       { href: "/gift", title: "Gift", blurb: "Send SOL or USDC as a claimable link.", icon: Gift },
       { href: "/claim", title: "Claim gift", blurb: "Open a gift link and claim with Face ID.", icon: Gift },
-      { href: "/link", title: "Short links", blurb: "Create sol.new/l/… short URLs. Custom codes 0.01 SOL.", icon: Link2 },
+      { href: "/link", title: "Short links", blurb: "Create sol.new/link/… short URLs. Custom codes 0.01 SOL.", icon: Link2 },
       { href: "/receipt", title: "Receipt", blurb: "Beautiful shareable tx receipt from a signature.", icon: Receipt },
     ],
   },
@@ -121,6 +125,7 @@ const SECTIONS: Section[] = [
     title: "Explore",
     intro: "Look up anything, track launches, stay informed.",
     items: [
+      { href: "/address", title: "Address", blurb: "sol.new/address/<pubkey> — wallet, token, or program lookup.", icon: Activity },
       { href: "/scan", title: "Scan", blurb: "Wallet, token, or program lookup.", icon: Activity },
       { href: "/stocks", title: "Stocks", blurb: "Tokenized equities screener on Solana.", icon: LineChart },
       { href: "/lists", title: "Lists", blurb: "Watchlists and quotes.", icon: List },

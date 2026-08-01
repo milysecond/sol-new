@@ -3,7 +3,12 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { createPasskeyWallet, recoverPasskeyWallet } from "./passkey-wallet";
+import {
+  createPasskeyWallet,
+  recoverPasskeyWallet,
+  identifyPasskeyWallet,
+  signalPasskeyUserDetails,
+} from "./passkey-wallet";
 import { useNetwork } from "./network";
 import { analytics } from "./analytics";
 import { getUsdcBalance } from "./usdc";
@@ -12,19 +17,31 @@ export interface WalletEntry {
   pubkey: string;
   credentialId: string;
   label: string;
+  /** WebAuthn user handle (base64) — enables renaming the passkey in browser settings */
+  userId?: string;
 }
+
+export type WalletBalances = Record<string, { sol: number; usdc: number }>;
 
 interface WalletState {
   publicKey: string | null;
   walletLabel: string | null;
   wallets: WalletEntry[];
+  walletBalances: WalletBalances;
   balance: number | null;
   usdcBalance: number | null;
   loading: boolean;
   error: string | null;
   connect: (username?: string) => Promise<void>;
-  recover: () => Promise<void>;
+  recover: (opts?: { forcePicker?: boolean }) => Promise<void>;
+  /** Probe one passkey from the full OS list; returns address (does not auto-activate). */
+  identify: () => Promise<{ publicKey: string; credentialId: string; sol: number; usdc: number }>;
+  /** Save/activate a discovered wallet with a label. */
+  activateWallet: (entry: WalletEntry) => void;
+  renameWallet: (pubkey: string, label: string) => void;
+  removeWallet: (pubkey: string) => void;
   switchWallet: (pubkey: string) => void;
+  refreshWalletListBalances: () => Promise<void>;
   disconnect: () => void;
   refreshBalance: () => Promise<void>;
   airdropping: boolean;
@@ -36,13 +53,19 @@ const WalletContext = createContext<WalletState>({
   publicKey: null,
   walletLabel: null,
   wallets: [],
+  walletBalances: {},
   balance: null,
   usdcBalance: null,
   loading: false,
   error: null,
   connect: async () => {},
   recover: async () => {},
+  identify: async () => ({ publicKey: "", credentialId: "", sol: 0, usdc: 0 }),
+  activateWallet: () => {},
+  renameWallet: () => {},
+  removeWallet: () => {},
   switchWallet: () => {},
+  refreshWalletListBalances: async () => {},
   disconnect: () => {},
   refreshBalance: async () => {},
   airdropping: false,
@@ -69,8 +92,15 @@ function saveWallets(wallets: WalletEntry[]) {
 function upsertWallet(entry: WalletEntry): WalletEntry[] {
   const wallets = loadWallets();
   const idx = wallets.findIndex((w) => w.pubkey === entry.pubkey);
-  if (idx >= 0) wallets[idx] = entry;
-  else wallets.push(entry);
+  if (idx >= 0) {
+    wallets[idx] = {
+      ...wallets[idx],
+      ...entry,
+      label: entry.label || wallets[idx].label,
+      credentialId: entry.credentialId || wallets[idx].credentialId,
+      userId: entry.userId || wallets[idx].userId,
+    };
+  } else wallets.push(entry);
   saveWallets(wallets);
   return wallets;
 }
@@ -79,13 +109,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [walletLabel, setWalletLabel] = useState<string | null>(null);
   const [wallets, setWallets] = useState<WalletEntry[]>([]);
+  const [walletBalances, setWalletBalances] = useState<WalletBalances>({});
   const [balance, setBalance] = useState<number | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { rpc, network } = useNetwork();
 
-  // Restore from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem("sol.new.wallet");
     const savedLabel = localStorage.getItem("sol.new.walletLabel");
@@ -109,11 +139,45 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       ]);
       setBalance(solLamports / LAMPORTS_PER_SOL);
       setUsdcBalance(usdc);
+      setWalletBalances((prev) => ({
+        ...prev,
+        [key]: { sol: solLamports / LAMPORTS_PER_SOL, usdc },
+      }));
     } catch {
       setBalance(null);
       setUsdcBalance(null);
     }
   }, [publicKey, rpc, network]);
+
+  const refreshWalletListBalances = useCallback(async () => {
+    const list = loadWallets();
+    if (!list.length) return;
+    try {
+      const conn = new Connection(rpc, "confirmed");
+      const next: WalletBalances = {};
+      // Batch in chunks of 10
+      for (let i = 0; i < list.length; i += 10) {
+        const chunk = list.slice(i, i + 10);
+        await Promise.all(
+          chunk.map(async (w) => {
+            try {
+              const pk = new PublicKey(w.pubkey);
+              const [solLamports, usdc] = await Promise.all([
+                conn.getBalance(pk),
+                getUsdcBalance(conn, pk, network as "mainnet" | "devnet"),
+              ]);
+              next[w.pubkey] = { sol: solLamports / LAMPORTS_PER_SOL, usdc };
+            } catch {
+              next[w.pubkey] = { sol: 0, usdc: 0 };
+            }
+          })
+        );
+      }
+      setWalletBalances((prev) => ({ ...prev, ...next }));
+    } catch {
+      /* ignore */
+    }
+  }, [rpc, network]);
 
   useEffect(() => {
     if (!publicKey) return;
@@ -124,6 +188,22 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [publicKey, refreshBalance, network]);
 
+  useEffect(() => {
+    if (wallets.length) void refreshWalletListBalances();
+  }, [wallets.length, network]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const activateWallet = (entry: WalletEntry) => {
+    const updated = upsertWallet(entry);
+    setWallets(updated);
+    setPublicKey(entry.pubkey);
+    setWalletLabel(entry.label);
+    setBalance(null);
+    setUsdcBalance(null);
+    localStorage.setItem("sol.new.wallet", entry.pubkey);
+    localStorage.setItem("sol.new.credentialId", entry.credentialId);
+    localStorage.setItem("sol.new.walletLabel", entry.label);
+  };
+
   const connect = async (username?: string) => {
     setError(null);
     setLoading(true);
@@ -133,15 +213,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       }
       const label = username?.trim() || `Wallet ${Date.now()}`;
       const result = await createPasskeyWallet(label);
-      const entry: WalletEntry = { pubkey: result.publicKey, credentialId: result.credentialId, label };
-      const updated = upsertWallet(entry);
-      setPublicKey(result.publicKey);
-      setWalletLabel(label);
-      setWallets(updated);
-      localStorage.setItem("sol.new.wallet", result.publicKey);
-      localStorage.setItem("sol.new.credentialId", result.credentialId);
-      localStorage.setItem("sol.new.walletLabel", label);
-      fetch("/api/wallet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publicKey: result.publicKey, credentialId: result.credentialId }) }).catch(() => {});
+      activateWallet({
+        pubkey: result.publicKey,
+        credentialId: result.credentialId,
+        label,
+        userId: result.userId,
+      });
+      fetch("/api/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publicKey: result.publicKey, credentialId: result.credentialId }),
+      }).catch(() => {});
       analytics.walletCreated(result.publicKey);
     } catch (e) {
       const { friendlyError } = await import("./friendly-errors");
@@ -151,31 +233,114 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const recover = async () => {
+  const recover = async (opts?: { forcePicker?: boolean }) => {
     setError(null);
     setLoading(true);
     try {
       if (!window.PublicKeyCredential) {
         throw new Error("Passkeys require HTTPS.");
       }
-      const result = await recoverPasskeyWallet();
-      const existing = loadWallets().find((w) => w.credentialId === result.credentialId || w.pubkey === result.publicKey);
-      const label = existing?.label || `Wallet ${result.publicKey.slice(0, 4)}…${result.publicKey.slice(-4)}`;
-      const entry: WalletEntry = { pubkey: result.publicKey, credentialId: result.credentialId, label };
-      const updated = upsertWallet(entry);
-      setPublicKey(result.publicKey);
-      setWalletLabel(label);
-      setWallets(updated);
-      localStorage.setItem("sol.new.wallet", result.publicKey);
-      localStorage.setItem("sol.new.credentialId", result.credentialId);
-      localStorage.setItem("sol.new.walletLabel", label);
-      fetch("/api/wallet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publicKey: result.publicKey }) }).catch(() => {});
+      const result = await recoverPasskeyWallet({ forcePicker: opts?.forcePicker });
+      const existing = loadWallets().find(
+        (w) => w.credentialId === result.credentialId || w.pubkey === result.publicKey
+      );
+      const label =
+        existing?.label || `Wallet ${result.publicKey.slice(0, 4)}…${result.publicKey.slice(-4)}`;
+      activateWallet({
+        pubkey: result.publicKey,
+        credentialId: result.credentialId,
+        label,
+      });
+      fetch("/api/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publicKey: result.publicKey }),
+      }).catch(() => {});
       analytics.walletRecovered();
     } catch (e) {
       const { friendlyError } = await import("./friendly-errors");
       setError(friendlyError(e, "We couldn't find your wallet. Try creating a new one."));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const identify = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      if (!window.PublicKeyCredential) {
+        throw new Error("Passkeys require HTTPS.");
+      }
+      const result = await identifyPasskeyWallet();
+      const conn = new Connection(rpc, "confirmed");
+      const pk = new PublicKey(result.publicKey);
+      const [solLamports, usdc] = await Promise.all([
+        conn.getBalance(pk),
+        getUsdcBalance(conn, pk, network as "mainnet" | "devnet"),
+      ]);
+      const sol = solLamports / LAMPORTS_PER_SOL;
+      setWalletBalances((prev) => ({
+        ...prev,
+        [result.publicKey]: { sol, usdc },
+      }));
+      // Upsert with temporary label so list grows while scanning
+      const existing = loadWallets().find((w) => w.pubkey === result.publicKey);
+      const label =
+        existing?.label || `${result.publicKey.slice(0, 4)}…${result.publicKey.slice(-4)}`;
+      const updated = upsertWallet({
+        pubkey: result.publicKey,
+        credentialId: result.credentialId,
+        label,
+      });
+      setWallets(updated);
+      return { publicKey: result.publicKey, credentialId: result.credentialId, sol, usdc };
+    } catch (e) {
+      const { friendlyError } = await import("./friendly-errors");
+      setError(friendlyError(e, "Couldn't read that passkey. Try another."));
+      throw e;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renameWallet = (pubkey: string, label: string) => {
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    const list = loadWallets();
+    const idx = list.findIndex((w) => w.pubkey === pubkey);
+    if (idx < 0) return;
+    list[idx] = { ...list[idx], label: trimmed };
+    saveWallets(list);
+    setWallets([...list]);
+    if (publicKey === pubkey) {
+      setWalletLabel(trimmed);
+      localStorage.setItem("sol.new.walletLabel", trimmed);
+    }
+    // Push name into browser passkey manager when we have userId (Chrome)
+    const entry = list[idx];
+    if (entry.userId) {
+      const short = `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`;
+      void signalPasskeyUserDetails({
+        userId: entry.userId,
+        name: `${trimmed} · ${short}`,
+        displayName: `${trimmed} · ${short}`,
+      });
+    }
+  };
+
+  const removeWallet = (pubkey: string) => {
+    const list = loadWallets().filter((w) => w.pubkey !== pubkey);
+    saveWallets(list);
+    setWallets(list);
+    if (publicKey === pubkey) {
+      setPublicKey(null);
+      setWalletLabel(null);
+      setBalance(null);
+      setUsdcBalance(null);
+      localStorage.removeItem("sol.new.wallet");
+      localStorage.removeItem("sol.new.credentialId");
+      localStorage.removeItem("sol.new.walletLabel");
     }
   };
 
@@ -187,7 +352,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setBalance(null);
     setUsdcBalance(null);
     localStorage.setItem("sol.new.wallet", entry.pubkey);
-    localStorage.setItem("sol.new.credentialId", entry.credentialId);
+    if (entry.credentialId) localStorage.setItem("sol.new.credentialId", entry.credentialId);
     localStorage.setItem("sol.new.walletLabel", entry.label);
   };
 
@@ -209,7 +374,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setAirdropDone(true);
       const { toast } = await import("sonner");
       toast.success("0.1 SOL airdropped!");
-      try { new Audio("/chaching.mp3").play(); } catch {}
+      try {
+        new Audio("/chaching.mp3").play();
+      } catch {}
       setTimeout(() => setAirdropDone(false), 3000);
     } catch {
       const { toast } = await import("sonner");
@@ -227,11 +394,34 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("sol.new.wallet");
     localStorage.removeItem("sol.new.credentialId");
     localStorage.removeItem("sol.new.walletLabel");
-    // Keep sol.new.wallets so user can switch back later
   };
 
   return (
-    <WalletContext.Provider value={{ publicKey, walletLabel, wallets, balance, usdcBalance, loading, error, connect, recover, switchWallet, disconnect, refreshBalance, airdropping, airdropDone, handleAirdrop }}>
+    <WalletContext.Provider
+      value={{
+        publicKey,
+        walletLabel,
+        wallets,
+        walletBalances,
+        balance,
+        usdcBalance,
+        loading,
+        error,
+        connect,
+        recover,
+        identify,
+        activateWallet,
+        renameWallet,
+        removeWallet,
+        switchWallet,
+        refreshWalletListBalances,
+        disconnect,
+        refreshBalance,
+        airdropping,
+        airdropDone,
+        handleAirdrop,
+      }}
+    >
       {children}
     </WalletContext.Provider>
   );

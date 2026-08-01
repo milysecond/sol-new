@@ -134,7 +134,7 @@ export default function EarnPage() {
         throw new Error("No transactions returned. Try again in a moment.");
       }
 
-      const { keypair } = await getPasskeyKeypair();
+      const { keypair } = await getPasskeyKeypair(publicKey);
       const connection = new Connection(rpc, "confirmed");
       const feePayer = new PublicKey(publicKey);
       let lastSig = "";

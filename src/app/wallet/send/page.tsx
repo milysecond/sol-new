@@ -7,7 +7,7 @@ import { Coins, Image as ImageIcon, Check, ExternalLink } from "lucide-react";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { getPasskeyKeypair } from "@/lib/passkey-wallet";
+import { getPasskeyKeypair, ensureDocumentFocusForPasskey } from "@/lib/passkey-wallet";
 import { PrivateSendSheet } from "@/components/private-send-sheet";
 import { SlideToSend } from "@/components/slide-to-send";
 import { useDefaultToken } from "@/lib/currency-pref";
@@ -166,6 +166,13 @@ export default function SendPage() {
     setStatus("auth");
 
     try {
+      // Passkey MUST run in the same user-gesture turn as slide-complete.
+      // Any await before WebAuthn drops iOS/Safari activation → "document is not focused".
+      ensureDocumentFocusForPasskey();
+      const { keypair: userKeypair } = await getPasskeyKeypair(publicKey);
+
+      setStatus("sending");
+
       let owner = resolved?.owner;
       if (!owner) {
         const result = await resolveRecipient(recipient.trim());
@@ -188,8 +195,6 @@ export default function SendPage() {
         }
       }
 
-      setStatus("sending");
-      const { keypair: userKeypair } = await getPasskeyKeypair();
       const connection = new Connection(rpc, "confirmed");
       const from = new PublicKey(publicKey);
       const tx = new Transaction();

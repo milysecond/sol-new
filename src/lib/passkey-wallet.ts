@@ -9,15 +9,16 @@ const CHALLENGE = new TextEncoder().encode("sol.new-wallet-creation");
  * address (heals sessions from before credentialId tracking existed, where
  * the browser would otherwise list every sol.new passkey on the device).
  */
-function getAllowCredentials() {
+function getAllowCredentials(forAddress?: string | null) {
   let credId = localStorage.getItem("sol.new.credentialId");
-  if (!credId) {
-    try {
-      const pubkey = localStorage.getItem("sol.new.wallet");
-      const wallets = JSON.parse(localStorage.getItem("sol.new.wallets") || "[]");
-      credId = wallets.find((w) => w.pubkey === pubkey)?.credentialId || null;
-    } catch {}
-  }
+  try {
+    const pubkey = forAddress || localStorage.getItem("sol.new.wallet");
+    const wallets = JSON.parse(localStorage.getItem("sol.new.wallets") || "[]");
+    if (pubkey) {
+      const fromList = wallets.find((w: { pubkey?: string }) => w.pubkey === pubkey)?.credentialId;
+      if (fromList) credId = fromList;
+    }
+  } catch {}
   return credId
     ? [{ id: Uint8Array.from(atob(credId), (c) => c.charCodeAt(0)), type: "public-key" as const }]
     : undefined;
@@ -44,6 +45,26 @@ function rememberCredential(address: string, rawId: ArrayBuffer) {
   } catch {}
 }
 
+/**
+ * Call immediately before navigator.credentials.get/create.
+ * iOS Safari throws "The document is not focused" if a drag control or
+ * blurred tab still holds activation after slide-to-send.
+ */
+export function ensureDocumentFocusForPasskey() {
+  try {
+    if (typeof document === "undefined") return;
+    const ae = document.activeElement as HTMLElement | null;
+    if (ae && typeof ae.blur === "function" && ae !== document.body) {
+      ae.blur();
+    }
+    window.focus?.();
+    // Nudge layout so Safari treats the document as focused after pointer-up
+    void document.body?.offsetHeight;
+  } catch {
+    /* ignore */
+  }
+}
+
 async function sha256(data: Uint8Array): Promise<Uint8Array> {
   const hash = await crypto.subtle.digest("SHA-256", new Uint8Array(data) as unknown as BufferSource);
   return new Uint8Array(hash);
@@ -52,15 +73,23 @@ async function sha256(data: Uint8Array): Promise<Uint8Array> {
 export async function createPasskeyWallet(username: string): Promise<{
   publicKey: string;
   credentialId: string;
+  userId: string;
 }> {
+  ensureDocumentFocusForPasskey();
+  const label = (username || "sol.new user").trim().slice(0, 64);
+  // Stable random user handle — needed later to rename the passkey in the browser via Signal API
+  const userIdBytes = crypto.getRandomValues(new Uint8Array(32));
+  const userId = btoa(String.fromCharCode(...userIdBytes));
+
   const credential = (await navigator.credentials.create({
     publicKey: {
       challenge: CHALLENGE,
       rp: { name: "sol.new", id: window.location.hostname },
       user: {
-        id: crypto.getRandomValues(new Uint8Array(32)),
-        name: username || "sol.new user",
-        displayName: username || "sol.new user",
+        id: userIdBytes,
+        // Browser passkey list shows name + displayName (Chrome/Safari settings)
+        name: `${label}@sol.new`,
+        displayName: label,
       },
       pubKeyCredParams: [
         { alg: -7, type: "public-key" },
@@ -72,7 +101,6 @@ export async function createPasskeyWallet(username: string): Promise<{
         userVerification: "required",
       },
       extensions: {
-        
         prf: {
           eval: {
             first: CHALLENGE,
@@ -84,7 +112,6 @@ export async function createPasskeyWallet(username: string): Promise<{
 
   if (!credential) throw new Error("Passkey creation cancelled");
 
-  
   const prfResult = credential.getClientExtensionResults()?.prf?.results?.first;
 
   let seed: Uint8Array;
@@ -96,27 +123,73 @@ export async function createPasskeyWallet(username: string): Promise<{
   }
 
   const keypair = Keypair.fromSeed(seed.slice(0, 32));
+  const publicKey = keypair.publicKey.toBase58();
   const credentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+  const short = `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`;
+
+  // Best-effort: put address into the browser passkey name (Chrome Signal API)
+  await signalPasskeyUserDetails({
+    userId,
+    name: `${label} · ${short}`,
+    displayName: `${label} · ${short}`,
+  });
 
   return {
-    publicKey: keypair.publicKey.toBase58(),
+    publicKey,
     credentialId,
+    userId,
   };
 }
 
-export async function recoverPasskeyWallet(): Promise<{
+/** Update browser passkey account name when supported (Chrome). */
+export async function signalPasskeyUserDetails(opts: {
+  userId: string;
+  name: string;
+  displayName: string;
+}): Promise<boolean> {
+  try {
+    const PK = PublicKeyCredential as unknown as {
+      signalCurrentUserDetails?: (o: {
+        rpId: string;
+        userId: BufferSource;
+        name: string;
+        displayName: string;
+      }) => Promise<void>;
+    };
+    if (typeof PK.signalCurrentUserDetails !== "function") return false;
+    const raw = Uint8Array.from(atob(opts.userId), (c) => c.charCodeAt(0));
+    await PK.signalCurrentUserDetails({
+      rpId: window.location.hostname,
+      userId: raw,
+      name: opts.name.slice(0, 64),
+      displayName: opts.displayName.slice(0, 64),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function recoverPasskeyWallet(opts?: {
+  /** Always show the system passkey picker (ignore pinned credential). */
+  forcePicker?: boolean;
+  /** Pin to this wallet's saved credential when known. */
+  forAddress?: string;
+}): Promise<{
   publicKey: string;
   credentialId: string;
 }> {
-  // Prefer the active / magic-link credential so we don't list every passkey.
-  const allowCredentials = getAllowCredentials();
+  ensureDocumentFocusForPasskey();
+  // Prefer pinned credential unless forcing the full picker (wallet finder).
+  const allowCredentials = opts?.forcePicker
+    ? undefined
+    : getAllowCredentials(opts?.forAddress);
   const credential = (await navigator.credentials.get({
     publicKey: {
       challenge: CHALLENGE,
       userVerification: "required",
       ...(allowCredentials && { allowCredentials }),
       extensions: {
-
         prf: {
           eval: {
             first: CHALLENGE,
@@ -140,11 +213,21 @@ export async function recoverPasskeyWallet(): Promise<{
   }
 
   const keypair = Keypair.fromSeed(seed.slice(0, 32));
+  const publicKey = keypair.publicKey.toBase58();
+  rememberCredential(publicKey, credential.rawId);
 
   return {
-    publicKey: keypair.publicKey.toBase58(),
+    publicKey,
     credentialId,
   };
+}
+
+/** Open the full passkey list and reveal the Solana address for the chosen one. */
+export async function identifyPasskeyWallet(): Promise<{
+  publicKey: string;
+  credentialId: string;
+}> {
+  return recoverPasskeyWallet({ forcePicker: true });
 }
 
 /**
@@ -152,8 +235,11 @@ export async function recoverPasskeyWallet(): Promise<{
  * Use this to verify address before creating transactions.
  * Returns both to avoid double authentication.
  */
-export async function getPasskeyKeypair(): Promise<{address: string, keypair: Keypair}> {
-  const allowCredentials = getAllowCredentials();
+export async function getPasskeyKeypair(
+  expectedPublicKey?: string
+): Promise<{ address: string; keypair: Keypair }> {
+  ensureDocumentFocusForPasskey();
+  const allowCredentials = getAllowCredentials(expectedPublicKey);
 
   const credential = (await navigator.credentials.get({
     publicKey: {
@@ -183,6 +269,11 @@ export async function getPasskeyKeypair(): Promise<{address: string, keypair: Ke
   const keypair = Keypair.fromSeed(seed.slice(0, 32));
   const address = keypair.publicKey.toBase58();
   rememberCredential(address, credential.rawId);
+  if (expectedPublicKey && address !== expectedPublicKey) {
+    throw new Error(
+      `Passkey does not match connected wallet (${expectedPublicKey.slice(0, 4)}…${expectedPublicKey.slice(-4)}). Switch wallet in the menu or reconnect.`
+    );
+  }
   return {
     address,
     keypair,
@@ -302,7 +393,8 @@ export async function signVersionedAndSend(
   rpc: string,
   expectedPublicKey?: string,
 ): Promise<string> {
-  const allowCredentials = getAllowCredentials();
+  ensureDocumentFocusForPasskey();
+  const allowCredentials = getAllowCredentials(expectedPublicKey);
 
   const credential = (await navigator.credentials.get({
     publicKey: {

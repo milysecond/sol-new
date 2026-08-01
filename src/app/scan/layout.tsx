@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata: Metadata = pageMeta({
   title: "Scan Any Solana Address — sol.new",
   description:
-    "Paste any Solana address to inspect a wallet's portfolio, a token's supply and risk profile, or a program's upgrade authority.",
+    "Paste any Solana address to inspect a wallet, token, or program. Share as sol.new/address/<pubkey>.",
   path: "/scan",
 });
 
