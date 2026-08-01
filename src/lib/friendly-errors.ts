@@ -58,6 +58,11 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
 
   // Slot / preflight
   if (m.includes("simulation failed") || m.includes("preflight")) {
+    if (m.includes("insufficient") || m.includes("0x1")) {
+      return "Not enough SOL for fees. Keep a little spare and try again.";
+    }
+    // Prefer the original message if it already explains the failure
+    if (msg.length < 200 && msg.toLowerCase().includes("stake")) return msg;
     return "The transaction couldn't be built. Refresh the page and try again.";
   }
 

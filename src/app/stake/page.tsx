@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Connection,
   PublicKey,
+  Keypair,
   StakeProgram,
   Authorized,
   Lockup,
@@ -36,16 +37,43 @@ type StakeRow = {
   deactivationEpoch: string | null;
 };
 
+function simErrorMessage(err: unknown, logs?: string[] | null): string {
+  const tail = logs?.filter(Boolean).slice(-6).join(" · ") || "";
+  const e =
+    typeof err === "string"
+      ? err
+      : err && typeof err === "object"
+        ? JSON.stringify(err)
+        : String(err);
+  if (/insufficient|0x1\b/i.test(e + tail)) {
+    return "Not enough SOL for stake + rent + fees. Try a smaller amount or Max.";
+  }
+  if (/blockhash/i.test(e + tail)) {
+    return "Network was slow — try again.";
+  }
+  if (tail) return `Stake failed: ${tail.slice(0, 220)}`;
+  return `Stake failed: ${e.slice(0, 180)}`;
+}
+
 export default function StakePage() {
   const { publicKey, balance, refreshBalance } = useWallet();
   const { rpc, network } = useNetwork();
-  const [amount, setAmount] = useState("1");
+  const [amount, setAmount] = useState("0.01");
   const [vote, setVote] = useState(DEFAULT_VOTE);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sig, setSig] = useState<string | null>(null);
   const [stakes, setStakes] = useState<StakeRow[]>([]);
   const [loadingStakes, setLoadingStakes] = useState(false);
+  const [rentLamports, setRentLamports] = useState(STAKE_RENT_LAMPORTS);
+
+  useEffect(() => {
+    const connection = new Connection(rpc, "confirmed");
+    connection
+      .getMinimumBalanceForRentExemption(StakeProgram.space)
+      .then((r) => setRentLamports(r))
+      .catch(() => setRentLamports(STAKE_RENT_LAMPORTS));
+  }, [rpc]);
 
   const loadStakes = useCallback(async () => {
     if (!publicKey) {
@@ -56,8 +84,7 @@ export default function StakePage() {
     try {
       const connection = new Connection(rpc, "confirmed");
       const owner = new PublicKey(publicKey);
-      // Staker authority is at offset 12 in StakeStateV2 meta.authorized.staker
-      // (4 discriminator + 8 rent_exempt_reserve = 12)
+      // Staker authority offset 12 in StakeStateV2 meta.authorized.staker
       const accounts = await connection.getParsedProgramAccounts(StakeProgram.programId, {
         commitment: "confirmed",
         filters: [
@@ -77,10 +104,8 @@ export default function StakePage() {
               voter?: string;
               activationEpoch?: string;
               deactivationEpoch?: string;
-              stake?: string;
             };
           };
-          meta?: { authorized?: { staker?: string; withdrawer?: string } };
         };
         const del = stakeInfo.stake?.delegation;
         return {
@@ -105,22 +130,35 @@ export default function StakePage() {
     void loadStakes();
   }, [loadStakes]);
 
-  const sendTx = async (tx: Transaction) => {
+  const sendTx = async (tx: Transaction, extraSigners: Keypair[] = []) => {
     if (!publicKey) throw new Error("Connect wallet first");
     const { keypair } = await getPasskeyKeypair(publicKey);
+    if (keypair.publicKey.toBase58() !== publicKey) {
+      throw new Error(
+        "Passkey does not match connected wallet. Open Find wallet and pick the right one."
+      );
+    }
     const connection = new Connection(rpc, "confirmed");
     const { blockhash, lastValidBlockHeight } =
       await connection.getLatestBlockhash("confirmed");
     tx.recentBlockhash = blockhash;
-    tx.feePayer = new PublicKey(publicKey);
-    tx.partialSign(keypair);
+    tx.feePayer = keypair.publicKey;
+    // Fresh Transaction — sign fee payer + any stake account keys
+    tx.sign(keypair, ...extraSigners);
+
+    const sim = await connection.simulateTransaction(tx);
+    if (sim.value.err) {
+      console.error("[stake] sim", sim.value.err, sim.value.logs);
+      throw new Error(simErrorMessage(sim.value.err, sim.value.logs));
+    }
+
     const signature = await connection.sendRawTransaction(tx.serialize(), {
-      skipPreflight: false,
+      skipPreflight: true, // already simulated
       maxRetries: 3,
     });
     await connection.confirmTransaction(
       { signature, blockhash, lastValidBlockHeight },
-      "confirmed",
+      "confirmed"
     );
     return signature;
   };
@@ -128,7 +166,7 @@ export default function StakePage() {
   const handleStake = async () => {
     if (!publicKey) return;
     if (network !== "mainnet") {
-      setError("Switch to mainnet to stake.");
+      setError("Switch to mainnet (live) to stake.");
       return;
     }
     setBusy(true);
@@ -140,46 +178,49 @@ export default function StakePage() {
         throw new Error(`Minimum stake is ${MIN_STAKE_SOL} SOL`);
       }
       const stakeLamports = Math.round(sol * LAMPORTS_PER_SOL);
-      const totalNeeded = stakeLamports + STAKE_RENT_LAMPORTS + STAKE_FEE_BUFFER_LAMPORTS;
+      const connection = new Connection(rpc, "confirmed");
+      let rent = rentLamports;
+      try {
+        rent = await connection.getMinimumBalanceForRentExemption(StakeProgram.space);
+        setRentLamports(rent);
+      } catch {
+        /* use cached */
+      }
+
+      const totalNeeded = stakeLamports + rent + STAKE_FEE_BUFFER_LAMPORTS;
       const balLamports = Math.round((balance ?? 0) * LAMPORTS_PER_SOL);
       if (totalNeeded > balLamports) {
         throw new Error(
-          `Not enough SOL. Need ~${(totalNeeded / LAMPORTS_PER_SOL).toFixed(4)} SOL including rent and fees.`,
+          `Not enough SOL. Need ~${(totalNeeded / LAMPORTS_PER_SOL).toFixed(4)} SOL (stake + rent ${((rent) / LAMPORTS_PER_SOL).toFixed(4)} + fees).`
         );
       }
 
       const from = new PublicKey(publicKey);
       const votePubkey = new PublicKey(vote);
-      const seed = `sn${Date.now().toString(36)}`;
-      const stakePubkey = await PublicKey.createWithSeed(
-        from,
-        seed,
-        StakeProgram.programId,
-      );
 
-      // StakeProgram helpers return full Transactions; merge instructions.
-      const createTx = StakeProgram.createAccountWithSeed({
+      // New stake account keypair (standard path — avoids createWithSeed base/seed quirks)
+      const stakeAccount = Keypair.generate();
+      const createIx = StakeProgram.createAccount({
         fromPubkey: from,
-        stakePubkey,
-        basePubkey: from,
-        seed,
+        stakePubkey: stakeAccount.publicKey,
         authorized: new Authorized(from, from),
-        lockup: new Lockup(0, 0, from),
-        lamports: stakeLamports + STAKE_RENT_LAMPORTS,
+        lockup: new Lockup(0, 0, PublicKey.default),
+        lamports: stakeLamports + rent,
       });
-      const delegateTx = StakeProgram.delegate({
-        stakePubkey,
+      const delegateIx = StakeProgram.delegate({
+        stakePubkey: stakeAccount.publicKey,
         authorizedPubkey: from,
         votePubkey,
       });
 
-      const tx = new Transaction().add(...createTx.instructions, ...delegateTx.instructions);
-      const signature = await sendTx(tx);
+      const tx = new Transaction().add(...createIx.instructions, ...delegateIx.instructions);
+      const signature = await sendTx(tx, [stakeAccount]);
       setSig(signature);
       await refreshBalance();
       await loadStakes();
     } catch (e) {
-      setError(friendlyError(e));
+      console.error("[stake]", e);
+      setError(friendlyError(e, "Couldn't stake. Try again."));
     } finally {
       setBusy(false);
     }
@@ -202,7 +243,7 @@ export default function StakePage() {
       setSig(signature);
       await loadStakes();
     } catch (e) {
-      setError(friendlyError(e));
+      setError(friendlyError(e, "Couldn't deactivate stake."));
     } finally {
       setBusy(false);
     }
@@ -228,7 +269,7 @@ export default function StakePage() {
       await refreshBalance();
       await loadStakes();
     } catch (e) {
-      setError(friendlyError(e));
+      setError(friendlyError(e, "Couldn't withdraw stake."));
     } finally {
       setBusy(false);
     }
@@ -236,10 +277,7 @@ export default function StakePage() {
 
   const maxStake = () => {
     const bal = Math.round((balance ?? 0) * LAMPORTS_PER_SOL);
-    const sendable = Math.max(
-      0,
-      bal - STAKE_RENT_LAMPORTS - STAKE_FEE_BUFFER_LAMPORTS,
-    );
+    const sendable = Math.max(0, bal - rentLamports - STAKE_FEE_BUFFER_LAMPORTS);
     if (sendable < MIN_STAKE_SOL * LAMPORTS_PER_SOL) {
       setError("Not enough SOL to stake after rent and fees.");
       return;
@@ -310,7 +348,8 @@ export default function StakePage() {
                     </button>
                   </div>
                   <p className="text-[11px] text-gray-400 mt-1">
-                    Balance: {(balance ?? 0).toFixed(4)} SOL · min {MIN_STAKE_SOL} SOL
+                    Balance: {(balance ?? 0).toFixed(4)} SOL · min {MIN_STAKE_SOL} SOL · +
+                    {(rentLamports / LAMPORTS_PER_SOL).toFixed(4)} rent
                   </p>
                 </div>
 
