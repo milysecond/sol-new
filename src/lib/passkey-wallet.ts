@@ -9,15 +9,16 @@ const CHALLENGE = new TextEncoder().encode("sol.new-wallet-creation");
  * address (heals sessions from before credentialId tracking existed, where
  * the browser would otherwise list every sol.new passkey on the device).
  */
-function getAllowCredentials() {
+function getAllowCredentials(forAddress?: string | null) {
   let credId = localStorage.getItem("sol.new.credentialId");
-  if (!credId) {
-    try {
-      const pubkey = localStorage.getItem("sol.new.wallet");
-      const wallets = JSON.parse(localStorage.getItem("sol.new.wallets") || "[]");
-      credId = wallets.find((w) => w.pubkey === pubkey)?.credentialId || null;
-    } catch {}
-  }
+  try {
+    const pubkey = forAddress || localStorage.getItem("sol.new.wallet");
+    const wallets = JSON.parse(localStorage.getItem("sol.new.wallets") || "[]");
+    if (pubkey) {
+      const fromList = wallets.find((w: { pubkey?: string }) => w.pubkey === pubkey)?.credentialId;
+      if (fromList) credId = fromList;
+    }
+  } catch {}
   return credId
     ? [{ id: Uint8Array.from(atob(credId), (c) => c.charCodeAt(0)), type: "public-key" as const }]
     : undefined;
@@ -152,8 +153,10 @@ export async function recoverPasskeyWallet(): Promise<{
  * Use this to verify address before creating transactions.
  * Returns both to avoid double authentication.
  */
-export async function getPasskeyKeypair(): Promise<{address: string, keypair: Keypair}> {
-  const allowCredentials = getAllowCredentials();
+export async function getPasskeyKeypair(
+  expectedPublicKey?: string
+): Promise<{ address: string; keypair: Keypair }> {
+  const allowCredentials = getAllowCredentials(expectedPublicKey);
 
   const credential = (await navigator.credentials.get({
     publicKey: {
@@ -183,6 +186,11 @@ export async function getPasskeyKeypair(): Promise<{address: string, keypair: Ke
   const keypair = Keypair.fromSeed(seed.slice(0, 32));
   const address = keypair.publicKey.toBase58();
   rememberCredential(address, credential.rawId);
+  if (expectedPublicKey && address !== expectedPublicKey) {
+    throw new Error(
+      `Passkey does not match connected wallet (${expectedPublicKey.slice(0, 4)}…${expectedPublicKey.slice(-4)}). Switch wallet in the menu or reconnect.`
+    );
+  }
   return {
     address,
     keypair,
@@ -302,7 +310,7 @@ export async function signVersionedAndSend(
   rpc: string,
   expectedPublicKey?: string,
 ): Promise<string> {
-  const allowCredentials = getAllowCredentials();
+  const allowCredentials = getAllowCredentials(expectedPublicKey);
 
   const credential = (await navigator.credentials.get({
     publicKey: {

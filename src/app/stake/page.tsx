@@ -107,7 +107,7 @@ export default function StakePage() {
 
   const sendTx = async (tx: Transaction) => {
     if (!publicKey) throw new Error("Connect wallet first");
-    const { keypair } = await getPasskeyKeypair();
+    const { keypair } = await getPasskeyKeypair(publicKey);
     const connection = new Connection(rpc, "confirmed");
     const { blockhash, lastValidBlockHeight } =
       await connection.getLatestBlockhash("confirmed");

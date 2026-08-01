@@ -87,7 +87,7 @@ function fmtUi(n: number | null | undefined, d = 4): string {
 }
 
 export default function SwapPage() {
-  const { publicKey, balance, usdcBalance, refreshBalance } = useWallet();
+  const { publicKey, walletLabel, balance, usdcBalance, refreshBalance } = useWallet();
   const { network } = useNetwork();
   const [from, setFrom] = useState<TokenOpt>(PRESETS[0]);
   const [to, setTo] = useState<TokenOpt>(PRESETS[1]);
@@ -302,10 +302,7 @@ export default function SwapPage() {
         throw new Error(oData.error || "Could not build swap");
       }
 
-      const { keypair } = await getPasskeyKeypair();
-      if (keypair.publicKey.toBase58() !== publicKey) {
-        throw new Error("Passkey does not match connected wallet");
-      }
+      const { keypair } = await getPasskeyKeypair(publicKey);
 
       const tx = VersionedTransaction.deserialize(
         Buffer.from(oData.order.transaction, "base64")
@@ -394,8 +391,14 @@ export default function SwapPage() {
               <AnimatedIcon icon={ArrowLeftRight} size={32} className="text-purple-500" />
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Swap</h1>
               <p className="text-xs sm:text-sm text-gray-500 dark:text-white/50">
-                Any token · passkey · Jupiter Ultra
+                Any token · your passkey wallet · Jupiter Ultra
               </p>
+              {publicKey && (
+                <p className="inline-flex items-center gap-1.5 text-[11px] font-mono text-purple-600 dark:text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-full px-2.5 py-1">
+                  {walletLabel ? `${walletLabel} · ` : ""}
+                  {publicKey.slice(0, 4)}…{publicKey.slice(-4)}
+                </p>
+              )}
             </div>
 
             {network === "devnet" && (

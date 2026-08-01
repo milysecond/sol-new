@@ -148,7 +148,7 @@ export default function GiftPage() {
       }
 
       setStatus("auth");
-      const { keypair: sender } = await getPasskeyKeypair();
+      const { keypair: sender } = await getPasskeyKeypair(publicKey);
       if (sender.publicKey.toBase58() !== publicKey) {
         throw new Error(
           `That passkey belongs to a different wallet. Pick the passkey for ${walletLabel || `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`}, or switch wallets in the menu.`
