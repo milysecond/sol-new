@@ -68,6 +68,14 @@ export function SlideToSend({
     if (confirmed.current || locked) return;
     confirmed.current = true;
     setOffset(max);
+    // Blur drag target so Safari treats the document as focused for WebAuthn.
+    // Do NOT await before onConfirm — that drops the user-gesture on iOS.
+    try {
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      window.focus?.();
+    } catch {
+      /* ignore */
+    }
     try {
       await onConfirm();
     } finally {
