@@ -403,12 +403,12 @@ export function Navbar() {
                           )}
                         </button>
                       )}
-                      {wallets.length > 1 && (
+                      {wallets.length > 0 && (
                         <div className="border-t border-black/10 dark:border-white/10">
                           <p className="text-[10px] uppercase tracking-wider text-gray-400 px-4 pt-2.5 pb-1">
                             Switch wallet
                           </p>
-                          {wallets.map((w) => (
+                          {wallets.slice(0, 12).map((w) => (
                             <button
                               key={w.pubkey}
                               type="button"
@@ -428,7 +428,23 @@ export function Navbar() {
                               </span>
                             </button>
                           ))}
+                          <Link
+                            href="/wallet/find"
+                            onClick={() => setShowMenu(false)}
+                            className="block w-full text-left px-4 py-2.5 text-sm text-purple-600 dark:text-purple-400 hover:bg-black/5 dark:hover:bg-white/5"
+                          >
+                            Find correct wallet…
+                          </Link>
                         </div>
+                      )}
+                      {wallets.length === 0 && (
+                        <Link
+                          href="/wallet/find"
+                          onClick={() => setShowMenu(false)}
+                          className="block w-full text-left px-4 py-2.5 text-sm text-purple-600 dark:text-purple-400 hover:bg-black/5 dark:hover:bg-white/5 border-t border-black/10 dark:border-white/10"
+                        >
+                          Find correct wallet…
+                        </Link>
                       )}
                       <button
                         type="button"
@@ -456,12 +472,18 @@ export function Navbar() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => recover()}
+                  onClick={() => recover({ forcePicker: true })}
                   disabled={loading}
                   className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 text-sm rounded-xl px-3 py-2 min-h-[40px] transition cursor-pointer disabled:opacity-50 hidden sm:block"
                 >
                   Recover
                 </button>
+                <Link
+                  href="/wallet/find"
+                  className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 text-sm rounded-xl px-3 py-2 min-h-[40px] transition hidden sm:flex items-center"
+                >
+                  Find
+                </Link>
               </div>
             )}
           </div>

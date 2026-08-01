@@ -125,19 +125,26 @@ export async function createPasskeyWallet(username: string): Promise<{
   };
 }
 
-export async function recoverPasskeyWallet(): Promise<{
+export async function recoverPasskeyWallet(opts?: {
+  /** Always show the system passkey picker (ignore pinned credential). */
+  forcePicker?: boolean;
+  /** Pin to this wallet's saved credential when known. */
+  forAddress?: string;
+}): Promise<{
   publicKey: string;
   credentialId: string;
 }> {
-  // Prefer the active / magic-link credential so we don't list every passkey.
-  const allowCredentials = getAllowCredentials();
+  ensureDocumentFocusForPasskey();
+  // Prefer pinned credential unless forcing the full picker (wallet finder).
+  const allowCredentials = opts?.forcePicker
+    ? undefined
+    : getAllowCredentials(opts?.forAddress);
   const credential = (await navigator.credentials.get({
     publicKey: {
       challenge: CHALLENGE,
       userVerification: "required",
       ...(allowCredentials && { allowCredentials }),
       extensions: {
-
         prf: {
           eval: {
             first: CHALLENGE,
@@ -161,11 +168,21 @@ export async function recoverPasskeyWallet(): Promise<{
   }
 
   const keypair = Keypair.fromSeed(seed.slice(0, 32));
+  const publicKey = keypair.publicKey.toBase58();
+  rememberCredential(publicKey, credential.rawId);
 
   return {
-    publicKey: keypair.publicKey.toBase58(),
+    publicKey,
     credentialId,
   };
+}
+
+/** Open the full passkey list and reveal the Solana address for the chosen one. */
+export async function identifyPasskeyWallet(): Promise<{
+  publicKey: string;
+  credentialId: string;
+}> {
+  return recoverPasskeyWallet({ forcePicker: true });
 }
 
 /**
