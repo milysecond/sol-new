@@ -11,8 +11,11 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
   if (m.includes("notallowederror") || m.includes("user cancelled") || m.includes("the operation either timed out") || m.includes("the user denied")) {
     return "Face ID was cancelled. Tap the button to try again.";
   }
-  if (m.includes("not allowed") && m.includes("passkey")) {
-    return "Your device blocked the passkey prompt. Check Face ID / Touch ID in Settings.";
+  if (m.includes("document is not focused") || m.includes("is not focused")) {
+    return "Tap Slide to send again — Face ID needs the page focused.";
+  }
+  if (m.includes("not allowed") && (m.includes("passkey") || m.includes("credential") || m.includes("publickey"))) {
+    return "Your device blocked the passkey prompt. Check Face ID / Touch ID in Settings, then try again.";
   }
   if (m.includes("no credentials") || m.includes("no passkey")) {
     return "No passkey found on this device. Create a new wallet, or restore from another device.";

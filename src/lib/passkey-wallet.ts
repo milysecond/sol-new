@@ -45,6 +45,26 @@ function rememberCredential(address: string, rawId: ArrayBuffer) {
   } catch {}
 }
 
+/**
+ * Call immediately before navigator.credentials.get/create.
+ * iOS Safari throws "The document is not focused" if a drag control or
+ * blurred tab still holds activation after slide-to-send.
+ */
+export function ensureDocumentFocusForPasskey() {
+  try {
+    if (typeof document === "undefined") return;
+    const ae = document.activeElement as HTMLElement | null;
+    if (ae && typeof ae.blur === "function" && ae !== document.body) {
+      ae.blur();
+    }
+    window.focus?.();
+    // Nudge layout so Safari treats the document as focused after pointer-up
+    void document.body?.offsetHeight;
+  } catch {
+    /* ignore */
+  }
+}
+
 async function sha256(data: Uint8Array): Promise<Uint8Array> {
   const hash = await crypto.subtle.digest("SHA-256", new Uint8Array(data) as unknown as BufferSource);
   return new Uint8Array(hash);
@@ -156,6 +176,7 @@ export async function recoverPasskeyWallet(): Promise<{
 export async function getPasskeyKeypair(
   expectedPublicKey?: string
 ): Promise<{ address: string; keypair: Keypair }> {
+  ensureDocumentFocusForPasskey();
   const allowCredentials = getAllowCredentials(expectedPublicKey);
 
   const credential = (await navigator.credentials.get({
@@ -310,6 +331,7 @@ export async function signVersionedAndSend(
   rpc: string,
   expectedPublicKey?: string,
 ): Promise<string> {
+  ensureDocumentFocusForPasskey();
   const allowCredentials = getAllowCredentials(expectedPublicKey);
 
   const credential = (await navigator.credentials.get({
