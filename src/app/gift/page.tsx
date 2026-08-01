@@ -310,11 +310,8 @@ export default function GiftPage() {
       assetLabel:
         giftEntry?.symbol ||
         giftEntry?.tokenSymbol ||
-        (giftEntry?.token === "SOL" || !giftEntry?.token
-          ? "SOL"
-          : giftEntry?.token === usdcMain
-            ? "USDC"
-            : assetLabel),
+        giftTokenLabel(giftEntry?.token) ||
+        tokenSymbol,
       giftUrl,
       message,
       senderLabel: walletLabel || null,
