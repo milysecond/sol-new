@@ -193,7 +193,7 @@ export function buildUsdcGiftInstructions(
 }
 
 /** UI amount → base units for SOL or USDC (legacy API helper). */
-export function giftAmountToBase(amountUi: number, token: "SOL" | "USDC"): number {
+export function giftAmountToBase(amountUi: number, token: string): number {
   if (!Number.isFinite(amountUi) || amountUi <= 0) return 0;
   if (token === "USDC") return Math.round(amountUi * 1e6);
   return Math.round(amountUi * 1e9);
@@ -207,19 +207,19 @@ export function buildGiftFundingInstructions(
   sender: PublicKey,
   giftPubkey: PublicKey,
   amountBase: number,
-  token: "SOL" | "USDC",
+  token: string,
   network: Network,
 ): TransactionInstruction[] {
-  if (token === "SOL") {
-    return [
-      SystemProgram.transfer({
-        fromPubkey: sender,
-        toPubkey: giftPubkey,
-        lamports: amountBase + CLAIM_FEE_LAMPORTS,
-      }),
-    ];
+  if (token === "USDC") {
+    return buildUsdcGiftInstructions(sender, giftPubkey, amountBase, network);
   }
-  return buildUsdcGiftInstructions(sender, giftPubkey, amountBase, network);
+  return [
+    SystemProgram.transfer({
+      fromPubkey: sender,
+      toPubkey: giftPubkey,
+      lamports: amountBase + CLAIM_FEE_LAMPORTS,
+    }),
+  ];
 }
 
 export async function sweepGift(
