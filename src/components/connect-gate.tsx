@@ -34,7 +34,7 @@ export function ConnectGate({
 }) {
   const { publicKey, walletLabel, wallets, connect, recover, switchWallet, loading, error } =
     useWallet();
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState("sol.new ");
   const [isTgWebView, setIsTgWebView] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
 
@@ -167,9 +167,19 @@ export function ConnectGate({
                   <div className="space-y-2 pt-1 border-t border-black/5 dark:border-white/10">
                     <input
                       type="text"
-                      placeholder="Wallet label (e.g. My Main Wallet)"
+                      placeholder="sol.new · name"
                       value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (!v.startsWith("sol.new")) {
+                          setUsername(v.startsWith("sol") ? v : `sol.new ${v.replace(/^sol\.new\s*/i, "")}`);
+                        } else {
+                          setUsername(v);
+                        }
+                      }}
+                      onFocus={() => {
+                        if (!username.trim()) setUsername("sol.new ");
+                      }}
                       className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/25 transition text-sm"
                     />
                     <button
