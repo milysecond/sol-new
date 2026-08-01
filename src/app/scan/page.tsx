@@ -611,7 +611,7 @@ function ScanInner() {
     e.preventDefault();
     const a = input.trim();
     if (!a) return;
-    router.push(`/scan?address=${encodeURIComponent(a)}`);
+    router.push(`/address/${encodeURIComponent(a)}`);
     scan(a);
   };
 
@@ -626,7 +626,10 @@ function ScanInner() {
               <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Scan</h1>
             </div>
             <p className="text-gray-500 dark:text-white/40 text-sm">
-              Paste any Solana address — wallet, token, or program.
+              Paste any Solana address — wallet, token, or program.{" "}
+              <span className="hidden sm:inline text-gray-400 dark:text-white/30">
+                sol.new/address/…
+              </span>
             </p>
           </div>
 
@@ -656,7 +659,11 @@ function ScanInner() {
 
           {publicKey && !result && !loading && (
             <button
-              onClick={() => { setInput(publicKey); router.push(`/scan?address=${encodeURIComponent(publicKey)}`); scan(publicKey); }}
+              onClick={() => {
+                setInput(publicKey);
+                router.push(`/address/${encodeURIComponent(publicKey)}`);
+                scan(publicKey);
+              }}
               className="mx-auto block text-xs text-purple-500 dark:text-purple-400 hover:underline"
             >
               Scan my connected wallet →

@@ -123,6 +123,7 @@ const SECTIONS: Section[] = [
     title: "Explore",
     intro: "Look up anything, track launches, stay informed.",
     items: [
+      { href: "/address", title: "Address", blurb: "sol.new/address/<pubkey> — wallet, token, or program lookup.", icon: Activity },
       { href: "/scan", title: "Scan", blurb: "Wallet, token, or program lookup.", icon: Activity },
       { href: "/stocks", title: "Stocks", blurb: "Tokenized equities screener on Solana.", icon: LineChart },
       { href: "/lists", title: "Lists", blurb: "Watchlists and quotes.", icon: List },
