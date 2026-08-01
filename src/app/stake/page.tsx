@@ -348,9 +348,13 @@ export default function StakePage() {
                     /lst
                   </a>
                 </p>
-                {sponsored && (
+                {sponsored ? (
                   <p className="text-[11px] text-emerald-600 dark:text-emerald-400">
                     Network fee paid by sol.new
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-gray-400">
+                    Network fee from your wallet (~0.00001 SOL)
                   </p>
                 )}
               </div>

@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
         amountSol,
         vote,
       });
-      return NextResponse.json({ ok: true, sponsored: true, ...built });
+      return NextResponse.json({ ok: true, ...built });
     }
 
     const built = await buildSelfPaidStakeTx({
@@ -72,9 +72,28 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
+  let sponsored = false;
+  let feePayer: string | null = null;
+  let feePayerLamports: number | null = null;
+  if (stakeSponsorConfigured()) {
+    try {
+      const { loadFeePayerKeypair } = await import("@/lib/fee-payer");
+      const { Connection } = await import("@solana/web3.js");
+      const { mainnetRpcUrl } = await import("@/lib/rpc-server");
+      const kp = loadFeePayerKeypair();
+      feePayer = kp.publicKey.toBase58();
+      const conn = new Connection(mainnetRpcUrl(), "confirmed");
+      feePayerLamports = await conn.getBalance(kp.publicKey, "confirmed");
+      sponsored = feePayerLamports >= 50_000;
+    } catch {
+      sponsored = false;
+    }
+  }
   return NextResponse.json({
     ok: true,
-    sponsored: stakeSponsorConfigured(),
+    sponsored,
+    feePayer,
+    feePayerLamports,
     validators: STAKE_VALIDATORS,
   });
 }

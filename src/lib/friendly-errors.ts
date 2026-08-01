@@ -21,11 +21,14 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
     return "No passkey found on this device. Create a new wallet, or restore from another device.";
   }
 
+  if (m.includes("no record of a prior credit") || m.includes("attempt to debit an account")) {
+    return "A wallet in this transaction has 0 SOL (often the network-fee payer). Try again — we'll use your balance for fees if needed.";
+  }
+
   // Insufficient SOL (system program 0x1 / simulation logs)
   if (
     m.includes("insufficient lamports") ||
     m.includes("insufficient funds") ||
-    m.includes("attempt to debit an account but found no record") ||
     (m.includes("0x1") && (m.includes("transfer") || m.includes("simulation") || m.includes("custom program error")))
   ) {
     if (m.includes("insufficient lamports") || m.includes("need ")) {
@@ -58,6 +61,9 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
 
   // Slot / preflight
   if (m.includes("simulation failed") || m.includes("preflight")) {
+    if (m.includes("no record of a prior credit") || m.includes("attempt to debit")) {
+      return "Network fee wallet is empty — retry (app will charge fees from your wallet).";
+    }
     if (m.includes("insufficient") || m.includes("0x1")) {
       return "Not enough SOL for fees. Keep a little spare and try again.";
     }

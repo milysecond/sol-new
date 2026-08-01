@@ -30,10 +30,8 @@ export async function buildSponsoredStakeTx(opts: {
   feePayer: string;
   rentLamports: number;
   stakeLamports: number;
+  sponsored: boolean;
 }> {
-  if (!feePayerConfigured()) {
-    throw new Error("Stake sponsorship unavailable");
-  }
   const seed = opts.seed;
   if (!seed || seed.length > 32) {
     throw new Error("Invalid stake seed");
@@ -45,7 +43,6 @@ export async function buildSponsoredStakeTx(opts: {
 
   const from = new PublicKey(opts.wallet);
   const votePubkey = new PublicKey(opts.vote);
-  const feePayer = loadFeePayerKeypair();
   const conn = new Connection(mainnetRpcUrl(), "confirmed");
 
   const rent = await conn.getMinimumBalanceForRentExemption(StakeProgram.space);
@@ -53,9 +50,11 @@ export async function buildSponsoredStakeTx(opts: {
   const totalFromUser = stakeLamports + rent;
 
   const bal = await conn.getBalance(from, "confirmed");
-  if (bal < totalFromUser + STAKE_FEE_BUFFER_LAMPORTS) {
+  // Self-paid needs stake+rent+fees from user; sponsored still needs stake+rent
+  const minSelf = totalFromUser + STAKE_FEE_BUFFER_LAMPORTS;
+  if (bal < totalFromUser + 5_000) {
     throw new Error(
-      `Not enough SOL. Need ~${((totalFromUser + STAKE_FEE_BUFFER_LAMPORTS) / LAMPORTS_PER_SOL).toFixed(4)} SOL (you have ${(bal / LAMPORTS_PER_SOL).toFixed(4)}).`
+      `Not enough SOL. Need ~${(totalFromUser / LAMPORTS_PER_SOL).toFixed(4)} SOL for stake + rent (you have ${(bal / LAMPORTS_PER_SOL).toFixed(4)}).`
     );
   }
 
@@ -84,28 +83,67 @@ export async function buildSponsoredStakeTx(opts: {
     authorizedPubkey: from,
     votePubkey,
   });
-
   const ixs = [...createTx.instructions, ...delegateTx.instructions];
   const { blockhash } = await conn.getLatestBlockhash("confirmed");
-  const msg = new TransactionMessage({
-    payerKey: feePayer.publicKey,
-    recentBlockhash: blockhash,
-    instructions: ixs,
-  }).compileToV0Message();
 
-  const vtx = new VersionedTransaction(msg);
-  vtx.sign([feePayer]);
+  // Prefer platform fee payer only if it has SOL
+  const MIN_SPONSOR_LAMPORTS = 50_000; // ~0.00005 SOL
+  let useSponsor = false;
+  let feePayerKp: ReturnType<typeof loadFeePayerKeypair> | null = null;
+  if (feePayerConfigured()) {
+    try {
+      feePayerKp = loadFeePayerKeypair();
+      const fpBal = await conn.getBalance(feePayerKp.publicKey, "confirmed");
+      useSponsor = fpBal >= MIN_SPONSOR_LAMPORTS;
+      if (!useSponsor) {
+        console.warn(
+          "[stake] fee payer empty",
+          feePayerKp.publicKey.toBase58(),
+          fpBal
+        );
+      }
+    } catch (e) {
+      console.warn("[stake] fee payer load failed", e);
+    }
+  }
 
-  // Do NOT simulate here: user hasn't signed yet (base authority). RPC often
-  // returns AccountNotFound on partially-signed createAccountWithSeed.
-  // Client preflight runs after passkey sign.
+  if (useSponsor && feePayerKp) {
+    const msg = new TransactionMessage({
+      payerKey: feePayerKp.publicKey,
+      recentBlockhash: blockhash,
+      instructions: ixs,
+    }).compileToV0Message();
+    const vtx = new VersionedTransaction(msg);
+    vtx.sign([feePayerKp]);
+    return {
+      tx: Buffer.from(vtx.serialize()).toString("base64"),
+      stakePubkey: stakePubkey.toBase58(),
+      feePayer: feePayerKp.publicKey.toBase58(),
+      rentLamports: rent,
+      stakeLamports,
+      sponsored: true,
+    };
+  }
 
+  // Self-paid: user is fee payer (needs a bit extra for network fee)
+  if (bal < minSelf) {
+    throw new Error(
+      `Not enough SOL for stake + rent + network fee. Need ~${(minSelf / LAMPORTS_PER_SOL).toFixed(4)} SOL (you have ${(bal / LAMPORTS_PER_SOL).toFixed(4)}).`
+    );
+  }
+
+  const tx = new Transaction().add(...ixs);
+  tx.recentBlockhash = blockhash;
+  tx.feePayer = from;
   return {
-    tx: Buffer.from(vtx.serialize()).toString("base64"),
+    tx: Buffer.from(
+      tx.serialize({ requireAllSignatures: false, verifySignatures: false })
+    ).toString("base64"),
     stakePubkey: stakePubkey.toBase58(),
-    feePayer: feePayer.publicKey.toBase58(),
+    feePayer: from.toBase58(),
     rentLamports: rent,
     stakeLamports,
+    sponsored: false,
   };
 }
 
