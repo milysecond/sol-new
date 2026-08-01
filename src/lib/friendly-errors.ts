@@ -21,8 +21,8 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
     return "No passkey found on this device. Create a new wallet, or restore from another device.";
   }
 
-  if (m.includes("no record of a prior credit") || m.includes("attempt to debit an account")) {
-    return "A wallet in this transaction has 0 SOL (often the network-fee payer). Try again — we'll use your balance for fees if needed.";
+  if (m.includes("0xc") || m.includes("insufficientdelegation") || m.includes("insufficient delegation")) {
+    return "Solana requires at least 1 SOL delegated. Add more SOL and try again.";
   }
 
   // Insufficient SOL (system program 0x1 / simulation logs)

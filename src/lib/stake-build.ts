@@ -14,7 +14,11 @@ import {
 } from "@solana/web3.js";
 import { loadFeePayerKeypair, feePayerConfigured } from "@/lib/fee-payer";
 import { mainnetRpcUrl } from "@/lib/rpc-server";
-import { STAKE_FEE_BUFFER_LAMPORTS } from "@/lib/stake-validators";
+import {
+  STAKE_FEE_BUFFER_LAMPORTS,
+  MIN_STAKE_SOL,
+  MIN_STAKE_LAMPORTS,
+} from "@/lib/stake-validators";
 
 export { feePayerConfigured as stakeSponsorConfigured };
 
@@ -37,16 +41,18 @@ export async function buildSponsoredStakeTx(opts: {
     throw new Error("Invalid stake seed");
   }
   const amountSol = opts.amountSol;
-  if (!Number.isFinite(amountSol) || amountSol < 0.001) {
-    throw new Error("Amount too small");
+  if (!Number.isFinite(amountSol) || amountSol < MIN_STAKE_SOL) {
+    throw new Error(`Minimum stake is ${MIN_STAKE_SOL} SOL (Solana network rule)`);
+  }
+  const stakeLamports = Math.round(amountSol * LAMPORTS_PER_SOL);
+  if (stakeLamports < MIN_STAKE_LAMPORTS) {
+    throw new Error(`Minimum stake is ${MIN_STAKE_SOL} SOL (Solana network rule)`);
   }
 
   const from = new PublicKey(opts.wallet);
   const votePubkey = new PublicKey(opts.vote);
   const conn = new Connection(mainnetRpcUrl(), "confirmed");
-
   const rent = await conn.getMinimumBalanceForRentExemption(StakeProgram.space);
-  const stakeLamports = Math.round(amountSol * LAMPORTS_PER_SOL);
   const totalFromUser = stakeLamports + rent;
 
   const bal = await conn.getBalance(from, "confirmed");
@@ -158,11 +164,17 @@ export async function buildSelfPaidStakeTx(opts: {
   stakePubkey: string;
   rentLamports: number;
 }> {
+  if (!Number.isFinite(opts.amountSol) || opts.amountSol < MIN_STAKE_SOL) {
+    throw new Error(`Minimum stake is ${MIN_STAKE_SOL} SOL (Solana network rule)`);
+  }
   const from = new PublicKey(opts.wallet);
   const votePubkey = new PublicKey(opts.vote);
   const conn = new Connection(mainnetRpcUrl(), "confirmed");
   const rent = await conn.getMinimumBalanceForRentExemption(StakeProgram.space);
   const stakeLamports = Math.round(opts.amountSol * LAMPORTS_PER_SOL);
+  if (stakeLamports < MIN_STAKE_LAMPORTS) {
+    throw new Error(`Minimum stake is ${MIN_STAKE_SOL} SOL (Solana network rule)`);
+  }
   const totalFromUser = stakeLamports + rent;
   const bal = await conn.getBalance(from, "confirmed");
   if (bal < totalFromUser + STAKE_FEE_BUFFER_LAMPORTS) {
