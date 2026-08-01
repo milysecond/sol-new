@@ -16,7 +16,7 @@ import { Spinner } from "@/components/spinner";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { getPasskeyKeypair, signVersionedAndSend } from "@/lib/passkey-wallet";
+import { getPasskeyKeypair, signVersionedWithKeypairAndSend } from "@/lib/passkey-wallet";
 import { friendlyError } from "@/lib/friendly-errors";
 import { SOL_MINT, USDC_MINT } from "@/lib/jup-ultra";
 
@@ -294,10 +294,17 @@ export default function SwapPage() {
     setError(null);
     setSig(null);
     try {
-      // Sponsored path: lite-api quote + swap-instructions + fee-payer build
-      // (sol.new pays network fee). Fall back to Ultra if unavailable.
+      // 1) Face ID once for the *connected* wallet — pin passkey before build
+      const { keypair, address } = await getPasskeyKeypair(publicKey);
+      if (address !== publicKey) {
+        throw new Error(
+          `Passkey is for ${address.slice(0, 4)}…${address.slice(-4)}, not the connected wallet. Switch wallet or pick the matching passkey.`
+        );
+      }
+
       let signature: string | null = null;
 
+      // 2) Prefer sponsored fee-payer path when available
       if (sponsored) {
         try {
           const JUP = "https://lite-api.jup.ag/swap/v1";
@@ -346,12 +353,18 @@ export default function SwapPage() {
             ok?: boolean;
             tx?: string;
             error?: string;
+            feePayerEmpty?: boolean;
           };
-          if (!bRes.ok || !bData.tx) throw new Error(bData.error || "Build failed");
-
-          signature = await signVersionedAndSend(bData.tx, rpc, publicKey);
-          if (quote.outAmount) {
-            setQuoteOut(fromAtomic(String(quote.outAmount), to.decimals));
+          if (bRes.ok && bData.tx) {
+            signature = await signVersionedWithKeypairAndSend(
+              bData.tx,
+              rpc,
+              keypair,
+              publicKey
+            );
+            if (quote.outAmount) {
+              setQuoteOut(fromAtomic(String(quote.outAmount), to.decimals));
+            }
           }
         } catch (e) {
           console.warn("Sponsored swap failed, trying Ultra", e);
@@ -359,6 +372,7 @@ export default function SwapPage() {
         }
       }
 
+      // 3) Ultra path — same connected passkey keypair (no second Face ID)
       if (!signature) {
         const q = new URLSearchParams({
           inputMint: from.mint,
@@ -376,7 +390,6 @@ export default function SwapPage() {
           throw new Error(oData.error || "Could not build swap");
         }
 
-        const { keypair } = await getPasskeyKeypair(publicKey);
         const tx = VersionedTransaction.deserialize(
           Buffer.from(oData.order.transaction, "base64")
         );
@@ -471,8 +484,7 @@ export default function SwapPage() {
               </p>
               {publicKey && (
                 <p className="inline-flex items-center gap-1.5 text-[11px] font-mono text-purple-600 dark:text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-full px-2.5 py-1">
-                  {walletLabel ? `${walletLabel} · ` : ""}
-                  {publicKey.slice(0, 4)}…{publicKey.slice(-4)}
+                  Connected · {publicKey.slice(0, 4)}…{publicKey.slice(-4)}
                 </p>
               )}
             </div>

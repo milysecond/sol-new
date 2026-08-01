@@ -203,8 +203,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setBalance(null);
     setUsdcBalance(null);
     localStorage.setItem("sol.new.wallet", labeled.pubkey);
-    localStorage.setItem("sol.new.credentialId", labeled.credentialId);
     localStorage.setItem("sol.new.walletLabel", labeled.pubkey);
+    // Never leave a stale credentialId from a previous wallet
+    if (labeled.credentialId) {
+      localStorage.setItem("sol.new.credentialId", labeled.credentialId);
+    } else {
+      localStorage.removeItem("sol.new.credentialId");
+    }
   };
 
   const connect = async (_username?: string) => {

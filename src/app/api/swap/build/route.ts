@@ -62,6 +62,17 @@ export async function POST(req: NextRequest) {
 
     const feePayer = feePayerKeypair();
     const conn = new Connection(RPC, "confirmed");
+    const fpBal = await conn.getBalance(feePayer.publicKey, "confirmed");
+    if (fpBal < 50_000) {
+      return NextResponse.json(
+        {
+          error: "Fee payer empty — use Ultra path",
+          feePayerEmpty: true,
+          feePayer: feePayer.publicKey.toBase58(),
+        },
+        { status: 503 }
+      );
+    }
 
     const altPubkeys: PublicKey[] = (swapInstructionsResponse.addressLookupTableAddresses || []).map(
       (a) => new PublicKey(a),
