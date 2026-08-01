@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>sol.new — tools map</title>
+  <style>
+    :root {
+      --bg: #07060c;
+      --ink: #f4f2ff;
+      --muted: #9b95b5;
+      --line: rgba(255,255,255,0.08);
+      --card: rgba(255,255,255,0.03);
+      --purple: #9945FF;
+      --green: #14F195;
+      --sky: #66e3ff;
+      --amber: #ffb020;
+      --rose: #ff6b9d;
+      --lime: #c8f542;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, rgba(153,69,255,0.22), transparent 55%),
+                  radial-gradient(900px 500px at 100% 0%, rgba(20,241,149,0.12), transparent 50%),
+                  var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 28px 18px 48px;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    header {
+      display: grid;
+      gap: 14px;
+      margin-bottom: 28px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--line);
+    }
+    @media (min-width: 800px) {
+      header { grid-template-columns: 1.4fr 1fr; align-items: end; }
+    }
+    .logo {
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      background: linear-gradient(100deg, var(--purple), var(--green));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    h1 {
+      font-size: clamp(28px, 4vw, 40px);
+      font-weight: 750;
+      letter-spacing: -0.035em;
+      line-height: 1.08;
+      margin-top: 10px;
+      max-width: 16ch;
+    }
+    .lede {
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.5;
+      max-width: 42ch;
+    }
+    .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .pill {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 11px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--ink);
+    }
+    .pill em { font-style: normal; color: var(--green); }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .stat {
+      border: 1px solid var(--line);
+      background: var(--card);
+      border-radius: 16px;
+      padding: 14px 14px 12px;
+    }
+    .stat b {
+      display: block;
+      font-size: 28px;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat span { color: var(--muted); font-size: 12px; }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 720px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (min-width: 1000px) {
+      .grid { grid-template-columns: 1fr 1fr 1fr; }
+    }
+
+    section {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015));
+      border-radius: 20px;
+      padding: 16px 16px 14px;
+      min-height: 100%;
+    }
+    section.wide { grid-column: 1 / -1; }
+    @media (min-width: 1000px) {
+      section.span2 { grid-column: span 2; }
+    }
+    .sec-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .dot {
+      width: 10px; height: 10px; border-radius: 99px; flex-shrink: 0;
+    }
+    .sec-head h2 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    ul { list-style: none; display: grid; gap: 8px; }
+    li {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: start;
+      padding: 10px 10px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.22);
+      border: 1px solid transparent;
+    }
+    li:hover { border-color: rgba(153,69,255,0.25); }
+    .path {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--purple);
+      padding-top: 2px;
+      white-space: nowrap;
+    }
+    .name { font-size: 14px; font-weight: 650; letter-spacing: -0.01em; }
+    .blurb { font-size: 12px; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+
+    .cols-2 ul { grid-template-columns: 1fr; }
+    @media (min-width: 720px) {
+      .cols-2 ul { grid-template-columns: 1fr 1fr; }
+    }
+
+    footer {
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    footer strong { color: var(--ink); font-weight: 650; }
+    .bar {
+      height: 3px;
+      width: 100%;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--purple), var(--green));
+      margin-bottom: 18px;
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="bar"></div>
+    <header>
+      <div>
+        <div class="logo">sol.new</div>
+        <h1>Every tool. One passkey wallet.</h1>
+        <p class="lede">
+          Zero-friction Solana — create, pay, gift, lend, stake, scan, and play.
+          Face ID. No seed phrases. No install.
+        </p>
+        <div class="pills">
+          <span class="pill">Passkey <em>first</em></span>
+          <span class="pill">Mainnet + devnet</span>
+          <span class="pill">PWA in the browser</span>
+          <span class="pill">sol.new</span>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>6</b><span>product pillars</span></div>
+        <div class="stat"><b>30+</b><span>tools & surfaces</span></div>
+        <div class="stat"><b>0</b><span>seed phrases</span></div>
+        <div class="stat"><b>1</b><span>URL: sol.new</span></div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section>
+        <div class="sec-head"><span class="dot" style="background:var(--purple)"></span><h2>Create</h2></div>
+        <ul>
+          <li><span class="path">/token</span><div><div class="name">Token launch</div><div class="blurb">SPL + bonding curve in seconds</div></div></li>
+          <li><span class="path">/nft</span><div><div class="name">NFT mint</div><div class="blurb">Standard or compressed cNFT</div></div></li>
+          <li><span class="path">/multisig</span><div><div class="name">Multisig</div><div class="blurb">Shared wallets, multi-signer</div></div></li>
+          <li><span class="path">/id</span><div><div class="name">.sol name</div><div class="blurb">Check & register a name</div></div></li>
+          <li><span class="path">/launch</span><div><div class="name">Live launches</div><div class="blurb">Feed of new tokens</div></div></li>
+        </ul>
+      </section>
+
+      <section>
+        <div class="sec-head"><span class="dot" style="background:var(--sky)"></span><h2>Wallet</h2></div>
+        <ul>
+          <li><span class="path">/wallet</span><div><div class="name">Passkey wallet</div><div class="blurb">Face ID / Touch ID secured</div></div></li>
+          <li><span class="path">/get</span><div><div class="name">Get SOL</div><div class="blurb">Card / Apple Pay / Google Pay</div></div></li>
+          <li><span class="path">/wallet/send</span><div><div class="name">Send</div><div class="blurb">SOL or USDC transfers</div></div></li>
+          <li><span class="path">/portfolio</span><div><div class="name">Portfolio</div><div class="blurb">Balances + Jupiter DeFi</div></div></li>
+          <li><span class="path">/burn</span><div><div class="name">Burn / reclaim</div><div class="blurb">Close empty ATAs, get rent back</div></div></li>
+        </ul>
+      </section>
+
+      <section>
+        <div class="sec-head"><span class="dot" style="background:var(--amber)"></span><h2>Money & links</h2></div>
+        <ul>
+          <li><span class="path">/pay</span><div><div class="name">Pay</div><div class="blurb">Solana Pay link or QR</div></div></li>
+          <li><span class="path">/split</span><div><div class="name">Split</div><div class="blurb">Bills, tips, who paid</div></div></li>
+          <li><span class="path">/gift</span><div><div class="name">Gift</div><div class="blurb">Claimable SOL/USDC links</div></div></li>
+          <li><span class="path">/link</span><div><div class="name">Short links</div><div class="blurb">sol.new/link/… · custom 0.01 SOL</div></div></li>
+          <li><span class="path">/receipt</span><div><div class="name">Receipt</div><div class="blurb">Shareable tx proof</div></div></li>
+        </ul>
+      </section>
+
+      <section>
+        <div class="sec-head"><span class="dot" style="background:var(--green)"></span><h2>Yield</h2></div>
+        <ul>
+          <li><span class="path">/earn</span><div><div class="name">Earn</div><div class="blurb">Protected USDC yield</div></div></li>
+          <li><span class="path">/loan</span><div><div class="name">Loan</div><div class="blurb">Supply or borrow · auto WSOL</div></div></li>
+          <li><span class="path">/stake</span><div><div class="name">Stake SOL</div><div class="blurb">Native validator staking</div></div></li>
+          <li><span class="path">/lst</span><div><div class="name">Liquid stake</div><div class="blurb">jitoSOL, mSOL, INF…</div></div></li>
+        </ul>
+      </section>
+
+      <section>
+        <div class="sec-head"><span class="dot" style="background:var(--lime)"></span><h2>Explore</h2></div>
+        <ul>
+          <li><span class="path">/address</span><div><div class="name">Address lookup</div><div class="blurb">sol.new/address/&lt;pubkey&gt;</div></div></li>
+          <li><span class="path">/scan</span><div><div class="name">Scan</div><div class="blurb">Wallet, token, or program</div></div></li>
+          <li><span class="path">/lists</span><div><div class="name">Lists</div><div class="blurb">Watchlists & quotes</div></div></li>
+          <li><span class="path">/stocks</span><div><div class="name">Stocks</div><div class="blurb">Equities on Solana</div></div></li>
+          <li><span class="path">/u/…</span><div><div class="name">@username</div><div class="blurb">Public creator profiles</div></div></li>
+        </ul>
+      </section>
+
+      <section>
+        <div class="sec-head"><span class="dot" style="background:var(--rose)"></span><h2>Play & social</h2></div>
+        <ul>
+          <li><span class="path">/draw</span><div><div class="name">Fair Draw</div><div class="blurb">Wheel · coin · dice · 1–N</div></div></li>
+          <li><span class="path">/punt</span><div><div class="name">Punt</div><div class="blurb">Free-to-play picks</div></div></li>
+          <li><span class="path">/news</span><div><div class="name">News</div><div class="blurb">Solana & crypto headlines</div></div></li>
+          <li><span class="path">/pods</span><div><div class="name">Pods</div><div class="blurb">Hand-picked podcasts</div></div></li>
+          <li><span class="path">/creator</span><div><div class="name">Creator</div><div class="blurb">Bio, socials, handle</div></div></li>
+        </ul>
+      </section>
+
+      <section class="wide cols-2">
+        <div class="sec-head"><span class="dot" style="background:linear-gradient(90deg,var(--purple),var(--green))"></span><h2>How it works · principles</h2></div>
+        <ul>
+          <li><span class="path">01</span><div><div class="name">Passkey wallet</div><div class="blurb">WebAuthn → Solana keypair. Biometrics only — no seed phrase to lose.</div></div></li>
+          <li><span class="path">02</span><div><div class="name">Shareable links</div><div class="blurb">Gifts, pay QRs, short links, receipts, draws — private or public as needed.</div></div></li>
+          <li><span class="path">03</span><div><div class="name">DeFi in-product</div><div class="blurb">Earn, loan, stake, LST, and Jupiter portfolio balances on /address & /portfolio.</div></div></li>
+          <li><span class="path">04</span><div><div class="name">Open map</div><div class="blurb">/features · /dir · /docs · /llms.txt — everything is a short path.</div></div></li>
+        </ul>
+      </section>
+    </div>
+
+    <footer>
+      <div><strong>sol.new</strong> · passkey Solana suite</div>
+      <div>x.com/soldotnew · t.me/soldotnew</div>
+      <div>No install · No signup · Face ID</div>
+    </footer>
+  </div>
+</body>
+</html>
