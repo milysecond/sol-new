@@ -56,12 +56,20 @@ export function keypairFromSecret(secret: string): Keypair | null {
   }
 }
 
-export function buildGiftUrl(secret: string, network: Network, message?: string): string {
+export function buildGiftUrl(
+  secret: string,
+  network: Network,
+  message?: string,
+  origin?: string,
+): string {
   const params = new URLSearchParams();
   if (network === "devnet") params.set("n", "d");
   if (message?.trim()) params.set("m", message.trim().slice(0, 80));
   const qs = params.toString();
-  return `${window.location.origin}/claim${qs ? `?${qs}` : ""}#${secret}`;
+  const base =
+    origin ||
+    (typeof window !== "undefined" ? window.location.origin : "https://sol.new");
+  return `${base}/claim${qs ? `?${qs}` : ""}#${secret}`;
 }
 
 export function parseGiftSecret(hash: string): string | null {
@@ -182,6 +190,36 @@ export function buildUsdcGiftInstructions(
     USDC_DECIMALS,
     TOKEN_PROGRAM_ID,
   );
+}
+
+/** UI amount → base units for SOL or USDC (legacy API helper). */
+export function giftAmountToBase(amountUi: number, token: "SOL" | "USDC"): number {
+  if (!Number.isFinite(amountUi) || amountUi <= 0) return 0;
+  if (token === "USDC") return Math.round(amountUi * 1e6);
+  return Math.round(amountUi * 1e9);
+}
+
+/**
+ * Build funding ixs for SOL or USDC gifts (server-side /api/gift/create).
+ * amountBase is lamports (SOL) or USDC base units.
+ */
+export function buildGiftFundingInstructions(
+  sender: PublicKey,
+  giftPubkey: PublicKey,
+  amountBase: number,
+  token: "SOL" | "USDC",
+  network: Network,
+): TransactionInstruction[] {
+  if (token === "SOL") {
+    return [
+      SystemProgram.transfer({
+        fromPubkey: sender,
+        toPubkey: giftPubkey,
+        lamports: amountBase + CLAIM_FEE_LAMPORTS,
+      }),
+    ];
+  }
+  return buildUsdcGiftInstructions(sender, giftPubkey, amountBase, network);
 }
 
 export async function sweepGift(
