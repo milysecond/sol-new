@@ -56,9 +56,24 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
     return "Couldn't read that transaction. Refresh and try again.";
   }
 
-  // Slot / preflight
-  if (m.includes("simulation failed") || m.includes("preflight")) {
-    return "The transaction couldn't be built. Refresh the page and try again.";
+  // Slot / preflight — keep a short actionable hint; append log snippet if present
+  if (m.includes("simulation failed") || m.includes("preflight") || m.includes("transaction simulation")) {
+    if (m.includes("insufficient") || m.includes("lamports")) {
+      return "Not enough SOL for this action (rent + network fee). Lower the amount or add SOL.";
+    }
+    if (m.includes("already in use") || m.includes("already exists")) {
+      return "That stake account already exists. Refresh and try again.";
+    }
+    if (m.includes("vote") || m.includes("invalid account data")) {
+      return "Validator vote account looks invalid. Pick another validator.";
+    }
+    // Surface first useful log line if the error carries it
+    const logMatch = msg.match(/Error processing Instruction[^:]*:\s*([^\n]+)/i)
+      || msg.match(/Program log:\s*([^\n]+)/i);
+    if (logMatch?.[1] && logMatch[1].length < 100) {
+      return `Transaction failed: ${logMatch[1].trim()}`;
+    }
+    return "The transaction failed simulation. Check balance/fees, refresh, and try again.";
   }
 
   // Promo

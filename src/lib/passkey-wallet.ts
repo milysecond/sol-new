@@ -4,6 +4,21 @@ import { Keypair, Transaction, VersionedTransaction, Connection } from "@solana/
 const CHALLENGE = new TextEncoder().encode("sol.new-wallet-creation");
 
 /**
+ * WebAuthn relying party id.
+ * Must be the current host or a registrable parent domain.
+ * Always prefer apex `sol.new` so www / preview hosts don't mint separate passkey silos.
+ * (Existing passkeys created under www.sol.new stay bound to that rpId.)
+ */
+export function getRpId(): string {
+  if (typeof window === "undefined") return "sol.new";
+  const host = window.location.hostname.toLowerCase();
+  if (host === "localhost" || host === "127.0.0.1") return host;
+  if (host === "sol.new" || host.endsWith(".sol.new")) return "sol.new";
+  // dev tunnels e.g. solnew.metasal.xyz — must match exact host
+  return host;
+}
+
+/**
  * Resolve which credential to allow for auth prompts. Prefers the active
  * credentialId; falls back to the saved wallet list keyed by the connected
  * address (heals sessions from before credentialId tracking existed, where
@@ -84,7 +99,7 @@ export async function createPasskeyWallet(username: string): Promise<{
   const credential = (await navigator.credentials.create({
     publicKey: {
       challenge: CHALLENGE,
-      rp: { name: "sol.new", id: window.location.hostname },
+      rp: { name: "sol.new", id: getRpId() },
       user: {
         id: userIdBytes,
         // Browser passkey list shows name + displayName (Chrome/Safari settings)
@@ -159,7 +174,7 @@ export async function signalPasskeyUserDetails(opts: {
     if (typeof PK.signalCurrentUserDetails !== "function") return false;
     const raw = Uint8Array.from(atob(opts.userId), (c) => c.charCodeAt(0));
     await PK.signalCurrentUserDetails({
-      rpId: window.location.hostname,
+      rpId: getRpId(),
       userId: raw,
       name: opts.name.slice(0, 64),
       displayName: opts.displayName.slice(0, 64),

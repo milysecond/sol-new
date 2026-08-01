@@ -140,7 +140,15 @@ export default function StakePage() {
         throw new Error(`Minimum stake is ${MIN_STAKE_SOL} SOL`);
       }
       const stakeLamports = Math.round(sol * LAMPORTS_PER_SOL);
-      const totalNeeded = stakeLamports + STAKE_RENT_LAMPORTS + STAKE_FEE_BUFFER_LAMPORTS;
+      const connection = new Connection(rpc, "confirmed");
+      // Live rent (stake account is ~200 bytes)
+      let rent = STAKE_RENT_LAMPORTS;
+      try {
+        rent = await connection.getMinimumBalanceForRentExemption(StakeProgram.space);
+      } catch {
+        /* keep constant */
+      }
+      const totalNeeded = stakeLamports + rent + STAKE_FEE_BUFFER_LAMPORTS;
       const balLamports = Math.round((balance ?? 0) * LAMPORTS_PER_SOL);
       if (totalNeeded > balLamports) {
         throw new Error(
@@ -150,22 +158,23 @@ export default function StakePage() {
 
       const from = new PublicKey(publicKey);
       const votePubkey = new PublicKey(vote);
-      const seed = `sn${Date.now().toString(36)}`;
+      // Unique seed each attempt (max 32 chars)
+      const seed = `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.slice(0, 32);
       const stakePubkey = await PublicKey.createWithSeed(
         from,
         seed,
         StakeProgram.programId,
       );
 
-      // StakeProgram helpers return full Transactions; merge instructions.
+      // No lockup — PublicKey.default custodian
       const createTx = StakeProgram.createAccountWithSeed({
         fromPubkey: from,
         stakePubkey,
         basePubkey: from,
         seed,
         authorized: new Authorized(from, from),
-        lockup: new Lockup(0, 0, from),
-        lamports: stakeLamports + STAKE_RENT_LAMPORTS,
+        lockup: new Lockup(0, 0, PublicKey.default),
+        lamports: stakeLamports + rent,
       });
       const delegateTx = StakeProgram.delegate({
         stakePubkey,
@@ -174,7 +183,33 @@ export default function StakePage() {
       });
 
       const tx = new Transaction().add(...createTx.instructions, ...delegateTx.instructions);
-      const signature = await sendTx(tx);
+
+      // Simulate first for a clear error (instead of generic preflight toast)
+      const { keypair } = await getPasskeyKeypair(publicKey);
+      const { blockhash, lastValidBlockHeight } =
+        await connection.getLatestBlockhash("confirmed");
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = from;
+      tx.sign(keypair);
+
+      const sim = await connection.simulateTransaction(tx);
+      if (sim.value.err) {
+        const logs = (sim.value.logs || []).join(" | ");
+        throw new Error(
+          logs
+            ? `Transaction simulation failed: ${JSON.stringify(sim.value.err)} ${logs.slice(0, 280)}`
+            : `Transaction simulation failed: ${JSON.stringify(sim.value.err)}`,
+        );
+      }
+
+      const signature = await connection.sendRawTransaction(tx.serialize(), {
+        skipPreflight: true,
+        maxRetries: 3,
+      });
+      await connection.confirmTransaction(
+        { signature, blockhash, lastValidBlockHeight },
+        "confirmed",
+      );
       setSig(signature);
       await refreshBalance();
       await loadStakes();
