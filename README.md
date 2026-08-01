@@ -1,9 +1,11 @@
 # sol.new
 
-**Zero-friction Solana creation platform.** Launch tokens, mint NFTs, create multisigs, and fund wallets—all in seconds, with just a passkey.
+**Zero-friction Solana creation platform.** Launch tokens, mint NFTs, create multisigs, fund wallets, lend/borrow, and send gifts — all with a passkey.
 
 🌐 **Website**: [sol.new](https://sol.new)  
-🔐 **Passkey-secured** • 💸 **Low fees** • ⚡ **Instant**
+🔐 **Passkey-secured** · 💸 **Low fees** · ⚡ **Instant**  
+📄 **Features**: [FEATURES.md](./FEATURES.md) · [sol.new/features](https://sol.new/features) · [sol.new/dir](https://sol.new/dir)  
+🤖 **LLMs**: [llms.txt](https://sol.new/llms.txt) · [llms-full.txt](https://sol.new/llms-full.txt)
 
 ---
 
@@ -11,76 +13,65 @@
 
 sol.new removes the complexity from Solana. No wallet downloads, no seed phrases, no gas management. Just create and go.
 
-**Features at a glance:** see [FEATURES.md](./FEATURES.md) and [https://sol.new/features](https://sol.new/features).
+### Highlights
 
-**Highlights:**
-- **Token launcher** — Deploy SPL tokens with Meteora bonding curves
-- **NFT minter** — Standard or compressed NFTs via Metaplex
-- **Multisig** — Squads v4 shared wallets
-- **Passkey wallet** — WebAuthn Face ID wallets
-- **Pay / split / gift** — Links and Solana Pay
-- **Receipt / Fair Draw / Scan** — Verify, raffle, explore
-
----
-
-## Pricing
-
-### Token Launches
-- **~0.05 SOL** to create token + pool
-- Trading fees: 2.5% → 1% over 24h (goes to creator)
-- Migration fee: 1% at graduation (goes to creator)
-
-### NFTs
-- **Standard NFT:** ~0.01 SOL (network rent)
-- **Compressed NFT:** ~0.0001 SOL (shared tree)
-
-### Multisig
-- **0.05 SOL total** to create
-  - 0.04 SOL: Network rent (Squads program)
-  - 0.01 SOL: Platform fee
-
-### Wallets
-- **Free** passkey creation
-- **Free** first transaction (rent-exempt funding)
-- SOL purchases: Provider fees apply (Moonpay/Ramp)
+| Area | Paths |
+|------|--------|
+| **Create** | `/token` · `/nft` · `/multisig` · `/id` |
+| **Wallet** | `/wallet` · `/get` · `/wallet/send` · `/portfolio` · `/burn` |
+| **Money** | `/pay` · `/split` · `/gift` · `/claim` · `/receipt` · `/link` |
+| **Yield** | `/earn` · `/loan` · `/stake` · `/lst` |
+| **Explore** | `/scan` · `/lists` · `/launch` · `/stocks` · `/u/[username]` |
+| **Play** | `/draw` · `/punt` |
 
 ---
 
-## Fee Structure
+## Pricing (mainnet, approx.)
 
-### Token Launches (Meteora DBC)
+| Action | Cost |
+|--------|------|
+| Passkey wallet | Free |
+| Token + bonding curve | ~0.05 SOL |
+| Standard NFT | ~0.01–0.02 SOL rent |
+| Compressed NFT | ~0.001 SOL platform + tiny network |
+| Multisig | ~0.05 SOL (incl. 0.01 platform) |
+| Custom short link | 0.01 SOL |
+| Gift (SOL/USDC) | Gift amount + claim fee float |
+| Lend / borrow | Network + protocol rates (Jupiter Lend) |
 
-sol.new uses **Meteora Dynamic Bonding Curve** for fair token launches:
+Live cost table: [sol.new/docs](https://sol.new/docs) · `GET /api/costs`
 
-**Trading Fees:**
-- Starts at **2.5%**, decreases to **1%** over 24 hours
-- 100% of trading fees go to **token creator**
-- Collected in SOL (quote currency)
+### Token launches (Meteora DBC)
 
-**Migration Fees:**
-- **1% fee** when bonding curve graduates to Meteora DAMM v2
-- 100% of migration fees go to **token creator**
+- Trading fee starts ~2.5% → 1% over 24h → **creator**
+- Migration fee 1% at graduation → **creator**
+- Pool creation fee: **0 SOL**
 
-**Launch Parameters:**
-- Initial market cap: ~$300 (1.5 SOL at $200/SOL)
-- Migration market cap: $750 (3.75 SOL)
-- Pool creation: **0 SOL** (free)
+---
 
-### Multisig Creation
+## Public APIs (selected)
 
-- **0.01 SOL fee** per multisig (from 0.05 SOL creation cost)
-- Uses Squads v4 protocol
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/gift/create` | Build unsigned gift funding tx + one-time claim secret |
+| `POST /api/gift` | Register gift status after on-chain fund |
+| `GET /api/gift?pk=` | Gift status |
+| `PATCH /api/gift` | Mark claimed / reclaimed |
+| `GET/POST /api/loan` | Jupiter Lend supply & borrow markets |
+| `GET/POST /api/link` | Short links (`sol.new/link/<code>`) |
+| `GET/POST /api/creator/profile` | Creator profile + `@username` claim |
+| `GET /api/costs` | Live action costs |
+| `GET /api/stats` | Aggregate counts |
+| `POST /api/draw` | Fair draw |
 
-### NFT Minting
+**Gift create flow**
 
-- **No platform fees**
-- Creator pays only network rent (~0.01 SOL for standard NFTs)
-- Compressed NFTs use shared Bubblegum tree
+1. `POST /api/gift/create` `{ wallet, amount, token?, network?, message? }`
+2. Sign + send returned `transaction`
+3. `POST /api/gift` with `register` body
+4. Share `claimUrl` (secret is in the `#fragment` — never stored server-side)
 
-### Wallet Operations
-
-- Passkey wallet creation: **Free**
-- SOL purchases: Provider fees apply (Moonpay/Ramp)
+Docs JSON: `GET /api/gift/create` with `Accept: application/json`
 
 ---
 
@@ -88,22 +79,21 @@ sol.new uses **Meteora Dynamic Bonding Curve** for fair token launches:
 
 **Address:** `nEWKinAMMZv3zyHKSaLLyWsw6JBdbpES8ktgRnf6Tzf`
 
-All platform fees are collected to this treasury address. Fees fund:
-- Platform development and maintenance
-- Shared infrastructure (Bubblegum trees, RPC nodes)
-- Future feature development
+Platform fees fund development, shared trees/RPC, and product work.
 
 ---
 
-## Tech Stack
+## Tech stack
 
-- **Frontend:** Next.js 16 (App Router + Turbopack)
-- **Wallet:** WebAuthn passkeys via [@solana/passkeys](https://github.com/solana-developers/solana-passkeys)
-- **Token Launches:** [Meteora Dynamic Bonding Curve SDK](https://github.com/MeteoraAg/dlmm-sdk)
-- **NFTs:** [Metaplex Umi](https://github.com/metaplex-foundation/umi) + Bubblegum (compressed)
-- **Multisig:** [Squads v4](https://github.com/Squads-Protocol/v4)
-- **Swap:** [Jupiter API](https://station.jup.ag/docs)
-- **Analytics:** Vercel Analytics (privacy-friendly)
+- **App:** Next.js 16 (App Router + Turbopack) · OpenNext → **Cloudflare Workers**
+- **Wallet:** WebAuthn passkeys → deterministic ed25519 (client-side)
+- **Tokens:** Meteora Dynamic Bonding Curve
+- **NFTs:** Metaplex Umi + Bubblegum
+- **Multisig:** Squads v4
+- **Swap / LST / Lend:** Jupiter (+ Lend earn/borrow)
+- **DB:** Turso (profiles, gifts registry, short links, draws, …)
+- **Images:** R2 / blob via `sol.new/images/…`
+- **Analytics:** privacy-friendly product analytics
 
 ---
 
@@ -112,37 +102,35 @@ All platform fees are collected to this treasury address. Fees fund:
 ### Prerequisites
 
 - Node.js 18+
-- npm/pnpm/yarn
+- npm
 
-### Environment Variables
+### Environment
 
-Create `.env.local`:
+Create `.env.local` / `.dev.vars` (Worker secrets for production):
 
 ```env
-# RPC — paid Helius Fast + Flux only (never free public Solana RPC)
+# RPC — paid Helius Fast + optional Flux (never free public mainnet RPC)
 NEXT_PUBLIC_RPC_URL=https://cassandra-bq5oqs-fast-mainnet.helius-rpc.com/
-# Server pool also uses viviyan-bkj12u-fast-mainnet + FLUXRPC_URL secret
-HELIUS_API_KEY=your_helius_key
-FLUXRPC_URL=https://eu.fluxrpc.com?key=your_flux_key
+HELIUS_API_KEY=
+FLUXRPC_URL=
 
-# Meteora Partner Config (mainnet/devnet)
-NEXT_PUBLIC_DBC_PARTNER_CONFIG=your_config_pubkey
+# Product
+JUP_API_KEY=                 # Jupiter Lend / swap
+TURSO_DATABASE_URL=
+TURSO_AUTH_TOKEN=
+CLOUDFLARE_API_TOKEN=        # deploy only
 
-# Bubblegum Tree (for compressed NFTs)
-NEXT_PUBLIC_BUBBLEGUM_TREE=your_tree_pubkey
+# Meteora / Bubblegum / Squads (as needed)
+NEXT_PUBLIC_DBC_PARTNER_CONFIG=
+NEXT_PUBLIC_BUBBLEGUM_TREE=
+NEXT_PUBLIC_SQUADS_TREASURY=
 
-# Squads Multisig Treasury (mainnet)
-NEXT_PUBLIC_SQUADS_TREASURY=your_multisig_pubkey
-
-# Image Generation (optional)
-POLLINATIONS_API_KEY=your_key
-
-# Onramp Providers (optional)
-MOONPAY_API_KEY=your_key
-RAMP_API_KEY=your_key
+# Optional onramp / email
+MOONPAY_API_KEY=
+RESEND_API_KEY=
 ```
 
-### Install & Run
+### Install & run
 
 ```bash
 npm install
@@ -151,120 +139,68 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
-### Build
+### Deploy (production)
+
+Must be on `main`:
 
 ```bash
-npm run build
-npm start
-```
-
-### Scripts
-
-```bash
-# Create Meteora partner config
-npx tsx scripts/create-partner-config.ts [mainnet|devnet]
-
-# Create Bubblegum tree for compressed NFTs
-npx tsx scripts/create-tree.ts
-
-# Create Squads multisig
-npx tsx scripts/create-multisig.ts [mainnet|devnet]
-
-# Grind vanity keypairs
-npx tsx scripts/grind-keys.ts --prefix NEW --count 10
-```
-
----
-
-## Architecture
-
-### Passkey Wallets
-
-sol.new uses WebAuthn passkeys to create Solana wallets:
-1. User creates passkey (biometric/device authentication)
-2. Passkey derives ed25519 keypair deterministically
-3. Keypair becomes Solana wallet (no seed phrase needed)
-4. Transactions signed client-side via passkey challenge
-
-### Token Launch Flow
-
-1. User enters token details (name, symbol, supply, image)
-2. Token metadata uploaded to Arweave via Irys
-3. Meteora DBC pool created with partner config
-4. Token mint + pool creation in atomic transaction
-5. Bonding curve active immediately
-6. Graduates to Meteora DAMM v2 at $750 market cap
-
-### NFT Minting
-
-**Standard NFTs:**
-- Metaplex Token Metadata standard
-- Image uploaded to Arweave
-- Metadata URI stored on-chain
-
-**Compressed NFTs:**
-- Metaplex Bubblegum (state compression)
-- Shared public tree (16,384 NFT capacity)
-- ~1000x cheaper than standard NFTs
-
----
-
-## Deployment
-
-sol.new runs on **Cloudflare Workers** via OpenNext (not Vercel).
-
-```bash
-# Production (must be on main)
 npm run deploy
 ```
 
-Secrets live in Worker secrets (`wrangler secret put`). Public vars are in `wrangler.jsonc`.
+Secrets: `wrangler secret put <NAME>`. Public vars: `wrangler.jsonc`.
 
-Local:
+---
 
-```bash
-npm run dev
-# or
-npm run preview
-```
+## Architecture notes
+
+### Passkey wallets
+
+1. User creates passkey (WebAuthn)
+2. PRF / rawId → SHA-256 → `Keypair.fromSeed`
+3. Sign client-side; server never holds the seed
+
+### Gifts
+
+- Ephemeral gift keypair; **secret only in claim URL fragment**
+- SOL: transfer amount + claim fee reserve
+- USDC: ATA + transfer + small SOL float for claim rent
+
+### Short links
+
+- Canonical: `https://sol.new/link/<code>`
+- Legacy `/l/<code>` → 308 → `/link/<code>`
+- Random codes free; custom codes 0.01 SOL (passkey or Solana Pay QR)
+
+### Loan (`/loan`)
+
+- Jupiter Lend earn (supply) + borrow markets
+- Auto wrap/unwrap WSOL for SOL markets
+- Balance checks + amount slider/presets
 
 ---
 
 ## Security
 
-- ✅ Passkeys secured by device biometrics
-- ✅ No seed phrases stored anywhere
-- ✅ Client-side transaction signing
-- ✅ HTTPS required (enforced by passkeys)
-- ✅ No backend database (stateless)
+- Passkeys secured by device biometrics
+- No seed phrases for passkey wallets
+- Client-side transaction signing
+- Gift claim secrets are **bearer links** — share privately
+- HTTPS required (passkeys)
 
-**Responsible Disclosure:**  
-Found a security issue? Email: security@sol.new
-
----
-
-## Contributing
-
-Contributions welcome! Please:
-1. Fork the repo
-2. Create feature branch
-3. Test thoroughly
-4. Submit PR with description
-
----
-
-## License
-
-MIT License - see [LICENSE](LICENSE)
+**Responsible disclosure:** security@sol.new
 
 ---
 
 ## Links
 
-- **Website:** https://sol.new
-- **Twitter:** [@soldotnew](https://x.com/soldotnew)
-- **GitHub:** https://github.com/milysecond/sol-new
+- **Site:** https://sol.new  
+- **X:** [@soldotnew](https://x.com/soldotnew)  
+- **Telegram:** https://t.me/soldotnew  
+- **GitHub:** https://github.com/milysecond/sol-new  
+- **Compare:** https://sol.new/compare  
 
 ---
 
-Built with ❤️ for the Solana ecosystem.
+MIT License — see [LICENSE](LICENSE)
+
+Built for the Solana ecosystem.

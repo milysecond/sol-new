@@ -15,6 +15,15 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-07-30",
+    title: "Docs, gift API, loan",
+    items: [
+      "POST /api/gift/create for gift funding txs; /gift uses it.",
+      "/loan lend & borrow with WSOL wrap, balance slider.",
+      "Updated README, FEATURES, docs, llms.txt + llms-full.txt.",
+    ],
+  },
+  {
+    date: "2026-07-30",
     title: "Lend & borrow",
     items: [
       "New /loan: supply assets to earn yield or borrow against collateral (passkey-signed).",
