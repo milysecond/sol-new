@@ -4,6 +4,7 @@ export const USERNAME_RE = /^[a-z][a-z0-9_]{2,19}$/;
 
 export const RESERVED_USERNAMES = new Set([
   "admin",
+  "address",
   "api",
   "app",
   "claim",
@@ -12,6 +13,7 @@ export const RESERVED_USERNAMES = new Set([
   "dir",
   "docs",
   "draw",
+  "earn",
   "edit",
   "features",
   "gift",
@@ -22,6 +24,7 @@ export const RESERVED_USERNAMES = new Set([
   "launch",
   "link",
   "links",
+  "loan",
   "me",
   "new",
   "nft",
@@ -33,6 +36,7 @@ export const RESERVED_USERNAMES = new Set([
   "profile",
   "receipt",
   "root",
+  "scan",
   "settings",
   "sol",
   "solana",

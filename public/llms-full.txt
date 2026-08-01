@@ -65,7 +65,8 @@
 | /creator/edit | Edit profile + claim username |
 | /creator/[wallet] | Creator by wallet |
 | /u/[username] | Username → creator profile |
-| /scan · /track | Explorer |
+| /scan · /track | Explorer form |
+| /address · /address/[pubkey] | Canonical wallet/token/program lookup URL |
 | /lists | Watchlists |
 | /stocks | Tokenized stocks |
 | /gallery · /compare | Gallery / compare |

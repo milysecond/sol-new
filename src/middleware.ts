@@ -41,6 +41,36 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
+  // Canonical wallet/token/program lookup: /address/<pubkey>
+  // Bare /address → scan form. Query ?address= still works via /scan.
+  if (path === "/address" || path === "/address/") {
+    url.pathname = "/scan";
+    return NextResponse.rewrite(url);
+  }
+  const addressLookup = path.match(/^\/address\/([^/]+)\/?$/);
+  if (addressLookup?.[1]) {
+    let addr = addressLookup[1];
+    try {
+      addr = decodeURIComponent(addr);
+    } catch {
+      /* keep raw */
+    }
+    url.pathname = "/scan";
+    url.searchParams.set("address", addr);
+    return NextResponse.rewrite(url);
+  }
+
+  // Legacy: /scan?address=X → pretty /address/X (shareable)
+  if (path === "/scan" || path === "/scan/") {
+    const q = url.searchParams.get("address") || url.searchParams.get("wallet");
+    if (q && q.trim()) {
+      const dest = request.nextUrl.clone();
+      dest.pathname = `/address/${encodeURIComponent(q.trim())}`;
+      dest.search = "";
+      return NextResponse.redirect(dest, 308);
+    }
+  }
+
   return NextResponse.next();
 }
 

@@ -33,7 +33,7 @@ Full product map for agents: https://sol.new/llms-full.txt · Features: https://
 - [Liquid stake](https://sol.new/lst): jitoSOL, mSOL, INF, more.
 
 ### Explore & social
-- [Scan](https://sol.new/scan) / [Track](https://sol.new/track): Lookup wallets and tokens.
+- [Scan](https://sol.new/scan) / [Address](https://sol.new/address) / [Track](https://sol.new/track): Lookup wallets and tokens (`sol.new/address/<pubkey>`).
 - [Lists](https://sol.new/lists): Watchlists.
 - [Stocks](https://sol.new/stocks): Stocks on Solana.
 - [Username](https://sol.new/creator/edit): Claim `@username` → https://sol.new/u/<name>

@@ -93,7 +93,7 @@
 
 | Feature | Path | One-liner |
 |---------|------|-----------|
-| Scan / track | `/scan` `/track` | Wallet, token, program lookup. |
+| Scan / track / address | `/scan` `/track` `/address/[pk]` | Wallet, token, program lookup. Share `sol.new/address/<pk>`. |
 | Lists | `/lists` | Watchlists and quotes. |
 | Stocks | `/stocks` | Stocks on Solana. |
 | Gallery | `/gallery` | Token gallery. |
