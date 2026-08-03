@@ -42,6 +42,8 @@ export const RESERVED_USERNAMES = new Set([
   "sol",
   "solana",
   "soldotnew",
+  "stake",
+  "starter",
   "support",
   "swap",
   "terms",

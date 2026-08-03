@@ -26,6 +26,7 @@ import {
   Star,
   ArrowLeftRight,
   Frame,
+  Sparkles,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
@@ -47,6 +48,7 @@ type Tile = {
 
 /** Full catalog — every icon is free to move anywhere in the list. */
 const ALL_TILES: Tile[] = [
+  { href: "/starter", title: "Starter", desc: "New to Solana? Start here", icon: Sparkles, color: "text-purple-600 dark:text-purple-400" },
   { href: "/wallet", title: "Wallet", desc: "Get SOL, send, manage", icon: Wallet, color: "text-fuchsia-500 dark:text-fuchsia-400" },
   { href: "/token", title: "Token", desc: "Launch your own coin", icon: Coins, color: "text-orange-500 dark:text-orange-400" },
   { href: "/gift", title: "Gift", desc: "Send crypto with a link", icon: Gift, color: "text-amber-500 dark:text-amber-400" },

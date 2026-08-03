@@ -6,6 +6,7 @@
 export const HOME_PIN_COUNT = 4;
 
 export const HOME_DEFAULT_ORDER = [
+  "/starter",
   "/wallet",
   "/token",
   "/gift",

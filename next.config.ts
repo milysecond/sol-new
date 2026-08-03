@@ -23,15 +23,11 @@ const nextConfig: NextConfig = {
         destination: "https://learn.sol.new",
         permanent: false,
       },
-      // /playbook + /starter alias the Solana New Starter welcome site.
+      // Legacy playbook path → primary starter host (full Solly curriculum).
+      // /starter is an in-app page on sol.new (home tile) — do not redirect it away.
       {
         source: "/playbook",
-        destination: "https://playbook.sol.new",
-        permanent: false,
-      },
-      {
-        source: "/starter",
-        destination: "https://playbook.sol.new",
+        destination: "https://starter.sol.new",
         permanent: false,
       },
       // /memes → meme generator app
