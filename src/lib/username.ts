@@ -16,6 +16,7 @@ export const RESERVED_USERNAMES = new Set([
   "earn",
   "edit",
   "features",
+  "frame",
   "gift",
   "help",
   "home",

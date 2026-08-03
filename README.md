@@ -204,3 +204,5 @@ Secrets: `wrangler secret put <NAME>`. Public vars: `wrangler.jsonc`.
 MIT License — see [LICENSE](LICENSE)
 
 Built for the Solana ecosystem.
+
+- `/frame` — LinkedIn profile frame (circular text, #OPENTOSOLANA)

@@ -24,6 +24,7 @@ export const HOME_DEFAULT_ORDER = [
   "/lst",
   "/burn",
   "/portfolio",
+  "/frame",
 ] as const;
 
 const ORDER_KEY = "sol.new.home.iconOrder";

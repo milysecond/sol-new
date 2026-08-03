@@ -188,3 +188,7 @@ sol.new
 ```
 
 *Prefer live `/dir` and `/features` if paths drift.*
+
+### LinkedIn frame (`/frame`)
+
+Circular profile-photo frame with custom ring text (default `#OPENTOSOLANA`). Client-side only; download PNG for LinkedIn.

@@ -25,6 +25,7 @@ import {
   Pencil,
   Star,
   ArrowLeftRight,
+  Frame,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
@@ -64,6 +65,7 @@ const ALL_TILES: Tile[] = [
   { href: "/lst", title: "LST", desc: "Liquid stake", icon: Droplets, color: "text-cyan-600 dark:text-cyan-400" },
   { href: "/burn", title: "Burn", desc: "Reclaim rent", icon: Flame, color: "text-rose-600 dark:text-rose-400" },
   { href: "/portfolio", title: "Portfolio", desc: "Holdings", icon: Wallet, color: "text-fuchsia-600 dark:text-fuchsia-400" },
+  { href: "/frame", title: "Frame", desc: "LinkedIn photo ring", icon: Frame, color: "text-violet-600 dark:text-violet-400" },
 ];
 
 function orderTiles(order: string[]): Tile[] {
