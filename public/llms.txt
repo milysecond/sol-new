@@ -61,3 +61,4 @@ Full product map for agents: https://sol.new/llms-full.txt · Features: https://
 - Access: no install; works in modern browsers; PWA.
 - Links: https://x.com/soldotnew · https://t.me/soldotnew
 - Repo docs: https://github.com/milysecond/sol-new
+- /frame — LinkedIn profile frame generator (#OPENTOSOLANA)
