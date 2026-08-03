@@ -23,9 +23,14 @@ const nextConfig: NextConfig = {
         destination: "https://learn.sol.new",
         permanent: false,
       },
-      // /playbook aliases the playbook subdomain.
+      // /playbook + /starter alias the Solana New Starter welcome site.
       {
         source: "/playbook",
+        destination: "https://playbook.sol.new",
+        permanent: false,
+      },
+      {
+        source: "/starter",
         destination: "https://playbook.sol.new",
         permanent: false,
       },
