@@ -33,16 +33,16 @@ export default function FramePage() {
         <div className="mb-3 flex items-center gap-1">
           <PageBack />
         </div>
-        <header className="mb-6 space-y-1">
-          <p className="text-xs font-medium uppercase tracking-wider text-fuchsia-600 dark:text-fuchsia-400">
-            Profile frame
-          </p>
+        <header className="mb-6 space-y-1 text-center sm:text-left">
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            LinkedIn frame
+            Custom LinkedIn frame
           </h1>
           <p className="text-sm text-gray-600 dark:text-white/60">
-            Circular text around your photo. Runs fully in your browser — nothing
-            is uploaded to sol.new.
+            Open-to-work style ring with{" "}
+            <span className="font-semibold text-fuchsia-600 dark:text-fuchsia-400">
+              #OPENTOSOLANA
+            </span>
+            . Upload a photo, drag to position, download PNG.
           </p>
         </header>
         <FrameStudio />

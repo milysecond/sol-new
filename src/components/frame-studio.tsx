@@ -3,20 +3,15 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
+  type PointerEvent as ReactPointerEvent,
+  type WheelEvent as ReactWheelEvent,
 } from "react";
 import { Download, ImagePlus, Link2, RotateCcw, Share2 } from "lucide-react";
 
-const SIZE = 800;
+const SIZE = 1000;
 const DEFAULT_TEXT = "#OPENTOSOLANA";
-const PRESETS = [
-  { label: "#OPENTOSOLANA", text: "#OPENTOSOLANA", color: "#9945FF", ring: "#14F195" },
-  { label: "#OPENTOWORK", text: "#OPENTOWORK", color: "#0A66C2", ring: "#0A66C2" },
-  { label: "Hiring", text: "HIRING · REACH OUT · ", color: "#F59E0B", ring: "#111827" },
-  { label: "Solana", text: "SOLANA · BUILD · SHIP · ", color: "#14F195", ring: "#9945FF" },
-] as const;
 
 function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
@@ -27,53 +22,109 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("Could not load image"));
+    img.crossOrigin = "anonymous";
     img.src = src;
   });
 }
 
-/** Draw text repeated along a circle (outside the photo ring). */
-function drawCircularText(
+/** Classic LinkedIn open-to-work style gradient (purple → pink → red). */
+function ringGradient(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number
+) {
+  const g = ctx.createLinearGradient(cx - r, cy, cx + r, cy + r * 0.6);
+  g.addColorStop(0, "#7C3AED"); // violet
+  g.addColorStop(0.35, "#C026D3"); // fuchsia
+  g.addColorStop(0.65, "#E11D48"); // rose
+  g.addColorStop(1, "#DC2626"); // red
+  return g;
+}
+
+/** Simple head+shoulders silhouette (placeholder). */
+function drawSilhouette(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  photoR: number
+) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, photoR, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(cx - photoR, cy - photoR, photoR * 2, photoR * 2);
+
+  ctx.fillStyle = "#0a0a0a";
+  // head
+  const headR = photoR * 0.32;
+  const headCy = cy - photoR * 0.18;
+  ctx.beginPath();
+  ctx.arc(cx, headCy, headR, 0, Math.PI * 2);
+  ctx.fill();
+  // shoulders / torso
+  ctx.beginPath();
+  ctx.moveTo(cx - photoR * 0.55, cy + photoR * 1.05);
+  ctx.quadraticCurveTo(cx - photoR * 0.5, cy + photoR * 0.15, cx - headR * 0.95, headCy + headR * 0.85);
+  ctx.quadraticCurveTo(cx, headCy + headR * 1.35, cx + headR * 0.95, headCy + headR * 0.85);
+  ctx.quadraticCurveTo(cx + photoR * 0.5, cy + photoR * 0.15, cx + photoR * 0.55, cy + photoR * 1.05);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Draw text once along a circular arc (not full-circle repeat).
+ * Angles in radians; text is centered on `centerAngle`.
+ */
+function drawArcText(
   ctx: CanvasRenderingContext2D,
   opts: {
     text: string;
     cx: number;
     cy: number;
     radius: number;
+    centerAngle: number;
     color: string;
     fontSize: number;
-    fontFamily: string;
-    clockwise?: boolean;
+    /** false = text sits on lower arc reading upright-ish (inside ring) */
+    outward?: boolean;
   }
 ) {
-  const raw = (opts.text || " ").trim() || " ";
-  // Space-pad so repeats don't glue together
-  const unit = raw.endsWith(" ") ? raw : `${raw} · `;
+  const text = (opts.text || "").trim() || " ";
   ctx.save();
   ctx.fillStyle = opts.color;
-  ctx.font = `700 ${opts.fontSize}px ${opts.fontFamily}`;
+  ctx.font = `800 ${opts.fontSize}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`;
   ctx.textBaseline = "middle";
   ctx.textAlign = "center";
 
-  // Measure how many copies fit the circumference
-  const circ = 2 * Math.PI * opts.radius;
-  const unitW = Math.max(ctx.measureText(unit).width, 1);
-  const copies = Math.max(1, Math.ceil(circ / unitW));
-  const full = unit.repeat(copies);
-  const totalW = ctx.measureText(full).width;
-  // Center the string around the circle
-  let angle = -Math.PI / 2 - (totalW / opts.radius) / 2;
-  const dir = opts.clockwise === false ? -1 : 1;
+  const chars = [...text];
+  const widths = chars.map((ch) => ctx.measureText(ch).width);
+  const total = widths.reduce((a, b) => a + b, 0);
+  // Angular span of the whole string
+  const span = total / opts.radius;
+  let angle = opts.centerAngle - span / 2;
 
-  for (const ch of full) {
-    const w = ctx.measureText(ch).width;
+  for (let i = 0; i < chars.length; i++) {
+    const w = widths[i];
     const step = w / opts.radius;
-    const mid = angle + (dir * step) / 2;
+    const mid = angle + step / 2;
     ctx.save();
-    ctx.translate(opts.cx + Math.cos(mid) * opts.radius, opts.cy + Math.sin(mid) * opts.radius);
-    ctx.rotate(mid + Math.PI / 2);
-    ctx.fillText(ch, 0, 0);
+    ctx.translate(
+      opts.cx + Math.cos(mid) * opts.radius,
+      opts.cy + Math.sin(mid) * opts.radius
+    );
+    // Rotate so baseline follows the circle; flip for lower-arc readability
+    if (opts.outward) {
+      ctx.rotate(mid + Math.PI / 2);
+    } else {
+      ctx.rotate(mid - Math.PI / 2);
+    }
+    ctx.fillText(chars[i], 0, 0);
     ctx.restore();
-    angle += dir * step;
+    angle += step;
   }
   ctx.restore();
 }
@@ -83,12 +134,14 @@ function drawFrame(
   opts: {
     photo: HTMLImageElement | null;
     text: string;
-    textColor: string;
-    ringColor: string;
-    bgColor: string;
-    fontSize: number;
-    ringWidth: number;
+    /** degrees, rotates text around ring */
+    textOffsetDeg: number;
+    /** -1..1 radial nudge inside the band */
+    textCenterOffset: number;
+    cubicle: boolean;
     photoZoom: number;
+    photoOffsetX: number;
+    photoOffsetY: number;
   }
 ) {
   const ctx = canvas.getContext("2d");
@@ -99,22 +152,39 @@ function drawFrame(
   const cx = s / 2;
   const cy = s / 2;
 
-  // Transparent outside for LinkedIn; fill optional bg behind ring only if set
+  // Transparent outside (LinkedIn composites on white anyway)
   ctx.clearRect(0, 0, s, s);
 
-  const outerR = s / 2 - 8;
-  const textR = outerR - opts.fontSize * 0.55;
-  const ringOuter = textR - opts.fontSize * 0.55;
-  const ringInner = ringOuter - opts.ringWidth;
-  const photoR = Math.max(40, ringInner - 4);
+  // Geometry matches screenshot: thick colored band, thin black outer rim
+  const outerR = s * 0.48;
+  const bandWidth = s * 0.105;
+  const innerR = outerR - bandWidth;
+  const photoR = innerR - 4;
+  const blackRim = 6;
 
-  // Soft outer glow disk
+  // Outer black rim
   ctx.beginPath();
-  ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
-  ctx.fillStyle = opts.bgColor;
-  ctx.fill();
+  ctx.arc(cx, cy, outerR + blackRim / 2, 0, Math.PI * 2);
+  ctx.strokeStyle = "#0a0a0a";
+  ctx.lineWidth = blackRim;
+  ctx.stroke();
 
-  // Photo clip
+  // Gradient band (donut)
+  ctx.beginPath();
+  ctx.arc(cx, cy, (outerR + innerR) / 2, 0, Math.PI * 2);
+  ctx.strokeStyle = ringGradient(ctx, cx, cy, outerR);
+  ctx.lineWidth = bandWidth;
+  ctx.lineCap = "butt";
+  ctx.stroke();
+
+  // Subtle highlight on band
+  ctx.beginPath();
+  ctx.arc(cx, cy, (outerR + innerR) / 2, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = bandWidth * 0.35;
+  ctx.stroke();
+
+  // Photo / silhouette
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, photoR, 0, Math.PI * 2);
@@ -122,73 +192,104 @@ function drawFrame(
   ctx.clip();
   if (opts.photo) {
     const img = opts.photo;
-    const zoom = clamp(opts.photoZoom, 1, 3);
-    const side = Math.min(img.width, img.height) / zoom;
+    const zoom = clamp(opts.photoZoom, 0.6, 3.5);
+    const base = Math.max(img.width, img.height);
+    const side = base / zoom;
+    const ox = opts.photoOffsetX * photoR * 0.9;
+    const oy = opts.photoOffsetY * photoR * 0.9;
     const sx = (img.width - side) / 2;
     const sy = (img.height - side) / 2;
-    ctx.drawImage(img, sx, sy, side, side, cx - photoR, cy - photoR, photoR * 2, photoR * 2);
+    ctx.drawImage(
+      img,
+      sx,
+      sy,
+      side,
+      side,
+      cx - photoR + ox,
+      cy - photoR + oy,
+      photoR * 2,
+      photoR * 2
+    );
   } else {
-    // Placeholder gradient
-    const g = ctx.createLinearGradient(cx - photoR, cy - photoR, cx + photoR, cy + photoR);
-    g.addColorStop(0, "#9945FF");
-    g.addColorStop(1, "#14F195");
-    ctx.fillStyle = g;
-    ctx.fillRect(cx - photoR, cy - photoR, photoR * 2, photoR * 2);
-    ctx.fillStyle = "rgba(255,255,255,0.92)";
-    ctx.font = `600 ${Math.round(photoR * 0.18)}px ui-sans-serif, system-ui, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("Your photo", cx, cy);
+    drawSilhouette(ctx, cx, cy, photoR);
   }
   ctx.restore();
 
-  // Ring (between photo and text)
+  // Inner edge
   ctx.beginPath();
-  ctx.arc(cx, cy, (ringOuter + ringInner) / 2, 0, Math.PI * 2);
-  ctx.strokeStyle = opts.ringColor;
-  ctx.lineWidth = opts.ringWidth;
+  ctx.arc(cx, cy, photoR + 1.5, 0, Math.PI * 2);
+  ctx.strokeStyle = "#0a0a0a";
+  ctx.lineWidth = 3;
   ctx.stroke();
 
-  // Optional thin inner edge
-  ctx.beginPath();
-  ctx.arc(cx, cy, photoR + 1, 0, Math.PI * 2);
-  ctx.strokeStyle = "rgba(255,255,255,0.35)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  // Cubicle mode: slight square notch / professional plate under text area
+  if (opts.cubicle) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(10,10,10,0.85)";
+    ctx.lineWidth = 10;
+    const r = outerR + blackRim + 8;
+    const rad = r * 0.12;
+    ctx.beginPath();
+    // rounded square frame
+    const x = cx - r;
+    const y = cy - r;
+    const w = r * 2;
+    ctx.moveTo(x + rad, y);
+    ctx.arcTo(x + w, y, x + w, y + w, rad);
+    ctx.arcTo(x + w, y + w, x, y + w, rad);
+    ctx.arcTo(x, y + w, x, y, rad);
+    ctx.arcTo(x, y, x + w, y, rad);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
 
-  drawCircularText(ctx, {
+  // Text on the band (lower-left arc like the reference)
+  const fontSize = Math.round(bandWidth * 0.72);
+  const radial =
+    (outerR + innerR) / 2 + opts.textCenterOffset * (bandWidth * 0.28);
+  // Reference sits text along bottom-left → bottom-right; center ~ 150° in canvas
+  // (canvas 0 = east, clockwise positive... standard math: 0 east, CCW)
+  // Lower arc center ≈ Math.PI / 2 (south) slightly toward west: ~ 2.0 rad
+  const baseCenter = Math.PI * 0.72; // ~130° — lower-left bias like screenshot
+  const centerAngle = baseCenter + (opts.textOffsetDeg * Math.PI) / 180;
+
+  drawArcText(ctx, {
     text: opts.text,
     cx,
     cy,
-    radius: textR,
-    color: opts.textColor,
-    fontSize: opts.fontSize,
-    fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
-    clockwise: true,
+    radius: radial,
+    centerAngle,
+    color: "#ffffff",
+    fontSize,
+    outward: false,
   });
 }
 
-function readHashDefaults(): Partial<{
+function readHash(): Partial<{
   text: string;
-  textColor: string;
-  ringColor: string;
-  bgColor: string;
+  textOffset: number;
+  textCenter: number;
+  cubicle: boolean;
 }> {
   if (typeof window === "undefined") return {};
   try {
     const raw = window.location.hash.replace(/^#/, "");
     if (!raw) return {};
-    // support #text=%23OPENTOSOLANA and #text=...&color=...
     const q = new URLSearchParams(raw.includes("=") ? raw : `text=${raw}`);
-    const out: Record<string, string> = {};
+    const out: {
+      text?: string;
+      textOffset?: number;
+      textCenter?: number;
+      cubicle?: boolean;
+    } = {};
     const t = q.get("text");
     if (t) out.text = t;
-    const c = q.get("color") || q.get("textColor");
-    if (c) out.textColor = c.startsWith("#") ? c : `#${c}`;
-    const r = q.get("ring") || q.get("ringColor");
-    if (r) out.ringColor = r.startsWith("#") ? r : `#${r}`;
-    const b = q.get("bg");
-    if (b) out.bgColor = b.startsWith("#") ? b : `#${b}`;
+    const o = q.get("offset");
+    if (o != null && o !== "") out.textOffset = Number(o);
+    const c = q.get("center");
+    if (c != null && c !== "") out.textCenter = Number(c);
+    if (q.get("cubicle") === "1") out.cubicle = true;
     return out;
   } catch {
     return {};
@@ -198,24 +299,34 @@ function readHashDefaults(): Partial<{
 export function FrameStudio() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const dragRef = useRef<{
+    x: number;
+    y: number;
+    ox: number;
+    oy: number;
+  } | null>(null);
+
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photo, setPhoto] = useState<HTMLImageElement | null>(null);
   const [text, setText] = useState(DEFAULT_TEXT);
-  const [textColor, setTextColor] = useState("#9945FF");
-  const [ringColor, setRingColor] = useState("#14F195");
-  const [bgColor, setBgColor] = useState("#0a0a0a");
-  const [fontSize, setFontSize] = useState(42);
-  const [ringWidth, setRingWidth] = useState(18);
-  const [photoZoom, setPhotoZoom] = useState(1);
+  const [textOffset, setTextOffset] = useState(0);
+  const [textCenter, setTextCenter] = useState(0);
+  const [cubicle, setCubicle] = useState(false);
+  const [photoZoom, setPhotoZoom] = useState(1.15);
+  const [photoOffsetX, setPhotoOffsetX] = useState(0);
+  const [photoOffsetY, setPhotoOffsetY] = useState(0);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
 
-  // hydrate from hash once
   useEffect(() => {
-    const d = readHashDefaults();
+    const d = readHash();
     if (d.text) setText(d.text);
-    if (d.textColor) setTextColor(d.textColor);
-    if (d.ringColor) setRingColor(d.ringColor);
-    if (d.bgColor) setBgColor(d.bgColor);
+    if (typeof d.textOffset === "number" && !Number.isNaN(d.textOffset)) {
+      setTextOffset(d.textOffset);
+    }
+    if (typeof d.textCenter === "number" && !Number.isNaN(d.textCenter)) {
+      setTextCenter(clamp(d.textCenter, -1, 1));
+    }
+    if (d.cubicle) setCubicle(true);
   }, []);
 
   useEffect(() => {
@@ -242,31 +353,39 @@ export function FrameStudio() {
     drawFrame(c, {
       photo,
       text,
-      textColor,
-      ringColor,
-      bgColor,
-      fontSize,
-      ringWidth,
+      textOffsetDeg: textOffset,
+      textCenterOffset: textCenter,
+      cubicle,
       photoZoom,
+      photoOffsetX,
+      photoOffsetY,
     });
-  }, [photo, text, textColor, ringColor, bgColor, fontSize, ringWidth, photoZoom]);
+  }, [
+    photo,
+    text,
+    textOffset,
+    textCenter,
+    cubicle,
+    photoZoom,
+    photoOffsetX,
+    photoOffsetY,
+  ]);
 
   useEffect(() => {
     redraw();
   }, [redraw]);
 
-  // sync shareable hash (no navigation)
   useEffect(() => {
     const q = new URLSearchParams();
     q.set("text", text);
-    q.set("color", textColor);
-    q.set("ring", ringColor);
-    q.set("bg", bgColor);
+    if (textOffset) q.set("offset", String(Math.round(textOffset)));
+    if (textCenter) q.set("center", textCenter.toFixed(2));
+    if (cubicle) q.set("cubicle", "1");
     const next = `#${q.toString()}`;
     if (typeof window !== "undefined" && window.location.hash !== next) {
       history.replaceState(null, "", `${window.location.pathname}${next}`);
     }
-  }, [text, textColor, ringColor, bgColor]);
+  }, [text, textOffset, textCenter, cubicle]);
 
   const onFile = (file: File | null) => {
     if (!file) return;
@@ -275,9 +394,44 @@ export function FrameStudio() {
       return;
     }
     if (photoUrl) URL.revokeObjectURL(photoUrl);
-    const url = URL.createObjectURL(file);
-    setPhotoUrl(url);
+    setPhotoUrl(URL.createObjectURL(file));
+    setPhotoOffsetX(0);
+    setPhotoOffsetY(0);
+    setPhotoZoom(1.15);
     setShareMsg(null);
+  };
+
+  const onPointerDown = (e: ReactPointerEvent) => {
+    if (!photo) return;
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    dragRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      ox: photoOffsetX,
+      oy: photoOffsetY,
+    };
+  };
+
+  const onPointerMove = (e: ReactPointerEvent) => {
+    const d = dragRef.current;
+    if (!d || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const scale = SIZE / rect.width;
+    const dx = ((e.clientX - d.x) * scale) / (SIZE * 0.4);
+    const dy = ((e.clientY - d.y) * scale) / (SIZE * 0.4);
+    setPhotoOffsetX(clamp(d.ox + dx, -1.2, 1.2));
+    setPhotoOffsetY(clamp(d.oy + dy, -1.2, 1.2));
+  };
+
+  const onPointerUp = () => {
+    dragRef.current = null;
+  };
+
+  const onWheel = (e: ReactWheelEvent) => {
+    if (!photo) return;
+    e.preventDefault();
+    const factor = e.deltaY > 0 ? 0.94 : 1.06;
+    setPhotoZoom((z) => clamp(z * factor, 0.6, 3.5));
   };
 
   const download = () => {
@@ -291,111 +445,119 @@ export function FrameStudio() {
   };
 
   const shareLink = async () => {
-    const url = typeof window !== "undefined" ? window.location.href : "https://sol.new/frame";
+    const url =
+      typeof window !== "undefined" ? window.location.href : "https://sol.new/frame";
     try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "My sol.new LinkedIn frame",
+          url,
+        });
+        return;
+      }
       await navigator.clipboard.writeText(url);
       setShareMsg("Link copied.");
     } catch {
-      setShareMsg(url);
+      try {
+        await navigator.clipboard.writeText(url);
+        setShareMsg("Link copied.");
+      } catch {
+        setShareMsg(url);
+      }
     }
   };
 
   const reset = () => {
     setText(DEFAULT_TEXT);
-    setTextColor("#9945FF");
-    setRingColor("#14F195");
-    setBgColor("#0a0a0a");
-    setFontSize(42);
-    setRingWidth(18);
-    setPhotoZoom(1);
+    setTextOffset(0);
+    setTextCenter(0);
+    setCubicle(false);
+    setPhotoZoom(1.15);
+    setPhotoOffsetX(0);
+    setPhotoOffsetY(0);
     if (photoUrl) URL.revokeObjectURL(photoUrl);
     setPhotoUrl(null);
     setPhoto(null);
     setShareMsg(null);
   };
 
-  const previewStyle = useMemo(
-    () => ({ maxWidth: "min(100%, 360px)" as const }),
-    []
-  );
-
   return (
-    <div className="space-y-6">
-      {/* Canvas preview */}
-      <div className="flex flex-col items-center gap-3">
+    <div className="space-y-5">
+      {/* Controls matching reference */}
+      <div className="space-y-4 rounded-2xl border border-black/8 bg-white px-4 py-4 dark:border-white/10 dark:bg-zinc-950">
+        <label className="flex items-center justify-between gap-4 text-sm font-medium text-gray-800 dark:text-white/90">
+          <span>Text Offset</span>
+          <input
+            type="range"
+            min={-180}
+            max={180}
+            value={textOffset}
+            onChange={(e) => setTextOffset(Number(e.target.value))}
+            className="h-2 w-[55%] max-w-[220px] cursor-pointer appearance-none rounded-full bg-gradient-to-r from-blue-200 to-blue-600 accent-blue-600"
+          />
+        </label>
+        <label className="flex items-center justify-between gap-4 text-sm font-medium text-gray-800 dark:text-white/90">
+          <span>Text Center offset</span>
+          <input
+            type="range"
+            min={-100}
+            max={100}
+            value={Math.round(textCenter * 100)}
+            onChange={(e) => setTextCenter(Number(e.target.value) / 100)}
+            className="h-2 w-[55%] max-w-[220px] cursor-pointer appearance-none rounded-full bg-gradient-to-r from-blue-200 to-blue-600 accent-blue-600"
+          />
+        </label>
+        <div className="flex items-center justify-between gap-4 text-sm font-medium text-gray-800 dark:text-white/90">
+          <span>Cubicle</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={cubicle}
+            onClick={() => setCubicle((v) => !v)}
+            className={`relative h-8 w-14 rounded-full transition ${
+              cubicle ? "bg-emerald-500" : "bg-gray-200 dark:bg-white/15"
+            }`}
+          >
+            <span
+              className={`absolute top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white text-[10px] font-bold shadow transition ${
+                cubicle ? "left-7 text-emerald-700" : "left-1 text-rose-500"
+              }`}
+            >
+              {cubicle ? "YES" : "NO"}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Preview */}
+      <div className="flex flex-col items-center gap-2">
         <div
-          className="relative w-full overflow-hidden rounded-full shadow-xl ring-1 ring-black/10 dark:ring-white/10"
-          style={previewStyle}
+          className={`relative w-full max-w-[340px] touch-none select-none ${
+            photo ? "cursor-grab active:cursor-grabbing" : ""
+          }`}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onWheel={onWheel}
         >
           <canvas
             ref={canvasRef}
             width={SIZE}
             height={SIZE}
             className="block h-auto w-full"
-            aria-label="Profile frame preview"
+            aria-label="LinkedIn frame preview"
           />
         </div>
-        <p className="text-center text-xs text-gray-500 dark:text-white/45">
-          800×800 PNG · use as LinkedIn profile photo
+        <p className="flex items-center gap-1.5 text-center text-xs text-gray-500 dark:text-white/45">
+          <span aria-hidden>✊</span>
+          Drag the image to position it.
+          <br />
+          Use scroll / pinch to resize.
         </p>
       </div>
 
-      {/* Upload */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Photo</label>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-        />
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-black/20 bg-black/[0.03] px-4 py-3 text-sm font-medium hover:bg-black/[0.06] dark:border-white/20 dark:bg-white/5 dark:hover:bg-white/10"
-        >
-          <ImagePlus size={18} />
-          {photo ? "Change photo" : "Upload profile photo"}
-        </button>
-        {photo && (
-          <label className="block text-xs text-gray-500 dark:text-white/50">
-            Zoom
-            <input
-              type="range"
-              min={1}
-              max={2.5}
-              step={0.01}
-              value={photoZoom}
-              onChange={(e) => setPhotoZoom(Number(e.target.value))}
-              className="mt-1 w-full"
-            />
-          </label>
-        )}
-      </div>
-
-      {/* Presets */}
-      <div className="space-y-2">
-        <p className="text-sm font-medium">Presets</p>
-        <div className="flex flex-wrap gap-2">
-          {PRESETS.map((p) => (
-            <button
-              key={p.label}
-              type="button"
-              onClick={() => {
-                setText(p.text);
-                setTextColor(p.color);
-                setRingColor(p.ring);
-              }}
-              className="rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Text */}
+      {/* Text + photo */}
       <div className="space-y-2">
         <label htmlFor="frame-text" className="text-sm font-medium">
           Ring text
@@ -403,92 +565,54 @@ export function FrameStudio() {
         <input
           id="frame-text"
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          className="w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-base outline-none focus:ring-2 focus:ring-fuchsia-500/40 dark:border-white/15 dark:bg-black"
+          onChange={(e) => setText(e.target.value.toUpperCase())}
+          className="w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-base font-semibold tracking-wide outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-white/15 dark:bg-black"
           placeholder="#OPENTOSOLANA"
-          maxLength={80}
+          maxLength={40}
         />
-        <label className="block text-xs text-gray-500 dark:text-white/50">
-          Text size
-          <input
-            type="range"
-            min={24}
-            max={64}
-            value={fontSize}
-            onChange={(e) => setFontSize(Number(e.target.value))}
-            className="mt-1 w-full"
-          />
-        </label>
       </div>
 
-      {/* Colors */}
-      <div className="grid grid-cols-3 gap-3">
-        <label className="space-y-1 text-xs font-medium">
-          Text
-          <input
-            type="color"
-            value={textColor}
-            onChange={(e) => setTextColor(e.target.value)}
-            className="h-10 w-full cursor-pointer rounded-lg border border-black/10 bg-transparent dark:border-white/15"
-          />
-        </label>
-        <label className="space-y-1 text-xs font-medium">
-          Ring
-          <input
-            type="color"
-            value={ringColor}
-            onChange={(e) => setRingColor(e.target.value)}
-            className="h-10 w-full cursor-pointer rounded-lg border border-black/10 bg-transparent dark:border-white/15"
-          />
-        </label>
-        <label className="space-y-1 text-xs font-medium">
-          Background
-          <input
-            type="color"
-            value={bgColor}
-            onChange={(e) => setBgColor(e.target.value)}
-            className="h-10 w-full cursor-pointer rounded-lg border border-black/10 bg-transparent dark:border-white/15"
-          />
-        </label>
-      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+      />
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-black/15 bg-black/[0.02] px-4 py-3 text-sm font-medium hover:bg-black/[0.05] dark:border-white/20 dark:bg-white/5 dark:hover:bg-white/10"
+      >
+        <ImagePlus size={18} />
+        {photo ? "Change photo" : "Upload profile photo"}
+      </button>
 
-      <label className="block text-xs text-gray-500 dark:text-white/50">
-        Ring thickness
-        <input
-          type="range"
-          min={6}
-          max={40}
-          value={ringWidth}
-          onChange={(e) => setRingWidth(Number(e.target.value))}
-          className="mt-1 w-full"
-        />
-      </label>
-
-      {/* Actions */}
-      <div className="flex flex-col gap-2 sm:flex-row">
+      {/* Primary actions — blue like reference */}
+      <div className="flex flex-col gap-2.5">
         <button
           type="button"
           onClick={download}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-fuchsia-600 px-4 py-3 text-sm font-semibold text-white hover:bg-fuchsia-500 active:scale-[0.99]"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#0A66C2] px-4 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-[#004182] active:scale-[0.99]"
         >
-          <Download size={18} />
-          Download PNG
+          <Download size={20} />
+          Download
         </button>
         <button
           type="button"
           onClick={shareLink}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-black/10 px-4 py-3 text-sm font-semibold hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#0A66C2] px-4 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-[#004182] active:scale-[0.99]"
         >
-          <Share2 size={18} />
-          Copy link
+          <Share2 size={20} />
+          Share Frame
         </button>
         <button
           type="button"
           onClick={reset}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-black/10 px-4 py-3 text-sm font-semibold hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10 sm:flex-none"
-          aria-label="Reset"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-black/10 px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-black/5 dark:border-white/15 dark:text-white/70 dark:hover:bg-white/10"
         >
-          <RotateCcw size={18} />
+          <RotateCcw size={16} />
+          Reset
         </button>
       </div>
 
@@ -499,11 +623,9 @@ export function FrameStudio() {
         </p>
       )}
 
-      <ol className="list-decimal space-y-1 pl-5 text-xs text-gray-500 dark:text-white/45">
-        <li>Upload a clear headshot (square crop works best).</li>
-        <li>Set ring text — default is #OPENTOSOLANA.</li>
-        <li>Download PNG → LinkedIn → Profile photo.</li>
-      </ol>
+      <p className="text-center text-[11px] text-gray-400 dark:text-white/35">
+        Private · runs in your browser · PNG for LinkedIn profile photo
+      </p>
     </div>
   );
 }
