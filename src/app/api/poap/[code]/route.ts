@@ -72,7 +72,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         ok: true,
         already: true,
         drop,
-        claimedAt: String((existing.rows[0] as { claimed_at: string }).claimed_at),
+        claimedAt: String((existing.rows[0] as unknown as { claimed_at?: string }).claimed_at ?? ""),
       });
     }
 
