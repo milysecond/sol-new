@@ -7,27 +7,63 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1F9FDF1855EA90DE855EC535 /* ClipAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F2E2DB7921413918FDF96D0 /* ClipAppDelegate.swift */; };
+		3649CDEE4901B3B61A42F683 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D3FC75C661C314C88ACF3F3D /* Assets.xcassets */; };
 		49FE6DCD1BC494CF2020563B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1181255328FE67C35E62825A /* Assets.xcassets */; };
-		A1B2C3D4E5F6A7B8C9D0E1F2 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F3 /* LaunchScreen.storyboard */; };
 		61193F175D955A72FBADF13E /* WebViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1A6E6E5BDB5EBA743EEF80 /* WebViewController.swift */; };
+		7C28621508875D1EBB193983 /* sol-new Clip.app in Embed App Clips */ = {isa = PBXBuildFile; fileRef = 1ED978229A49A7DB5F126BB4 /* sol-new Clip.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		AE872D45114A34D1B6E3723B /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 0716749D73F3F560190D1E59 /* LaunchScreen.storyboard */; };
 		BF92A4E856B1C5D8511DFE72 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C27F566C35506A02E742F0FF /* AppDelegate.swift */; };
 		DE01EA7C1A0EE0718091040D /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 742AB21F834B706CD47BD036 /* SceneDelegate.swift */; };
+		F15A068469AC230A6E55E602 /* ClipWebViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 990D060C405B5D8C7F8705AD /* ClipWebViewController.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		A0ADCBBFAEFA18097F6ABA95 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2EE4F510C7DBE3B47015C0FD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3CCD396F257DA45C96D5FA90;
+			remoteInfo = "sol-new Clip";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		727F8E2F32A9455B5D1A469E /* Embed App Clips */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/AppClips";
+			dstSubfolderSpec = 16;
+			files = (
+				7C28621508875D1EBB193983 /* sol-new Clip.app in Embed App Clips */,
+			);
+			name = "Embed App Clips";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		0716749D73F3F560190D1E59 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		0ADFEF87F4D45361F63A9EA9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		A1B2C3D4E5F6A7B8C9D0E1F3 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		1181255328FE67C35E62825A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		1ED978229A49A7DB5F126BB4 /* sol-new Clip.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "sol-new Clip.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		742AB21F834B706CD47BD036 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		9578A47ED0CADD163092D10A /* sol-new.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "sol-new.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		990D060C405B5D8C7F8705AD /* ClipWebViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipWebViewController.swift; sourceTree = "<group>"; };
+		9ECF996548FFCF199AB1B6CC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9F2E2DB7921413918FDF96D0 /* ClipAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipAppDelegate.swift; sourceTree = "<group>"; };
 		BE1A6E6E5BDB5EBA743EEF80 /* WebViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewController.swift; sourceTree = "<group>"; };
 		C27F566C35506A02E742F0FF /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		D3FC75C661C314C88ACF3F3D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		E99B323E427502BD71A13E8A /* sol-new.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "sol-new.entitlements"; sourceTree = "<group>"; };
+		EB7E2DE2DFF5720120EA4EDC /* Clip.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Clip.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
 		012248CB69EE5E31C11AA53C /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				1ED978229A49A7DB5F126BB4 /* sol-new Clip.app */,
 				9578A47ED0CADD163092D10A /* sol-new.app */,
 			);
 			name = Products;
@@ -39,8 +75,9 @@
 				C27F566C35506A02E742F0FF /* AppDelegate.swift */,
 				1181255328FE67C35E62825A /* Assets.xcassets */,
 				0ADFEF87F4D45361F63A9EA9 /* Info.plist */,
-				A1B2C3D4E5F6A7B8C9D0E1F3 /* LaunchScreen.storyboard */,
+				0716749D73F3F560190D1E59 /* LaunchScreen.storyboard */,
 				742AB21F834B706CD47BD036 /* SceneDelegate.swift */,
+				E99B323E427502BD71A13E8A /* sol-new.entitlements */,
 				BE1A6E6E5BDB5EBA743EEF80 /* WebViewController.swift */,
 			);
 			path = "sol-new";
@@ -49,24 +86,57 @@
 		38167408463B15258780E2EF = {
 			isa = PBXGroup;
 			children = (
+				DF30E6DCBF926AE30D1D9D9A /* Clip */,
 				3421C92D2744C553D56B3F7B /* sol-new */,
 				012248CB69EE5E31C11AA53C /* Products */,
 			);
 			sourceTree = "<group>";
 		};
+		DF30E6DCBF926AE30D1D9D9A /* Clip */ = {
+			isa = PBXGroup;
+			children = (
+				D3FC75C661C314C88ACF3F3D /* Assets.xcassets */,
+				EB7E2DE2DFF5720120EA4EDC /* Clip.entitlements */,
+				9F2E2DB7921413918FDF96D0 /* ClipAppDelegate.swift */,
+				990D060C405B5D8C7F8705AD /* ClipWebViewController.swift */,
+				9ECF996548FFCF199AB1B6CC /* Info.plist */,
+			);
+			path = Clip;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		3CCD396F257DA45C96D5FA90 /* sol-new Clip */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0CED46EE83C98C32C109B083 /* Build configuration list for PBXNativeTarget "sol-new Clip" */;
+			buildPhases = (
+				EA8C0D764F143B7F9A7A1502 /* Sources */,
+				2F160BC6080AE1FD488BC368 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "sol-new Clip";
+			packageProductDependencies = (
+			);
+			productName = "sol-new Clip";
+			productReference = 1ED978229A49A7DB5F126BB4 /* sol-new Clip.app */;
+			productType = "com.apple.product-type.application.on-demand-install-capable";
+		};
 		E091410F8E168B7F2CEBE01F /* sol-new */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = FF967FBDE8097CBFD59A2E08 /* Build configuration list for PBXNativeTarget "sol-new" */;
 			buildPhases = (
 				0C512661C07BEC36AED7AC3D /* Sources */,
 				36F763BF64FBB2F50DDAD2D9 /* Resources */,
+				727F8E2F32A9455B5D1A469E /* Embed App Clips */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				71037CD8A21B655AD4591A4E /* PBXTargetDependency */,
 			);
 			name = "sol-new";
 			packageProductDependencies = (
@@ -84,14 +154,13 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					3CCD396F257DA45C96D5FA90 = {
+						DevelopmentTeam = 4CK2SMVS2Y;
+						ProvisioningStyle = Automatic;
+					};
 					E091410F8E168B7F2CEBE01F = {
 						DevelopmentTeam = 4CK2SMVS2Y;
 						ProvisioningStyle = Automatic;
-						SystemCapabilities = {
-							com.apple.Push = {
-								enabled = 1;
-							};
-						};
 					};
 				};
 			};
@@ -110,17 +179,26 @@
 			projectRoot = "";
 			targets = (
 				E091410F8E168B7F2CEBE01F /* sol-new */,
+				3CCD396F257DA45C96D5FA90 /* sol-new Clip */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		2F160BC6080AE1FD488BC368 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3649CDEE4901B3B61A42F683 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		36F763BF64FBB2F50DDAD2D9 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				49FE6DCD1BC494CF2020563B /* Assets.xcassets in Resources */,
-				A1B2C3D4E5F6A7B8C9D0E1F2 /* LaunchScreen.storyboard in Resources */,
+				AE872D45114A34D1B6E3723B /* LaunchScreen.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -137,7 +215,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		EA8C0D764F143B7F9A7A1502 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1F9FDF1855EA90DE855EC535 /* ClipAppDelegate.swift in Sources */,
+				F15A068469AC230A6E55E602 /* ClipWebViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		71037CD8A21B655AD4591A4E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3CCD396F257DA45C96D5FA90 /* sol-new Clip */;
+			targetProxy = A0ADCBBFAEFA18097F6ABA95 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		11E5906CF63E3CBA9C66B661 /* Debug */ = {
@@ -175,8 +270,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CODE_SIGN_ENTITLEMENTS = "sol-new/sol-new.entitlements";
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 4CK2SMVS2Y;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -209,18 +303,40 @@
 			};
 			name = Debug;
 		};
-		4B24D3085721BB4BD85FCB1F /* Release */ = {
+		1EF17C1B250F04FC7D0E9B5A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				INFOPLIST_FILE = "sol-new/Info.plist";
+				CODE_SIGN_ENTITLEMENTS = Clip/Clip.entitlements;
+				INFOPLIST_FILE = Clip/Info.plist;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = new.sol;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.solnew.app.Clip;
+				PRODUCT_NAME = "sol-new Clip";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		4B24D3085721BB4BD85FCB1F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "sol-new/sol-new.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = "sol-new/Info.plist";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.solnew.app;
 				PRODUCT_NAME = "sol-new";
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
@@ -228,6 +344,26 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
+		};
+		A1D8FA8DD0560648F5A540AF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Clip/Clip.entitlements;
+				INFOPLIST_FILE = Clip/Info.plist;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.solnew.app.Clip;
+				PRODUCT_NAME = "sol-new Clip";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
 		};
 		D18DF1847988217816AF855B /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -264,8 +400,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CODE_SIGN_ENTITLEMENTS = "sol-new/sol-new.entitlements";
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 4CK2SMVS2Y;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -295,14 +430,16 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "sol-new/sol-new.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = "sol-new/Info.plist";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = new.sol;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.solnew.app;
 				PRODUCT_NAME = "sol-new";
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
@@ -314,6 +451,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		0CED46EE83C98C32C109B083 /* Build configuration list for PBXNativeTarget "sol-new Clip" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1D8FA8DD0560648F5A540AF /* Debug */,
+				1EF17C1B250F04FC7D0E9B5A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		104D5E33C5C2CBBD9A44435A /* Build configuration list for PBXProject "sol-new" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
