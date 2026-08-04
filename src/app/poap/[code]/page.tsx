@@ -324,7 +324,7 @@ export default function PoapClaimPage() {
                     </button>
                   </ConnectGate>
                   <p className="text-[10px] text-center text-gray-400">
-                    Free compressed NFT to your passkey wallet · sol.new sponsors mint
+                    Free cNFT · on-chain SVG art baked into metadata
                   </p>
                 </>
               )}

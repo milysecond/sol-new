@@ -12,12 +12,11 @@ import {
 } from "@/lib/poap";
 import { mintCompressedNft } from "@/lib/mint-cnft";
 import { notifyEvent } from "@/lib/notify";
+import { poapBadgeDataUri, shortWalletTag } from "@/lib/poap-badge";
 
 export const runtime = "nodejs";
 
 type Ctx = { params: Promise<{ code: string }> };
-
-const DEFAULT_IMAGE = "https://sol.new/poap/opengraph-image";
 
 function originFrom(req: NextRequest): string {
   const h = req.headers.get("x-forwarded-host");
@@ -29,35 +28,116 @@ function originFrom(req: NextRequest): string {
   }
 }
 
+/**
+ * Build NFT image as on-chain data URI (SVG badge).
+ * Optionally embeds a small remote drop image inside the SVG.
+ */
+async function buildOnchainImage(
+  drop: PoapDrop,
+  wallet: string,
+  claimedAt: string
+): Promise<{ imageDataUri: string; mime: string }> {
+  // Pure SVG badge — always works, no external dependency
+  const badge = poapBadgeDataUri({
+    title: drop.title,
+    code: drop.code,
+    location: drop.location,
+    claimedAt,
+    walletTag: shortWalletTag(wallet),
+    geoLocked: isGeoLocked(drop),
+  });
+
+  // If issuer set an image URL and it's a small raster, try to embed into a richer SVG
+  if (drop.imageUrl && /^https?:\/\//i.test(drop.imageUrl)) {
+    try {
+      const r = await fetch(drop.imageUrl, {
+        signal: AbortSignal.timeout(8_000),
+        headers: { Accept: "image/*" },
+      });
+      if (r.ok) {
+        const ct = (r.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+        const buf = Buffer.from(await r.arrayBuffer());
+        // Keep embedded raster small so metadata stays wallet-friendly
+        if (
+          buf.length > 0 &&
+          buf.length <= 48_000 &&
+          (ct === "image/png" || ct === "image/jpeg" || ct === "image/webp" || ct === "image/gif")
+        ) {
+          const b64 = buf.toString("base64");
+          const href = `data:${ct};base64,${b64}`;
+          const title = (drop.title || "POAP").slice(0, 28);
+          const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="400" height="400" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#db2777"/>
+    </linearGradient>
+    <clipPath id="c"><rect x="28" y="28" width="344" height="280" rx="28"/></clipPath>
+  </defs>
+  <rect width="400" height="400" rx="48" fill="url(#g)"/>
+  <image href="${href}" xlink:href="${href}" x="28" y="28" width="344" height="280" preserveAspectRatio="xMidYMid slice" clip-path="url(#c)"/>
+  <rect x="28" y="28" width="344" height="280" rx="28" fill="none" stroke="#fff" stroke-opacity="0.35"/>
+  <text x="200" y="348" text-anchor="middle" fill="#fff" font-family="ui-sans-serif,system-ui,sans-serif" font-size="20" font-weight="700">${title
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")}</text>
+  <text x="200" y="372" text-anchor="middle" fill="#fff" fill-opacity="0.7" font-family="ui-monospace,monospace" font-size="12">${drop.code.toUpperCase()} · sol.new</text>
+</svg>`;
+          return {
+            imageDataUri: `data:image/svg+xml;base64,${Buffer.from(svg, "utf8").toString("base64")}`,
+            mime: "image/svg+xml",
+          };
+        }
+      }
+    } catch {
+      /* fall through to badge */
+    }
+  }
+
+  return { imageDataUri: badge, mime: "image/svg+xml" };
+}
+
 async function mintPoapCnft(
   req: NextRequest,
   drop: PoapDrop,
   wallet: string
-): Promise<{ assetId: string; signature: string; metadataUri: string }> {
+): Promise<{
+  assetId: string;
+  signature: string;
+  metadataUri: string;
+  imageDataUri: string;
+}> {
   const origin = originFrom(req);
-  const image = drop.imageUrl || DEFAULT_IMAGE;
   const claimedAt = new Date().toISOString();
+  const { imageDataUri, mime } = await buildOnchainImage(drop, wallet, claimedAt);
+
   const attributes = [
     { trait_type: "Drop", value: drop.code },
     { trait_type: "Issuer", value: drop.issuer },
     { trait_type: "Claimed", value: claimedAt.slice(0, 10) },
+    { trait_type: "Image", value: "on-chain SVG" },
   ];
   if (drop.location) attributes.push({ trait_type: "Location", value: drop.location });
   if (isGeoLocked(drop)) attributes.push({ trait_type: "Geo-locked", value: "yes" });
 
+  const description = (
+    drop.description ||
+    `Proof of attendance · ${drop.title} · sol.new/poap/${drop.code}`
+  ).slice(0, 800);
+
+  // Metadata JSON with image as data URI — image lives in the metadata blob (no host dependency)
   const metaBody = {
     name: drop.title.slice(0, 32),
     symbol: "POAP",
-    description: (
-      drop.description ||
-      `Proof of attendance · ${drop.title} · sol.new/poap/${drop.code}`
-    ).slice(0, 800),
-    image,
+    description,
+    image: imageDataUri,
+    animation_url: imageDataUri,
     external_url: `${origin}/poap/${drop.code}`,
     attributes,
     properties: {
       category: "image",
-      files: [{ uri: image, type: "image/png" }],
+      files: [{ uri: imageDataUri, type: mime }],
     },
     collection: { name: "sol.new POAP", family: "sol.new" },
     creator: drop.issuer,
@@ -67,18 +147,35 @@ async function mintPoapCnft(
   await saveMetadata(id, JSON.stringify(metaBody), wallet);
   const metadataUri = `${origin}/metadata/${id}.json`;
 
-  const mint = await mintCompressedNft({
-    owner: wallet,
-    name: drop.title.slice(0, 32),
-    symbol: "POAP",
-    uri: metadataUri,
-    description: metaBody.description,
-    network: "mainnet",
-    externalUrl: metaBody.external_url,
-    attributes,
-  });
+  // Mint: prefer image data URI; some RPCs reject data: in imageUrl — fall back
+  let mint: { assetId: string; signature: string };
+  try {
+    mint = await mintCompressedNft({
+      owner: wallet,
+      name: drop.title.slice(0, 32),
+      symbol: "POAP",
+      uri: metadataUri,
+      imageUrl: imageDataUri,
+      description,
+      network: "mainnet",
+      externalUrl: metaBody.external_url,
+      attributes,
+    });
+  } catch (e1) {
+    console.warn("poap mint with imageUrl failed, retry uri-only", e1);
+    mint = await mintCompressedNft({
+      owner: wallet,
+      name: drop.title.slice(0, 32),
+      symbol: "POAP",
+      uri: metadataUri,
+      description,
+      network: "mainnet",
+      externalUrl: metaBody.external_url,
+      attributes,
+    });
+  }
 
-  return { ...mint, metadataUri };
+  return { ...mint, metadataUri, imageDataUri };
 }
 
 export async function GET(req: NextRequest, ctx: Ctx) {

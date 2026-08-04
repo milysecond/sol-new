@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-01",
+    title: "POAP on-chain image",
+    items: [
+      "POAP NFT art is an on-chain SVG data URI (no external image host).",
+      "Optional drop photo is embedded in the SVG when small enough.",
+    ],
+  },
+  {
+    date: "2026-08-01",
     title: "POAP on-chain",
     items: [
       "Claiming a POAP mints a free compressed NFT to your passkey wallet.",

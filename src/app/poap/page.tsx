@@ -255,7 +255,7 @@ export default function PoapPage() {
               <AnimatedIcon icon={Award} size={32} className="text-violet-500" />
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">POAP</h1>
               <p className="text-xs sm:text-sm text-gray-500 dark:text-white/50">
-                Proof on-chain · mint a memory · drop a claim link
+                On-chain SVG badge · mint a memory · drop a claim link
               </p>
             </div>
 
