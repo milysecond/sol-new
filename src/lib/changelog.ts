@@ -15,10 +15,10 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-01",
-    title: ".sns + AllDomains names",
+    title: "Name service: .sol .bonk .sns .skr",
     items: [
-      "Resolve .sns names (and any AllDomains TLD) for send, portfolio, and NFT lookup.",
-      ".sol still via Bonfida; .bonk / .skr and other TLDs via AllDomains.",
+      "Send, portfolio, and NFT lookup resolve .sol, .bonk, .sns, and .skr.",
+      ".sol via Bonfida; .bonk/.skr via AllDomains; .sns = SNS (ANS or .sol alias).",
     ],
   },
   {
