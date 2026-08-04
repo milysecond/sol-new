@@ -8,24 +8,52 @@ import { QrCode } from "@/components/qr-code";
 import { WalletShell } from "@/components/wallet-shell";
 import { PageTransition } from "@/components/page-transition";
 import { ConvertToSolCard } from "@/components/convert-to-sol-card";
+import { RequestFundsShare } from "@/components/request-funds-share";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 
-function QrModal({ open, onClose, publicKey, onCopy, copied }: {
-  open: boolean; onClose: () => void; publicKey: string; onCopy: () => void; copied: boolean;
+function QrModal({
+  open,
+  onClose,
+  publicKey,
+  onCopy,
+  copied,
+}: {
+  open: boolean;
+  onClose: () => void;
+  publicKey: string;
+  onCopy: () => void;
+  copied: boolean;
 }) {
   return (
-    <BottomSheet open={open} onClose={onClose} className="p-8 flex flex-col items-center gap-5">
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      className="p-6 flex flex-col items-center gap-4 max-h-[90dvh] overflow-y-auto"
+    >
       <div className="bg-white rounded-2xl p-4">
         <QrCode data={`solana:${publicKey}`} size={224} className="w-56 h-56" />
       </div>
-      <p className="text-gray-500 dark:text-gray-400 text-xs font-mono break-all text-center leading-relaxed">{publicKey}</p>
+      <p className="text-gray-500 dark:text-gray-400 text-xs font-mono break-all text-center leading-relaxed">
+        {publicKey}
+      </p>
       <button
         onClick={onCopy}
         className="w-full flex items-center justify-center gap-1.5 bg-fuchsia-500 hover:bg-fuchsia-400 text-white font-semibold rounded-xl px-4 py-3 transition"
       >
-        {copied ? <><Check size={16} /> Copied</> : <><Copy size={16} /> Copy address</>}
+        {copied ? (
+          <>
+            <Check size={16} /> Copied
+          </>
+        ) : (
+          <>
+            <Copy size={16} /> Copy address
+          </>
+        )}
       </button>
+      <div className="w-full">
+        <RequestFundsShare publicKey={publicKey} variant="full" />
+      </div>
     </BottomSheet>
   );
 }
@@ -38,7 +66,6 @@ export default function WalletGetPage() {
   const clusterParam = network === "devnet" ? "?cluster=devnet&hideSpam=true" : "?hideSpam=true";
   const [qrFullscreen, setQrFullscreen] = useState(false);
 
-  // Max brightness when fullscreen QR is shown
   useEffect(() => {
     if (qrFullscreen && "wakeLock" in navigator) {
       let lock: WakeLockSentinel | null = null;
@@ -106,6 +133,8 @@ export default function WalletGetPage() {
                   </button>
                 </div>
               </div>
+
+              <RequestFundsShare publicKey={publicKey} variant="full" />
 
               {network === "devnet" && (
                 <button
