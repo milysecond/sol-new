@@ -23,6 +23,15 @@ targets:
       - path: sol-new
     entitlements:
       path: sol-new/sol-new.entitlements
+      properties:
+        com.apple.developer.associated-domains:
+          - webcredentials:sol.new
+          - applinks:sol.new
+          - appclips:sol.new
+        aps-environment: production
+        com.apple.developer.nfc.readersession.formats:
+          - NDEF
+          - TAG
     info:
       path: sol-new/Info.plist
       properties:
@@ -85,6 +94,15 @@ targets:
           - README.md
     entitlements:
       path: Clip/Clip.entitlements
+      properties:
+        com.apple.developer.parent-application-identifiers:
+          - $(AppIdentifierPrefix)new.sol
+        com.apple.developer.associated-domains:
+          - appclips:sol.new
+          - applinks:sol.new
+        com.apple.developer.nfc.readersession.formats:
+          - NDEF
+          - TAG
     info:
       path: Clip/Info.plist
       properties:
