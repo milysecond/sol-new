@@ -4,6 +4,9 @@ import { mainnetRpcUrl } from "@/lib/rpc-server";
 
 export const runtime = "nodejs";
 
+/** Product-supported name TLDs */
+const SUPPORTED = new Set(["sol", "bonk", "sns", "skr"]);
+
 function rpcUrl() {
   return mainnetRpcUrl();
 }
@@ -20,9 +23,10 @@ function parseAnsOwner(data: Buffer): PublicKey | null {
   }
 }
 
-async function resolveSol(connection: Connection, name: string): Promise<string | null> {
-  // Bonfida SNS expects bare name without .sol
-  const bare = name.replace(/\.sol$/i, "");
+/** Bonfida Solana Name Service (.sol) */
+async function resolveBonfidaSol(connection: Connection, bareOrFull: string): Promise<string | null> {
+  const bare = bareOrFull.replace(/\.sol$/i, "").replace(/\.sns$/i, "");
+  if (!bare) return null;
   const { resolve } = await import("@bonfida/spl-name-service");
   try {
     const pk = await resolve(connection, bare);
@@ -32,9 +36,8 @@ async function resolveSol(connection: Connection, name: string): Promise<string 
   }
 }
 
+/** AllDomains / ANS (.bonk, .skr, .sns if registered, …) */
 async function resolveAns(connection: Connection, fullDomain: string): Promise<string | null> {
-  // getDomainKey works; NameRecordHeader borsh deserialize is broken vs borsh@0.7,
-  // so we read the owner field manually at offset 40.
   const { getDomainKey } = await import("@onsol/tldparser");
   try {
     const { pubkey } = await getDomainKey(fullDomain.toLowerCase());
@@ -49,9 +52,7 @@ async function resolveAns(connection: Connection, fullDomain: string): Promise<s
 
 /**
  * GET /api/resolve?name=
- * - base58 pubkey passthrough
- * - name.sol → Bonfida SNS
- * - name.sns / name.bonk / name.skr / any AllDomains TLD → ANS
+ * Supported: .sol (Bonfida), .bonk/.skr (AllDomains), .sns (ANS if live, else Bonfida alias of .sol)
  */
 export async function GET(req: NextRequest) {
   const raw = req.nextUrl.searchParams.get("name")?.trim() ?? "";
@@ -73,35 +74,46 @@ export async function GET(req: NextRequest) {
   const parts = lower.split(".");
   if (parts.length < 2) {
     return NextResponse.json(
-      { ok: false, error: "Use name.sol, name.sns, name.bonk, name.skr, …" },
+      { ok: false, error: "Use name.sol, name.bonk, name.sns, or name.skr" },
       { status: 400 }
     );
   }
   const tld = parts[parts.length - 1];
-  if (!/^[a-z0-9]+$/i.test(tld) || tld.length > 32) {
-    return NextResponse.json({ ok: false, error: "Invalid domain" }, { status: 400 });
+  if (!SUPPORTED.has(tld)) {
+    return NextResponse.json(
+      { ok: false, error: "Supported names: .sol, .bonk, .sns, .skr" },
+      { status: 400 }
+    );
   }
 
   try {
     const connection = new Connection(rpcUrl(), "confirmed");
     let owner: string | null = null;
     let kind: "sol" | "sns" | "ans" = "ans";
+    let resolvedAs: string | undefined;
 
     if (tld === "sol") {
-      // Bonfida Solana Name Service (.sol)
-      owner = await resolveSol(connection, lower);
+      owner = await resolveBonfidaSol(connection, lower);
       kind = "sol";
-      // Fallback: some .sol names also live on AllDomains
       if (!owner) {
         owner = await resolveAns(connection, lower);
         if (owner) kind = "ans";
       }
     } else if (tld === "sns") {
-      // Explicit .sns — AllDomains TLD (and alias brand for SNS-style names)
+      // Prefer native AllDomains .sns if/when registered
       owner = await resolveAns(connection, lower);
-      kind = owner ? "sns" : "sns";
+      if (owner) {
+        kind = "sns";
+      } else {
+        // SNS brand alias → Bonfida .sol (name.sns ≡ name.sol)
+        owner = await resolveBonfidaSol(connection, lower);
+        if (owner) {
+          kind = "sns";
+          resolvedAs = `${parts.slice(0, -1).join(".")}.sol`;
+        }
+      }
     } else {
-      // Any other TLD: try AllDomains / ANS (.bonk, .skr, .abc, …)
+      // .bonk / .skr
       owner = await resolveAns(connection, lower);
       kind = "ans";
     }
@@ -119,6 +131,7 @@ export async function GET(req: NextRequest) {
       kind,
       domain: lower,
       tld,
+      ...(resolvedAs ? { resolvedAs } : {}),
       input: raw,
     });
   } catch (e) {

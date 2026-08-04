@@ -9,7 +9,7 @@ import { PageTransition } from "@/components/page-transition";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { resolveRecipient } from "@/lib/resolve-name";
+import { resolveRecipient, NAME_PLACEHOLDER } from "@/lib/resolve-name";
 
 interface Token {
   id: number;
@@ -145,7 +145,7 @@ export default function PortfolioPage() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter") void lookup();
                     }}
-                    placeholder="Address or name.sol / .sns / .bonk / …"
+                    placeholder={NAME_PLACEHOLDER}
                     className="w-full pl-9 pr-3 py-2.5 min-h-[44px] rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm"
                     spellCheck={false}
                     autoComplete="off"

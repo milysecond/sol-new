@@ -12,7 +12,7 @@ const ROWS: { feature: string; sol: Cell; pump: Cell; bags: Cell; bonk: Cell }[]
   { feature: "Launch a token", sol: true, pump: true, bags: true, bonk: true },
   { feature: "Browse recent / top tokens", sol: true, pump: true, bags: "partial", bonk: "partial" },
   { feature: "Mint NFTs (standard + compressed)", sol: true, pump: false, bags: false, bonk: false },
-  { feature: "NFT lookup by .sol / .sns / .bonk / …", sol: true, pump: false, bags: false, bonk: false },
+  { feature: "Names: .sol / .bonk / .sns / .skr", sol: true, pump: false, bags: false, bonk: false },
   { feature: "Multisig wallets", sol: true, pump: false, bags: false, bonk: false },
   { feature: "Portfolio by address or name", sol: true, pump: false, bags: false, bonk: false },
   { feature: "Send / pay / split / gift", sol: true, pump: false, bags: "partial", bonk: false },

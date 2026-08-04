@@ -10,7 +10,7 @@ import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair, ensureDocumentFocusForPasskey } from "@/lib/passkey-wallet";
 import { PrivateSendSheet } from "@/components/private-send-sheet";
 import { SlideToSend } from "@/components/slide-to-send";
-import { resolveRecipient, looksLikeDomain } from "@/lib/resolve-name";
+import { resolveRecipient, looksLikeDomain, NAME_PLACEHOLDER } from "@/lib/resolve-name";
 import {
   Connection,
   PublicKey,
@@ -404,7 +404,7 @@ export default function SendPage() {
                       e.preventDefault();
                       handleRecipientChange(e.clipboardData.getData("text"), true);
                     }}
-                    placeholder="Address or name.sol / .sns / .bonk / …"
+                    placeholder={NAME_PLACEHOLDER}
                     disabled={busy}
                     autoComplete="off"
                     spellCheck={false}
