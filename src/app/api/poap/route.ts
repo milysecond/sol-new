@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
 import { db, initDb } from "@/lib/db";
-import { generatePoapCode, rowToDrop } from "@/lib/poap";
+import {
+  DEFAULT_GEO_RADIUS_M,
+  generatePoapCode,
+  MAX_GEO_RADIUS_M,
+  MIN_GEO_RADIUS_M,
+  rowToDrop,
+} from "@/lib/poap";
 
 export const runtime = "nodejs";
 
@@ -42,6 +48,10 @@ export async function POST(req: NextRequest) {
       maxClaims?: number | null;
       startsAt?: string | null;
       endsAt?: string | null;
+      geoLat?: number | null;
+      geoLng?: number | null;
+      geoRadiusM?: number | null;
+      geoLock?: boolean;
     };
 
     const title = (body.title || "").trim().slice(0, 80);
@@ -67,7 +77,29 @@ export async function POST(req: NextRequest) {
       maxClaims = Math.floor(n);
     }
 
-    // unique code
+    let geoLat: number | null = null;
+    let geoLng: number | null = null;
+    let geoRadiusM: number | null = null;
+    const wantGeo =
+      body.geoLock === true ||
+      (body.geoLat != null && body.geoLng != null && body.geoLat !== undefined);
+
+    if (wantGeo) {
+      const lat = Number(body.geoLat);
+      const lng = Number(body.geoLng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return NextResponse.json(
+          { error: "Geo-lock needs valid lat/lng (use your current location)" },
+          { status: 400 }
+        );
+      }
+      geoLat = lat;
+      geoLng = lng;
+      let r = body.geoRadiusM != null ? Number(body.geoRadiusM) : DEFAULT_GEO_RADIUS_M;
+      if (!Number.isFinite(r)) r = DEFAULT_GEO_RADIUS_M;
+      geoRadiusM = Math.min(MAX_GEO_RADIUS_M, Math.max(MIN_GEO_RADIUS_M, Math.floor(r)));
+    }
+
     let code = generatePoapCode(8);
     for (let i = 0; i < 5; i++) {
       const exists = await db.execute({
@@ -80,8 +112,8 @@ export async function POST(req: NextRequest) {
 
     await db.execute({
       sql: `INSERT INTO poap_drops
-        (code, title, description, image_url, location, issuer, max_claims, starts_at, ends_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (code, title, description, image_url, location, issuer, max_claims, starts_at, ends_at, geo_lat, geo_lng, geo_radius_m)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         code,
         title,
@@ -92,6 +124,9 @@ export async function POST(req: NextRequest) {
         maxClaims,
         body.startsAt || null,
         body.endsAt || null,
+        geoLat,
+        geoLng,
+        geoRadiusM,
       ],
     });
 
@@ -106,6 +141,9 @@ export async function POST(req: NextRequest) {
       claim_count: 0,
       starts_at: body.startsAt || null,
       ends_at: body.endsAt || null,
+      geo_lat: geoLat,
+      geo_lng: geoLng,
+      geo_radius_m: geoRadiusM,
       created_at: new Date().toISOString(),
     });
 

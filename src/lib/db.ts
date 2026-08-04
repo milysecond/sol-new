@@ -163,6 +163,9 @@ export async function initDb() {
       claim_count INTEGER NOT NULL DEFAULT 0,
       starts_at TEXT,
       ends_at TEXT,
+      geo_lat REAL,
+      geo_lng REAL,
+      geo_radius_m INTEGER,
       created_at TEXT DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS poap_claims (
@@ -170,6 +173,9 @@ export async function initDb() {
       drop_code TEXT NOT NULL,
       wallet TEXT NOT NULL,
       claimed_at TEXT DEFAULT (datetime('now')),
+      claim_lat REAL,
+      claim_lng REAL,
+      claim_accuracy_m REAL,
       UNIQUE(drop_code, wallet),
       FOREIGN KEY (drop_code) REFERENCES poap_drops(code)
     )`,
@@ -322,6 +328,21 @@ export async function initDb() {
     await db.execute("ALTER TABLE claim_links ADD COLUMN token TEXT DEFAULT 'SOL'");
   } catch {
     // column already exists
+  }
+  // POAP geo-lock columns (existing drops)
+  for (const sql of [
+    "ALTER TABLE poap_drops ADD COLUMN geo_lat REAL",
+    "ALTER TABLE poap_drops ADD COLUMN geo_lng REAL",
+    "ALTER TABLE poap_drops ADD COLUMN geo_radius_m INTEGER",
+    "ALTER TABLE poap_claims ADD COLUMN claim_lat REAL",
+    "ALTER TABLE poap_claims ADD COLUMN claim_lng REAL",
+    "ALTER TABLE poap_claims ADD COLUMN claim_accuracy_m REAL",
+  ]) {
+    try {
+      await db.execute(sql);
+    } catch {
+      /* already exists */
+    }
   }
   // Token rows pre-column are all from the mainnet-only era — safe to
   // backfill. Multisigs are NOT, because the create flow has been used on
