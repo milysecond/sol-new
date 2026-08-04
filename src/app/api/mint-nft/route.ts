@@ -129,26 +129,9 @@ async function mintCompressedNft(
   uri: string,
   description: string
 ) {
-  const res = await fetch(rpcUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: "sol-new",
-      method: "mintCompressedNft",
-      params: {
-        name,
-        symbol,
-        owner,
-        description,
-        uri,
-        sellerFeeBasisPoints: 0,
-      },
-    }),
-  });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-  return { assetId: data.result?.assetId, signature: data.result?.signature };
+  const { mintCompressedNft: mint } = await import("@/lib/mint-cnft");
+  const network = rpcUrl.includes("devnet") ? "devnet" : "mainnet";
+  return mint({ owner, name, symbol, uri, description, network: network as "mainnet" | "devnet" });
 }
 
 export async function POST(req: NextRequest) {

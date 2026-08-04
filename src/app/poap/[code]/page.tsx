@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Award, Check, MapPin, Navigation, Sparkles } from "lucide-react";
+import { Award, Check, ExternalLink, MapPin, Navigation, Sparkles } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { PageTransition } from "@/components/page-transition";
@@ -42,6 +42,10 @@ export default function PoapClaimPage() {
   const [claimed, setClaimed] = useState(false);
   const [already, setAlready] = useState(false);
   const [distanceM, setDistanceM] = useState<number | null>(null);
+  const [assetId, setAssetId] = useState<string | null>(null);
+  const [mintSig, setMintSig] = useState<string | null>(null);
+  const [onchain, setOnchain] = useState(false);
+  const [mintNote, setMintNote] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,13 +53,21 @@ export default function PoapClaimPage() {
       setLoading(true);
       setError(null);
       try {
-        const r = await fetch(`/api/poap/${encodeURIComponent(code)}`, { cache: "no-store" });
+        const q = publicKey ? `?wallet=${encodeURIComponent(publicKey)}` : "";
+        const r = await fetch(`/api/poap/${encodeURIComponent(code)}${q}`, {
+          cache: "no-store",
+        });
         const d = (await r.json()) as {
           drop?: PoapDrop;
           open?: boolean;
           reason?: string;
           geoLocked?: boolean;
           geoRadiusM?: number | null;
+          claim?: {
+            claimedAt: string;
+            assetId: string | null;
+            mintSignature: string | null;
+          } | null;
           error?: string;
         };
         if (!r.ok || !d.drop) throw new Error(d.error || "Not found");
@@ -65,6 +77,13 @@ export default function PoapClaimPage() {
         setReason(d.reason);
         setGeoLocked(!!d.geoLocked || isGeoLocked(d.drop));
         setGeoRadiusM(d.geoRadiusM ?? d.drop.geoRadiusM ?? DEFAULT_GEO_RADIUS_M);
+        if (d.claim) {
+          setClaimed(true);
+          setAlready(true);
+          setAssetId(d.claim.assetId);
+          setMintSig(d.claim.mintSignature);
+          setOnchain(Boolean(d.claim.assetId));
+        }
       } catch (e) {
         if (!cancelled) setError(friendlyError(e, "Drop not found"));
       } finally {
@@ -74,13 +93,14 @@ export default function PoapClaimPage() {
     return () => {
       cancelled = true;
     };
-  }, [code]);
+  }, [code, publicKey]);
 
   const claim = async () => {
     if (!publicKey || !drop) return;
     setBusy(true);
     setError(null);
     setDistanceM(null);
+    setMintNote(null);
     try {
       let lat: number | undefined;
       let lng: number | undefined;
@@ -105,6 +125,10 @@ export default function PoapClaimPage() {
         drop?: PoapDrop;
         error?: string;
         distanceM?: number;
+        assetId?: string | null;
+        mintSignature?: string | null;
+        onchain?: boolean;
+        mintError?: string;
       };
       if (!r.ok || !d.ok) {
         if (typeof d.distanceM === "number") setDistanceM(d.distanceM);
@@ -114,6 +138,10 @@ export default function PoapClaimPage() {
       if (typeof d.distanceM === "number") setDistanceM(d.distanceM);
       setClaimed(true);
       setAlready(!!d.already);
+      setAssetId(d.assetId ?? null);
+      setMintSig(d.mintSignature ?? null);
+      setOnchain(!!d.onchain);
+      if (d.mintError) setMintNote(d.mintError);
     } catch (e) {
       setError(friendlyError(e, "Couldn't claim"));
     } finally {
@@ -146,7 +174,7 @@ export default function PoapClaimPage() {
             <div className="space-y-5">
               <div className="text-center space-y-1">
                 <p className="text-[11px] uppercase tracking-wider text-violet-500 font-semibold">
-                  POAP drop
+                  On-chain POAP
                 </p>
                 <h1 className="text-2xl font-bold tracking-tight">{drop.title}</h1>
                 {drop.location && (
@@ -187,20 +215,72 @@ export default function PoapClaimPage() {
 
               <p className="text-center text-[11px] text-gray-400">
                 {drop.claimCount}
-                {drop.maxClaims != null ? ` / ${drop.maxClaims}` : ""} claimed
+                {drop.maxClaims != null ? ` / ${drop.maxClaims}` : ""} claimed · compressed NFT
               </p>
 
               {(claimed || already) && (
-                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-4 text-center space-y-1">
+                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-4 text-center space-y-2">
                   <Check className="w-6 h-6 text-emerald-500 mx-auto" />
                   <p className="font-semibold text-emerald-700 dark:text-emerald-300">
-                    {already ? "Already in your collection" : "Claimed — you're on the list"}
+                    {already && onchain
+                      ? "Already in your wallet"
+                      : onchain
+                        ? "Minted on-chain"
+                        : already
+                          ? "Claim recorded"
+                          : "Claimed"}
                   </p>
                   <p className="text-xs text-gray-500 font-mono">
                     {publicKey?.slice(0, 4)}…{publicKey?.slice(-4)}
                   </p>
                   {distanceM != null && (
                     <p className="text-[11px] text-gray-400">~{Math.round(distanceM)}m from pin</p>
+                  )}
+                  {onchain && assetId && (
+                    <div className="pt-1 space-y-1.5">
+                      <p className="text-[11px] font-mono text-gray-500 break-all px-2">
+                        {assetId.slice(0, 8)}…{assetId.slice(-8)}
+                      </p>
+                      <div className="flex gap-2 justify-center flex-wrap">
+                        <a
+                          href={`https://xray.helius.xyz/token/${assetId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-violet-600 dark:text-violet-400"
+                        >
+                          View NFT <ExternalLink className="w-3 h-3" />
+                        </a>
+                        {mintSig && (
+                          <a
+                            href={`https://solscan.io/tx/${mintSig}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-medium text-gray-500"
+                          >
+                            Tx <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                        <Link
+                          href="/nfts"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-gray-500"
+                        >
+                          My NFTs
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                  {mintNote && (
+                    <p className="text-xs text-amber-700 dark:text-amber-300">{mintNote}</p>
+                  )}
+                  {!onchain && (
+                    <button
+                      type="button"
+                      onClick={() => void claim()}
+                      disabled={busy}
+                      className="mt-1 text-xs text-violet-600 font-medium"
+                    >
+                      {busy ? "Minting…" : "Finish on-chain mint"}
+                    </button>
                   )}
                 </div>
               )}
@@ -237,19 +317,15 @@ export default function PoapClaimPage() {
                         <Award className="w-5 h-5" />
                       )}
                       {busy
-                        ? geoLocked || isGeoLocked(drop)
-                          ? "Checking location…"
-                          : "Claiming…"
+                        ? "Minting on-chain…"
                         : geoLocked || isGeoLocked(drop)
-                          ? "Claim here (uses GPS)"
-                          : "Claim POAP"}
+                          ? "Claim + mint (uses GPS)"
+                          : "Claim + mint NFT"}
                     </button>
                   </ConnectGate>
-                  {(geoLocked || isGeoLocked(drop)) && (
-                    <p className="text-[10px] text-center text-gray-400">
-                      Location stays on device for the check · not sold
-                    </p>
-                  )}
+                  <p className="text-[10px] text-center text-gray-400">
+                    Free compressed NFT to your passkey wallet · sol.new sponsors mint
+                  </p>
                 </>
               )}
 

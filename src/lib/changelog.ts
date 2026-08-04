@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-01",
+    title: "POAP on-chain",
+    items: [
+      "Claiming a POAP mints a free compressed NFT to your passkey wallet.",
+      "Metadata + explorer links; geo-lock still applies before mint.",
+    ],
+  },
+  {
+    date: "2026-08-01",
     title: "POAP venue search",
     items: [
       "Geo-lock pins by venue or address name (OpenStreetMap), not just GPS.",
