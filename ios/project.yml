@@ -52,6 +52,7 @@ targets:
         NSFaceIDUsageDescription: sol.new uses Face ID to authenticate your passkey-secured wallet.
         NSPhotoLibraryUsageDescription: sol.new uses photos so you can pick an image for your token, NFT, or profile.
         NSPhotoLibraryAddUsageDescription: sol.new can save QR codes and receipts to your photo library.
+        NFCReaderUsageDescription: sol.new uses NFC to open links and experiences from tags.
         LSApplicationQueriesSchemes:
           - solana
           - phantom
@@ -102,6 +103,7 @@ targets:
         NSAppClip:
           NSAppClipRequestEphemeralUserNotification: false
           NSAppClipRequestLocationConfirmation: false
+        NFCReaderUsageDescription: sol.new uses NFC to open links and experiences from tags.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: new.sol.Clip

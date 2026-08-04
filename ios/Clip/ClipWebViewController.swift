@@ -33,6 +33,22 @@ final class ClipWebViewController: UIViewController, WKNavigationDelegate {
         return s
     }()
 
+    private lazy var nfcButton: UIButton = {
+        var config = UIButton.Configuration.filled()
+        config.title = "Scan NFC"
+        config.image = UIImage(systemName: "wave.3.right")
+        config.imagePadding = 8
+        config.cornerStyle = .capsule
+        config.baseBackgroundColor = UIColor(red: 0.66, green: 0.33, blue: 0.97, alpha: 0.95)
+        config.baseForegroundColor = .white
+        config.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 18, bottom: 12, trailing: 18)
+        let b = UIButton(configuration: config)
+        b.translatesAutoresizingMaskIntoConstraints = false
+        b.addTarget(self, action: #selector(scanNFC), for: .touchUpInside)
+        b.isHidden = !ClipNFCReader.shared.isAvailable
+        return b
+    }()
+
     init(startURL: URL) {
         self.startURL = startURL
         super.init(nibName: nil, bundle: nil)
@@ -48,6 +64,7 @@ final class ClipWebViewController: UIViewController, WKNavigationDelegate {
         view.backgroundColor = .black
         view.addSubview(webView)
         view.addSubview(spinner)
+        view.addSubview(nfcButton)
         NSLayoutConstraint.activate([
             webView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -55,8 +72,29 @@ final class ClipWebViewController: UIViewController, WKNavigationDelegate {
             webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            nfcButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            nfcButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
         ])
         load(startURL)
+    }
+
+    @objc private func scanNFC() {
+        ClipNFCReader.shared.scan(
+            onURL: { [weak self] url in
+                guard let self else { return }
+                if let host = url.host?.lowercased(),
+                   host == "sol.new" || host == "www.sol.new" || host.hasSuffix(".sol.new") {
+                    self.load(url)
+                } else {
+                    UIApplication.shared.open(url)
+                }
+            },
+            onMessage: { [weak self] msg in
+                let alert = UIAlertController(title: "NFC", message: msg, preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "OK", style: .default))
+                self?.present(alert, animated: true)
+            }
+        )
     }
 
     func load(_ url: URL) {
