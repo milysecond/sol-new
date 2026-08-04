@@ -244,7 +244,7 @@ function NftsBrowseInner() {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Address or name.sol / .bonk / .skr"
+                placeholder="Address or name.sol / .sns / .bonk / …"
                 spellCheck={false}
                 autoComplete="off"
                 className="flex-1 min-w-0 px-3 py-2.5 min-h-[44px] rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm focus:outline-none focus:border-purple-400/50"

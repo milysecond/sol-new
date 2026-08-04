@@ -8,8 +8,6 @@ function rpcUrl() {
   return mainnetRpcUrl();
 }
 
-const SUPPORTED = new Set(["sol", "bonk", "skr"]);
-
 /** ANS NameRecordHeader: disc(8) + parent(32) + owner(32) + class(32) + ... */
 function parseAnsOwner(data: Buffer): PublicKey | null {
   if (data.length < 72) return null;
@@ -23,7 +21,7 @@ function parseAnsOwner(data: Buffer): PublicKey | null {
 }
 
 async function resolveSol(connection: Connection, name: string): Promise<string | null> {
-  // Bonfida expects bare name without .sol
+  // Bonfida SNS expects bare name without .sol
   const bare = name.replace(/\.sol$/i, "");
   const { resolve } = await import("@bonfida/spl-name-service");
   try {
@@ -49,6 +47,12 @@ async function resolveAns(connection: Connection, fullDomain: string): Promise<s
   }
 }
 
+/**
+ * GET /api/resolve?name=
+ * - base58 pubkey passthrough
+ * - name.sol → Bonfida SNS
+ * - name.sns / name.bonk / name.skr / any AllDomains TLD → ANS
+ */
 export async function GET(req: NextRequest) {
   const raw = req.nextUrl.searchParams.get("name")?.trim() ?? "";
   if (!raw) {
@@ -68,25 +72,38 @@ export async function GET(req: NextRequest) {
   const lower = raw.toLowerCase();
   const parts = lower.split(".");
   if (parts.length < 2) {
-    return NextResponse.json({ ok: false, error: "Use name.sol, name.bonk, or name.skr" }, { status: 400 });
-  }
-  const tld = parts[parts.length - 1];
-  if (!SUPPORTED.has(tld)) {
     return NextResponse.json(
-      { ok: false, error: "Supported names: .sol, .bonk, .skr" },
+      { ok: false, error: "Use name.sol, name.sns, name.bonk, name.skr, …" },
       { status: 400 }
     );
+  }
+  const tld = parts[parts.length - 1];
+  if (!/^[a-z0-9]+$/i.test(tld) || tld.length > 32) {
+    return NextResponse.json({ ok: false, error: "Invalid domain" }, { status: 400 });
   }
 
   try {
     const connection = new Connection(rpcUrl(), "confirmed");
     let owner: string | null = null;
-    let kind: "sol" | "ans" = tld === "sol" ? "sol" : "ans";
+    let kind: "sol" | "sns" | "ans" = "ans";
 
     if (tld === "sol") {
+      // Bonfida Solana Name Service (.sol)
       owner = await resolveSol(connection, lower);
-    } else {
+      kind = "sol";
+      // Fallback: some .sol names also live on AllDomains
+      if (!owner) {
+        owner = await resolveAns(connection, lower);
+        if (owner) kind = "ans";
+      }
+    } else if (tld === "sns") {
+      // Explicit .sns — AllDomains TLD (and alias brand for SNS-style names)
       owner = await resolveAns(connection, lower);
+      kind = owner ? "sns" : "sns";
+    } else {
+      // Any other TLD: try AllDomains / ANS (.bonk, .skr, .abc, …)
+      owner = await resolveAns(connection, lower);
+      kind = "ans";
     }
 
     if (!owner) {
