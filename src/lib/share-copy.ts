@@ -92,6 +92,58 @@ export function tokenLaunchSharePayload(opts: {
   };
 }
 
+/** Ask a friend to send SOL/USDC to this wallet */
+export function requestFundsSharePayload(opts: {
+  publicKey: string;
+  origin?: string;
+  /** Optional amount hint, e.g. "0.5 SOL" or "$20" */
+  amountHint?: string | null;
+}): SharePayload {
+  const origin = opts.origin || (typeof window !== "undefined" ? window.location.origin : "https://sol.new");
+  const pk = opts.publicKey.trim();
+  const payUrl = `${origin}/address/${encodeURIComponent(pk)}`;
+  const short = pk.length > 12 ? `${pk.slice(0, 4)}…${pk.slice(-4)}` : pk;
+  const amount = opts.amountHint?.trim();
+  const title = amount ? `Send me ${amount} on Solana` : "Send me SOL on Solana";
+  const text = [
+    amount
+      ? `Hey — can you send me ${amount} on Solana?`
+      : "Hey — can you send me some SOL (or USDC) on Solana?",
+    "",
+    `My wallet: ${pk}`,
+    "",
+    `Open: ${payUrl}`,
+    "",
+    `(${short} on sol.new)`,
+  ].join("\n");
+  return { title, text, url: payUrl };
+}
+
+/** Deep-link builders for request-funds channels */
+export function requestFundsChannelLinks(payload: SharePayload) {
+  const full = payload.text.includes(payload.url)
+    ? payload.text
+    : `${payload.text}\n${payload.url}`;
+  const enc = encodeURIComponent(full);
+  const encUrl = encodeURIComponent(payload.url);
+  const encTitle = encodeURIComponent(payload.title);
+
+  return {
+    /** iOS + Android sms body */
+    sms: `sms:?&body=${enc}`,
+    whatsapp: `https://wa.me/?text=${enc}`,
+    telegram: `https://t.me/share/url?url=${encUrl}&text=${encTitle}%0A%0A${enc}`,
+    /**
+     * X has no public “compose DM with body” without a recipient id.
+     * Intent tweet posts the ask; users can also open Messages from X app.
+     * Also expose messages home for manual DM paste.
+     */
+    xPost: `https://x.com/intent/tweet?text=${enc}`,
+    xMessages: "https://x.com/messages",
+    nativeText: full,
+  };
+}
+
 /** navigator.share with clipboard fallback */
 export async function shareOrCopy(payload: SharePayload): Promise<"shared" | "copied"> {
   try {

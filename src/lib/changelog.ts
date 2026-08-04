@@ -15,6 +15,13 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-01",
+    title: "Ask for funds",
+    items: [
+      "Wallet Get: share buttons to request SOL via SMS, WhatsApp, Telegram, X DM, or system share.",
+    ],
+  },
+  {
+    date: "2026-08-01",
     title: "Onboard is home",
     items: [
       "sol.new/ opens the onboarding flow by default. Full app grid lives at /home.",
