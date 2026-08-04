@@ -21,13 +21,15 @@ targets:
     deploymentTarget: "16.0"
     sources:
       - path: sol-new
+    entitlements:
+      path: sol-new/sol-new.entitlements
     info:
       path: sol-new/Info.plist
       properties:
         CFBundleDisplayName: sol.new
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        UILaunchStorybard: LaunchScreen
+        UILaunchStoryboardName: LaunchScreen
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
@@ -68,3 +70,43 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         SUPPORTS_MACCATALYST: "NO"
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: "NO"
+    dependencies:
+      - target: sol-new Clip
+        embed: true
+
+  sol-new Clip:
+    type: application.on-demand-install-capable
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Clip
+        excludes:
+          - README.md
+    entitlements:
+      path: Clip/Clip.entitlements
+    info:
+      path: Clip/Info.plist
+      properties:
+        CFBundleDisplayName: sol.new
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen:
+          UIColorName: black
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIStatusBarStyle: UIStatusBarStyleLightContent
+        UIViewControllerBasedStatusBarAppearance: true
+        ITSAppUsesNonExemptEncryption: false
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+        NSAppClip:
+          NSAppClipRequestEphemeralUserNotification: false
+          NSAppClipRequestLocationConfirmation: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: xyz.solnew.app.Clip
+        PRODUCT_NAME: sol-new Clip
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SUPPORTS_MACCATALYST: "NO"
