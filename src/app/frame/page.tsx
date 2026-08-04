@@ -6,22 +6,21 @@ const site = "https://sol.new";
 
 export const metadata: Metadata = {
   metadataBase: new URL(site),
-  title: "LinkedIn Frame Generator | sol.new",
+  title: "#OPENTOSOLANA LinkedIn Frame | sol.new",
   description:
-    "Free LinkedIn profile frame with circular text. Default #OPENTOSOLANA. Upload a photo, customize colors, download a PNG — private, in-browser, no signup.",
+    "Free #OPENTOSOLANA LinkedIn profile frame. Upload a photo, download PNG — private, in-browser.",
   alternates: { canonical: "/frame" },
   openGraph: {
-    title: "LinkedIn Frame · sol.new",
-    description:
-      "Custom circular profile frames for LinkedIn. #OPENTOSOLANA and your own text — free on sol.new.",
+    title: "#OPENTOSOLANA Frame · sol.new",
+    description: "LinkedIn profile frame with the #OPENTOSOLANA arc. Free on sol.new.",
     url: `${site}/frame`,
     siteName: "sol.new",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "LinkedIn Frame · sol.new",
-    description: "Circular profile frames with custom text. #OPENTOSOLANA.",
+    title: "#OPENTOSOLANA Frame · sol.new",
+    description: "LinkedIn profile frame — upload photo, download PNG.",
   },
   robots: { index: true, follow: true },
 };
@@ -35,14 +34,11 @@ export default function FramePage() {
         </div>
         <header className="mb-6 space-y-1 text-center sm:text-left">
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Custom LinkedIn frame
+            #OPENTOSOLANA frame
           </h1>
           <p className="text-sm text-gray-600 dark:text-white/60">
-            Open-to-work style ring with{" "}
-            <span className="font-semibold text-fuchsia-600 dark:text-fuchsia-400">
-              #OPENTOSOLANA
-            </span>
-            . Upload a photo, drag to position, download PNG.
+            Upload your photo · download a LinkedIn-ready PNG. Nothing leaves your
+            browser.
           </p>
         </header>
         <FrameStudio />
