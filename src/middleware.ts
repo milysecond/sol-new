@@ -2,14 +2,15 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * SEO / host hygiene:
- * - Force apex host (sol.new). www.sol.new had a self-redirect loop and
- *   fragments the index across hosts.
- * - Strip index.html / trailing junk that crawlers invent.
+ * SEO / host hygiene + default entry:
+ * - Force apex host (sol.new)
+ * - `/` rewrites to onboard (default route; URL stays `/`)
+ * - Short links, address pretty URLs
  */
 export function middleware(request: NextRequest) {
   const url = request.nextUrl.clone();
   const host = request.headers.get("host")?.toLowerCase() || "";
+  const path = url.pathname;
 
   // www → apex (preserve path + query)
   if (host === "www.sol.new" || host.startsWith("www.sol.new:")) {
@@ -18,8 +19,13 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  // Common crawler dead-ends that should never 404 in the report forever
-  const path = url.pathname;
+  // Default product entry: onboarding (URL stays `/`)
+  if (path === "/" || path === "") {
+    url.pathname = "/onboard";
+    return NextResponse.rewrite(url);
+  }
+
+  // Common crawler dead-ends
   if (path === "/index.html" || path === "/home.html") {
     url.pathname = "/";
     return NextResponse.redirect(url, 308);
