@@ -404,7 +404,7 @@ export default function SendPage() {
                       e.preventDefault();
                       handleRecipientChange(e.clipboardData.getData("text"), true);
                     }}
-                    placeholder="Address or name.sol / .bonk / .skr"
+                    placeholder="Address or name.sol / .sns / .bonk / …"
                     disabled={busy}
                     autoComplete="off"
                     spellCheck={false}

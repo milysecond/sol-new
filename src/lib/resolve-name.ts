@@ -1,9 +1,11 @@
 /**
- * Resolve Solana addresses and name-service domains (.sol / .bonk / .skr).
+ * Resolve Solana addresses and name-service domains.
+ * - .sol → Bonfida SNS (+ ANS fallback)
+ * - .sns / .bonk / .skr / other AllDomains TLDs → ANS
  * Domain resolution hits /api/resolve (server has Bonfida + ANS parsers).
  */
 
-export type ResolveKind = "pubkey" | "sol" | "ans";
+export type ResolveKind = "pubkey" | "sol" | "sns" | "ans";
 
 export interface ResolveOk {
   ok: true;
@@ -23,7 +25,9 @@ export interface ResolveErr {
 export type ResolveResult = ResolveOk | ResolveErr;
 
 const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
-const SUPPORTED_TLDS = new Set(["sol", "bonk", "skr"]);
+
+/** Highlighted TLDs in UI copy (any valid ANS TLD still resolves). */
+export const FEATURED_TLDS = ["sol", "sns", "bonk", "skr"] as const;
 
 /** True if the string looks like a multi-label domain (name.tld). */
 export function looksLikeDomain(input: string): boolean {
@@ -32,11 +36,15 @@ export function looksLikeDomain(input: string): boolean {
   return DOMAIN_RE.test(s);
 }
 
-export function supportedDomainTld(input: string): string | null {
+export function domainTld(input: string): string | null {
   const s = input.trim().toLowerCase();
   if (!looksLikeDomain(s)) return null;
-  const tld = s.split(".").pop() || "";
-  return SUPPORTED_TLDS.has(tld) ? tld : null;
+  return s.split(".").pop() || null;
+}
+
+/** @deprecated use domainTld — kept for call sites that checked allowlist */
+export function supportedDomainTld(input: string): string | null {
+  return domainTld(input);
 }
 
 /** True if input might still be a base58 pubkey (length heuristic). */
@@ -45,9 +53,11 @@ export function looksLikePubkey(input: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
 }
 
+export const NAME_HINT = "wallet address or name.sol / name.sns / name.bonk / …";
+
 /**
  * Resolve a recipient field to a wallet pubkey.
- * Accepts base58 addresses, name.sol, name.bonk, name.skr.
+ * Accepts base58 addresses and name-service domains (.sol, .sns, AllDomains).
  */
 export async function resolveRecipient(raw: string): Promise<ResolveResult> {
   const input = raw.trim();
@@ -65,17 +75,13 @@ export async function resolveRecipient(raw: string): Promise<ResolveResult> {
   }
 
   if (looksLikeDomain(input)) {
-    const tld = supportedDomainTld(input);
-    if (!tld) {
-      return {
-        ok: false,
-        input,
-        error: "Supported names: .sol, .bonk, .skr",
-      };
-    }
+    // ok — resolve via API
   } else if (!looksLikePubkey(input)) {
-    // bare name without tld — try as .sol convenience? keep strict for now
-    return { ok: false, input, error: "Enter a wallet address or name.sol / name.bonk / name.skr" };
+    return {
+      ok: false,
+      input,
+      error: `Enter a ${NAME_HINT}`,
+    };
   }
 
   try {

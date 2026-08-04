@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-01",
+    title: ".sns + AllDomains names",
+    items: [
+      "Resolve .sns names (and any AllDomains TLD) for send, portfolio, and NFT lookup.",
+      ".sol still via Bonfida; .bonk / .skr and other TLDs via AllDomains.",
+    ],
+  },
+  {
+    date: "2026-08-01",
     title: "Token swap",
     items: [
       "New /swap: Jupiter Ultra routing for SOL, USDC, and any mint (passkey-signed).",
