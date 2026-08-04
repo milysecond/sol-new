@@ -2,7 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Search } from "lucide-react";
+import { Search } from "lucide-react";
+import { Spinner } from "@/components/spinner";
 import { isValidSignature } from "@/lib/receipt";
 
 export function ReceiptSearch({
@@ -70,7 +71,7 @@ export function ReceiptSearch({
       >
         {loading ? (
           <>
-            <Loader2 className="w-4 h-4 animate-spin" /> Looking up…
+            <Spinner size={16} className="w-4 h-4" /> Looking up…
           </>
         ) : (
           "Verify transaction"

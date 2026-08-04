@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownUp,
   ChevronDown,
-  Loader2,
   Search,
   ArrowLeftRight,
 } from "lucide-react";
@@ -553,7 +552,7 @@ export default function SwapPage() {
                 <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-3.5 space-y-2">
                   <div className="flex justify-between text-xs text-gray-500 dark:text-white/40">
                     <span>You receive</span>
-                    {quoting && <span className="flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> quoting</span>}
+                    {quoting && <span className="flex items-center gap-1"><Spinner size={16} className="w-3 h-3" /> quoting</span>}
                     {impact && !quoting && <span>Impact ~{impact}</span>}
                   </div>
                   <div className="flex items-center gap-2">
@@ -639,7 +638,7 @@ export default function SwapPage() {
             <div className="overflow-y-auto p-2 pb-6">
               {searching && (
                 <div className="flex justify-center py-6">
-                  <Loader2 className="w-5 h-5 animate-spin text-purple-500" />
+                  <Spinner size={20} className="w-5 h-5 text-purple-500" />
                 </div>
               )}
               {(hits.length ? hits : PRESETS).map((t) => (

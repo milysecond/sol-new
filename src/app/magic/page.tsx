@@ -4,7 +4,8 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Fingerprint, Loader2, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Fingerprint, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { recoverPasskeyWallet } from "@/lib/passkey-wallet";
 
@@ -161,7 +162,7 @@ function MagicInner() {
 
       {status.kind === "loading" ? (
         <div className="flex flex-col items-center gap-3 py-10 text-zinc-400 text-sm">
-          <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
+          <Spinner size={24} className="w-6 h-6 text-purple-400" />
           Checking magic link…
         </div>
       ) : null}
@@ -226,7 +227,7 @@ function MagicInner() {
           >
             {busy ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Spinner size={16} className="w-4 h-4" />
                 Checking passkey…
               </>
             ) : (

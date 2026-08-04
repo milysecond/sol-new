@@ -15,6 +15,13 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-01",
+    title: "Thinking Orbs loading",
+    items: [
+      "All loading indicators use Thinking Orbs (orbs.jakubantalik.com).",
+    ],
+  },
+  {
+    date: "2026-08-01",
     title: "POAP on-chain image",
     items: [
       "POAP NFT art is an on-chain SVG data URI (no external image host).",

@@ -602,7 +602,7 @@ export default function ListsPage() {
               className="text-xs text-gray-500 dark:text-white/40 hover:text-purple-400 inline-flex items-center gap-1 cursor-pointer ml-auto px-2 py-2 min-h-[40px] rounded-lg hover:bg-black/5 dark:hover:bg-white/5"
               disabled={quotesLoading}
             >
-              <RefreshCw size={12} className={quotesLoading ? "animate-spin" : ""} />
+              {quotesLoading ? <Spinner size={16} state="searching" /> : <RefreshCw size={12} />}
               <span className="hidden xs:inline sm:inline">Refresh</span>
               <span className="sm:hidden">Sync</span>
             </button>

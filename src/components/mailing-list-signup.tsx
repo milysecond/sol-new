@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Mail, Check, Loader2, Fingerprint } from "lucide-react";
+import { Mail, Check, Fingerprint } from "lucide-react";
+import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 
 type Props = {
@@ -123,7 +124,7 @@ export function MailingListSignup({
           className="rounded-full bg-gradient-to-r from-purple-500 to-purple-600 text-white text-sm font-semibold px-5 py-2.5 disabled:opacity-50 hover:brightness-110 transition shrink-0"
         >
           {busy ? (
-            <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+            <Spinner size={16} className="w-4 h-4 mx-auto" />
           ) : done ? (
             "Joined"
           ) : (
@@ -217,7 +218,7 @@ export function MailingListSignup({
               >
                 {busy ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Spinner size={16} className="w-4 h-4" />
                     Joining…
                   </>
                 ) : publicKey ? (

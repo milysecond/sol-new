@@ -4,7 +4,6 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Dices,
-  Loader2,
   Sparkles,
   Trophy,
   Coins,
@@ -666,7 +665,7 @@ function DrawInner() {
             >
               {busy || spinning ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Spinner size={16} className="w-4 h-4" />
                   {spinning ? "Spinning…" : "Drawing…"}
                 </>
               ) : (
@@ -806,7 +805,7 @@ function DrawInner() {
               Recent results
             </h2>
             {historyLoading && (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
+              <Spinner size={16} className="w-3.5 h-3.5 text-gray-400" />
             )}
           </div>
 

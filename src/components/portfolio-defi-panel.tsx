@@ -6,9 +6,9 @@ import {
   ExternalLink,
   Landmark,
   Layers,
-  Loader2,
   Wallet as WalletIcon,
 } from "lucide-react";
+import { Spinner } from "@/components/spinner";
 import Link from "next/link";
 
 export type PortfolioApi = {
@@ -208,7 +208,7 @@ export function PortfolioDefiPanel({
 
       {loading && !data && (
         <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-400">
-          <Loader2 className="w-4 h-4 animate-spin text-purple-500" />
+          <Spinner size={16} className="w-4 h-4 text-purple-500" />
           Loading Jupiter balances…
         </div>
       )}

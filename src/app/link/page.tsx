@@ -2,7 +2,8 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Link2, Check, Copy, ExternalLink, Loader2, QrCode as QrIcon, Wallet } from "lucide-react";
+import { Link2, Check, Copy, ExternalLink, QrCode as QrIcon, Wallet } from "lucide-react";
+import { Spinner } from "@/components/spinner";
 import { Navbar } from "@/components/navbar";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { QrCode } from "@/components/qr-code";
@@ -430,7 +431,7 @@ function LinkPageInner() {
                 {payUrlPreview(qrPay.payUrl)}
               </p>
               <div className="flex items-center justify-center gap-2 text-sm text-sky-600 dark:text-sky-400">
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Spinner size={16} className="w-4 h-4" />
                 {statusLabel || "Waiting for payment…"}
               </div>
               <div className="flex gap-2">
@@ -477,7 +478,7 @@ function LinkPageInner() {
               >
                 {busy ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Spinner size={16} className="w-4 h-4" />
                     {statusLabel || "Working…"}
                   </>
                 ) : (
@@ -497,7 +498,7 @@ function LinkPageInner() {
             >
               {busy ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Spinner size={16} className="w-4 h-4" />
                   {statusLabel || "Creating…"}
                 </>
               ) : (

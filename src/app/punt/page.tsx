@@ -473,7 +473,7 @@ export default function PuntPage() {
                   disabled={refreshing}
                   className="inline-flex items-center gap-1 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer disabled:opacity-50"
                 >
-                  <RefreshCw size={11} className={refreshing ? "animate-spin" : ""} /> Refresh
+                  {refreshing ? <Spinner size={16} state="searching" /> : <RefreshCw size={11} />} Refresh
                 </button>
               </div>
             )}

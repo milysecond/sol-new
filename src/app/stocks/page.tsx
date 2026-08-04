@@ -234,7 +234,7 @@ export default function StocksPage() {
                 disabled={loading}
                 className={`${selectCls} inline-flex items-center gap-1 disabled:opacity-40`}
               >
-                <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+                {loading ? <Spinner size={16} state="searching" /> : <RefreshCw size={14} />}
                 Refresh
               </button>
             </div>

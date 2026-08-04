@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Tag, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Tag, CheckCircle, XCircle } from "lucide-react";
+import { Spinner } from "@/components/spinner";
 
 interface PromoInputProps {
   onValidCode: (code: string) => void;
@@ -75,7 +76,7 @@ export function PromoInput({ onValidCode, onClear }: PromoInputProps) {
           maxLength={16}
           className="w-full px-3 py-2 text-sm font-mono rounded-lg border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 outline-none focus:border-purple-400/50 tracking-widest uppercase"
         />
-        {status === "checking" && <Loader2 className="absolute right-2.5 top-2.5 w-4 h-4 animate-spin text-gray-400" />}
+        {status === "checking" && <Spinner size={16} className="absolute right-2.5 top-2.5 w-4 h-4 text-gray-400" />}
         {status === "valid" && <CheckCircle className="absolute right-2.5 top-2.5 w-4 h-4 text-green-400" />}
         {status === "invalid" && <XCircle className="absolute right-2.5 top-2.5 w-4 h-4 text-red-400" />}
       </div>
