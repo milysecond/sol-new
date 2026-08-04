@@ -1,7 +1,8 @@
 "use client";
 
 import { Navbar } from "@/components/navbar";
-import { Headphones, Play, Pause, Loader2, ChevronDown } from "lucide-react";
+import { Headphones, Play, Pause, ChevronDown } from "lucide-react";
+import { Spinner } from "@/components/spinner";
 import { useState } from "react";
 import { usePodPlayer } from "@/lib/pod-player";
 
@@ -262,7 +263,7 @@ export default function PodsPage() {
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-fuchsia-500 hover:bg-fuchsia-600 text-white text-xs font-semibold transition active:scale-[0.98]"
                   >
                     {st?.loading ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <Spinner size={16} className="w-3.5 h-3.5" />
                     ) : (
                       <Play className="w-3.5 h-3.5 fill-current" />
                     )}
@@ -286,7 +287,7 @@ export default function PodsPage() {
                   <div className="border-t border-black/10 dark:border-white/10 pt-2 -mx-1">
                     {st?.loading && (
                       <div className="flex items-center justify-center gap-2 py-4 text-xs text-gray-400 dark:text-white/40">
-                        <Loader2 className="w-4 h-4 animate-spin" /> Loading episodes…
+                        <Spinner size={16} className="w-4 h-4" /> Loading episodes…
                       </div>
                     )}
                     {st && !st.loading && st.episodes.length === 0 && (

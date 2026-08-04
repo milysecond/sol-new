@@ -8,9 +8,9 @@ import {
   Check,
   Copy,
   Dices,
-  Loader2,
   Trophy,
 } from "lucide-react";
+import { Spinner } from "@/components/spinner";
 import { Navbar } from "@/components/navbar";
 import { type VrfDrawRecord } from "@/lib/vrf";
 
@@ -66,7 +66,7 @@ export default function VrfReceiptPage() {
 
         {loading && (
           <div className="rounded-3xl border border-black/10 dark:border-white/10 p-10 text-center">
-            <Loader2 className="w-8 h-8 text-violet-500 animate-spin mx-auto mb-3" />
+            <Spinner size={32} className="w-8 h-8 text-violet-500 mx-auto mb-3" />
             <p className="text-sm text-gray-500">Loading draw…</p>
           </div>
         )}

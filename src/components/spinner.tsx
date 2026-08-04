@@ -1,21 +1,41 @@
 "use client";
 
-export function Spinner({ size = 20, className = "" }: { size?: number; className?: string }) {
+import { ThinkingOrb, type OrbState } from "thinking-orbs";
+
+type SpinnerProps = {
+  /** CSS px hint — mapped to orb presets 20 | 64 */
+  size?: number;
+  className?: string;
+  /** thinking-orbs state */
+  state?: OrbState;
+  /** aria label */
+  label?: string;
+};
+
+/**
+ * Global loading indicator — Thinking Orbs (orbs.jakubantalik.com).
+ * Drop-in for all previous SVG spinners.
+ */
+export function Spinner({
+  size = 20,
+  className = "",
+  state = "working",
+  label = "Loading",
+}: SpinnerProps) {
+  // Package ships only two tuned presets
+  const orbSize = size >= 40 ? 64 : 20;
+
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      className={`animate-spin ${className}`}
+    <span
+      className={`inline-flex items-center justify-center shrink-0 ${className}`}
+      style={{ width: orbSize, height: orbSize }}
     >
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.2" />
-      <path
-        d="M12 2a10 10 0 0 1 10 10"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
+      <ThinkingOrb
+        state={state}
+        size={orbSize}
+        theme="auto"
+        aria-label={label}
       />
-    </svg>
+    </span>
   );
 }

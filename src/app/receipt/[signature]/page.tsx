@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, Loader2, Receipt, X } from "lucide-react";
+import { AlertCircle, Receipt, X } from "lucide-react";
+import { Spinner } from "@/components/spinner";
 import { Navbar } from "@/components/navbar";
 import { ReceiptCard } from "@/components/receipt-card";
 import { ReceiptSearch } from "@/components/receipt-search";
@@ -95,7 +96,7 @@ export default function ReceiptSignaturePage() {
 
           {loading && (
             <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-10 text-center">
-              <Loader2 className="w-8 h-8 text-purple-500 animate-spin mx-auto mb-3" />
+              <Spinner size={32} className="w-8 h-8 text-purple-500 mx-auto mb-3" />
               <p className="text-sm text-gray-500 dark:text-white/40">
                 Verifying transaction…
               </p>

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Navbar } from "@/components/navbar";
 import { Newspaper, ExternalLink, RefreshCw } from "lucide-react";
+import { Spinner } from "@/components/spinner";
 import { timeAgo } from "@/lib/time";
 
 type NewsItem = {
@@ -71,7 +72,7 @@ export default function NewsPage() {
             disabled={loading}
             className="shrink-0 flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer disabled:opacity-40"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+            {loading ? <Spinner size={16} state="searching" /> : <RefreshCw className="w-4 h-4" />} Refresh
           </button>
         </header>
 

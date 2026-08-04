@@ -3,11 +3,12 @@
 import { useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
-  Search, Loader2, ExternalLink, ShieldCheck, ShieldAlert,
+  Search, ExternalLink, ShieldCheck, ShieldAlert,
   ShieldX, Copy, Check, Coins, Activity, Code2, AlertTriangle,
   Lock, Unlock, FileCode, ImageIcon, CalendarDays, ArrowUpRight,
   Wallet as WalletIcon, Landmark, LineChart, Layers, Sprout, Gift, Vote,
 } from "lucide-react";
+import { Spinner } from "@/components/spinner";
 import { Navbar } from "@/components/navbar";
 import { useWallet } from "@/lib/wallet-context";
 import { analytics } from "@/lib/analytics";
@@ -508,7 +509,7 @@ function ScanInner() {
               disabled={loading || !input.trim()}
               className="px-4 rounded-xl bg-purple-500/20 text-purple-600 dark:text-purple-300 border border-purple-400/50 text-sm font-medium hover:bg-purple-500/30 transition disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
             >
-              {loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
+              {loading ? <Spinner size={20} /> : <Search size={15} />}
               <span className="hidden sm:inline">Scan</span>
             </button>
           </form>
@@ -534,7 +535,7 @@ function ScanInner() {
 
           {loading && (
             <div className="flex flex-col items-center gap-3 py-10 text-gray-400 dark:text-white/30">
-              <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+              <Spinner size={32} className="w-8 h-8 text-purple-500" />
               <span className="text-sm">Scanning address…</span>
             </div>
           )}

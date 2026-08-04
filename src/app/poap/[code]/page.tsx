@@ -310,7 +310,7 @@ export default function PoapClaimPage() {
                       className="w-full min-h-[52px] rounded-2xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-semibold text-base flex items-center justify-center gap-2"
                     >
                       {busy ? (
-                        <Spinner size={20} />
+                        <Spinner size={20} state="composing" label="Minting" />
                       ) : geoLocked || isGeoLocked(drop) ? (
                         <Navigation className="w-5 h-5" />
                       ) : (

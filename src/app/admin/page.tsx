@@ -263,7 +263,7 @@ export default function AdminPage() {
           <div className="px-6 py-4 border-b border-black/10 dark:border-white/10 flex items-center justify-between">
             <h2 className="font-semibold">All codes</h2>
             <button onClick={load} disabled={loading} className="text-gray-400 hover:text-white transition">
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+              {loading ? <Spinner size={16} state="searching" /> : <RefreshCw className="w-4 h-4" />}
             </button>
           </div>
           <div className="overflow-x-auto">
@@ -345,7 +345,7 @@ export default function AdminPage() {
               <Link2 className="w-4 h-4 text-sky-400" /> Short links
             </h2>
             <button onClick={load} disabled={loading} className="text-gray-400 hover:text-white transition">
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+              {loading ? <Spinner size={16} state="searching" /> : <RefreshCw className="w-4 h-4" />}
             </button>
           </div>
           <div className="overflow-x-auto">

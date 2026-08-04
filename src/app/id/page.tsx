@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { Search, CheckCircle, XCircle, Loader2, ExternalLink, ArrowRight } from "lucide-react";
+import { Search, CheckCircle, XCircle, ExternalLink, ArrowRight } from "lucide-react";
+import { Spinner } from "@/components/spinner";
 import { Navbar } from "@/components/navbar";
 import { PageTransition } from "@/components/page-transition";
 import { AnimatedIcon } from "@/components/animated-icon";
@@ -128,7 +129,7 @@ export default function IdPage() {
             {/* Result */}
             {checking && (
               <div className="flex items-center gap-2 text-gray-500 dark:text-white/40 text-sm">
-                <Loader2 size={15} className="animate-spin" /> Checking…
+                <Spinner size={20} /> Checking…
               </div>
             )}
 
@@ -172,7 +173,7 @@ export default function IdPage() {
                         className="w-full bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       >
                         {busy ? (
-                          <><Loader2 size={15} className="animate-spin" /> {statusLabel}</>
+                          <><Spinner size={20} /> {statusLabel}</>
                         ) : !publicKey ? (
                           "Connect wallet to register"
                         ) : (

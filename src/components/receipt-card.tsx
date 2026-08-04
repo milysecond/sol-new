@@ -5,11 +5,11 @@ import {
   Check,
   Copy,
   ExternalLink,
-  Loader2,
   Printer,
   Share2,
   XCircle,
 } from "lucide-react";
+import { Spinner } from "@/components/spinner";
 import { toast } from "sonner";
 import {
   type ReceiptData,
@@ -322,7 +322,7 @@ export const ReceiptCard = forwardRef<HTMLDivElement, { tx: ReceiptData }>(
                 className="touch-target flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/10 dark:border-white/10 text-xs font-medium text-gray-700 dark:text-white/80 hover:bg-black/[0.07] dark:hover:bg-white/[0.1] transition disabled:opacity-60"
               >
                 {sharing ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Spinner size={16} className="w-3.5 h-3.5" />
                 ) : (
                   <Share2 className="w-3.5 h-3.5" />
                 )}

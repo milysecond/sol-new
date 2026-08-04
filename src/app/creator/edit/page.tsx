@@ -9,7 +9,7 @@ import { useWallet } from "@/lib/wallet-context";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { uploadImage } from "@/lib/api";
 import { normalizeUsername, usernameError, displayUsername } from "@/lib/username";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 
 function EditInner() {
   const { publicKey } = useWallet();
@@ -227,7 +227,7 @@ function EditInner() {
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2">
             {checkingUser ? (
-              <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+              <Spinner size={16} className="w-4 h-4 text-gray-400" />
             ) : userAvail === true ? (
               <Check className="w-4 h-4 text-emerald-500" />
             ) : userAvail === false ? (

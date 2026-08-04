@@ -10,7 +10,7 @@ import {
   type Keypair,
 } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { Landmark, Loader2 } from "lucide-react";
+import { Landmark } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { PageTransition } from "@/components/page-transition";
@@ -1101,7 +1101,7 @@ export default function LoanPage() {
                 onClick={onPrimary}
                 className="hidden sm:flex w-full rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white font-semibold min-h-[52px] items-center justify-center gap-2 transition cursor-pointer"
               >
-                {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+                {busy && <Spinner size={16} className="w-4 h-4" />}
                 {primaryLabel}
               </button>
             )}
@@ -1117,7 +1117,7 @@ export default function LoanPage() {
             onClick={onPrimary}
             className="pointer-events-auto w-full rounded-2xl bg-emerald-500 active:bg-emerald-400 disabled:opacity-40 text-white font-semibold min-h-[52px] flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25"
           >
-            {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+            {busy && <Spinner size={16} className="w-4 h-4" />}
             {primaryLabel}
           </button>
         </div>
