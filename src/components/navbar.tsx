@@ -37,6 +37,7 @@ import {
   Flame,
   Users,
   ArrowLeftRight,
+  Award,
 } from "lucide-react";
 import { getPushPermission, subscribePush, unsubscribePush, type PushPermission } from "@/lib/push-client";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -81,6 +82,7 @@ const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
       { href: "/pay", label: "Pay", icon: HandCoins },
       { href: "/split", label: "Split", icon: Users },
       { href: "/gift", label: "Gift", icon: Gift },
+      { href: "/poap", label: "POAP", icon: Award },
       { href: "/earn", label: "Earn", icon: TrendingUp },
       { href: "/loan", label: "Loan", icon: Landmark },
       { href: "/swap", label: "Swap", icon: ArrowLeftRight },
@@ -96,6 +98,7 @@ const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
       { href: "/lists", label: "Lists", icon: Star },
       { href: "/scan", label: "Scan", icon: Activity },
       { href: "/receipt", label: "Receipt", icon: Receipt },
+      { href: "/poap", label: "POAP", icon: Award },
       { href: "/draw", label: "Draw", icon: Dices },
       { href: "/punt", label: "Punt", icon: Trophy },
       { href: "/burn", label: "Burn", icon: Flame },

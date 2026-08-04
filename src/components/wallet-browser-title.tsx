@@ -42,6 +42,7 @@ function pathTitle(pathname: string): string | null {
     "/swap": "Swap",
     "/loan": "Loan",
     "/gift": "Gift",
+    "/poap": "POAP",
     "/pay": "Pay",
     "/earn": "Earn",
     "/stake": "Stake",
