@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-01",
+    title: "Onboarding",
+    items: [
+      "New /onboard: value first, one goal, Face ID wallet, then a personal next step.",
+      "Home “Get started” opens the flow instead of dumping into create.",
+    ],
+  },
+  {
+    date: "2026-08-01",
     title: "Thinking Orbs loading",
     items: [
       "All loading indicators use Thinking Orbs (orbs.jakubantalik.com).",

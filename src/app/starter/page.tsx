@@ -39,6 +39,13 @@ export const metadata: Metadata = {
 
 const steps = [
   {
+    href: "/onboard",
+    title: "Start here",
+    desc: "Face ID wallet + your first win in under a minute.",
+    icon: Sparkles,
+    color: "text-violet-600 dark:text-violet-400",
+  },
+  {
     href: "/wallet",
     title: "Get a wallet",
     desc: "Passkey wallet on sol.new — no app store, seconds to start.",
