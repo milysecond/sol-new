@@ -315,7 +315,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = xyz.solnew.app.Clip;
+				PRODUCT_BUNDLE_IDENTIFIER = new.sol.Clip;
 				PRODUCT_NAME = "sol-new Clip";
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
@@ -336,7 +336,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = xyz.solnew.app;
+				PRODUCT_BUNDLE_IDENTIFIER = new.sol;
 				PRODUCT_NAME = "sol-new";
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
@@ -357,7 +357,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = xyz.solnew.app.Clip;
+				PRODUCT_BUNDLE_IDENTIFIER = new.sol.Clip;
 				PRODUCT_NAME = "sol-new Clip";
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
@@ -439,7 +439,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = xyz.solnew.app;
+				PRODUCT_BUNDLE_IDENTIFIER = new.sol;
 				PRODUCT_NAME = "sol-new";
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;

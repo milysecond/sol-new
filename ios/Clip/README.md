@@ -5,11 +5,14 @@ Tiny iOS **App Clip** that opens `https://sol.new` (or the invocation URL) in a 
 ## Why
 iOS has **no Web NFC**. An App Clip is the lightest native surface for NFC/QR → instant experience without full install.
 
-## Bundle IDs
+## Bundle IDs (App Store Connect — live)
 | Target | ID |
 |--------|-----|
-| Full app | `xyz.solnew.app` |
-| App Clip | `xyz.solnew.app.Clip` |
+| Full app | `new.sol` (app id `6768180177`) |
+| App Clip | `new.sol.Clip` (bundle resource `CC9XD9RNC2`) |
+| Team | `4CK2SMVS2Y` |
+
+Portal: Clip has **Associated Domains**. Parent already has Associated Domains + Push.
 
 ## Generate Xcode project
 ```bash
