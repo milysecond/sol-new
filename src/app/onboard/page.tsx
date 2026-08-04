@@ -88,7 +88,7 @@ export default function OnboardPage() {
     [goal]
   );
 
-  // Resume if already connected
+  // Restore goal + already-done state
   useEffect(() => {
     try {
       const saved = localStorage.getItem(GOAL_KEY) as Goal | null;
@@ -98,14 +98,14 @@ export default function OnboardPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (publicKey && step < 2) {
-      // Skip create if wallet already exists
-      if (step === 0 || step === 1) {
-        /* stay — user may still pick goal */
-      }
+  const skipToHome = () => {
+    try {
+      localStorage.setItem(ONBOARD_KEY, "1");
+    } catch {
+      /* ignore */
     }
-  }, [publicKey, step]);
+    router.push("/home");
+  };
 
   const pickGoal = (id: Goal) => {
     setGoal(id);
@@ -204,6 +204,10 @@ export default function OnboardPage() {
             </button>
             <p className="text-[11px] text-gray-400">
               Already set up?{" "}
+              <button type="button" onClick={skipToHome} className="text-violet-500">
+                Go to home
+              </button>
+              {" · "}
               <Link href="/wallet/find" className="text-violet-500">
                 Find my wallet
               </Link>

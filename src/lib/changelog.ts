@@ -15,6 +15,13 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-01",
+    title: "Onboard is home",
+    items: [
+      "sol.new/ opens the onboarding flow by default. Full app grid lives at /home.",
+    ],
+  },
+  {
+    date: "2026-08-01",
     title: "Onboarding",
     items: [
       "New /onboard: value first, one goal, Face ID wallet, then a personal next step.",

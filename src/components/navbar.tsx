@@ -111,7 +111,7 @@ const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
 ];
 
 const MOBILE_PRIMARY = [
-  { href: "/", label: "Home", icon: Zap },
+  { href: "/home", label: "Home", icon: Zap },
   { href: "/wallet", label: "Wallet", icon: Wallet },
   { href: "/token", label: "Token", icon: Coins },
   { href: "/gift", label: "Gift", icon: Gift },
