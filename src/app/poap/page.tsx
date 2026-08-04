@@ -7,12 +7,14 @@ import {
   Check,
   Copy,
   ExternalLink,
+  ImagePlus,
   MapPin,
   Navigation,
   Plus,
   QrCode,
   Share2,
   Sparkles,
+  X,
 } from "lucide-react";
 import QRCode from "qrcode";
 import { Navbar } from "@/components/navbar";
@@ -22,6 +24,7 @@ import { Spinner } from "@/components/spinner";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { useWallet } from "@/lib/wallet-context";
 import { friendlyError } from "@/lib/friendly-errors";
+import { uploadImage } from "@/lib/api";
 import type { PoapDrop } from "@/lib/poap";
 import { DEFAULT_GEO_RADIUS_M, isGeoLocked, poapClaimUrl } from "@/lib/poap";
 
@@ -54,6 +57,12 @@ export default function PoapPage() {
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageName, setImageName] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [maxClaims, setMaxClaims] = useState("");
   const [geoLock, setGeoLock] = useState(false);
   const [geoLat, setGeoLat] = useState<number | null>(null);
@@ -121,6 +130,19 @@ export default function PoapPage() {
     setBusy(true);
     setError(null);
     try {
+      let finalImageUrl = imageUrl.trim() || undefined;
+      // Upload pending file first (drag/drop or picker)
+      if (imageFile) {
+        setUploading(true);
+        try {
+          const up = await uploadImage(imageFile);
+          finalImageUrl = up.url;
+          setImageUrl(up.url);
+        } finally {
+          setUploading(false);
+        }
+      }
+
       const r = await fetch("/api/poap", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -128,7 +150,7 @@ export default function PoapPage() {
           title: t,
           description: description.trim() || undefined,
           location: location.trim() || undefined,
-          imageUrl: imageUrl.trim() || undefined,
+          imageUrl: finalImageUrl,
           issuer: publicKey,
           maxClaims: maxClaims.trim() ? Number(maxClaims) : null,
           geoLock,
@@ -152,7 +174,51 @@ export default function PoapPage() {
       setError(friendlyError(e, "Couldn't create drop"));
     } finally {
       setBusy(false);
+      setUploading(false);
     }
+  };
+
+  const clearImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setImageName(null);
+    setImageUrl("");
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const acceptImageFile = (file: File | null | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Use a PNG, JPEG, GIF, or WebP image");
+      return;
+    }
+    if (file.type === "image/svg+xml") {
+      setError("SVG uploads aren’t allowed — use PNG or JPEG");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image too large (max 5MB)");
+      return;
+    }
+    setError(null);
+    setImageFile(file);
+    setImageName(file.name);
+    setImageUrl(""); // will upload on create
+    const reader = new FileReader();
+    reader.onload = () => setImagePreview(typeof reader.result === "string" ? reader.result : null);
+    reader.readAsDataURL(file);
+  };
+
+  const onFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    acceptImageFile(e.target.files?.[0]);
+  };
+
+  const onDropImage = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    const f = e.dataTransfer.files?.[0];
+    acceptImageFile(f);
   };
 
   const pinLocation = async () => {
@@ -336,13 +402,76 @@ export default function PoapPage() {
                     />
                   </label>
                   <label className="block space-y-1">
-                    <span className="text-xs text-gray-500">Image URL</span>
+                    <span className="text-xs text-gray-500">Art (optional)</span>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          fileRef.current?.click();
+                        }
+                      }}
+                      onClick={() => fileRef.current?.click()}
+                      onDragEnter={(e) => {
+                        e.preventDefault();
+                        setDragOver(true);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOver(true);
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        setDragOver(false);
+                      }}
+                      onDrop={onDropImage}
+                      className={`relative rounded-xl border border-dashed px-3 py-6 text-center cursor-pointer transition ${
+                        dragOver
+                          ? "border-violet-500 bg-violet-500/10"
+                          : "border-black/15 dark:border-white/15 bg-black/5 dark:bg-white/5 hover:border-violet-400/50"
+                      }`}
+                    >
+                      {imagePreview ? (
+                        <div className="flex flex-col items-center gap-2">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={imagePreview}
+                            alt=""
+                            className="w-24 h-24 rounded-xl object-cover border border-black/10 dark:border-white/10"
+                          />
+                          <p className="text-xs text-gray-500 truncate max-w-full px-2">
+                            {imageName || "Image ready"}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              clearImage();
+                            }}
+                            className="inline-flex items-center gap-1 text-xs text-red-500"
+                          >
+                            <X className="w-3 h-3" /> Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <ImagePlus className="w-7 h-7 text-violet-500 mx-auto" />
+                          <p className="text-sm font-medium text-gray-700 dark:text-white/80">
+                            Drag & drop art here
+                          </p>
+                          <p className="text-[11px] text-gray-400">
+                            or tap to upload · PNG / JPEG / WebP · max 5MB
+                          </p>
+                        </div>
+                      )}
+                    </div>
                     <input
-                      value={imageUrl}
-                      onChange={(e) => setImageUrl(e.target.value)}
-                      placeholder="https://… (optional art)"
-                      maxLength={500}
-                      className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-2.5 text-sm font-mono text-xs"
+                      ref={fileRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      onChange={onFileInput}
+                      className="sr-only"
                     />
                   </label>
                   <label className="block space-y-1">
@@ -489,7 +618,7 @@ export default function PoapPage() {
                     ) : (
                       <>
                         <Plus className="w-4 h-4" />
-                        Create drop
+                        {uploading ? "Uploading art…" : "Create drop"}
                       </>
                     )}
                   </button>
@@ -540,6 +669,9 @@ export default function PoapPage() {
                       setDescription("");
                       setLocation("");
                       setImageUrl("");
+                      setImagePreview(null);
+                      setImageName(null);
+                      setImageFile(null);
                       setMaxClaims("");
                       setGeoLock(false);
                       setGeoLat(null);
