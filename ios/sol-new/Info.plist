@@ -31,6 +31,8 @@
 		<string>tel</string>
 		<string>sms</string>
 	</array>
+	<key>NFCReaderUsageDescription</key>
+	<string>sol.new uses NFC to open links and experiences from tags.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

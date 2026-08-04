@@ -12,7 +12,7 @@ iOS has **no Web NFC**. An App Clip is the lightest native surface for NFC/QR â†
 | App Clip | `new.sol.Clip` (bundle resource `CC9XD9RNC2`) |
 | Team | `4CK2SMVS2Y` |
 
-Portal: Clip has **Associated Domains**. Parent already has Associated Domains + Push.
+Portal: Clip has **Associated Domains** + **NFC Tag Reading**. Parent has the same NFC capability.
 
 ## Generate Xcode project
 ```bash
