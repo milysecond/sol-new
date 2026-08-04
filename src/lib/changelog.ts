@@ -15,6 +15,13 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-01",
+    title: "POAP venue search",
+    items: [
+      "Geo-lock pins by venue or address name (OpenStreetMap), not just GPS.",
+    ],
+  },
+  {
+    date: "2026-08-01",
     title: "POAP geo-lock",
     items: [
       "Optional GPS lock on POAP drops — claim only within 100m–5km of the pin.",

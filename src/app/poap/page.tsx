@@ -60,6 +60,13 @@ export default function PoapPage() {
   const [geoLng, setGeoLng] = useState<number | null>(null);
   const [geoRadiusM, setGeoRadiusM] = useState(DEFAULT_GEO_RADIUS_M);
   const [geoBusy, setGeoBusy] = useState(false);
+  const [venueQuery, setVenueQuery] = useState("");
+  const [venueHits, setVenueHits] = useState<
+    { label: string; lat: number; lng: number }[]
+  >([]);
+  const [venueSearching, setVenueSearching] = useState(false);
+  const [pinnedLabel, setPinnedLabel] = useState<string | null>(null);
+  const venueTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ drop: PoapDrop; url: string } | null>(null);
@@ -156,6 +163,8 @@ export default function PoapPage() {
       setGeoLat(pos.coords.latitude);
       setGeoLng(pos.coords.longitude);
       setGeoLock(true);
+      setPinnedLabel("Current location");
+      setVenueHits([]);
     } catch (e) {
       const msg =
         e && typeof e === "object" && "code" in e
@@ -166,6 +175,51 @@ export default function PoapPage() {
       setError(msg);
     } finally {
       setGeoBusy(false);
+    }
+  };
+
+  const searchVenue = useCallback(async (q: string) => {
+    const query = q.trim();
+    if (query.length < 2) {
+      setVenueHits([]);
+      return;
+    }
+    setVenueSearching(true);
+    try {
+      const r = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`, {
+        cache: "no-store",
+      });
+      const d = (await r.json()) as {
+        hits?: { label: string; lat: number; lng: number }[];
+        error?: string;
+      };
+      if (!r.ok) throw new Error(d.error || "Search failed");
+      setVenueHits(d.hits || []);
+    } catch (e) {
+      setVenueHits([]);
+      setError(friendlyError(e, "Couldn't find that place"));
+    } finally {
+      setVenueSearching(false);
+    }
+  }, []);
+
+  const onVenueQuery = (v: string) => {
+    setVenueQuery(v);
+    if (venueTimer.current) clearTimeout(venueTimer.current);
+    venueTimer.current = setTimeout(() => void searchVenue(v), 400);
+  };
+
+  const pickVenue = (hit: { label: string; lat: number; lng: number }) => {
+    setGeoLat(hit.lat);
+    setGeoLng(hit.lng);
+    setGeoLock(true);
+    setPinnedLabel(hit.label);
+    setVenueQuery(hit.label);
+    setVenueHits([]);
+    // Fill human location label if empty
+    if (!location.trim()) {
+      const short = hit.label.split(",").slice(0, 2).join(",").trim();
+      setLocation(short.slice(0, 120));
     }
   };
 
@@ -317,16 +371,62 @@ export default function PoapPage() {
                           if (!e.target.checked) {
                             setGeoLat(null);
                             setGeoLng(null);
+                            setPinnedLabel(null);
+                            setVenueHits([]);
                           }
                         }}
                         className="w-4 h-4 accent-violet-600"
                       />
                     </label>
                     <p className="text-[11px] text-gray-500">
-                      Claimers must be near this spot (phone GPS). Best for IRL events.
+                      Claimers must be near the pin. Search a venue or use GPS.
                     </p>
                     {geoLock && (
                       <>
+                        <label className="block space-y-1">
+                          <span className="text-xs text-gray-500">Venue or address</span>
+                          <div className="relative">
+                            <input
+                              value={venueQuery}
+                              onChange={(e) => onVenueQuery(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  void searchVenue(venueQuery);
+                                }
+                              }}
+                              placeholder="e.g. Federation Square Melbourne"
+                              className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-2.5 text-sm pr-9"
+                            />
+                            {venueSearching && (
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <Spinner size={14} />
+                              </span>
+                            )}
+                          </div>
+                        </label>
+                        {venueHits.length > 0 && (
+                          <ul className="rounded-xl border border-black/10 dark:border-white/10 overflow-hidden max-h-48 overflow-y-auto">
+                            {venueHits.map((h) => (
+                              <li key={`${h.lat},${h.lng},${h.label.slice(0, 40)}`}>
+                                <button
+                                  type="button"
+                                  onClick={() => pickVenue(h)}
+                                  className="w-full text-left px-3 py-2.5 text-xs hover:bg-violet-500/10 border-b border-black/5 dark:border-white/5 last:border-0"
+                                >
+                                  <span className="line-clamp-2 text-gray-800 dark:text-white/90">
+                                    {h.label}
+                                  </span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <div className="h-px flex-1 bg-black/10 dark:bg-white/10" />
+                          <span className="text-[10px] text-gray-400">or</span>
+                          <div className="h-px flex-1 bg-black/10 dark:bg-white/10" />
+                        </div>
                         <button
                           type="button"
                           onClick={() => void pinLocation()}
@@ -338,12 +438,19 @@ export default function PoapPage() {
                           ) : (
                             <MapPin className="w-4 h-4" />
                           )}
-                          {geoLat != null ? "Update pin (my location)" : "Use my location"}
+                          Use my GPS
                         </button>
                         {geoLat != null && geoLng != null && (
-                          <p className="text-[11px] font-mono text-gray-500 text-center">
-                            {geoLat.toFixed(5)}, {geoLng.toFixed(5)}
-                          </p>
+                          <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-2 text-center">
+                            {pinnedLabel && (
+                              <p className="text-xs text-emerald-800 dark:text-emerald-200 line-clamp-2 mb-0.5">
+                                📍 {pinnedLabel}
+                              </p>
+                            )}
+                            <p className="text-[11px] font-mono text-gray-500">
+                              {geoLat.toFixed(5)}, {geoLng.toFixed(5)}
+                            </p>
+                          </div>
                         )}
                         <div className="flex flex-wrap gap-1.5 justify-center">
                           {RADIUS_PRESETS.map((p) => (
@@ -438,6 +545,9 @@ export default function PoapPage() {
                       setGeoLat(null);
                       setGeoLng(null);
                       setGeoRadiusM(DEFAULT_GEO_RADIUS_M);
+                      setVenueQuery("");
+                      setVenueHits([]);
+                      setPinnedLabel(null);
                     }}
                     className="block w-full text-xs text-gray-500 mt-2"
                   >
