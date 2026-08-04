@@ -7,23 +7,30 @@ export async function mintCompressedNft(opts: {
   owner: string;
   name: string;
   symbol?: string;
-  uri: string;
+  /** Off-chain metadata JSON URI (https or data:) */
+  uri?: string;
+  /** Image URL or data: URI — used when Helius builds Arweave metadata */
+  imageUrl?: string;
   description?: string;
   network?: "mainnet" | "devnet";
   externalUrl?: string;
   attributes?: { trait_type: string; value: string }[];
 }): Promise<{ assetId: string; signature: string }> {
-  const rpcUrl =
-    opts.network === "devnet" ? devnetRpcUrl() : mainnetRpcUrl();
+  const rpcUrl = opts.network === "devnet" ? devnetRpcUrl() : mainnetRpcUrl();
+
+  if (!opts.uri && !opts.imageUrl) {
+    throw new Error("mintCompressedNft requires uri or imageUrl");
+  }
 
   const params: Record<string, unknown> = {
     name: opts.name.slice(0, 32),
     symbol: (opts.symbol || "POAP").slice(0, 10),
     owner: opts.owner,
     description: (opts.description || "").slice(0, 1000),
-    uri: opts.uri,
     sellerFeeBasisPoints: 0,
   };
+  if (opts.uri) params.uri = opts.uri;
+  if (opts.imageUrl) params.imageUrl = opts.imageUrl;
   if (opts.externalUrl) params.external_url = opts.externalUrl;
   if (opts.attributes?.length) params.attributes = opts.attributes;
 
