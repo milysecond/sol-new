@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-01",
+    title: "POAP drops",
+    items: [
+      "New /poap: create proof-of-attendance drops with link + QR.",
+      "Collectors claim at /poap/<code> with a passkey wallet.",
+    ],
+  },
+  {
+    date: "2026-08-01",
     title: "Name service: .sol .bonk .sns .skr",
     items: [
       "Send, portfolio, and NFT lookup resolve .sol, .bonk, .sns, and .skr.",

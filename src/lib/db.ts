@@ -152,6 +152,29 @@ export async function initDb() {
       claimed_at TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS poap_drops (
+      code TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      image_url TEXT,
+      location TEXT,
+      issuer TEXT NOT NULL,
+      max_claims INTEGER,
+      claim_count INTEGER NOT NULL DEFAULT 0,
+      starts_at TEXT,
+      ends_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS poap_claims (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      drop_code TEXT NOT NULL,
+      wallet TEXT NOT NULL,
+      claimed_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(drop_code, wallet),
+      FOREIGN KEY (drop_code) REFERENCES poap_drops(code)
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_poap_claims_wallet ON poap_claims(wallet)`,
+    `CREATE INDEX IF NOT EXISTS idx_poap_drops_issuer ON poap_drops(issuer)`,
     `CREATE TABLE IF NOT EXISTS punt_picks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       wallet TEXT NOT NULL,
