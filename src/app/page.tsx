@@ -46,11 +46,9 @@ function isTelegramWebView() {
 }
 
 function GetStarted({
-  connect,
   recover,
   loading,
 }: {
-  connect: (username?: string) => Promise<void>;
   recover: () => Promise<void>;
   loading: boolean;
 }) {
@@ -77,20 +75,15 @@ function GetStarted({
 
   return (
     <div className="mt-3 flex flex-col items-center gap-2 w-full max-w-xs mx-auto">
-      <button
-        onClick={() => connect("My Wallet")}
-        disabled={loading}
-        className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-purple-400/60 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed text-base"
+      <Link
+        href="/onboard"
+        className="w-full bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-xl px-4 py-3.5 transition text-base text-center"
       >
-        {loading ? (
-          <><Spinner size={16} className="inline mr-2" />Setting up…</>
-        ) : (
-          "Create my wallet"
-        )}
-      </button>
+        Get started
+      </Link>
       <p className="text-[11px] text-gray-500 dark:text-white/40 text-center px-1 flex items-center gap-1 justify-center">
         <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-        Secured by Face ID — no seed phrases
+        Face ID wallet · value first · one clear next step
       </p>
       <button
         type="button"
@@ -328,7 +321,7 @@ export default function Home() {
             </p>
             <StatsBar />
             {!publicKey && (
-              <GetStarted connect={connect} recover={recover} loading={loading} />
+              <GetStarted recover={recover} loading={loading} />
             )}
           </div>
 
