@@ -16,7 +16,7 @@ import { Download, ImagePlus, Link2, RotateCcw, Share2 } from "lucide-react";
  */
 
 const SIZE = 1080;
-const OVERLAY_SRC = "/frame/opentosolana-overlay.png";
+const OVERLAY_SRC = "/frame/opentosolana-overlay.png?v=4";
 
 function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
