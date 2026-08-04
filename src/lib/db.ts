@@ -176,6 +176,9 @@ export async function initDb() {
       claim_lat REAL,
       claim_lng REAL,
       claim_accuracy_m REAL,
+      asset_id TEXT,
+      mint_signature TEXT,
+      metadata_uri TEXT,
       UNIQUE(drop_code, wallet),
       FOREIGN KEY (drop_code) REFERENCES poap_drops(code)
     )`,
@@ -337,6 +340,9 @@ export async function initDb() {
     "ALTER TABLE poap_claims ADD COLUMN claim_lat REAL",
     "ALTER TABLE poap_claims ADD COLUMN claim_lng REAL",
     "ALTER TABLE poap_claims ADD COLUMN claim_accuracy_m REAL",
+    "ALTER TABLE poap_claims ADD COLUMN asset_id TEXT",
+    "ALTER TABLE poap_claims ADD COLUMN mint_signature TEXT",
+    "ALTER TABLE poap_claims ADD COLUMN metadata_uri TEXT",
   ]) {
     try {
       await db.execute(sql);

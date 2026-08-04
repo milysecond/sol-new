@@ -8,7 +8,7 @@ export default async function Image() {
   return featureOgImage({
     eyebrow: "POAP",
     title: "Proof you were there",
-    subtitle: "Create a drop · share link or QR · claim with Face ID",
+    subtitle: "Create a drop · share link or QR · claim a free compressed NFT",
     cta: "Create a drop",
     accent: "purple",
     path: "sol.new/poap",
