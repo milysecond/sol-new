@@ -8,6 +8,7 @@ import {
   Copy,
   ExternalLink,
   MapPin,
+  Navigation,
   Plus,
   QrCode,
   Share2,
@@ -22,7 +23,29 @@ import { AnimatedIcon } from "@/components/animated-icon";
 import { useWallet } from "@/lib/wallet-context";
 import { friendlyError } from "@/lib/friendly-errors";
 import type { PoapDrop } from "@/lib/poap";
-import { poapClaimUrl } from "@/lib/poap";
+import { DEFAULT_GEO_RADIUS_M, isGeoLocked, poapClaimUrl } from "@/lib/poap";
+
+const RADIUS_PRESETS = [
+  { m: 100, label: "100m" },
+  { m: 200, label: "200m" },
+  { m: 500, label: "500m" },
+  { m: 1000, label: "1km" },
+  { m: 5000, label: "5km" },
+] as const;
+
+function readPosition(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Location not supported on this device"));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 20_000,
+      maximumAge: 15_000,
+    });
+  });
+}
 
 export default function PoapPage() {
   const { publicKey } = useWallet();
@@ -32,6 +55,11 @@ export default function PoapPage() {
   const [location, setLocation] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [maxClaims, setMaxClaims] = useState("");
+  const [geoLock, setGeoLock] = useState(false);
+  const [geoLat, setGeoLat] = useState<number | null>(null);
+  const [geoLng, setGeoLng] = useState<number | null>(null);
+  const [geoRadiusM, setGeoRadiusM] = useState(DEFAULT_GEO_RADIUS_M);
+  const [geoBusy, setGeoBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ drop: PoapDrop; url: string } | null>(null);
@@ -79,6 +107,10 @@ export default function PoapPage() {
       setError("Give your drop a title");
       return;
     }
+    if (geoLock && (geoLat == null || geoLng == null)) {
+      setError("Pin a location for geo-lock (Use my location)");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -92,6 +124,10 @@ export default function PoapPage() {
           imageUrl: imageUrl.trim() || undefined,
           issuer: publicKey,
           maxClaims: maxClaims.trim() ? Number(maxClaims) : null,
+          geoLock,
+          geoLat: geoLock ? geoLat : null,
+          geoLng: geoLock ? geoLng : null,
+          geoRadiusM: geoLock ? geoRadiusM : null,
         }),
       });
       const d = (await r.json()) as {
@@ -109,6 +145,27 @@ export default function PoapPage() {
       setError(friendlyError(e, "Couldn't create drop"));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const pinLocation = async () => {
+    setGeoBusy(true);
+    setError(null);
+    try {
+      const pos = await readPosition();
+      setGeoLat(pos.coords.latitude);
+      setGeoLng(pos.coords.longitude);
+      setGeoLock(true);
+    } catch (e) {
+      const msg =
+        e && typeof e === "object" && "code" in e
+          ? (e as GeolocationPositionError).code === 1
+            ? "Location permission denied"
+            : "Couldn't read location"
+          : friendlyError(e, "Couldn't read location");
+      setError(msg);
+    } finally {
+      setGeoBusy(false);
     }
   };
 
@@ -245,6 +302,69 @@ export default function PoapPage() {
                     />
                   </label>
 
+                  {/* Geo-lock */}
+                  <div className="rounded-xl border border-black/10 dark:border-white/10 p-3 space-y-2.5">
+                    <label className="flex items-center justify-between gap-3 cursor-pointer">
+                      <span className="text-sm font-medium flex items-center gap-1.5">
+                        <Navigation className="w-4 h-4 text-violet-500" />
+                        Geo-lock claim
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={geoLock}
+                        onChange={(e) => {
+                          setGeoLock(e.target.checked);
+                          if (!e.target.checked) {
+                            setGeoLat(null);
+                            setGeoLng(null);
+                          }
+                        }}
+                        className="w-4 h-4 accent-violet-600"
+                      />
+                    </label>
+                    <p className="text-[11px] text-gray-500">
+                      Claimers must be near this spot (phone GPS). Best for IRL events.
+                    </p>
+                    {geoLock && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void pinLocation()}
+                          disabled={geoBusy}
+                          className="w-full min-h-[40px] rounded-xl bg-violet-600/15 text-violet-700 dark:text-violet-300 text-sm font-medium flex items-center justify-center gap-2"
+                        >
+                          {geoBusy ? (
+                            <Spinner size={16} />
+                          ) : (
+                            <MapPin className="w-4 h-4" />
+                          )}
+                          {geoLat != null ? "Update pin (my location)" : "Use my location"}
+                        </button>
+                        {geoLat != null && geoLng != null && (
+                          <p className="text-[11px] font-mono text-gray-500 text-center">
+                            {geoLat.toFixed(5)}, {geoLng.toFixed(5)}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-1.5 justify-center">
+                          {RADIUS_PRESETS.map((p) => (
+                            <button
+                              key={p.m}
+                              type="button"
+                              onClick={() => setGeoRadiusM(p.m)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
+                                geoRadiusM === p.m
+                                  ? "bg-violet-600 text-white"
+                                  : "bg-black/5 dark:bg-white/10 text-gray-600 dark:text-white/70"
+                              }`}
+                            >
+                              {p.label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
                   {error && (
                     <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
                       {error}
@@ -314,6 +434,10 @@ export default function PoapPage() {
                       setLocation("");
                       setImageUrl("");
                       setMaxClaims("");
+                      setGeoLock(false);
+                      setGeoLat(null);
+                      setGeoLng(null);
+                      setGeoRadiusM(DEFAULT_GEO_RADIUS_M);
                     }}
                     className="block w-full text-xs text-gray-500 mt-2"
                   >
@@ -356,8 +480,11 @@ export default function PoapPage() {
                             <p className="font-semibold text-sm truncate">{d.title}</p>
                             <p className="text-[11px] text-gray-500">
                               {d.claimCount}
-                              {d.maxClaims != null ? ` / ${d.maxClaims}` : ""} claimed ·{" "}
-                              <span className="font-mono">{d.code}</span>
+                              {d.maxClaims != null ? ` / ${d.maxClaims}` : ""} claimed
+                              {isGeoLocked(d)
+                                ? ` · 📍 ${d.geoRadiusM ?? DEFAULT_GEO_RADIUS_M}m`
+                                : ""}{" "}
+                              · <span className="font-mono">{d.code}</span>
                             </p>
                           </div>
                         </div>

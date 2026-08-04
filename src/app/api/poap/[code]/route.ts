@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
 import { db, initDb } from "@/lib/db";
-import { isPoapOpen, rowToDrop } from "@/lib/poap";
+import { checkGeoLock, isGeoLocked, isPoapOpen, publicGeoSummary, rowToDrop } from "@/lib/poap";
 
 export const runtime = "nodejs";
 
@@ -24,14 +24,19 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
     }
     const drop = rowToDrop(rs.rows[0] as Record<string, unknown>);
     const status = isPoapOpen(drop);
-    return NextResponse.json({ ok: true, drop, ...status });
+    return NextResponse.json({
+      ok: true,
+      drop,
+      ...status,
+      ...publicGeoSummary(drop),
+    });
   } catch (e) {
     console.error("poap/[code] GET", e);
     return NextResponse.json({ error: "Failed to load drop" }, { status: 500 });
   }
 }
 
-/** Claim drop with connected wallet */
+/** Claim drop with connected wallet (+ optional geo) */
 export async function POST(req: NextRequest, ctx: Ctx) {
   try {
     await initDb();
@@ -41,7 +46,12 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       return NextResponse.json({ error: "Invalid code" }, { status: 400 });
     }
 
-    const body = (await req.json()) as { wallet?: string };
+    const body = (await req.json()) as {
+      wallet?: string;
+      lat?: number;
+      lng?: number;
+      accuracyM?: number;
+    };
     const wallet = (body.wallet || "").trim();
     try {
       new PublicKey(wallet);
@@ -72,14 +82,52 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         ok: true,
         already: true,
         drop,
-        claimedAt: String((existing.rows[0] as unknown as { claimed_at?: string }).claimed_at ?? ""),
+        claimedAt: String(
+          (existing.rows[0] as unknown as { claimed_at?: string }).claimed_at ?? ""
+        ),
       });
+    }
+
+    let claimLat: number | null = null;
+    let claimLng: number | null = null;
+    let claimAcc: number | null = null;
+    let distanceM: number | undefined;
+
+    if (isGeoLocked(drop)) {
+      const lat = Number(body.lat);
+      const lng = Number(body.lng);
+      const acc = body.accuracyM != null ? Number(body.accuracyM) : null;
+      const geo = checkGeoLock(drop, lat, lng, acc);
+      if (!geo.ok) {
+        return NextResponse.json(
+          {
+            error: geo.reason,
+            geoLocked: true,
+            distanceM: geo.distanceM,
+            requiredRadiusM: drop.geoRadiusM,
+          },
+          { status: 403 }
+        );
+      }
+      claimLat = lat;
+      claimLng = lng;
+      claimAcc = acc != null && Number.isFinite(acc) ? acc : null;
+      distanceM = geo.distanceM;
+    } else if (body.lat != null && body.lng != null) {
+      // optional telemetry
+      const lat = Number(body.lat);
+      const lng = Number(body.lng);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        claimLat = lat;
+        claimLng = lng;
+      }
     }
 
     try {
       await db.execute({
-        sql: `INSERT INTO poap_claims (drop_code, wallet) VALUES (?, ?)`,
-        args: [code, wallet],
+        sql: `INSERT INTO poap_claims (drop_code, wallet, claim_lat, claim_lng, claim_accuracy_m)
+              VALUES (?, ?, ?, ?, ?)`,
+        args: [code, wallet, claimLat, claimLng, claimAcc],
       });
       await db.execute({
         sql: `UPDATE poap_drops SET claim_count = claim_count + 1 WHERE code = ?`,
@@ -104,6 +152,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       already: false,
       drop: next,
       claimedAt: new Date().toISOString(),
+      distanceM,
     });
   } catch (e) {
     console.error("poap/[code] POST", e);

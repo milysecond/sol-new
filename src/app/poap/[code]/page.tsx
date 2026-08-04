@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Award, Check, MapPin, Sparkles } from "lucide-react";
+import { Award, Check, MapPin, Navigation, Sparkles } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { PageTransition } from "@/components/page-transition";
@@ -11,6 +11,21 @@ import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { friendlyError } from "@/lib/friendly-errors";
 import type { PoapDrop } from "@/lib/poap";
+import { DEFAULT_GEO_RADIUS_M, isGeoLocked } from "@/lib/poap";
+
+function readPosition(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Location not supported — try Safari/Chrome on a phone"));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 20_000,
+      maximumAge: 10_000,
+    });
+  });
+}
 
 export default function PoapClaimPage() {
   const params = useParams();
@@ -19,11 +34,14 @@ export default function PoapClaimPage() {
   const [drop, setDrop] = useState<PoapDrop | null>(null);
   const [open, setOpen] = useState(true);
   const [reason, setReason] = useState<string | undefined>();
+  const [geoLocked, setGeoLocked] = useState(false);
+  const [geoRadiusM, setGeoRadiusM] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [claimed, setClaimed] = useState(false);
   const [already, setAlready] = useState(false);
+  const [distanceM, setDistanceM] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +54,8 @@ export default function PoapClaimPage() {
           drop?: PoapDrop;
           open?: boolean;
           reason?: string;
+          geoLocked?: boolean;
+          geoRadiusM?: number | null;
           error?: string;
         };
         if (!r.ok || !d.drop) throw new Error(d.error || "Not found");
@@ -43,6 +63,8 @@ export default function PoapClaimPage() {
         setDrop(d.drop);
         setOpen(d.open !== false);
         setReason(d.reason);
+        setGeoLocked(!!d.geoLocked || isGeoLocked(d.drop));
+        setGeoRadiusM(d.geoRadiusM ?? d.drop.geoRadiusM ?? DEFAULT_GEO_RADIUS_M);
       } catch (e) {
         if (!cancelled) setError(friendlyError(e, "Drop not found"));
       } finally {
@@ -58,20 +80,38 @@ export default function PoapClaimPage() {
     if (!publicKey || !drop) return;
     setBusy(true);
     setError(null);
+    setDistanceM(null);
     try {
+      let lat: number | undefined;
+      let lng: number | undefined;
+      let accuracyM: number | undefined;
+
+      if (geoLocked || isGeoLocked(drop)) {
+        const pos = await readPosition();
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+        accuracyM =
+          typeof pos.coords.accuracy === "number" ? pos.coords.accuracy : undefined;
+      }
+
       const r = await fetch(`/api/poap/${encodeURIComponent(code)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet: publicKey }),
+        body: JSON.stringify({ wallet: publicKey, lat, lng, accuracyM }),
       });
       const d = (await r.json()) as {
         ok?: boolean;
         already?: boolean;
         drop?: PoapDrop;
         error?: string;
+        distanceM?: number;
       };
-      if (!r.ok || !d.ok) throw new Error(d.error || "Claim failed");
+      if (!r.ok || !d.ok) {
+        if (typeof d.distanceM === "number") setDistanceM(d.distanceM);
+        throw new Error(d.error || "Claim failed");
+      }
       if (d.drop) setDrop(d.drop);
+      if (typeof d.distanceM === "number") setDistanceM(d.distanceM);
       setClaimed(true);
       setAlready(!!d.already);
     } catch (e) {
@@ -119,7 +159,11 @@ export default function PoapClaimPage() {
               <div className="relative mx-auto w-56 h-56 rounded-3xl overflow-hidden border border-black/10 dark:border-white/10 shadow-lg bg-gradient-to-br from-violet-600 to-fuchsia-500 flex items-center justify-center">
                 {drop.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={drop.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                  <img
+                    src={drop.imageUrl}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
                 ) : (
                   <div className="text-center text-white px-4">
                     <Sparkles className="w-10 h-10 mx-auto mb-2 opacity-90" />
@@ -132,6 +176,13 @@ export default function PoapClaimPage() {
                 <p className="text-sm text-gray-600 dark:text-white/70 text-center whitespace-pre-wrap">
                   {drop.description}
                 </p>
+              )}
+
+              {(geoLocked || isGeoLocked(drop)) && (
+                <div className="rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-2.5 text-center text-sm text-violet-800 dark:text-violet-200 flex items-center justify-center gap-2">
+                  <Navigation className="w-4 h-4 shrink-0" />
+                  Geo-locked · within {geoRadiusM ?? DEFAULT_GEO_RADIUS_M}m
+                </div>
               )}
 
               <p className="text-center text-[11px] text-gray-400">
@@ -148,6 +199,9 @@ export default function PoapClaimPage() {
                   <p className="text-xs text-gray-500 font-mono">
                     {publicKey?.slice(0, 4)}…{publicKey?.slice(-4)}
                   </p>
+                  {distanceM != null && (
+                    <p className="text-[11px] text-gray-400">~{Math.round(distanceM)}m from pin</p>
+                  )}
                 </div>
               )}
 
@@ -161,6 +215,11 @@ export default function PoapClaimPage() {
                   {error && (
                     <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400 text-center">
                       {error}
+                      {distanceM != null && (
+                        <span className="block text-xs mt-1 opacity-80">
+                          ~{Math.round(distanceM)}m away
+                        </span>
+                      )}
                     </div>
                   )}
                   <ConnectGate action="claim this POAP">
@@ -170,10 +229,27 @@ export default function PoapClaimPage() {
                       disabled={busy || !open}
                       className="w-full min-h-[52px] rounded-2xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-semibold text-base flex items-center justify-center gap-2"
                     >
-                      {busy ? <Spinner size={20} /> : <Award className="w-5 h-5" />}
-                      {busy ? "Claiming…" : "Claim POAP"}
+                      {busy ? (
+                        <Spinner size={20} />
+                      ) : geoLocked || isGeoLocked(drop) ? (
+                        <Navigation className="w-5 h-5" />
+                      ) : (
+                        <Award className="w-5 h-5" />
+                      )}
+                      {busy
+                        ? geoLocked || isGeoLocked(drop)
+                          ? "Checking location…"
+                          : "Claiming…"
+                        : geoLocked || isGeoLocked(drop)
+                          ? "Claim here (uses GPS)"
+                          : "Claim POAP"}
                     </button>
                   </ConnectGate>
+                  {(geoLocked || isGeoLocked(drop)) && (
+                    <p className="text-[10px] text-center text-gray-400">
+                      Location stays on device for the check · not sold
+                    </p>
+                  )}
                 </>
               )}
 
