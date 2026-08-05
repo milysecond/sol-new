@@ -14,6 +14,14 @@ export type ChangelogEntry = {
 /** Newest first. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-05",
+    title: "App Clip GTM — full product",
+    items: [
+      "iPhone App Clip loads the full sol.new app (wallet, swap, gift, POAP…).",
+      "New /clip landing with QR for IRL; GTM checklist in ios/Clip/GTM.md.",
+    ],
+  },
+  {
     date: "2026-08-01",
     title: "Ask for funds",
     items: [

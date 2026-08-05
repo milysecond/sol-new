@@ -1,7 +1,8 @@
 import UIKit
 import WebKit
 
-/// Minimal App Clip: full-screen WKWebView → sol.new (or invocation URL).
+/// Full-product App Clip: WKWebView shell for anything on sol.new
+/// (wallet, swap, gift, POAP, stake…). Invocation URL deep-links in.
 @main
 final class ClipAppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
@@ -30,7 +31,8 @@ final class ClipAppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
-    private static let fallback = URL(string: "https://sol.new/?source=appclip")!
+    /// Cold open with no invocation → full product home (not a limited demo).
+    private static let fallback = URL(string: "https://sol.new/home?source=appclip")!
 
     private static func initialURL(from launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> URL {
         if let activity = launchOptions?[.userActivityDictionary] as? [AnyHashable: Any] {
@@ -39,6 +41,12 @@ final class ClipAppDelegate: UIResponder, UIApplicationDelegate {
                     return url
                 }
             }
+        }
+        // Xcode / Local Experience can pass _XCAppClipURL via process info
+        if let raw = ProcessInfo.processInfo.environment["_XCAppClipURL"],
+           let url = URL(string: raw),
+           isAllowed(url) {
+            return appendSource(url)
         }
         return fallback
     }

@@ -47,6 +47,7 @@ const STATIC_ROUTES: { path: string; priority: number; freq: MetadataRoute.Sitem
   { path: "/swap", priority: 0.85, freq: "hourly" },
   { path: "/starter", priority: 0.9, freq: "weekly" },
   { path: "/onboard", priority: 0.9, freq: "weekly" },
+  { path: "/clip", priority: 0.85, freq: "weekly" },
   { path: "/frame", priority: 0.75, freq: "weekly" },
   { path: "/stake", priority: 0.7, freq: "weekly" },
   { path: "/lst", priority: 0.7, freq: "weekly" },
