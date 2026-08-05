@@ -4,7 +4,7 @@
     "details": [
       {
         "appIDs": [
-          "4CK2SMVS2Y.new.sol"
+          "4CK2SMVS2Y.xyz.solnew.app"
         ],
         "components": [
           { "/": "/*" }
@@ -14,12 +14,12 @@
   },
   "webcredentials": {
     "apps": [
-      "4CK2SMVS2Y.new.sol"
+      "4CK2SMVS2Y.xyz.solnew.app"
     ]
   },
   "appclips": {
     "apps": [
-      "4CK2SMVS2Y.new.sol.Clip"
+      "4CK2SMVS2Y.xyz.solnew.app.Clip"
     ]
   }
 }
