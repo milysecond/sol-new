@@ -126,7 +126,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: xyz.solnew.app.Clip
         PRODUCT_NAME: sol-new Clip
-        TARGETED_DEVICE_FAMILY: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SUPPORTS_MACCATALYST: "NO"
