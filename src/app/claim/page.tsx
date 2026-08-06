@@ -173,7 +173,7 @@ export default function ClaimPage() {
       await refreshBalance();
       const { toast } = await import("@/lib/toast");
       toast.money("Gift claimed!");
-            router.push("/wallet");
+    } catch (err) {
       const { friendlyError } = await import("@/lib/friendly-errors");
       setError(friendlyError(err, "We couldn't claim this gift. Try again."));
     } finally {
