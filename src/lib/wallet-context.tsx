@@ -361,14 +361,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       await new Promise((r) => setTimeout(r, 3000));
       await refreshBalance();
       setAirdropDone(true);
-      const { toast } = await import("sonner");
-      toast.success("0.1 SOL airdropped!");
-      try {
-        new Audio("/chaching.mp3").play();
-      } catch {}
+      const { toast } = await import("@/lib/toast");
+      toast.money("0.1 SOL airdropped!");
       setTimeout(() => setAirdropDone(false), 3000);
     } catch {
-      const { toast } = await import("sonner");
+      const { toast } = await import("@/lib/toast");
       toast.error("Airdrop failed — try again");
     } finally {
       setAirdropping(false);

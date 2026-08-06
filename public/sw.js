@@ -24,14 +24,26 @@ self.addEventListener("push", (e) => {
   try { data = e.data?.json() ?? {}; } catch { data = { title: "sol.new", body: e.data?.text() }; }
 
   e.waitUntil(
-    self.registration.showNotification(data.title ?? "sol.new", {
-      body: data.body ?? "",
-      icon: data.icon ?? "/icon-192.png",
-      badge: "/icon-32.png",
-      tag: data.tag ?? "solnew",
-      renotify: !!data.tag,
-      data: { url: data.url ?? "/" },
-    })
+    (async () => {
+      // Best-effort: play chime in open clients (SW can't play reliably in bg)
+      try {
+        const list = await clients.matchAll({ type: "window", includeUncontrolled: true });
+        for (const c of list) {
+          c.postMessage({ type: "solnew-sfx", kind: "notify" });
+        }
+      } catch { /* ignore */ }
+
+      return self.registration.showNotification(data.title ?? "sol.new", {
+        body: data.body ?? "",
+        icon: data.icon ?? "/icon-192.png",
+        badge: "/icon-32.png",
+        tag: data.tag ?? "solnew",
+        renotify: true,
+        silent: false,
+        // Prefer OS default notification sound
+        data: { url: data.url ?? "/" },
+      });
+    })()
   );
 });
 

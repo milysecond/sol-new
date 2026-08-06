@@ -14,6 +14,15 @@ export type ChangelogEntry = {
 /** Newest first. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-07",
+    title: "Brand orbs + toast/push SFX",
+    items: [
+      "Thinking Orbs tinted to sol.new violet.",
+      "Toasts play success/error/notify sounds; airdrop/claim use cha-ching.",
+      "Push notifications: OS sound on + in-app chime when tab is open.",
+    ],
+  },
+  {
     date: "2026-08-05",
     title: "App Clip GTM — full product",
     items: [

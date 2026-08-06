@@ -171,12 +171,9 @@ export default function ClaimPage() {
         signature,
       });
       await refreshBalance();
-      const { toast } = await import("sonner");
-      toast.success("Gift claimed!");
-      try {
-        new Audio("/chaching.mp3").play();
-      } catch {}
-    } catch (err) {
+      const { toast } = await import("@/lib/toast");
+      toast.money("Gift claimed!");
+            router.push("/wallet");
       const { friendlyError } = await import("@/lib/friendly-errors");
       setError(friendlyError(err, "We couldn't claim this gift. Try again."));
     } finally {

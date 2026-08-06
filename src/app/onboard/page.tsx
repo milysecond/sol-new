@@ -12,7 +12,6 @@ import {
   Sparkles,
   Wallet,
 } from "lucide-react";
-import { ThinkingOrb } from "thinking-orbs";
 import { Navbar } from "@/components/navbar";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
@@ -164,7 +163,7 @@ export default function OnboardPage() {
         {step === 0 && (
           <div className="space-y-8 text-center">
             <div className="flex justify-center py-4">
-              <ThinkingOrb state="breathing" size={64} theme="auto" aria-label="sol.new" />
+              <Spinner size={64} state="breathing" label="sol.new" />
             </div>
             <div className="space-y-2">
               <p className="text-[11px] uppercase tracking-wider text-violet-500 font-semibold">
@@ -264,12 +263,7 @@ export default function OnboardPage() {
           <div className="space-y-6 text-center">
             <div className="flex justify-center py-2">
               {creating || loading ? (
-                <ThinkingOrb
-                  state="composing"
-                  size={64}
-                  theme="auto"
-                  aria-label="Creating wallet"
-                />
+                <Spinner size={64} state="composing" label="Creating wallet" />
               ) : (
                 <div className="w-16 h-16 rounded-2xl bg-violet-500/15 text-violet-600 dark:text-violet-400 flex items-center justify-center">
                   <Wallet className="w-8 h-8" />
