@@ -8,11 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		1F9FDF1855EA90DE855EC535 /* ClipAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F2E2DB7921413918FDF96D0 /* ClipAppDelegate.swift */; };
-		2D9EA86D84735126D1C3A9F4 /* ClipNFCReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E1910FAE5FDDF4B3ACD1C4 /* ClipNFCReader.swift */; };
 		3649CDEE4901B3B61A42F683 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D3FC75C661C314C88ACF3F3D /* Assets.xcassets */; };
 		49FE6DCD1BC494CF2020563B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1181255328FE67C35E62825A /* Assets.xcassets */; };
 		61193F175D955A72FBADF13E /* WebViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1A6E6E5BDB5EBA743EEF80 /* WebViewController.swift */; };
-		637A889C2E7EA6CA71982032 /* GTM.md in Resources */ = {isa = PBXBuildFile; fileRef = AD35A0784509F143167E33C3 /* GTM.md */; };
 		7C28621508875D1EBB193983 /* sol-new Clip.app in Embed App Clips */ = {isa = PBXBuildFile; fileRef = 1ED978229A49A7DB5F126BB4 /* sol-new Clip.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		AE872D45114A34D1B6E3723B /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 0716749D73F3F560190D1E59 /* LaunchScreen.storyboard */; };
 		BF92A4E856B1C5D8511DFE72 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C27F566C35506A02E742F0FF /* AppDelegate.swift */; };
@@ -49,13 +47,11 @@
 		0ADFEF87F4D45361F63A9EA9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1181255328FE67C35E62825A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1ED978229A49A7DB5F126BB4 /* sol-new Clip.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "sol-new Clip.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		23E1910FAE5FDDF4B3ACD1C4 /* ClipNFCReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipNFCReader.swift; sourceTree = "<group>"; };
 		742AB21F834B706CD47BD036 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		9578A47ED0CADD163092D10A /* sol-new.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "sol-new.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		990D060C405B5D8C7F8705AD /* ClipWebViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipWebViewController.swift; sourceTree = "<group>"; };
 		9ECF996548FFCF199AB1B6CC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		9F2E2DB7921413918FDF96D0 /* ClipAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipAppDelegate.swift; sourceTree = "<group>"; };
-		AD35A0784509F143167E33C3 /* GTM.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = GTM.md; sourceTree = "<group>"; };
 		BE1A6E6E5BDB5EBA743EEF80 /* WebViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewController.swift; sourceTree = "<group>"; };
 		C27F566C35506A02E742F0FF /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		D3FC75C661C314C88ACF3F3D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -102,9 +98,7 @@
 				D3FC75C661C314C88ACF3F3D /* Assets.xcassets */,
 				EB7E2DE2DFF5720120EA4EDC /* Clip.entitlements */,
 				9F2E2DB7921413918FDF96D0 /* ClipAppDelegate.swift */,
-				23E1910FAE5FDDF4B3ACD1C4 /* ClipNFCReader.swift */,
 				990D060C405B5D8C7F8705AD /* ClipWebViewController.swift */,
-				AD35A0784509F143167E33C3 /* GTM.md */,
 				9ECF996548FFCF199AB1B6CC /* Info.plist */,
 			);
 			path = Clip;
@@ -196,7 +190,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				3649CDEE4901B3B61A42F683 /* Assets.xcassets in Resources */,
-				637A889C2E7EA6CA71982032 /* GTM.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -227,7 +220,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				1F9FDF1855EA90DE855EC535 /* ClipAppDelegate.swift in Sources */,
-				2D9EA86D84735126D1C3A9F4 /* ClipNFCReader.swift in Sources */,
 				F15A068469AC230A6E55E602 /* ClipWebViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -278,7 +270,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 4CK2SMVS2Y;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -317,6 +309,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Clip/Clip.entitlements;
 				INFOPLIST_FILE = Clip/Info.plist;
+				INFOPLIST_KEY_CFBundlePackageType = APPL;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -359,6 +352,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Clip/Clip.entitlements;
 				INFOPLIST_FILE = Clip/Info.plist;
+				INFOPLIST_KEY_CFBundlePackageType = APPL;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -408,7 +402,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 4CK2SMVS2Y;
 				ENABLE_NS_ASSERTIONS = NO;

@@ -11,7 +11,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "5.9"
     MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "3"
     ENABLE_USER_SCRIPT_SANDBOXING: "YES"
 
 targets:
@@ -29,13 +29,11 @@ targets:
           - applinks:sol.new
           - appclips:sol.new
         aps-environment: production
-        com.apple.developer.nfc.readersession.formats:
-          - NDEF
-          - TAG
     info:
       path: sol-new/Info.plist
       properties:
         CFBundleDisplayName: sol.new
+        CFBundlePackageType: APPL
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchStoryboardName: LaunchScreen
@@ -92,6 +90,8 @@ targets:
       - path: Clip
         excludes:
           - README.md
+          - GTM.md
+          - ClipNFCReader.swift
     entitlements:
       path: Clip/Clip.entitlements
       properties:
@@ -100,19 +100,26 @@ targets:
         com.apple.developer.associated-domains:
           - appclips:sol.new
           - applinks:sol.new
-        com.apple.developer.nfc.readersession.formats:
-          - NDEF
-          - TAG
     info:
       path: Clip/Info.plist
       properties:
         CFBundleDisplayName: sol.new
+        CFBundlePackageType: APPL
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen:
           UIColorName: black
+        # iPad multitasking requires all four when device family includes iPad
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         UIStatusBarStyle: UIStatusBarStyleLightContent
         UIViewControllerBasedStatusBarAppearance: true
         ITSAppUsesNonExemptEncryption: false
@@ -121,7 +128,6 @@ targets:
         NSAppClip:
           NSAppClipRequestEphemeralUserNotification: false
           NSAppClipRequestLocationConfirmation: false
-        NFCReaderUsageDescription: sol.new uses NFC to open links and experiences from tags.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: xyz.solnew.app.Clip
@@ -130,6 +136,8 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SUPPORTS_MACCATALYST: "NO"
+        # Ensure package type APPL (App Store rejects non-APPL for Clip)
+        INFOPLIST_KEY_CFBundlePackageType: APPL
 
 schemes:
   sol-new:
