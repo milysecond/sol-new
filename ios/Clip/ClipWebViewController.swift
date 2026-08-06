@@ -62,11 +62,9 @@ final class ClipWebViewController: UIViewController, WKNavigationDelegate, WKUID
         b.translatesAutoresizingMaskIntoConstraints = false
         b.accessibilityLabel = "Scan NFC"
         b.addTarget(self, action: #selector(scanNFC), for: .touchUpInside)
-        b.isHidden = !ClipNFCReader.shared.isAvailable
-        b.layer.shadowColor = UIColor.black.cgColor
-        b.layer.shadowOpacity = 0.25
-        b.layer.shadowRadius = 8
-        b.layer.shadowOffset = CGSize(width: 0, height: 4)
+        // Core NFC NDEF entitlement removed for App Store (SDK 26). System still
+        // opens the Clip from NFC URL tags; in-Clip scan is optional/unavailable.
+        b.isHidden = true
         return b
     }()
 
