@@ -50,23 +50,6 @@ final class ClipWebViewController: UIViewController, WKNavigationDelegate, WKUID
         return s
     }()
 
-    private lazy var nfcButton: UIButton = {
-        var config = UIButton.Configuration.filled()
-        config.title = nil
-        config.image = UIImage(systemName: "wave.3.right")
-        config.cornerStyle = .capsule
-        config.baseBackgroundColor = UIColor(red: 0.66, green: 0.33, blue: 0.97, alpha: 0.92)
-        config.baseForegroundColor = .white
-        config.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12)
-        let b = UIButton(configuration: config)
-        b.translatesAutoresizingMaskIntoConstraints = false
-        b.accessibilityLabel = "Scan NFC"
-        b.addTarget(self, action: #selector(scanNFC), for: .touchUpInside)
-        // Core NFC NDEF entitlement removed for App Store (SDK 26). System still
-        // opens the Clip from NFC URL tags; in-Clip scan is optional/unavailable.
-        b.isHidden = true
-        return b
-    }()
 
     init(startURL: URL) {
         self.startURL = startURL
@@ -83,7 +66,6 @@ final class ClipWebViewController: UIViewController, WKNavigationDelegate, WKUID
         view.backgroundColor = .black
         view.addSubview(webView)
         view.addSubview(spinner)
-        view.addSubview(nfcButton)
         NSLayoutConstraint.activate([
             webView.topAnchor.constraint(equalTo: view.topAnchor),
             webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -91,10 +73,6 @@ final class ClipWebViewController: UIViewController, WKNavigationDelegate, WKUID
             webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            nfcButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
-            nfcButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -72),
-            nfcButton.widthAnchor.constraint(equalToConstant: 48),
-            nfcButton.heightAnchor.constraint(equalToConstant: 48),
         ])
 
         let refresh = UIRefreshControl()
@@ -111,23 +89,6 @@ final class ClipWebViewController: UIViewController, WKNavigationDelegate, WKUID
         }
     }
 
-    @objc private func scanNFC() {
-        ClipNFCReader.shared.scan(
-            onURL: { [weak self] url in
-                guard let self else { return }
-                if Self.isSolNew(url) {
-                    self.load(Self.withAppClipSource(url))
-                } else {
-                    UIApplication.shared.open(url)
-                }
-            },
-            onMessage: { [weak self] msg in
-                let alert = UIAlertController(title: "NFC", message: msg, preferredStyle: .alert)
-                alert.addAction(UIAlertAction(title: "OK", style: .default))
-                self?.present(alert, animated: true)
-            }
-        )
-    }
 
     func load(_ url: URL) {
         spinner.startAnimating()
