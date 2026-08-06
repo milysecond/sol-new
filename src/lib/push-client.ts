@@ -140,14 +140,18 @@ export async function showLocalNotification(title: string, body: string, url = "
   if (getPushPermission() !== "granted") return;
   if (!("serviceWorker" in navigator)) return;
   try {
+    // In-app cue
+    const { playSfx } = await import("@/lib/sfx");
+    playSfx("notify");
     const reg = await navigator.serviceWorker.ready;
     await reg.showNotification(title, {
       body,
       icon: "/icon-192.png",
       badge: "/icon-32.png",
       tag: "tx-confirmed",
+      silent: false,
       data: { url },
-    });
+    } as NotificationOptions);
   } catch {
     // sw not ready yet — silent fail
   }

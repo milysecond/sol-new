@@ -290,7 +290,7 @@ export default function SendPage() {
       setStatus("done");
       await refreshBalance();
       void loadTokens();
-      const { toast } = await import("sonner");
+      const { toast } = await import("@/lib/toast");
       toast.success("Transfer successful!");
       try {
         new Audio("/chaching.mp3").play();

@@ -171,7 +171,7 @@ export function PrivateSendSheet() {
       setDoneTx(tx);
       setAmount("");
       if (mode === "send") setRecipient("");
-      const { toast } = await import("sonner");
+      const { toast } = await import("@/lib/toast");
       toast.success(mode === "shield" ? "Shielded!" : mode === "send" ? "Sent privately!" : "Unshielded!");
       try { new Audio("/chaching.mp3").play(); } catch {}
       await refreshBalance(session);

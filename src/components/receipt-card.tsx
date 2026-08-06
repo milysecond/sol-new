@@ -10,7 +10,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Spinner } from "@/components/spinner";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   type ReceiptData,
   formatLamportsAsSol,

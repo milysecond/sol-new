@@ -218,7 +218,7 @@ export default function PuntPage() {
   useEffect(() => { loadPicks(); }, [loadPicks]);
 
   const handlePick = async (match: PuntMatch, pick: string) => {
-    const { toast } = await import("sonner");
+    const { toast } = await import("@/lib/toast");
     if (!publicKey) {
       toast("Connect your wallet up top to play — it's free.");
       return;

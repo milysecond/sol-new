@@ -5,7 +5,8 @@ import { WalletProvider } from "@/lib/wallet-context";
 import { NetworkProvider } from "@/lib/network";
 import { ThemeProvider } from "@/lib/theme-context";
 import { PodPlayerProvider } from "@/lib/pod-player";
-import { Toaster } from "sonner";
+import { AppToaster } from "@/components/app-toaster";
+import { SfxBridge } from "@/components/sfx-bridge";
 import { InstallPrompt } from "@/components/install-prompt";
 import { PushPrompt } from "@/components/push-prompt";
 import { SiteFooter } from "@/components/site-footer";
@@ -139,8 +140,9 @@ export default function RootLayout({
             </PodPlayerProvider>
           </WalletProvider>
         </NetworkProvider>
+          <AppToaster />
+          <SfxBridge />
         </ThemeProvider>
-        <Toaster theme="light" position="top-center" richColors />
         <InstallPrompt />
         <PushPrompt />
         <script

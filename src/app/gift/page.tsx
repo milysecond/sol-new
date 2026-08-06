@@ -281,7 +281,7 @@ export default function GiftPage() {
       setStatus("done");
       startCancelWindow();
       await refreshBalance();
-      const { toast } = await import("sonner");
+      const { toast } = await import("@/lib/toast");
       toast.success("Gift link created!");
       try {
         new Audio("/chaching.mp3").play();
@@ -331,7 +331,7 @@ export default function GiftPage() {
   const handleReclaim = async (entry: GiftLinkEntry): Promise<boolean> => {
     if (!publicKey) return false;
     setReclaiming(entry.pubkey);
-    const { toast } = await import("sonner");
+    const { toast } = await import("@/lib/toast");
     try {
       const secret = parseGiftSecret(new URL(entry.url).hash);
       const gift = secret ? keypairFromSecret(secret) : null;
