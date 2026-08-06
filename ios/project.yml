@@ -130,3 +130,22 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SUPPORTS_MACCATALYST: "NO"
+
+schemes:
+  sol-new:
+    build:
+      targets:
+        sol-new: all
+        sol-new Clip: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  sol-new Clip:
+    build:
+      targets:
+        sol-new Clip: all
+    run:
+      config: Debug
+    archive:
+      config: Release
