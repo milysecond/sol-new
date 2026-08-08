@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 
-// /track → /address (pretty) or /scan
+// /track → /address (pretty) or bare address scan
 export default async function TrackRedirect({
   searchParams,
 }: {
@@ -8,6 +8,6 @@ export default async function TrackRedirect({
 }) {
   const sp = await searchParams;
   const wallet = sp.wallet || sp.address;
-  if (wallet) redirect(`/address/${encodeURIComponent(wallet)}`);
-  redirect("/address");
+  if (wallet) permanentRedirect(`/address/${encodeURIComponent(wallet)}`);
+  permanentRedirect("/address");
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Calendar, ExternalLink, Link2, MousePointerClick } from "lucide-react";
 import { initDb, getShortLink, incrementShortLinkClicks } from "@/lib/db";
 import {
@@ -16,9 +16,12 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/** Crawlers that need HTML meta / OG without a hard bounce. */
+/** Social preview bots only — search engines get honest redirect/404. */
 function isShareCrawler(ua: string): boolean {
   const u = ua.toLowerCase();
+  if (u.includes("googlebot") || u.includes("bingbot") || u.includes("duckduckbot") || u.includes("yandex")) {
+    return false;
+  }
   return (
     u.includes("twitterbot") ||
     u.includes("facebookexternalhit") ||
@@ -34,17 +37,8 @@ function isShareCrawler(ua: string): boolean {
     u.includes("embedly") ||
     u.includes("quora link preview") ||
     u.includes("applebot") ||
-    u.includes("googlebot") ||
-    u.includes("bingbot") ||
-    u.includes("duckduckbot") ||
-    u.includes("baiduspider") ||
-    u.includes("yandex") ||
     u.includes("iframely") ||
-    u.includes("opengraph") ||
-    u.includes("preview") ||
-    u.includes("bot") ||
-    u.includes("crawler") ||
-    u.includes("spider")
+    u.includes("opengraph")
   );
 }
 
@@ -71,8 +65,9 @@ export async function generateMetadata({
 
   if (!link) {
     return {
-      title: `Short link ${shortPath(code || "…")} — sol.new`,
-      description: "sol.new short link. Create free short URLs for Solana tools and the open web.",
+      title: `Link not found — sol.new`,
+      description: "This short link does not exist or has expired.",
+      robots: { index: false, follow: false },
     };
   }
 
@@ -91,6 +86,7 @@ export async function generateMetadata({
   return {
     title: `${title} · ${dest.siteName}`,
     description,
+    robots: { index: false, follow: true },
     alternates: { canonical: url },
     openGraph: {
       title: `${title}`,
@@ -98,7 +94,6 @@ export async function generateMetadata({
       url,
       siteName: "sol.new",
       type: "website",
-      // Next auto-attaches opengraph-image; keep explicit for picky scrapers
       images: [{ url: `${url}/opengraph-image`, width: 1200, height: 630, alt: title }],
     },
     twitter: {
@@ -113,24 +108,20 @@ export async function generateMetadata({
 
 /**
  * Short link landing:
- * - Humans: always auto-forward to destination (click counted)
- * - Share crawlers: stay on a lightweight preview so OG/meta resolve
+ * - Missing/expired/invalid → real 404
+ * - Humans + search bots: auto-forward
+ * - Social preview bots: OG shell (noindex)
  */
 export default async function ShortLinkPage({
   params,
 }: {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ go?: string }>;
 }) {
   const { code: raw } = await params;
   const loaded = await loadLink(raw);
 
-  if (loaded.invalid) redirect("/link?e=invalid");
-  if ("expired" in loaded && loaded.expired) {
-    redirect(`/link?e=expired&code=${encodeURIComponent(loaded.code)}`);
-  }
-  if (!loaded.link) {
-    redirect(`/link?e=missing&code=${encodeURIComponent(loaded.code)}`);
+  if (loaded.invalid || !loaded.link || ("expired" in loaded && loaded.expired)) {
+    notFound();
   }
 
   const { code, link } = loaded;
@@ -139,27 +130,17 @@ export default async function ShortLinkPage({
   const ua = h.get("user-agent") || "";
   const crawler = isShareCrawler(ua);
 
-  // Auto-forward everyone except share/preview crawlers
   if (!crawler) {
     incrementShortLinkClicks(code).catch(() => {});
     redirect(link.targetUrl);
   }
 
-  // Crawler / preview shell
   const displayTitle = shortLinkDisplayTitle(link.title, dest);
   const createdLabel = formatShortLinkCreated(link.createdAt);
   const KindIcon = dest.kind === "Calendar" ? Calendar : Link2;
 
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col items-center justify-center px-4 py-10">
-      {/* Instant client fallback if a human ever lands here */}
-      <meta httpEquiv="refresh" content={`0;url=${link.targetUrl}`} />
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `location.replace(${JSON.stringify(link.targetUrl)})`,
-        }}
-      />
-
       <div className="w-full max-w-md space-y-5">
         <div className="text-center space-y-2">
           <p className="text-xs font-medium uppercase tracking-wide text-sky-500">

@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 
 /** Legacy alias → /draw */
 export default function VrfAlias() {
-  redirect("/draw");
+  permanentRedirect("/draw");
 }
