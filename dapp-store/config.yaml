@@ -16,7 +16,7 @@ app:
     - purpose: icon
       uri: media/icon.png
 release:
-  address: DFerwxXJPHVxgoY7brmLrBHpBZbGnqoSGXJB4PjJ6P8u
+  address: 3Drh66f63vFVBU79ypyzzsB9qs2BNsnS76TEmcc5adAB
   media:
     - purpose: icon
       uri: media/icon.png
@@ -25,37 +25,52 @@ release:
     - purpose: screenshot
       uri: media/screenshot-home.png
     - purpose: screenshot
-      uri: media/screenshot-launches.png
+      uri: media/screenshot-onboard.png
     - purpose: screenshot
-      uri: media/screenshot-docs.png
+      uri: media/screenshot-gift.png
     - purpose: screenshot
-      uri: media/screenshot-token.png
+      uri: media/screenshot-poap.png
   files:
     - purpose: install
       uri: media/solnew.apk
   android_details:
     cert_fingerprint: 61773d28fbf56b10a447233ef495c3f4e427ddd51238b14a3e89cbd44fdfd288
     min_sdk: 23
-    version: 1.0.0
-    version_code: 1
+    version: 1.0.1
+    version_code: 2
     locales:
       - en-US
   catalog:
     en-US:
       name: sol.new
-      short_description: Create anything on Solana
+      short_description: Passkey Solana wallet & tools
       long_description: |
-        sol.new is the fastest way to create tokens, NFTs, multisig wallets, and payments on Solana. Passkey-secured, low fees, no extensions. Launch a token in seconds, mint NFTs, run multisigs, and manage wallets — all from one app.
-      new_in_version: Initial release on the Solana dApp Store.
+        sol.new is the fastest full Solana wallet and creator app — Face ID passkeys, no seed phrases, no extensions.
+
+        • Create a wallet in seconds with Face ID / fingerprint
+        • Swap any token (Jupiter) with optional sponsored fees
+        • Send gifts anyone can claim — even without a wallet yet
+        • Stake SOL, request funds, short links, POAP drops
+        • Mint tokens & NFTs, multisig, portfolio — one app
+
+        Built for Seeker and the open web. Free to start.
+      new_in_version: |
+        • Default onboard flow + home app grid
+        • Gift links, ask-for-funds share (SMS/WA/TG)
+        • POAP drops with optional geo + on-chain cNFT
+        • Swap, stake, short links, brand orbs + toast SFX
+        • App Clip-ready product shell
       saga_features: ''
       sagaFeaturesLocalized: ''
 solana_mobile_dapp_publisher_portal:
   google_store_package: ''
   testing_instructions: |
-    No login required. From the home screen tap "Get started" to create a passkey-secured wallet. To exercise a token launch flow on devnet, use the network toggle in the top-right and switch to "test".
+    No login required. Cold open shows onboard — tap Get started / Face ID to create a passkey wallet.
+    Then try: Wallet → Get (request funds), Gift, Swap, POAP, Home grid.
+    Optional: network toggle to testnet for free airdrop play.
 lastSubmittedVersionOnChain:
-  address: DFerwxXJPHVxgoY7brmLrBHpBZbGnqoSGXJB4PjJ6P8u
-  version_code: 1
-  apk_hash: uh8/Z5PKhvgg1rqvCGFIJAPh8/OtNOmV+XGSeSVmj5w=
+  address: 3Drh66f63vFVBU79ypyzzsB9qs2BNsnS76TEmcc5adAB
+  version_code: 2
+  apk_hash: WY8URQWTItzIFaNt+/MhNySqPbw6QURyvfD/1C6arnA=
 lastUpdatedVersionOnStore:
-  address: DFerwxXJPHVxgoY7brmLrBHpBZbGnqoSGXJB4PjJ6P8u
+  address: 3Drh66f63vFVBU79ypyzzsB9qs2BNsnS76TEmcc5adAB

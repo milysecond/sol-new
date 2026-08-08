@@ -6,10 +6,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MEDIA = path.join(__dirname, "media");
 
 const SHOTS = [
-  { name: "screenshot-home.png", url: "https://sol.new/" },
-  { name: "screenshot-launches.png", url: "https://sol.new/whats-new" },
-  { name: "screenshot-docs.png", url: "https://sol.new/docs" },
-  { name: "screenshot-token.png", url: "https://sol.new/token/5XQcCrVy57V4iP2u8PateCGk3a1DHfEKMSPagPJMYniG" },
+  { name: "screenshot-home.png", url: "https://sol.new/home" },
+  { name: "screenshot-onboard.png", url: "https://sol.new/" },
+  { name: "screenshot-gift.png", url: "https://sol.new/gift" },
+  { name: "screenshot-poap.png", url: "https://sol.new/poap" },
 ];
 
 const VIEWPORT = { width: 1080, height: 1920 };
@@ -37,7 +37,12 @@ await ctx.addInitScript(() => {
 for (const shot of SHOTS) {
   const page = await ctx.newPage();
   console.log("→", shot.url);
-  await page.goto(shot.url, { waitUntil: "networkidle", timeout: 45_000 });
+  await page.goto(shot.url, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  try {
+    await page.waitForLoadState("networkidle", { timeout: 12_000 });
+  } catch {
+    /* ok — SPA may keep connections open */
+  }
   // Hide the install prompt and any toaster overlays for clean shots.
   await page.addStyleTag({
     content: `

@@ -11,22 +11,23 @@
   "navigationDividerColor": "#000000",
   "navigationDividerColorDark": "#000000",
   "backgroundColor": "#000000",
-  "enableNotifications": false,
+  "enableNotifications": true,
   "startUrl": "/",
   "iconUrl": "https://sol.new/icon-512.png",
   "maskableIconUrl": "https://sol.new/icon-512.png",
-  "appVersion": "1.0.0",
-  "appVersionName": "1.0.0",
-  "appVersionCode": 1,
+  "appVersion": "1.0.1",
+  "appVersionName": "1.0.1",
+  "appVersionCode": 2,
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "./android.keystore",
     "alias": "android"
   },
   "shortcuts": [
-    { "name": "Token",    "shortName": "Token",    "url": "/token",    "chosenIconUrl": "https://sol.new/icon-192.png" },
-    { "name": "NFT",      "shortName": "NFT",      "url": "/nft",      "chosenIconUrl": "https://sol.new/icon-192.png" },
-    { "name": "Wallet",   "shortName": "Wallet",   "url": "/wallet",   "chosenIconUrl": "https://sol.new/icon-192.png" }
+    { "name": "Wallet", "shortName": "Wallet", "url": "/wallet", "chosenIconUrl": "https://sol.new/icon-192.png" },
+    { "name": "Swap", "shortName": "Swap", "url": "/swap", "chosenIconUrl": "https://sol.new/icon-192.png" },
+    { "name": "Gift", "shortName": "Gift", "url": "/gift", "chosenIconUrl": "https://sol.new/icon-192.png" },
+    { "name": "POAP", "shortName": "POAP", "url": "/poap", "chosenIconUrl": "https://sol.new/icon-192.png" }
   ],
   "generatorApp": "bubblewrap-cli",
   "fallbackType": "customtabs",
