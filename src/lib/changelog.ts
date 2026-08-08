@@ -15,6 +15,15 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-08",
+    title: "SEO: GSC redirect + soft 404 hygiene",
+    items: [
+      "Sitemap drops pure aliases (/wheel,/flip,/dice); robots blocks /link/ and /l/.",
+      "Missing short links and unknown POAPs return real 404s.",
+      "Alias routes use permanent redirects (308).",
+    ],
+  },
+  {
+    date: "2026-08-08",
     title: "Seeker dApp Store 1.0.1",
     items: [
       "sol.new updated on Solana Mobile / Seeker store — onboard, gifts, POAP, swap.",
