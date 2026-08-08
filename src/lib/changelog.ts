@@ -14,6 +14,13 @@ export type ChangelogEntry = {
 /** Newest first. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-08",
+    title: "Seeker dApp Store 1.0.1",
+    items: [
+      "sol.new updated on Solana Mobile / Seeker store — onboard, gifts, POAP, swap.",
+    ],
+  },
+  {
     date: "2026-08-07",
     title: "Brand orbs + toast/push SFX",
     items: [
