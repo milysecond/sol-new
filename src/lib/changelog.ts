@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-08",
+    title: "Stripe Apple Pay domain fix",
+    items: [
+      "Registered sol.new (+ www) for Apple Pay / Google Pay / Link on Stripe.",
+      "Updated Apple merchant domain association file; iOS opens checkout same-tab.",
+    ],
+  },
+  {
+    date: "2026-08-08",
     title: "SEO: GSC redirect + soft 404 hygiene",
     items: [
       "Sitemap drops pure aliases (/wheel,/flip,/dice); robots blocks /link/ and /l/.",
