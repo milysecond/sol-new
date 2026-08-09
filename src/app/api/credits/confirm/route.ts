@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
-import { getStripe, stripeConfigured } from "@/lib/stripe";
+import {
+  CREDIT_PACK_CREDITS,
+  retrieveCheckoutSession,
+  creditsConfigured,
+} from "@/lib/credits";
 import { creditWalletFromStripe, getCreditBalanceCents, initDb } from "@/lib/db";
-import { CREDIT_PACK_CREDITS } from "@/lib/credits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,10 +13,9 @@ export const dynamic = "force-dynamic";
 /**
  * POST { sessionId, wallet }
  * Client fallback when returning from Checkout — credits if paid (idempotent).
- * Webhook is still preferred for reliability.
  */
 export async function POST(req: NextRequest) {
-  if (!stripeConfigured()) {
+  if (!creditsConfigured()) {
     return NextResponse.json({ error: "not configured" }, { status: 503 });
   }
 
@@ -33,8 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const stripe = getStripe();
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const session = await retrieveCheckoutSession(sessionId);
     if (session.payment_status !== "paid") {
       return NextResponse.json({
         ok: false,
