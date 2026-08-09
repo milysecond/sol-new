@@ -41,6 +41,39 @@ function openExternal(url: string) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
+/** Same-tab navigation — required for Apple Pay on iOS Safari. */
+function openCheckoutSameTab(url: string) {
+  window.location.assign(url);
+}
+
+function isLikelyIosSafari(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  const iOS =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  return iOS && /WebKit/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+}
+
+/** AU-first: Melbourne/Sydney TZ or en-AU locale. */
+function detectAustralia(): boolean {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    if (tz.startsWith("Australia/")) return true;
+  } catch {
+    /* ignore */
+  }
+  try {
+    const langs = navigator.languages?.length
+      ? navigator.languages
+      : [navigator.language || ""];
+    if (langs.some((l) => /en-AU|en-NZ/i.test(l))) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
 function isReady(c: BridgeCustomer | null | undefined) {
   return c?.kycStatus === "approved" && c?.tosStatus === "approved";
 }
@@ -50,9 +83,21 @@ function TransakGetSection() {
   const [ok, setOk] = useState<boolean | null>(null);
   const [amount, setAmount] = useState(50);
   const [asset, setAsset] = useState<"SOL" | "USDC">("SOL");
+  const isAu = detectAustralia();
   const [fiat, setFiat] = useState<"AUD" | "USD">("AUD");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [doneBanner, setDoneBanner] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).get("transak") === "done") {
+        setDoneBanner(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,7 +115,7 @@ function TransakGetSection() {
     };
   }, []);
 
-  const openBuy = async () => {
+  const openBuy = async (sameTab = true) => {
     if (!publicKey) return;
     setBusy(true);
     setError(null);
@@ -83,7 +128,8 @@ function TransakGetSection() {
           asset,
           fiatAmount: amount,
           fiatCurrency: fiat,
-          countryCode: fiat === "AUD" ? "AU" : undefined,
+          // Always pin AU when paying AUD — enables local rails + Apple Pay AU
+          countryCode: fiat === "AUD" ? "AU" : fiat === "USD" ? "US" : undefined,
         }),
       });
       const data = (await res.json()) as {
@@ -92,10 +138,14 @@ function TransakGetSection() {
         widgetUrl?: string;
       };
       if (!res.ok || !data.ok || !data.widgetUrl) {
-        throw new Error(data.error || "Could not open Transak");
+        throw new Error(data.error || "Could not open buy checkout");
       }
-      openExternal(data.widgetUrl);
-      // Soft refresh balance later; Transak may take minutes
+      // Apple Pay needs top-level navigation (same tab), especially iOS Safari
+      if (sameTab || isLikelyIosSafari()) {
+        openCheckoutSameTab(data.widgetUrl);
+      } else {
+        openExternal(data.widgetUrl);
+      }
       setTimeout(() => void refreshBalance(), 30_000);
     } catch (e) {
       setError(friendlyError(e, "Could not open buy flow."));
@@ -114,17 +164,38 @@ function TransakGetSection() {
   if (!ok) return null;
 
   return (
-    <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-5 space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="bg-purple-500/5 border border-purple-500/30 rounded-xl p-5 space-y-4 ring-1 ring-purple-500/10">
+      <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
-          <DollarSign size={16} className="text-purple-500" /> Buy with Apple Pay
+          <DollarSign size={16} className="text-purple-500" /> Buy crypto
+          {isAu ? " in Australia" : ""}
         </p>
-        <span className="text-xs text-purple-600/80 dark:text-purple-400/80">via Transak</span>
+        <span className="text-[10px] uppercase tracking-wide font-semibold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">
+          Apple Pay · AUD
+        </span>
       </div>
-      <p className="text-xs text-gray-500 dark:text-white/40">
-        Apple Pay, card, Google Pay, and local methods (including Australia / AUD). Crypto goes to
-        your locked Solana wallet. Transak handles KYC.
+      <p className="text-xs text-gray-500 dark:text-white/45 leading-relaxed">
+        {isAu ? (
+          <>
+            Works in <strong className="font-semibold text-gray-700 dark:text-white/70">Australia</strong> with
+            Apple Pay, card, Google Pay, and PayID-style methods. Defaults to{" "}
+            <strong className="font-semibold">AUD</strong>. Crypto goes straight to your sol.new wallet.
+          </>
+        ) : (
+          <>
+            Apple Pay, card, Google Pay, and local methods — including{" "}
+            <strong className="font-semibold">Australia / AUD</strong>. Crypto goes to your locked Solana
+            wallet. KYC via Transak.
+          </>
+        )}
       </p>
+
+      {doneBanner && (
+        <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-lg px-3 py-2 text-emerald-700 dark:text-emerald-300 text-xs">
+          Thanks — if you finished checkout, crypto usually arrives within a few minutes. Pull to refresh
+          balance.
+        </div>
+      )}
 
       <div className="flex gap-2">
         <button
@@ -161,7 +232,7 @@ function TransakGetSection() {
               : "bg-black/5 dark:bg-white/5 text-gray-500"
           }`}
         >
-          AUD (AU)
+          AUD (Australia)
         </button>
         <button
           type="button"
@@ -193,13 +264,20 @@ function TransakGetSection() {
 
       <button
         type="button"
-        onClick={() => void openBuy()}
+        onClick={() => void openBuy(true)}
         disabled={busy || !publicKey}
-        className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2"
+        className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer flex items-center justify-center gap-2"
       >
         {busy ? <Spinner size={16} /> : null}
-        Continue to Apple Pay / card
-        <ExternalLink className="w-4 h-4 opacity-80" />
+        Continue — Apple Pay / card
+      </button>
+      <button
+        type="button"
+        onClick={() => void openBuy(false)}
+        disabled={busy || !publicKey}
+        className="w-full text-xs text-gray-500 dark:text-white/40 hover:text-purple-500 transition cursor-pointer py-1 disabled:opacity-40"
+      >
+        Or open in new tab <ExternalLink className="w-3 h-3 inline opacity-70" />
       </button>
 
       {error && (
@@ -208,7 +286,8 @@ function TransakGetSection() {
         </div>
       )}
       <p className="text-[11px] text-gray-400 dark:text-white/30">
-        Opens Transak. Destination is locked to your sol.new wallet on Solana.
+        Opens Transak checkout in this tab (best for Apple Pay on iPhone). Destination locked to your
+        sol.new wallet on Solana.
       </p>
     </div>
   );
@@ -220,6 +299,7 @@ function StripeGetSection() {
   const [amount, setAmount] = useState(50);
   const [asset, setAsset] = useState<"usdc" | "sol">("usdc");
   const [showCheckout, setShowCheckout] = useState(false);
+  const isAu = detectAustralia();
 
   useEffect(() => {
     let cancelled = false;
@@ -249,6 +329,11 @@ function StripeGetSection() {
     return null;
   }
 
+  // Australia: Stripe Crypto Onramp is not available — Transak is the AU path
+  if (isAu) {
+    return null;
+  }
+
   return (
     <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-5 space-y-4">
       <div className="flex items-center justify-between">
@@ -258,7 +343,8 @@ function StripeGetSection() {
         <span className="text-xs text-indigo-600/80 dark:text-indigo-400/80">via Stripe</span>
       </div>
       <p className="text-xs text-gray-500 dark:text-white/40">
-        Stripe Crypto Onramp: Apple Pay / card for US and EU only. For Australia use Transak above.
+        Stripe Crypto Onramp for US and EU only (not Australia). AU users: use Buy crypto above
+        (Transak · Apple Pay · AUD).
       </p>
 
       <div className="flex gap-2">
@@ -848,7 +934,7 @@ export default function GetPage() {
               </div>
             )}
 
-            {/* Stripe Apple Pay / card (primary) + Bridge bank (secondary) */}
+            {/* Transak (AU/global Apple Pay) primary · Stripe US/EU · Bridge bank */}
             {network === "mainnet" && (
               <>
                 <TransakGetSection />

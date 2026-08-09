@@ -80,7 +80,9 @@ export async function POST(req: NextRequest) {
       asset,
       fiatAmount,
       fiatCurrency: body.fiatCurrency?.trim().toUpperCase() || "AUD",
-      countryCode: body.countryCode?.trim().toUpperCase(),
+      countryCode:
+        body.countryCode?.trim().toUpperCase() ||
+        ((body.fiatCurrency?.trim().toUpperCase() || "AUD") === "AUD" ? "AU" : undefined),
       redirectURL: `${origin}/get?transak=done`,
       userIp: clientIp(req),
     });
