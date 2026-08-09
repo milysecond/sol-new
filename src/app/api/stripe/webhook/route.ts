@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
 
   let event: { type: string; data: { object: Record<string, unknown> } };
   try {
-    event = stripe.webhooks.constructEvent(raw, sig, secret) as typeof event;
+    event = stripe.webhooks.constructEvent(raw, sig, secret) as unknown as typeof event;
   } catch (e) {
     const msg = e instanceof Error ? e.message : "bad signature";
     console.error("[stripe/webhook] sig", msg);
