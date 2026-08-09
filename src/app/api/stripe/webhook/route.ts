@@ -1,25 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStripe, stripeConfigured } from "@/lib/stripe";
 import { creditWalletFromStripe, initDb } from "@/lib/db";
-import { CREDIT_PACK_CREDITS } from "@/lib/credits";
+import { CREDIT_PACK_CREDITS, creditsConfigured } from "@/lib/credits";
 import { notifyEvent } from "@/lib/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function envVar(name: string): string | undefined {
+  const v = process.env[name]?.trim();
+  if (v) return v;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getCloudflareContext } = require("@opennextjs/cloudflare") as {
+      getCloudflareContext: (opts?: { async?: boolean }) => { env?: Record<string, unknown> };
+    };
+    const ctx = getCloudflareContext();
+    const x = ctx?.env?.[name];
+    if (typeof x === "string" && x.trim()) return x.trim();
+  } catch {
+    /* ignore */
+  }
+  return undefined;
+}
+
 /**
- * Stripe webhook — credits packs + future payment events.
- * Dashboard: https://sol.new/api/stripe/webhook
- * Events: checkout.session.completed
+ * Stripe webhook — credits packs.
+ * Dashboard URL: https://sol.new/api/stripe/webhook
+ * Event: checkout.session.completed
+ *
+ * Signature verified with Stripe's constructEvent via dynamic import only when
+ * secret is set; otherwise accept is disabled.
  */
 export async function POST(req: NextRequest) {
-  if (!stripeConfigured()) {
+  if (!creditsConfigured()) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 503 });
   }
 
   const secret =
-    process.env.STRIPE_WEBHOOK_SECRET?.trim() ||
-    process.env.STRIPE_CREDITS_WEBHOOK_SECRET?.trim();
+    envVar("STRIPE_WEBHOOK_SECRET") || envVar("STRIPE_CREDITS_WEBHOOK_SECRET");
   if (!secret) {
     console.error("[stripe/webhook] STRIPE_WEBHOOK_SECRET missing");
     return NextResponse.json({ error: "Webhook secret not configured" }, { status: 503 });
@@ -31,11 +49,18 @@ export async function POST(req: NextRequest) {
   }
 
   const raw = await req.text();
-  const stripe = getStripe();
 
-  let event;
+  // Lazy import stripe for signature only
+  const Stripe = (await import("stripe")).default;
+  const key = envVar("STRIPE_SECRET_KEY");
+  if (!key) {
+    return NextResponse.json({ error: "no key" }, { status: 503 });
+  }
+  const stripe = new Stripe(key, { apiVersion: "2026-01-28.clover" });
+
+  let event: { type: string; data: { object: Record<string, unknown> } };
   try {
-    event = stripe.webhooks.constructEvent(raw, sig, secret);
+    event = stripe.webhooks.constructEvent(raw, sig, secret) as typeof event;
   } catch (e) {
     const msg = e instanceof Error ? e.message : "bad signature";
     console.error("[stripe/webhook] sig", msg);
@@ -57,17 +82,15 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, skipped: "not_paid" });
       }
 
-      const wallet =
-        session.metadata?.wallet ||
-        session.client_reference_id ||
-        "";
+      const wallet = session.metadata?.wallet || session.client_reference_id || "";
       const product = session.metadata?.product || "";
       if (!wallet || product !== "credits_pack_aud_5") {
         return NextResponse.json({ ok: true, skipped: "not_credits" });
       }
 
-      const credits = Number(session.metadata?.credits || CREDIT_PACK_CREDITS);
-      const delta = Number(session.metadata?.credit_cents || session.amount_total || credits);
+      const delta = Number(
+        session.metadata?.credit_cents || session.amount_total || CREDIT_PACK_CREDITS,
+      );
 
       await initDb();
       const { balanceCents, applied } = await creditWalletFromStripe({
