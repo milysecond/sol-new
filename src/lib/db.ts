@@ -184,6 +184,22 @@ export async function initDb() {
     )`,
     `CREATE INDEX IF NOT EXISTS idx_poap_claims_wallet ON poap_claims(wallet)`,
     `CREATE INDEX IF NOT EXISTS idx_poap_drops_issuer ON poap_drops(issuer)`,
+    `CREATE TABLE IF NOT EXISTS credit_balances (
+      wallet TEXT PRIMARY KEY,
+      balance_cents INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS credit_ledger (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      wallet TEXT NOT NULL,
+      delta_cents INTEGER NOT NULL,
+      balance_after INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      stripe_session_id TEXT UNIQUE,
+      note TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_credit_ledger_wallet ON credit_ledger(wallet)`,
     `CREATE TABLE IF NOT EXISTS punt_picks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       wallet TEXT NOT NULL,
@@ -1349,4 +1365,63 @@ export async function getWalletShortLinks(wallet: string, limit = 50): Promise<S
     args: [wallet, limit],
   });
   return r.rows.map((row) => mapShortLink(row as Record<string, unknown>));
+}
+
+// ─── Credits (fiat packs via Stripe Checkout / Apple Pay) ─────────────────
+
+export async function getCreditBalanceCents(wallet: string): Promise<number> {
+  const r = await db.execute({
+    sql: "SELECT balance_cents FROM credit_balances WHERE wallet = ? LIMIT 1",
+    args: [wallet],
+  });
+  const row = r.rows[0] as { balance_cents?: number } | undefined;
+  return Number(row?.balance_cents ?? 0);
+}
+
+/**
+ * Credit a wallet after Stripe payment. Idempotent on stripe_session_id.
+ * Returns new balance (or existing if already applied).
+ */
+export async function creditWalletFromStripe(opts: {
+  wallet: string;
+  deltaCents: number;
+  stripeSessionId: string;
+  note?: string;
+}): Promise<{ balanceCents: number; applied: boolean }> {
+  const wallet = opts.wallet;
+  const delta = Math.floor(opts.deltaCents);
+  if (delta <= 0) throw new Error("delta must be positive");
+
+  // Already applied?
+  const existing = await db.execute({
+    sql: "SELECT balance_after FROM credit_ledger WHERE stripe_session_id = ? LIMIT 1",
+    args: [opts.stripeSessionId],
+  });
+  if (existing.rows[0]) {
+    const after = Number(
+      (existing.rows[0] as unknown as { balance_after?: number }).balance_after ?? 0,
+    );
+    return {
+      balanceCents: after,
+      applied: false,
+    };
+  }
+
+  const cur = await getCreditBalanceCents(wallet);
+  const next = cur + delta;
+
+  await db.execute({
+    sql: `INSERT INTO credit_balances (wallet, balance_cents, updated_at)
+          VALUES (?, ?, datetime('now'))
+          ON CONFLICT(wallet) DO UPDATE SET
+            balance_cents = excluded.balance_cents,
+            updated_at = datetime('now')`,
+    args: [wallet, next],
+  });
+  await db.execute({
+    sql: `INSERT INTO credit_ledger (wallet, delta_cents, balance_after, kind, stripe_session_id, note)
+          VALUES (?, ?, ?, 'purchase', ?, ?)`,
+    args: [wallet, delta, next, opts.stripeSessionId, opts.note || "credits pack"],
+  });
+  return { balanceCents: next, applied: true };
 }

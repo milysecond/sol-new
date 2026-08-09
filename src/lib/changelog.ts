@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-08",
+    title: "A$5 credits via Apple Pay",
+    items: [
+      "Buy sol.new credits with Stripe Checkout + Apple Pay (works in Australia).",
+      "Not crypto on-ramp — digital credits for platform use.",
+    ],
+  },
+  {
+    date: "2026-08-08",
     title: "AU buy: MoonPay + Transak fallback",
     items: [
       "Australia Apple Pay path via MoonPay (AUD), same-tab checkout.",

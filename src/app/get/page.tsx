@@ -78,6 +78,141 @@ function isReady(c: BridgeCustomer | null | undefined) {
   return c?.kycStatus === "approved" && c?.tosStatus === "approved";
 }
 
+function CreditsBuySection() {
+  const { publicKey } = useWallet();
+  const [ok, setOk] = useState<boolean | null>(null);
+  const [balance, setBalance] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const refresh = useCallback(async () => {
+    if (!publicKey) {
+      setOk(null);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/credits/checkout?wallet=${encodeURIComponent(publicKey)}`, {
+        cache: "no-store",
+      });
+      const data = (await res.json()) as {
+        configured?: boolean;
+        balanceCredits?: number;
+      };
+      setOk(data.configured === true);
+      setBalance(Number(data.balanceCredits || 0));
+    } catch {
+      setOk(false);
+    }
+  }, [publicKey]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      if (q.get("credits") === "success") {
+        setSuccess(true);
+        const sid = q.get("session_id");
+        if (sid && publicKey) {
+          void fetch("/api/credits/confirm", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId: sid, wallet: publicKey }),
+          }).then(() => refresh());
+        } else {
+          void refresh();
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [refresh, publicKey]);
+
+  const buy = async () => {
+    if (!publicKey) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/credits/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet: publicKey }),
+      });
+      const data = (await res.json()) as { ok?: boolean; url?: string; error?: string };
+      if (!res.ok || !data.ok || !data.url) {
+        throw new Error(data.error || "Could not start checkout");
+      }
+      // Same-tab for Apple Pay on iOS Safari
+      window.location.assign(data.url);
+    } catch (e) {
+      setError(friendlyError(e, "Checkout failed."));
+      setBusy(false);
+    }
+  };
+
+  if (ok === null) {
+    return (
+      <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-5 text-xs text-gray-500 flex items-center gap-2">
+        <Spinner size={14} /> Checking credits…
+      </div>
+    );
+  }
+  if (!ok) return null;
+
+  return (
+    <div className="bg-violet-500/5 border border-violet-500/30 rounded-xl p-5 space-y-4 ring-1 ring-violet-500/15">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
+          <DollarSign size={16} className="text-violet-500" /> Credits
+        </p>
+        <span className="text-[10px] uppercase tracking-wide font-semibold text-violet-600 dark:text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full">
+          Apple Pay · AUD
+        </span>
+      </div>
+      <p className="text-xs text-gray-500 dark:text-white/45 leading-relaxed">
+        Buy <strong className="font-semibold text-gray-800 dark:text-white/80">A$5</strong> of sol.new
+        credits with <strong className="font-semibold">Apple Pay</strong> or card — works in Australia.
+        Not a crypto purchase; digital credit for fees, links, and drops on sol.new.
+      </p>
+
+      <div className="flex items-center justify-between rounded-xl bg-black/5 dark:bg-white/5 px-4 py-3">
+        <span className="text-xs text-gray-500 dark:text-white/40">Your balance</span>
+        <span className="text-lg font-bold tabular-nums text-gray-900 dark:text-white">
+          {balance.toLocaleString()}{" "}
+          <span className="text-xs font-medium text-gray-400">credits</span>
+        </span>
+      </div>
+
+      {success && (
+        <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-lg px-3 py-2 text-emerald-700 dark:text-emerald-300 text-xs">
+          Payment received — credits will appear within a few seconds. Pull to refresh if needed.
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => void buy()}
+        disabled={busy || !publicKey}
+        className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer flex items-center justify-center gap-2"
+      >
+        {busy ? <Spinner size={16} /> : null}
+        Buy A$5 credits — Apple Pay
+      </button>
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs">
+          {error}
+        </div>
+      )}
+      <p className="text-[11px] text-gray-400 dark:text-white/30">
+        Stripe Checkout · A$5.00 · 500 credits · non-refundable digital goods
+      </p>
+    </div>
+  );
+}
+
 function AuBuySection() {
   const { publicKey, refreshBalance } = useWallet();
   const [moonOk, setMoonOk] = useState<boolean | null>(null);
@@ -992,6 +1127,7 @@ export default function GetPage() {
             {/* Transak (AU/global Apple Pay) primary · Stripe US/EU · Bridge bank */}
             {network === "mainnet" && (
               <>
+                <CreditsBuySection />
                 <AuBuySection />
                 <StripeGetSection />
                 {BRIDGE_UI && (
