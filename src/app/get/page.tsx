@@ -78,9 +78,11 @@ function isReady(c: BridgeCustomer | null | undefined) {
   return c?.kycStatus === "approved" && c?.tosStatus === "approved";
 }
 
-function TransakGetSection() {
+function AuBuySection() {
   const { publicKey, refreshBalance } = useWallet();
-  const [ok, setOk] = useState<boolean | null>(null);
+  const [moonOk, setMoonOk] = useState<boolean | null>(null);
+  const [transakOk, setTransakOk] = useState<boolean | null>(null);
+  const [moonTest, setMoonTest] = useState(false);
   const [amount, setAmount] = useState(50);
   const [asset, setAsset] = useState<"SOL" | "USDC">("SOL");
   const isAu = detectAustralia();
@@ -88,12 +90,12 @@ function TransakGetSection() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [doneBanner, setDoneBanner] = useState(false);
+  const [provider, setProvider] = useState<"moonpay" | "transak">("moonpay");
 
   useEffect(() => {
     try {
-      if (new URLSearchParams(window.location.search).get("transak") === "done") {
-        setDoneBanner(true);
-      }
+      const q = new URLSearchParams(window.location.search);
+      if (q.get("moonpay") === "done" || q.get("transak") === "done") setDoneBanner(true);
     } catch {
       /* ignore */
     }
@@ -103,11 +105,24 @@ function TransakGetSection() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/transak/widget", { cache: "no-store" });
-        const data = (await res.json()) as { configured?: boolean };
-        if (!cancelled) setOk(data.configured === true);
+        const [m, t] = await Promise.all([
+          fetch("/api/moonpay/widget", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/transak/widget", { cache: "no-store" }).then((r) => r.json()),
+        ]);
+        if (cancelled) return;
+        const moon = (m as { configured?: boolean; testMode?: boolean }).configured === true;
+        const transak = (t as { configured?: boolean }).configured === true;
+        setMoonOk(moon);
+        setMoonTest(Boolean((m as { testMode?: boolean }).testMode));
+        setTransakOk(transak);
+        // Prefer MoonPay for AU (Transak partner widget currently 403s without domain allowlist)
+        if (moon) setProvider("moonpay");
+        else if (transak) setProvider("transak");
       } catch {
-        if (!cancelled) setOk(false);
+        if (!cancelled) {
+          setMoonOk(false);
+          setTransakOk(false);
+        }
       }
     })();
     return () => {
@@ -120,7 +135,9 @@ function TransakGetSection() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/transak/widget", {
+      const endpoint =
+        provider === "moonpay" ? "/api/moonpay/widget" : "/api/transak/widget";
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -128,7 +145,6 @@ function TransakGetSection() {
           asset,
           fiatAmount: amount,
           fiatCurrency: fiat,
-          // Always pin AU when paying AUD — enables local rails + Apple Pay AU
           countryCode: fiat === "AUD" ? "AU" : fiat === "USD" ? "US" : undefined,
         }),
       });
@@ -138,9 +154,17 @@ function TransakGetSection() {
         widgetUrl?: string;
       };
       if (!res.ok || !data.ok || !data.widgetUrl) {
+        // Auto-fallback once
+        if (provider === "moonpay" && transakOk) {
+          setProvider("transak");
+          throw new Error(data.error || "MoonPay failed — try again for Transak");
+        }
+        if (provider === "transak" && moonOk) {
+          setProvider("moonpay");
+          throw new Error(data.error || "Transak failed — try again for MoonPay");
+        }
         throw new Error(data.error || "Could not open buy checkout");
       }
-      // Apple Pay needs top-level navigation (same tab), especially iOS Safari
       if (sameTab || isLikelyIosSafari()) {
         openCheckoutSameTab(data.widgetUrl);
       } else {
@@ -154,14 +178,14 @@ function TransakGetSection() {
     }
   };
 
-  if (ok === null) {
+  if (moonOk === null || transakOk === null) {
     return (
       <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-5 text-xs text-gray-500 flex items-center gap-2">
         <Spinner size={14} /> Checking buy options…
       </div>
     );
   }
-  if (!ok) return null;
+  if (!moonOk && !transakOk) return null;
 
   return (
     <div className="bg-purple-500/5 border border-purple-500/30 rounded-xl p-5 space-y-4 ring-1 ring-purple-500/10">
@@ -171,29 +195,55 @@ function TransakGetSection() {
           {isAu ? " in Australia" : ""}
         </p>
         <span className="text-[10px] uppercase tracking-wide font-semibold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">
-          Apple Pay · AUD
+          Apple Pay · {fiat}
         </span>
       </div>
       <p className="text-xs text-gray-500 dark:text-white/45 leading-relaxed">
         {isAu ? (
           <>
-            Works in <strong className="font-semibold text-gray-700 dark:text-white/70">Australia</strong> with
-            Apple Pay, card, Google Pay, and PayID-style methods. Defaults to{" "}
-            <strong className="font-semibold">AUD</strong>. Crypto goes straight to your sol.new wallet.
+            Built for <strong className="font-semibold text-gray-700 dark:text-white/70">Australia</strong>:
+            Apple Pay, card, and AUD. Checkout opens in this tab (required for Apple Pay on iPhone).
+            Crypto is sent to your sol.new wallet on Solana.
           </>
         ) : (
           <>
-            Apple Pay, card, Google Pay, and local methods — including{" "}
-            <strong className="font-semibold">Australia / AUD</strong>. Crypto goes to your locked Solana
-            wallet. KYC via Transak.
+            Apple Pay, card, Google Pay — including <strong className="font-semibold">Australia / AUD</strong>.
+            Same-tab checkout works best on iPhone. Destination locked to your wallet.
           </>
         )}
       </p>
 
       {doneBanner && (
         <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-lg px-3 py-2 text-emerald-700 dark:text-emerald-300 text-xs">
-          Thanks — if you finished checkout, crypto usually arrives within a few minutes. Pull to refresh
-          balance.
+          Thanks — if you finished checkout, crypto usually arrives within a few minutes. Refresh
+          balance shortly.
+        </div>
+      )}
+
+      {moonOk && transakOk && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setProvider("moonpay")}
+            className={`flex-1 text-[11px] font-semibold rounded-lg px-2 py-1.5 transition cursor-pointer ${
+              provider === "moonpay"
+                ? "bg-purple-600 text-white"
+                : "bg-black/5 dark:bg-white/5 text-gray-500"
+            }`}
+          >
+            MoonPay{moonTest ? " (test)" : ""}
+          </button>
+          <button
+            type="button"
+            onClick={() => setProvider("transak")}
+            className={`flex-1 text-[11px] font-semibold rounded-lg px-2 py-1.5 transition cursor-pointer ${
+              provider === "transak"
+                ? "bg-purple-600 text-white"
+                : "bg-black/5 dark:bg-white/5 text-gray-500"
+            }`}
+          >
+            Transak
+          </button>
         </div>
       )}
 
@@ -281,13 +331,18 @@ function TransakGetSection() {
       </button>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs">
-          {error}
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs space-y-1">
+          <p>{error}</p>
+          <p className="text-red-400/80">
+            Tip: use Safari (not Instagram/Telegram in-app browser). VPN off. Try the other provider
+            toggle if shown.
+          </p>
         </div>
       )}
       <p className="text-[11px] text-gray-400 dark:text-white/30">
-        Opens Transak checkout in this tab (best for Apple Pay on iPhone). Destination locked to your
-        sol.new wallet on Solana.
+        {provider === "moonpay" ? "MoonPay" : "Transak"} · same-tab for Apple Pay · wallet locked on
+        Solana
+        {moonTest && provider === "moonpay" ? " · test mode keys" : ""}
       </p>
     </div>
   );
@@ -937,7 +992,7 @@ export default function GetPage() {
             {/* Transak (AU/global Apple Pay) primary · Stripe US/EU · Bridge bank */}
             {network === "mainnet" && (
               <>
-                <TransakGetSection />
+                <AuBuySection />
                 <StripeGetSection />
                 {BRIDGE_UI && (
                   <Suspense
