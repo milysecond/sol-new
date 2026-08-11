@@ -185,7 +185,8 @@ type RugcheckReport = {
 
 async function scanToken(address: string, info?: any) {
   const parsedMint = info?.data?.parsed?.info;
-  const [rugcheck, jup, sigs] = await Promise.allSettled([
+  const { getOnChainCreatedAt, formatAge } = await import("@/lib/onchain-age");
+  const [rugcheck, jup, createdAt] = await Promise.allSettled([
     fetch(`https://api.rugcheck.xyz/v1/tokens/${address}/report`, {
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(10_000),
@@ -195,24 +196,14 @@ async function scanToken(address: string, info?: any) {
       signal: AbortSignal.timeout(5_000),
     }).then((r) => (r.ok ? r.json() : null)),
 
-    rpc<{ signature: string; blockTime: number | null }[]>("getSignaturesForAddress", [
-      address,
-      { limit: 1000 },
-    ]).catch(() => null),
+    getOnChainCreatedAt(address),
   ]);
 
   const rc: RugcheckReport | null = rugcheck.status === "fulfilled" ? rugcheck.value : null;
   const jupData = jup.status === "fulfilled" ? (jup.value as { decimals?: number; name?: string; symbol?: string; logoURI?: string } | null) : null;
-  const sigsData = sigs.status === "fulfilled" ? (sigs.value as { signature: string; blockTime: number | null }[] | null) : null;
-
-  // Creation date from oldest signature
-  let createdAt: string | null = null;
-  if (Array.isArray(sigsData) && sigsData.length > 0) {
-    const oldest = sigsData[sigsData.length - 1];
-    if (oldest?.blockTime) {
-      createdAt = new Date(oldest.blockTime * 1000).toISOString();
-    }
-  }
+  const createdAtIso =
+    createdAt.status === "fulfilled" ? createdAt.value : null;
+  const age = formatAge(createdAtIso);
 
   // Token-2022 embedded metadata
   const t22meta = Array.isArray(parsedMint?.extensions)
@@ -300,7 +291,10 @@ async function scanToken(address: string, info?: any) {
     score: rc?.score ?? null,
     risks: rc?.risks ?? [],
     rugged: rc?.rugged ?? false,
-    createdAt,
+    createdAt: createdAtIso,
+    ageRelative: age.relative,
+    ageAbsolute: age.absolute,
+    ageSource: "chain" as const,
     topHolders: (rc?.topHolders ?? []).slice(0, 10),
     markets: (rc?.markets ?? []).slice(0, 5),
     rugcheckUrl: `https://rugcheck.xyz/tokens/${address}`,
@@ -377,8 +371,10 @@ export async function GET(req: NextRequest) {
     }
 
     // Wallet: prefer Jupiter holdings for SOL/USDC, fall back to RPC
+    const { getOnChainCreatedAt, formatAge } = await import("@/lib/onchain-age");
     let sol = 0;
     let usdc: number | null = 0;
+    const createdAtPromise = getOnChainCreatedAt(address).catch(() => null);
     try {
       const { jupConfigured, jupHoldings } = await import("@/lib/jup-portfolio");
       if (jupConfigured()) {
@@ -426,6 +422,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const createdAt = await createdAtPromise;
+    const age = formatAge(createdAt);
+
     return NextResponse.json(
       {
         type: "wallet",
@@ -435,6 +434,10 @@ export async function GET(req: NextRequest) {
         usdc,
         balances: { sol, usdc },
         owner: info?.owner ?? "11111111111111111111111111111111",
+        createdAt,
+        ageRelative: age.relative,
+        ageAbsolute: age.absolute,
+        ageSource: "chain",
         solscanUrl: `https://solscan.io/account/${address}`,
       },
       { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } }

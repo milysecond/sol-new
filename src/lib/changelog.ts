@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-11",
+    title: "On-chain age + address OG",
+    items: [
+      "Token/account age from oldest on-chain signature — not Turso.",
+      "OG cards for /address/<pubkey> with type, name, and chain age.",
+    ],
+  },
+  {
+    date: "2026-08-11",
     title: "Address URLs by default",
     items: [
       "Lookups live at sol.new/address/<pubkey> — /scan redirects there.",
