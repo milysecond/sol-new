@@ -14,6 +14,15 @@ export type ChangelogEntry = {
 /** Newest first. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-11",
+    title: "Scan detects address type",
+    items: [
+      "Token-2022 mints no longer misread as wallets.",
+      "/scan shows wallet · token mint · token account · program badges.",
+      "Indexed TOKENSHIT mint fEbiuDd…shit in Turso.",
+    ],
+  },
+  {
     date: "2026-08-09",
     title: "iOS app camera for Pay scan",
     items: [
