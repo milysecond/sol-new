@@ -27,6 +27,7 @@ import {
   ArrowLeftRight,
   Frame,
   Sparkles,
+  Store,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
@@ -57,6 +58,8 @@ const ALL_TILES: Tile[] = [
   { href: "/nfts", title: "Browse", desc: "NFT gallery", icon: Layers, color: "text-emerald-600 dark:text-emerald-400" },
   { href: "/multisig", title: "Multisig", desc: "Shared wallet", icon: ShieldCheck, color: "text-blue-600 dark:text-blue-400" },
   { href: "/pay", title: "Pay", desc: "Request money", icon: HandCoins, color: "text-teal-600 dark:text-teal-400" },
+  { href: "/pos", title: "POS", desc: "Charge with QR", icon: Store, color: "text-violet-600 dark:text-violet-400" },
+  { href: "/sub", title: "Subs", desc: "Credits & plans", icon: Sparkles, color: "text-fuchsia-600 dark:text-fuchsia-400" },
   { href: "/split", title: "Split", desc: "Split a bill", icon: Users, color: "text-purple-600 dark:text-purple-400" },
   { href: "/receipt", title: "Receipt", desc: "Tx receipt", icon: Receipt, color: "text-orange-600 dark:text-orange-400" },
   { href: "/draw", title: "Draw", desc: "Fair raffle", icon: Dices, color: "text-violet-600 dark:text-violet-400" },

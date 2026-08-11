@@ -27,6 +27,8 @@ const STATIC_ROUTES: {
   { path: "/wallet/get", priority: 0.7, freq: "weekly" },
   { path: "/get", priority: 0.8, freq: "weekly" },
   { path: "/pay", priority: 0.8, freq: "weekly" },
+  { path: "/pos", priority: 0.85, freq: "weekly" },
+  { path: "/sub", priority: 0.85, freq: "weekly" },
   { path: "/split", priority: 0.8, freq: "weekly" },
   { path: "/gift", priority: 0.8, freq: "weekly" },
   { path: "/poap", priority: 0.8, freq: "weekly" },

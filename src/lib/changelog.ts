@@ -14,6 +14,15 @@ export type ChangelogEntry = {
 /** Newest first. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-09",
+    title: "POS + Subscriptions hub",
+    items: [
+      "/pos — merchant point of sale with tip, QR, live Solana Pay confirm.",
+      "/sub — credits pack + Stripe status + on-chain USDC plans roadmap.",
+      "BACKLOG.md for cross-session work.",
+    ],
+  },
+  {
     date: "2026-08-08",
     title: "A$5 credits via Apple Pay",
     items: [
