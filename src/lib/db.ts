@@ -250,9 +250,15 @@ export async function initDb() {
       prize_symbol TEXT NOT NULL,
       prize_amount_ui TEXT NOT NULL,
       prize_decimals INTEGER NOT NULL DEFAULT 6,
+      prize_amount_raw TEXT,
+      prize_program_id TEXT,
+      creator_wallet TEXT,
       status TEXT NOT NULL DEFAULT 'open',
       winner_wallet TEXT,
       draw_id TEXT,
+      deposit_sig TEXT,
+      payout_sig TEXT,
+      refund_sig TEXT,
       min_entries INTEGER NOT NULL DEFAULT 2,
       max_entries INTEGER NOT NULL DEFAULT 10000,
       closes_at TEXT,
@@ -352,6 +358,20 @@ export async function initDb() {
     );
   } catch {
     /* ignore */
+  }
+  for (const col of [
+    "ALTER TABLE fair_raffles ADD COLUMN prize_amount_raw TEXT",
+    "ALTER TABLE fair_raffles ADD COLUMN prize_program_id TEXT",
+    "ALTER TABLE fair_raffles ADD COLUMN creator_wallet TEXT",
+    "ALTER TABLE fair_raffles ADD COLUMN deposit_sig TEXT",
+    "ALTER TABLE fair_raffles ADD COLUMN payout_sig TEXT",
+    "ALTER TABLE fair_raffles ADD COLUMN refund_sig TEXT",
+  ]) {
+    try {
+      await db.execute(col);
+    } catch {
+      /* exists */
+    }
   }
   // Idempotent migration for the network column on existing deployments
   try {
@@ -1008,9 +1028,15 @@ export type FairRaffleRow = {
   prize_symbol: string;
   prize_amount_ui: string;
   prize_decimals: number;
+  prize_amount_raw: string | null;
+  prize_program_id: string | null;
+  creator_wallet: string | null;
   status: string;
   winner_wallet: string | null;
   draw_id: string | null;
+  deposit_sig: string | null;
+  payout_sig: string | null;
+  refund_sig: string | null;
   min_entries: number;
   max_entries: number;
   closes_at: string | null;
@@ -1018,20 +1044,25 @@ export type FairRaffleRow = {
   created_at: string;
 };
 
+function rowRaffle(r: unknown): FairRaffleRow {
+  return r as FairRaffleRow;
+}
+
 export async function ensureDefaultTokenshitRaffle(): Promise<FairRaffleRow> {
   const slug = "tokenshit-1m";
   const existing = await db.execute({
     sql: "SELECT * FROM fair_raffles WHERE slug = ? LIMIT 1",
     args: [slug],
   });
-  if (existing.rows[0]) return existing.rows[0] as unknown as FairRaffleRow;
+  if (existing.rows[0]) return rowRaffle(existing.rows[0]);
 
   const id = `raffle_${Date.now().toString(36)}`;
+  // Official promo raffle — prize distribution manual / treasury-funded
   await db.execute({
     sql: `INSERT INTO fair_raffles (
       id, slug, title, prize_mint, prize_symbol, prize_amount_ui, prize_decimals,
-      status, min_entries, max_entries
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', 2, 10000)`,
+      prize_amount_raw, status, min_entries, max_entries, creator_wallet
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'open', 2, 10000, ?)`,
     args: [
       id,
       slug,
@@ -1040,13 +1071,15 @@ export async function ensureDefaultTokenshitRaffle(): Promise<FairRaffleRow> {
       "TOKENSHIT",
       "1000000",
       6,
+      String(BigInt(1_000_000) * BigInt(1_000_000)),
+      "sol.new",
     ],
   });
   const row = await db.execute({
     sql: "SELECT * FROM fair_raffles WHERE id = ? LIMIT 1",
     args: [id],
   });
-  return row.rows[0] as unknown as FairRaffleRow;
+  return rowRaffle(row.rows[0]);
 }
 
 export async function getFairRaffleBySlug(slug: string) {
@@ -1054,7 +1087,140 @@ export async function getFairRaffleBySlug(slug: string) {
     sql: "SELECT * FROM fair_raffles WHERE slug = ? LIMIT 1",
     args: [slug],
   });
-  return (r.rows[0] as unknown as FairRaffleRow) ?? null;
+  return r.rows[0] ? rowRaffle(r.rows[0]) : null;
+}
+
+export async function getFairRaffleById(id: string) {
+  const r = await db.execute({
+    sql: "SELECT * FROM fair_raffles WHERE id = ? LIMIT 1",
+    args: [id],
+  });
+  return r.rows[0] ? rowRaffle(r.rows[0]) : null;
+}
+
+export async function listOpenFairRaffles(limit = 30) {
+  const r = await db.execute({
+    sql: `SELECT * FROM fair_raffles
+          WHERE status IN ('open', 'pending_fund')
+          ORDER BY
+            CASE status WHEN 'open' THEN 0 ELSE 1 END,
+            closes_at IS NULL, closes_at ASC, created_at DESC
+          LIMIT ?`,
+    args: [limit],
+  });
+  return r.rows.map(rowRaffle);
+}
+
+export async function listDueFairRaffles() {
+  const r = await db.execute({
+    sql: `SELECT * FROM fair_raffles
+          WHERE status = 'open'
+            AND closes_at IS NOT NULL
+            AND closes_at <= datetime('now')`,
+  });
+  return r.rows.map(rowRaffle);
+}
+
+export async function createFairRaffle(opts: {
+  id: string;
+  slug: string;
+  title: string;
+  prizeMint: string;
+  prizeSymbol: string;
+  prizeAmountUi: string;
+  prizeDecimals: number;
+  prizeAmountRaw: string;
+  prizeProgramId: string;
+  creatorWallet: string;
+  closesAt: string;
+  minEntries?: number;
+  maxEntries?: number;
+}) {
+  await db.execute({
+    sql: `INSERT INTO fair_raffles (
+      id, slug, title, prize_mint, prize_symbol, prize_amount_ui, prize_decimals,
+      prize_amount_raw, prize_program_id, creator_wallet, status,
+      min_entries, max_entries, closes_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_fund', ?, ?, ?)`,
+    args: [
+      opts.id,
+      opts.slug,
+      opts.title,
+      opts.prizeMint,
+      opts.prizeSymbol,
+      opts.prizeAmountUi,
+      opts.prizeDecimals,
+      opts.prizeAmountRaw,
+      opts.prizeProgramId,
+      opts.creatorWallet,
+      opts.minEntries ?? 2,
+      opts.maxEntries ?? 5000,
+      opts.closesAt,
+    ],
+  });
+}
+
+export async function markRaffleFunded(opts: {
+  id: string;
+  depositSig: string;
+}) {
+  await db.execute({
+    sql: `UPDATE fair_raffles SET status = 'open', deposit_sig = ?
+          WHERE id = ? AND status = 'pending_fund'`,
+    args: [opts.depositSig, opts.id],
+  });
+}
+
+export async function delayFairRaffle(opts: {
+  id: string;
+  creatorWallet: string;
+  closesAt: string;
+}) {
+  await db.execute({
+    sql: `UPDATE fair_raffles SET closes_at = ?
+          WHERE id = ? AND creator_wallet = ? AND status = 'open'`,
+    args: [opts.closesAt, opts.id, opts.creatorWallet],
+  });
+}
+
+export async function cancelFairRaffle(opts: {
+  id: string;
+  creatorWallet: string;
+  refundSig?: string | null;
+}) {
+  await db.execute({
+    sql: `UPDATE fair_raffles
+          SET status = 'cancelled', refund_sig = COALESCE(?, refund_sig)
+          WHERE id = ? AND creator_wallet = ? AND status IN ('open', 'pending_fund')`,
+    args: [opts.refundSig ?? null, opts.id, opts.creatorWallet],
+  });
+}
+
+export async function markRaffleDrawn(opts: {
+  raffleId: string;
+  winnerWallet: string;
+  drawId: string;
+  payoutSig?: string | null;
+}) {
+  await db.execute({
+    sql: `UPDATE fair_raffles
+          SET status = 'drawn', winner_wallet = ?, draw_id = ?, drawn_at = datetime('now'),
+              payout_sig = COALESCE(?, payout_sig)
+          WHERE id = ? AND status = 'open'`,
+    args: [
+      opts.winnerWallet,
+      opts.drawId,
+      opts.payoutSig ?? null,
+      opts.raffleId,
+    ],
+  });
+}
+
+export async function setRafflePayoutSig(id: string, payoutSig: string) {
+  await db.execute({
+    sql: `UPDATE fair_raffles SET payout_sig = ? WHERE id = ?`,
+    args: [payoutSig, id],
+  });
 }
 
 export async function countRaffleEntries(raffleId: string): Promise<number> {
@@ -1062,7 +1228,7 @@ export async function countRaffleEntries(raffleId: string): Promise<number> {
     sql: "SELECT COUNT(*) as c FROM fair_raffle_entries WHERE raffle_id = ?",
     args: [raffleId],
   });
-  return Number((r.rows[0] as { c?: number })?.c ?? 0);
+  return Number((r.rows[0] as unknown as { c?: number })?.c ?? 0);
 }
 
 export async function listRaffleEntries(raffleId: string, limit = 100) {
@@ -1097,19 +1263,6 @@ export async function getAllRaffleWallets(raffleId: string): Promise<string[]> {
     args: [raffleId],
   });
   return r.rows.map((row) => String((row as unknown as { wallet: string }).wallet));
-}
-
-export async function markRaffleDrawn(opts: {
-  raffleId: string;
-  winnerWallet: string;
-  drawId: string;
-}) {
-  await db.execute({
-    sql: `UPDATE fair_raffles
-          SET status = 'drawn', winner_wallet = ?, draw_id = ?, drawn_at = datetime('now')
-          WHERE id = ? AND status = 'open'`,
-    args: [opts.winnerWallet, opts.drawId, opts.raffleId],
-  });
 }
 
 export async function getStats() {

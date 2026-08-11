@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-11",
+    title: "User raffles — prize CA + auto draw",
+    items: [
+      "Create raffle: prize mint + amount + run time.",
+      "Deposit to escrow · auto draw & on-chain payout · delay or cancel/refund.",
+    ],
+  },
+  {
+    date: "2026-08-11",
     title: "Fair Draw raffle — TOKENSHIT 1M",
     items: [
       "Register with connected wallet on /draw to enter.",
