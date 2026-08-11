@@ -242,6 +242,32 @@ export async function initDb() {
       wallet TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS fair_raffles (
+      id TEXT PRIMARY KEY,
+      slug TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      prize_mint TEXT NOT NULL,
+      prize_symbol TEXT NOT NULL,
+      prize_amount_ui TEXT NOT NULL,
+      prize_decimals INTEGER NOT NULL DEFAULT 6,
+      status TEXT NOT NULL DEFAULT 'open',
+      winner_wallet TEXT,
+      draw_id TEXT,
+      min_entries INTEGER NOT NULL DEFAULT 2,
+      max_entries INTEGER NOT NULL DEFAULT 10000,
+      closes_at TEXT,
+      drawn_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS fair_raffle_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      raffle_id TEXT NOT NULL,
+      wallet TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(raffle_id, wallet)
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_fair_raffle_entries_raffle
+      ON fair_raffle_entries(raffle_id, created_at)`,
     `CREATE TABLE IF NOT EXISTS short_links (
       code TEXT PRIMARY KEY,
       target_url TEXT NOT NULL,
@@ -970,6 +996,120 @@ export async function getVrfDrawsByWallet(wallet: string, limit = 50) {
     args: [wallet, limit],
   });
   return r.rows;
+}
+
+// ─── Fair raffles (wallet registration → VRF winner) ──────────────────────────
+
+export type FairRaffleRow = {
+  id: string;
+  slug: string;
+  title: string;
+  prize_mint: string;
+  prize_symbol: string;
+  prize_amount_ui: string;
+  prize_decimals: number;
+  status: string;
+  winner_wallet: string | null;
+  draw_id: string | null;
+  min_entries: number;
+  max_entries: number;
+  closes_at: string | null;
+  drawn_at: string | null;
+  created_at: string;
+};
+
+export async function ensureDefaultTokenshitRaffle(): Promise<FairRaffleRow> {
+  const slug = "tokenshit-1m";
+  const existing = await db.execute({
+    sql: "SELECT * FROM fair_raffles WHERE slug = ? LIMIT 1",
+    args: [slug],
+  });
+  if (existing.rows[0]) return existing.rows[0] as unknown as FairRaffleRow;
+
+  const id = `raffle_${Date.now().toString(36)}`;
+  await db.execute({
+    sql: `INSERT INTO fair_raffles (
+      id, slug, title, prize_mint, prize_symbol, prize_amount_ui, prize_decimals,
+      status, min_entries, max_entries
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', 2, 10000)`,
+    args: [
+      id,
+      slug,
+      "TOKENSHIT 1M Fair Draw",
+      "fEbiuDdZZ1QaWYpJFPqk23ZkaRnAyHg4aivhrCTshit",
+      "TOKENSHIT",
+      "1000000",
+      6,
+    ],
+  });
+  const row = await db.execute({
+    sql: "SELECT * FROM fair_raffles WHERE id = ? LIMIT 1",
+    args: [id],
+  });
+  return row.rows[0] as unknown as FairRaffleRow;
+}
+
+export async function getFairRaffleBySlug(slug: string) {
+  const r = await db.execute({
+    sql: "SELECT * FROM fair_raffles WHERE slug = ? LIMIT 1",
+    args: [slug],
+  });
+  return (r.rows[0] as unknown as FairRaffleRow) ?? null;
+}
+
+export async function countRaffleEntries(raffleId: string): Promise<number> {
+  const r = await db.execute({
+    sql: "SELECT COUNT(*) as c FROM fair_raffle_entries WHERE raffle_id = ?",
+    args: [raffleId],
+  });
+  return Number((r.rows[0] as { c?: number })?.c ?? 0);
+}
+
+export async function listRaffleEntries(raffleId: string, limit = 100) {
+  const r = await db.execute({
+    sql: `SELECT wallet, created_at FROM fair_raffle_entries
+          WHERE raffle_id = ?
+          ORDER BY created_at ASC
+          LIMIT ?`,
+    args: [raffleId, limit],
+  });
+  return r.rows as unknown as { wallet: string; created_at: string }[];
+}
+
+export async function isWalletEntered(raffleId: string, wallet: string) {
+  const r = await db.execute({
+    sql: "SELECT 1 FROM fair_raffle_entries WHERE raffle_id = ? AND wallet = ? LIMIT 1",
+    args: [raffleId, wallet],
+  });
+  return Boolean(r.rows[0]);
+}
+
+export async function registerRaffleEntry(raffleId: string, wallet: string) {
+  await db.execute({
+    sql: `INSERT INTO fair_raffle_entries (raffle_id, wallet) VALUES (?, ?)`,
+    args: [raffleId, wallet],
+  });
+}
+
+export async function getAllRaffleWallets(raffleId: string): Promise<string[]> {
+  const r = await db.execute({
+    sql: `SELECT wallet FROM fair_raffle_entries WHERE raffle_id = ? ORDER BY created_at ASC, id ASC`,
+    args: [raffleId],
+  });
+  return r.rows.map((row) => String((row as unknown as { wallet: string }).wallet));
+}
+
+export async function markRaffleDrawn(opts: {
+  raffleId: string;
+  winnerWallet: string;
+  drawId: string;
+}) {
+  await db.execute({
+    sql: `UPDATE fair_raffles
+          SET status = 'drawn', winner_wallet = ?, draw_id = ?, drawn_at = datetime('now')
+          WHERE id = ? AND status = 'open'`,
+    args: [opts.winnerWallet, opts.drawId, opts.raffleId],
+  });
 }
 
 export async function getStats() {

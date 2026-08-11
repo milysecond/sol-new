@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-11",
+    title: "Fair Draw raffle — TOKENSHIT 1M",
+    items: [
+      "Register with connected wallet on /draw to enter.",
+      "Prize: 1,000,000 TOKENSHIT (fEbiuDd…shit). Provably fair draw when ready.",
+    ],
+  },
+  {
+    date: "2026-08-11",
     title: "On-chain age + address OG",
     items: [
       "Token/account age from oldest on-chain signature — not Turso.",
