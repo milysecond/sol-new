@@ -172,9 +172,9 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/pay",
-    label: "Pay link",
+    label: "Pay",
     title: "Pay",
-    desc: "Request money",
+    desc: "Request or scan QR",
     icon: CreditCard,
     color: "text-teal-600 dark:text-teal-400",
     category: "payments",

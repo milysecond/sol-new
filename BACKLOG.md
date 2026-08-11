@@ -4,6 +4,9 @@ Living list so we can pick up across sessions. Newest active work first.
 
 ## Active now
 
+### `/pay` — Scan & pay
+- [x] Scan Solana Pay QR + passkey pay (SOL/USDC)
+
 ### `/pos` — Point of sale
 - [x] Merchant POS: amount pad, SOL/USDC, large QR, tip %
 - [x] Solana Pay reference + poll for payment

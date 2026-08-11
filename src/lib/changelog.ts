@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-09",
+    title: "Pay by scanning Solana Pay QR",
+    items: [
+      "/pay Scan & pay — camera QR, paste link, passkey send (SOL/USDC).",
+      "Request tab still creates payment QRs; POS unchanged for merchants.",
+    ],
+  },
+  {
+    date: "2026-08-09",
     title: "Menu: categories, search, A–Z, drag",
     items: [
       "More menu recategorized — no duplicates, search, Groups / A–Z / Custom drag order.",
