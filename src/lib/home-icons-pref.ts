@@ -1,34 +1,13 @@
 /**
  * Persist home tool tile order in localStorage.
- * One list: any icon can move to any position. First N show as large tiles.
+ * Defaults + merge from shared nav catalog.
  */
+
+import { HOME_DEFAULT_ORDER as CATALOG_DEFAULT } from "@/lib/nav-catalog";
 
 export const HOME_PIN_COUNT = 4;
 
-export const HOME_DEFAULT_ORDER = [
-  "/starter",
-  "/wallet",
-  "/token",
-  "/gift",
-  "/punt",
-  "/nft",
-  "/nfts",
-  "/multisig",
-  "/pay",
-  "/pos",
-  "/sub",
-  "/split",
-  "/receipt",
-  "/draw",
-  "/earn",
-  "/loan",
-  "/swap",
-  "/stake",
-  "/lst",
-  "/burn",
-  "/portfolio",
-  "/frame",
-] as const;
+export const HOME_DEFAULT_ORDER = CATALOG_DEFAULT;
 
 const ORDER_KEY = "sol.new.home.iconOrder";
 /** Legacy keys — migrated once into ORDER_KEY */
@@ -64,7 +43,6 @@ export function getHomeIconOrder(): string[] {
     return mergeKnown(unified, HOME_DEFAULT_ORDER);
   }
 
-  // Migrate split primary + secondary prefs
   const primary = readJsonArray(PRIMARY_KEY);
   const secondary = readJsonArray(SECONDARY_KEY);
   if (primary?.length || secondary?.length) {
