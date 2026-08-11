@@ -15,6 +15,8 @@ export const HOME_DEFAULT_ORDER = [
   "/nfts",
   "/multisig",
   "/pay",
+  "/pos",
+  "/sub",
   "/split",
   "/receipt",
   "/draw",

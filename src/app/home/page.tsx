@@ -30,6 +30,7 @@ import {
   Landmark,
   Droplets,
   Award,
+  Sparkles,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -48,6 +49,8 @@ const PRODUCTS: Product[] = [
   { index: "03", href: "/wallet", title: "Wallets", blurb: "A Solana wallet secured by Face ID. Get SOL, send, and manage it all.", icon: Wallet, accent: "#e879f9" },
   { index: "04", href: "/multisig", title: "Multisig", blurb: "Shared wallets with multiple signers — for couples, teams, and DAOs.", icon: ShieldCheck, accent: "#60a5fa" },
   { index: "05", href: "/pay", title: "Payments", blurb: "Create a Solana Pay link or QR anyone can pay with, in SOL or USDC.", icon: CreditCard, accent: "#a855f7" },
+  { index: "05b", href: "/pos", title: "POS", blurb: "Point of sale — charge, tip, big QR, live payment confirm.", icon: CreditCard, accent: "#8b5cf6" },
+  { index: "05c", href: "/sub", title: "Subscriptions", blurb: "Credits packs and on-chain USDC plans.", icon: Sparkles, accent: "#e879f9" },
   { index: "06", href: "/gift", title: "Gifts", blurb: "Send SOL with a link — even to people without a wallet. They claim it with Face ID.", icon: Gift, accent: "#f59e0b" },
   { index: "06b", href: "/poap", title: "POAP", blurb: "Proof you were there. Create a drop, share a QR, collectors claim with Face ID.", icon: Award, accent: "#8b5cf6" },
   { index: "07", href: "/earn", title: "Earn", blurb: "Protected USDC yield. Deposit and withdraw with your passkey.", icon: TrendingUp, accent: "#34d399" },
