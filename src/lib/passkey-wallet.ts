@@ -12,6 +12,41 @@ export function getRpId(): string {
   return host;
 }
 
+function credIdToBytes(credentialId: string): Uint8Array {
+  // Support both standard base64 and base64url
+  const b64 = credentialId.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+  const bin = atob(pad);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function bytesToCredId(rawId: ArrayBuffer | Uint8Array): string {
+  const bytes = rawId instanceof Uint8Array ? rawId : new Uint8Array(rawId);
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]!);
+  return btoa(s);
+}
+
+function listKnownCredentialIds(): string[] {
+  const ids: string[] = [];
+  try {
+    const wallets = JSON.parse(localStorage.getItem("sol.new.wallets") || "[]") as {
+      credentialId?: string;
+    }[];
+    for (const w of wallets) {
+      if (w.credentialId && !ids.includes(w.credentialId)) ids.push(w.credentialId);
+    }
+  } catch { /* ignore */ }
+  try {
+    const g = localStorage.getItem("sol.new.credentialId");
+    if (g && !ids.includes(g)) ids.push(g);
+  } catch { /* ignore */ }
+  return ids;
+}
+
+
 
 /**
  * Resolve which credential to allow for auth prompts.
@@ -30,8 +65,9 @@ function getAllowCredentials(forAddress?: string | null) {
       if (fromList) {
         return [
           {
-            id: Uint8Array.from(atob(fromList), (c) => c.charCodeAt(0)),
+            id: credIdToBytes(fromList),
             type: "public-key" as const,
+            transports: ["internal", "hybrid"] as AuthenticatorTransport[],
           },
         ];
       }
@@ -46,8 +82,9 @@ function getAllowCredentials(forAddress?: string | null) {
     if (credId && pubkey && active === pubkey) {
       return [
         {
-          id: Uint8Array.from(atob(credId), (c) => c.charCodeAt(0)),
+          id: credIdToBytes(credId),
           type: "public-key" as const,
+          transports: ["internal", "hybrid"] as AuthenticatorTransport[],
         },
       ];
     }
@@ -64,7 +101,7 @@ function getAllowCredentials(forAddress?: string | null) {
  */
 function rememberCredential(address: string, rawId: ArrayBuffer) {
   try {
-    const credentialId = btoa(String.fromCharCode(...new Uint8Array(rawId)));
+    const credentialId = bytesToCredId(rawId);
     const wallets = JSON.parse(localStorage.getItem("sol.new.wallets") || "[]") as {
       pubkey: string;
       credentialId?: string;
@@ -124,6 +161,12 @@ export async function createPasskeyWallet(_username?: string): Promise<{
   const userIdBytes = crypto.getRandomValues(new Uint8Array(32));
   const userId = btoa(String.fromCharCode(...userIdBytes));
 
+  const excludeCredentials = listKnownCredentialIds().map((id) => ({
+    id: credIdToBytes(id),
+    type: "public-key" as const,
+    transports: ["internal", "hybrid"] as AuthenticatorTransport[],
+  }));
+
   const credential = (await navigator.credentials.create({
     publicKey: {
       challenge: CHALLENGE,
@@ -141,8 +184,11 @@ export async function createPasskeyWallet(_username?: string): Promise<{
       authenticatorSelection: {
         authenticatorAttachment: "platform",
         residentKey: "required",
+        requireResidentKey: true,
         userVerification: "required",
       },
+      // Discourage accidental re-enroll of the same authenticator slot when we already know IDs
+      ...(excludeCredentials.length ? { excludeCredentials } : {}),
       extensions: {
         prf: {
           eval: {
@@ -167,7 +213,8 @@ export async function createPasskeyWallet(_username?: string): Promise<{
 
   const keypair = Keypair.fromSeed(seed.slice(0, 32));
   const publicKey = keypair.publicKey.toBase58();
-  const credentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+  const credentialId = bytesToCredId(credential.rawId);
+  rememberCredential(publicKey, credential.rawId);
 
   // Wallet name === address (browser passkey list + UI)
   await signalPasskeyUserDetails({
@@ -229,6 +276,7 @@ export async function recoverPasskeyWallet(opts?: {
   const credential = (await navigator.credentials.get({
     publicKey: {
       challenge: CHALLENGE,
+      rpId: getRpId(),
       userVerification: "required",
       ...(allowCredentials && { allowCredentials }),
       extensions: {
@@ -243,7 +291,7 @@ export async function recoverPasskeyWallet(opts?: {
 
   if (!credential) throw new Error("Passkey authentication cancelled");
 
-  const credentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+  const credentialId = bytesToCredId(credential.rawId);
   const prfResult = credential.getClientExtensionResults()?.prf?.results?.first;
 
   let seed: Uint8Array;
@@ -256,6 +304,11 @@ export async function recoverPasskeyWallet(opts?: {
 
   const keypair = Keypair.fromSeed(seed.slice(0, 32));
   const publicKey = keypair.publicKey.toBase58();
+  if (opts?.forAddress && publicKey !== opts.forAddress) {
+    throw new Error(
+      `That passkey is for ${publicKey.slice(0, 4)}…${publicKey.slice(-4)}, not the selected wallet. Pick the matching passkey.`,
+    );
+  }
   rememberCredential(publicKey, credential.rawId);
 
   return {
@@ -277,15 +330,19 @@ export async function identifyPasskeyWallet(): Promise<{
  * Use this to verify address before creating transactions.
  * Returns both to avoid double authentication.
  */
-export async function getPasskeyKeypair(
-  expectedPublicKey?: string
-): Promise<{ address: string; keypair: Keypair }> {
+async function authPasskeyOnce(opts?: {
+  forAddress?: string | null;
+  forcePicker?: boolean;
+}): Promise<{ address: string; keypair: Keypair; credential: PublicKeyCredential }> {
   ensureDocumentFocusForPasskey();
-  const allowCredentials = getAllowCredentials(expectedPublicKey);
+  const allowCredentials = opts?.forcePicker
+    ? undefined
+    : getAllowCredentials(opts?.forAddress);
 
   const credential = (await navigator.credentials.get({
     publicKey: {
       challenge: CHALLENGE,
+      rpId: getRpId(),
       userVerification: "required",
       ...(allowCredentials && { allowCredentials }),
       extensions: {
@@ -296,6 +353,7 @@ export async function getPasskeyKeypair(
         },
       },
     },
+    // Prefer conditional UI only when not forcing a full list
   })) as PublicKeyCredential;
 
   if (!credential) throw new Error("Passkey authentication cancelled");
@@ -307,19 +365,34 @@ export async function getPasskeyKeypair(
   } else {
     seed = await sha256(new Uint8Array(credential.rawId));
   }
-
   const keypair = Keypair.fromSeed(seed.slice(0, 32));
   const address = keypair.publicKey.toBase58();
-  rememberCredential(address, credential.rawId);
-  if (expectedPublicKey && address !== expectedPublicKey) {
+  return { address, keypair, credential };
+}
+
+export async function getPasskeyKeypair(
+  expectedPublicKey?: string
+): Promise<{ address: string; keypair: Keypair }> {
+  // 1) Try pinned credential for this wallet
+  try {
+    const first = await authPasskeyOnce({ forAddress: expectedPublicKey, forcePicker: false });
+    if (!expectedPublicKey || first.address === expectedPublicKey) {
+      rememberCredential(first.address, first.credential.rawId);
+      return { address: first.address, keypair: first.keypair };
+    }
+  } catch {
+    /* pinned missing/wrong — fall through to picker */
+  }
+
+  // 2) Full picker — user must pick the passkey that derives expected address
+  const second = await authPasskeyOnce({ forcePicker: true });
+  if (expectedPublicKey && second.address !== expectedPublicKey) {
     throw new Error(
-      `Passkey does not match connected wallet (${expectedPublicKey.slice(0, 4)}…${expectedPublicKey.slice(-4)}). Switch wallet in the menu or reconnect.`
+      `Wrong passkey. Connected wallet is ${expectedPublicKey.slice(0, 4)}…${expectedPublicKey.slice(-4)}, but that passkey is ${second.address.slice(0, 4)}…${second.address.slice(-4)}. Choose the passkey named with your full address.`,
     );
   }
-  return {
-    address,
-    keypair,
-  };
+  rememberCredential(second.address, second.credential.rawId);
+  return { address: second.address, keypair: second.keypair };
 }
 
 /**
@@ -364,64 +437,8 @@ export async function signAndSendTransaction(
   rpc: string,
   expectedPublicKey?: string
 ): Promise<string> {
-  // Pin the prompt to the right passkey for the connected wallet
-  const allowCredentials = getAllowCredentials();
-
-  const credential = (await navigator.credentials.get({
-    publicKey: {
-      challenge: CHALLENGE,
-      userVerification: "required",
-      ...(allowCredentials && { allowCredentials }),
-      extensions: {
-        prf: {
-          eval: {
-            first: CHALLENGE,
-          },
-        },
-      },
-    },
-  })) as PublicKeyCredential;
-
-  if (!credential) throw new Error("Passkey authentication cancelled");
-
-  const prfResult = credential.getClientExtensionResults()?.prf?.results?.first;
-
-  let seed: Uint8Array;
-  if (prfResult) {
-    seed = await sha256(new Uint8Array(prfResult));
-  } else {
-    seed = await sha256(new Uint8Array(credential.rawId));
-  }
-
-  const keypair = Keypair.fromSeed(seed.slice(0, 32));
-  rememberCredential(keypair.publicKey.toBase58(), credential.rawId);
-
-  // Verify the derived wallet matches expected
-  if (expectedPublicKey && keypair.publicKey.toBase58() !== expectedPublicKey) {
-    throw new Error(`Passkey mismatch: expected ${expectedPublicKey} but got ${keypair.publicKey.toBase58()}`);
-  }
-  
-  const tx = Transaction.from(Buffer.from(serializedTx, "base64"));
-  
-  // Get fresh blockhash before signing
-  const conn = new Connection(rpc, "confirmed");
-  const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
-  tx.recentBlockhash = blockhash;
-  
-  tx.partialSign(keypair);
-
-  const sig = await conn.sendRawTransaction(tx.serialize(), {
-    skipPreflight: false,
-    maxRetries: 3,
-  });
-  
-  await conn.confirmTransaction({
-    signature: sig,
-    blockhash,
-    lastValidBlockHeight,
-  }, "confirmed");
-  
-  return sig;
+  const { keypair } = await getPasskeyKeypair(expectedPublicKey);
+  return signAndSendWithKeypair(serializedTx, rpc, keypair);
 }
 
 /**
@@ -481,60 +498,11 @@ export async function signVersionedAndSend(
   rpc: string,
   expectedPublicKey?: string,
 ): Promise<string> {
-  ensureDocumentFocusForPasskey();
-  const allowCredentials = getAllowCredentials(expectedPublicKey);
-
-  const credential = (await navigator.credentials.get({
-    publicKey: {
-      challenge: CHALLENGE,
-      userVerification: "required",
-      ...(allowCredentials && { allowCredentials }),
-      extensions: { prf: { eval: { first: CHALLENGE } } },
-    },
-  })) as PublicKeyCredential;
-  if (!credential) throw new Error("Passkey authentication cancelled");
-
-  const prfResult = credential.getClientExtensionResults()?.prf?.results?.first;
-  const seed = prfResult
-    ? await sha256(new Uint8Array(prfResult))
-    : await sha256(new Uint8Array(credential.rawId));
-
-  const keypair = Keypair.fromSeed(seed.slice(0, 32));
-  rememberCredential(keypair.publicKey.toBase58(), credential.rawId);
-  if (expectedPublicKey && keypair.publicKey.toBase58() !== expectedPublicKey) {
-    throw new Error(`Passkey mismatch: expected ${expectedPublicKey}, got ${keypair.publicKey.toBase58()}`);
-  }
-
-  const tx = VersionedTransaction.deserialize(Buffer.from(serializedTx, "base64"));
-  // VersionedTransaction.sign() only writes to the slots whose pubkey matches
-  // a provided signer — fee payer's existing signature is preserved.
-  tx.sign([keypair]);
-
-  const conn = new Connection(rpc, "confirmed");
-  try {
-    const sig = await conn.sendRawTransaction(tx.serialize(), {
-      skipPreflight: false,
-      maxRetries: 3,
-    });
-    await conn.confirmTransaction(sig, "confirmed");
-    return sig;
-  } catch (e: unknown) {
-    // Prefer simulation logs when available
-    const anyE = e as {
-      message?: string;
-      logs?: string[];
-      getLogs?: () => Promise<string[]>;
-    };
-    let logs: string[] | undefined = anyE.logs;
-    try {
-      if (!logs && typeof anyE.getLogs === "function") {
-        logs = await anyE.getLogs();
-      }
-    } catch {
-      /* ignore */
-    }
-    const tail = logs?.slice(-6).join(" · ");
-    const base = anyE.message || String(e);
-    throw new Error(tail ? `${base} — ${tail}` : base);
-  }
+  const { keypair } = await getPasskeyKeypair(expectedPublicKey);
+  return signVersionedWithKeypairAndSend(
+    serializedTx,
+    rpc,
+    keypair,
+    expectedPublicKey,
+  );
 }

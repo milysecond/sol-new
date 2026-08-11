@@ -414,7 +414,7 @@ export function Navbar() {
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => connect()}
+                  onClick={() => void connect()}
                   disabled={loading}
                   className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-xl px-3.5 py-2 min-h-[40px] transition cursor-pointer disabled:opacity-50"
                 >
@@ -422,11 +422,12 @@ export function Navbar() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => recover({ forcePicker: true })}
+                  onClick={() => void connect({ createNew: true })}
                   disabled={loading}
                   className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 text-sm rounded-xl px-3 py-2 min-h-[40px] transition cursor-pointer disabled:opacity-50 hidden sm:block"
+                  title="Only if you need a brand-new wallet"
                 >
-                  Recover
+                  New
                 </button>
                 <Link
                   href="/wallet/find"
