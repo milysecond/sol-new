@@ -47,7 +47,6 @@ function pathTitle(pathname: string): string | null {
     "/earn": "Earn",
     "/stake": "Stake",
     "/lst": "LST",
-    "/address": "Scan",
     "/address": "Address",
     "/scan": "Address",
     "/portfolio": "Portfolio",
