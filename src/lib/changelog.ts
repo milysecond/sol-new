@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-09",
+    title: "Menu: categories, search, A–Z, drag",
+    items: [
+      "More menu recategorized — no duplicates, search, Groups / A–Z / Custom drag order.",
+      "Home grid shares the same catalog; rearrange + A–Z sort.",
+    ],
+  },
+  {
+    date: "2026-08-09",
     title: "POS + Subscriptions hub",
     items: [
       "/pos — merchant point of sale with tip, QR, live Solana Pay confirm.",

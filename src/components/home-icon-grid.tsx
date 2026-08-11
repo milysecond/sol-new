@@ -4,32 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Reorder, useDragControls } from "motion/react";
 import {
-  Coins,
-  Image,
-  Wallet,
-  ShieldCheck,
-  Users,
-  HandCoins,
-  Gift,
-  Trophy,
-  Receipt,
-  Dices,
-  TrendingUp,
-  Landmark,
-  Droplets,
-  Flame,
-  Layers,
+  ArrowDownAZ,
   GripVertical,
   RotateCcw,
   Check,
   Pencil,
   Star,
-  ArrowLeftRight,
-  Frame,
-  Sparkles,
-  Store,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import {
   getHomeIconOrder,
@@ -38,61 +19,27 @@ import {
   HOME_DEFAULT_ORDER,
   HOME_PIN_COUNT,
 } from "@/lib/home-icons-pref";
+import {
+  homeNavItems,
+  sortNavAlpha,
+  type NavItem,
+} from "@/lib/nav-catalog";
 
-type Tile = {
-  href: string;
-  title: string;
-  desc: string;
-  icon: LucideIcon;
-  color: string;
-};
-
-/** Full catalog — every icon is free to move anywhere in the list. */
-const ALL_TILES: Tile[] = [
-  { href: "/starter", title: "Starter", desc: "New to Solana? Start here", icon: Sparkles, color: "text-purple-600 dark:text-purple-400" },
-  { href: "/wallet", title: "Wallet", desc: "Get SOL, send, manage", icon: Wallet, color: "text-fuchsia-500 dark:text-fuchsia-400" },
-  { href: "/token", title: "Token", desc: "Launch your own coin", icon: Coins, color: "text-orange-500 dark:text-orange-400" },
-  { href: "/gift", title: "Gift", desc: "Send crypto with a link", icon: Gift, color: "text-amber-500 dark:text-amber-400" },
-  { href: "/punt", title: "Punt", desc: "Odds, picks, markets", icon: Trophy, color: "text-green-600 dark:text-green-400" },
-  { href: "/nft", title: "NFT", desc: "Image to NFT", icon: Image, color: "text-green-600 dark:text-green-400" },
-  { href: "/nfts", title: "Browse", desc: "NFT gallery", icon: Layers, color: "text-emerald-600 dark:text-emerald-400" },
-  { href: "/multisig", title: "Multisig", desc: "Shared wallet", icon: ShieldCheck, color: "text-blue-600 dark:text-blue-400" },
-  { href: "/pay", title: "Pay", desc: "Request money", icon: HandCoins, color: "text-teal-600 dark:text-teal-400" },
-  { href: "/pos", title: "POS", desc: "Charge with QR", icon: Store, color: "text-violet-600 dark:text-violet-400" },
-  { href: "/sub", title: "Subs", desc: "Credits & plans", icon: Sparkles, color: "text-fuchsia-600 dark:text-fuchsia-400" },
-  { href: "/split", title: "Split", desc: "Split a bill", icon: Users, color: "text-purple-600 dark:text-purple-400" },
-  { href: "/receipt", title: "Receipt", desc: "Tx receipt", icon: Receipt, color: "text-orange-600 dark:text-orange-400" },
-  { href: "/draw", title: "Draw", desc: "Fair raffle", icon: Dices, color: "text-violet-600 dark:text-violet-400" },
-  { href: "/earn", title: "Earn", desc: "USDC yield", icon: TrendingUp, color: "text-emerald-600 dark:text-emerald-400" },
-  { href: "/loan", title: "Loan", desc: "Lend & borrow", icon: Landmark, color: "text-lime-600 dark:text-lime-400" },
-  { href: "/swap", title: "Swap", desc: "Trade tokens", icon: ArrowLeftRight, color: "text-fuchsia-600 dark:text-fuchsia-400" },
-  { href: "/stake", title: "Stake", desc: "Stake SOL", icon: Landmark, color: "text-purple-600 dark:text-purple-400" },
-  { href: "/lst", title: "LST", desc: "Liquid stake", icon: Droplets, color: "text-cyan-600 dark:text-cyan-400" },
-  { href: "/burn", title: "Burn", desc: "Reclaim rent", icon: Flame, color: "text-rose-600 dark:text-rose-400" },
-  { href: "/portfolio", title: "Portfolio", desc: "Holdings", icon: Wallet, color: "text-fuchsia-600 dark:text-fuchsia-400" },
-  { href: "/frame", title: "Frame", desc: "LinkedIn photo ring", icon: Frame, color: "text-violet-600 dark:text-violet-400" },
-];
-
-function orderTiles(order: string[]): Tile[] {
-  const map = new Map(ALL_TILES.map((t) => [t.href, t]));
-  const out: Tile[] = [];
+function orderTiles(order: string[]): NavItem[] {
+  const all = homeNavItems();
+  const map = new Map(all.map((t) => [t.href, t]));
+  const out: NavItem[] = [];
   for (const href of order) {
     const t = map.get(href);
     if (t) out.push(t);
   }
-  for (const t of ALL_TILES) {
+  for (const t of all) {
     if (!out.some((x) => x.href === t.href)) out.push(t);
   }
   return out;
 }
 
-function DragRow({
-  tile,
-  index,
-}: {
-  tile: Tile;
-  index: number;
-}) {
+function DragRow({ tile, index }: { tile: NavItem; index: number }) {
   const controls = useDragControls();
   const Icon = tile.icon;
   const pinned = index < HOME_PIN_COUNT;
@@ -156,6 +103,12 @@ export function HomeIconGrid() {
     setOrder([...HOME_DEFAULT_ORDER]);
   };
 
+  const sortAlpha = () => {
+    const alpha = sortNavAlpha(homeNavItems()).map((t) => t.href);
+    setOrder(alpha);
+    setHomeIconOrder(alpha);
+  };
+
   if (!hydrated) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 min-h-[120px] animate-pulse">
@@ -175,17 +128,26 @@ export function HomeIconGrid() {
         <p className="text-[11px] text-gray-400 dark:text-white/30">
           {editing
             ? `Drag any icon. Top ${HOME_PIN_COUNT} show as large tiles.`
-            : "Your tools · rearrange any icon"}
+            : "Your tools · rearrange or A–Z"}
         </p>
         <div className="flex items-center gap-1.5">
           {editing && (
-            <button
-              type="button"
-              onClick={reset}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] rounded-lg text-xs text-gray-600 dark:text-white/60 border border-black/10 dark:border-white/10 cursor-pointer touch-manipulation"
-            >
-              <RotateCcw size={12} /> Reset
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={sortAlpha}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] rounded-lg text-xs text-gray-600 dark:text-white/60 border border-black/10 dark:border-white/10 cursor-pointer touch-manipulation"
+              >
+                <ArrowDownAZ size={12} /> A–Z
+              </button>
+              <button
+                type="button"
+                onClick={reset}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] rounded-lg text-xs text-gray-600 dark:text-white/60 border border-black/10 dark:border-white/10 cursor-pointer touch-manipulation"
+              >
+                <RotateCcw size={12} /> Reset
+              </button>
+            </>
           )}
           <button
             type="button"
@@ -212,7 +174,7 @@ export function HomeIconGrid() {
       {editing ? (
         <Reorder.Group
           axis="y"
-          values={order}
+          values={tiles.map((x) => x.href)}
           onReorder={onReorder}
           className="flex flex-col gap-2 list-none m-0 p-0"
         >
@@ -251,9 +213,7 @@ export function HomeIconGrid() {
                 href={t.href}
                 className="group relative z-0 flex flex-col items-center justify-center gap-1.5 py-3.5 sm:py-4 min-h-[84px] bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.07] dark:hover:bg-white/[0.07] active:scale-[0.98] border border-black/10 dark:border-white/10 hover:border-purple-400/30 rounded-2xl transition-all duration-150 touch-manipulation select-none"
               >
-                <t.icon
-                  className={`w-5 h-5 sm:w-6 sm:h-6 ${t.color} pointer-events-none`}
-                />
+                <t.icon className={`w-5 h-5 sm:w-6 sm:h-6 ${t.color} pointer-events-none`} />
                 <div className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white pointer-events-none">
                   {t.title}
                 </div>

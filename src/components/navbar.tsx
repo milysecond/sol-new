@@ -7,38 +7,20 @@ import { useNetwork } from "@/lib/network";
 import { useState, useEffect } from "react";
 import {
   Coins,
-  Image,
-  ShieldCheck,
   Wallet,
   Droplets,
   Zap,
   ExternalLink,
   Copy,
   LogOut,
-  Sparkles,
   Bell,
   BellOff,
-  Activity,
-  AtSign,
   MoreHorizontal,
-  X,
   Gift,
   Trophy,
-  HandCoins,
-  Newspaper,
-  Star,
-  Receipt,
-  Dices,
-  Link2,
-  TrendingUp,
-  Landmark,
-  Layers,
   FolderOpen,
-  Flame,
-  Users,
-  ArrowLeftRight,
-  Award,
 } from "lucide-react";
+import { AppNavMenu } from "@/components/app-nav-menu";
 import { getPushPermission, subscribePush, unsubscribePush, type PushPermission } from "@/lib/push-client";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Spinner } from "@/components/spinner";
@@ -62,52 +44,6 @@ const TABLET_NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/gift", label: "Gift", icon: Gift },
   { href: "/punt", label: "Punt", icon: Trophy },
   { href: "/portfolio", label: "Port", icon: FolderOpen },
-];
-
-type MoreItem = { href: string; label: string; icon: LucideIcon };
-
-const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
-  {
-    title: "Create",
-    items: [
-      { href: "/token", label: "Token", icon: Coins },
-      { href: "/nft", label: "Mint NFT", icon: Image },
-      { href: "/multisig", label: "Multisig", icon: ShieldCheck },
-    ],
-  },
-  {
-    title: "Money",
-    items: [
-      { href: "/get", label: "Get funds", icon: HandCoins },
-      { href: "/pay", label: "Pay", icon: HandCoins },
-      { href: "/split", label: "Split", icon: Users },
-      { href: "/gift", label: "Gift", icon: Gift },
-      { href: "/poap", label: "POAP", icon: Award },
-      { href: "/earn", label: "Earn", icon: TrendingUp },
-      { href: "/loan", label: "Loan", icon: Landmark },
-      { href: "/swap", label: "Swap", icon: ArrowLeftRight },
-      { href: "/stake", label: "Stake", icon: Landmark },
-      { href: "/lst", label: "Liquid", icon: Droplets },
-    ],
-  },
-  {
-    title: "Explore",
-    items: [
-      { href: "/portfolio", label: "Portfolio", icon: FolderOpen },
-      { href: "/nfts", label: "NFTs", icon: Layers },
-      { href: "/lists", label: "Lists", icon: Star },
-      { href: "/scan", label: "Scan", icon: Activity },
-      { href: "/receipt", label: "Receipt", icon: Receipt },
-      { href: "/poap", label: "POAP", icon: Award },
-      { href: "/draw", label: "Draw", icon: Dices },
-      { href: "/punt", label: "Punt", icon: Trophy },
-      { href: "/burn", label: "Burn", icon: Flame },
-      { href: "/id", label: "Names", icon: AtSign },
-      { href: "/link", label: "Links", icon: Link2 },
-      { href: "/news", label: "News", icon: Newspaper },
-      { href: "/whats-new", label: "What's new", icon: Sparkles },
-    ],
-  },
 ];
 
 const MOBILE_PRIMARY = [
@@ -162,7 +98,14 @@ export function Navbar() {
     );
   };
 
-  const moreActive = MORE_GROUPS.some((g) => g.items.some((i) => isActive(i.href)));
+  const primaryHrefs = ["/home", "/wallet", "/token", "/gift", "/punt", "/portfolio"];
+  const moreActive = Boolean(
+    pathname &&
+      pathname !== "/" &&
+      !primaryHrefs.some(
+        (h) => pathname === h || (h !== "/home" && pathname.startsWith(h + "/")),
+      ),
+  );
 
   return (
     <nav>
@@ -525,59 +468,11 @@ export function Navbar() {
         </button>
       </div>
 
-      {/* More tray — phones + desktop "More" */}
-      {showMore && (
-        <>
-          <div
-            className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm"
-            onClick={() => setShowMore(false)}
-          />
-          <div className="fixed bottom-0 left-0 right-0 z-[70] bg-white dark:bg-black border-t border-black/10 dark:border-white/10 rounded-t-2xl pb-safe animate-[slideUp_0.2s_ease-out] max-h-[85dvh] overflow-y-auto sm:left-1/2 sm:right-auto sm:bottom-auto sm:top-20 sm:-translate-x-1/2 sm:w-full sm:max-w-lg sm:rounded-2xl sm:border sm:shadow-xl">
-            <div className="flex justify-center pt-2 pb-1 sm:hidden">
-              <div className="w-10 h-1 rounded-full bg-black/15 dark:bg-white/15" />
-            </div>
-            <div className="flex items-center justify-between px-5 pt-2 pb-2 sticky top-0 bg-white dark:bg-black z-10">
-              <span className="text-sm font-semibold text-gray-900 dark:text-white">Menu</span>
-              <button
-                type="button"
-                onClick={() => setShowMore(false)}
-                className="text-gray-400 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
-                aria-label="Close"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="px-3 pb-10 space-y-4">
-              {MORE_GROUPS.map((group) => (
-                <div key={group.title}>
-                  <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-white/30 px-2 mb-1.5">
-                    {group.title}
-                  </p>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-1">
-                    {group.items.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setShowMore(false)}
-                        className={`flex flex-col items-center gap-1.5 px-2 py-3 min-h-[72px] rounded-xl transition active:scale-95 touch-manipulation ${
-                          isActive(item.href)
-                            ? "text-purple-700 dark:text-purple-300 bg-purple-500/15"
-                            : "text-gray-700 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/5"
-                        }`}
-                      >
-                        <item.icon size={22} />
-                        <span className="text-[11px] font-medium text-center leading-tight">
-                          {item.label}
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
+      <AppNavMenu
+        open={showMore}
+        onClose={() => setShowMore(false)}
+        isActive={isActive}
+      />
 
       {airdropping && (
         <div className="fixed bottom-20 sm:bottom-6 right-6 z-[100] bg-yellow-500/10 backdrop-blur-sm border border-yellow-500/30 rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg">
