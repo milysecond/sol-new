@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageTransition } from "@/components/page-transition";
 import { Navbar } from "@/components/navbar";
+import { MoneyGramRampsCard } from "@/components/moneygram-ramps";
 import { ConnectGate } from "@/components/connect-gate";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
@@ -1127,6 +1128,7 @@ export default function GetPage() {
             {/* Transak (AU/global Apple Pay) primary · Stripe US/EU · Bridge bank */}
             {network === "mainnet" && (
               <>
+                <MoneyGramRampsCard />
                 <CreditsBuySection />
                 <AuBuySection />
                 <StripeGetSection />

@@ -14,6 +14,14 @@ export type ChangelogEntry = {
 /** Newest first. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-12",
+    title: "MoneyGram Ramps sandbox",
+    items: [
+      "Cash in / cash out USDC via MoneyGram widget on /get (sandbox keys).",
+      "Server session API — secret never in the browser.",
+    ],
+  },
+  {
     date: "2026-08-11",
     title: "User raffles — prize CA + auto draw",
     items: [
