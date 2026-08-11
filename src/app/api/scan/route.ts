@@ -22,17 +22,53 @@ async function rpc<T = unknown>(method: string, params: unknown[]): Promise<T> {
 }
 
 async function getAccountInfo(address: string) {
-  const r = await rpc<{ value: any }>("getAccountInfo", [address, { encoding: "base64" }]);
+  const r = await rpc<{ value: any }>("getAccountInfo", [
+    address,
+    { encoding: "jsonParsed" },
+  ]);
   return r?.value ?? null;
 }
 
-function classifyAccount(info: any): "program" | "token" | "wallet" {
+/**
+ * Classify Solana account:
+ * - program (executable)
+ * - token mint (SPL / Token-2022 mint)
+ * - token_account (ATA / token holdings account)
+ * - wallet (system / other)
+ */
+function classifyAccount(
+  info: any,
+): "program" | "token" | "token_account" | "wallet" {
   if (!info) return "wallet";
   if (info.executable) return "program";
-  if (info.owner === TOKEN_PROGRAM || info.owner === TOKEN_2022_PROGRAM) {
-    const bytes = Buffer.from(info.data[0], "base64").length;
-    if (bytes <= 200) return "token"; // mint=82, token acct=165
+
+  const owner = info.owner as string | undefined;
+  const parsed = info.data?.parsed;
+  const pType = parsed?.type as string | undefined;
+
+  if (owner === TOKEN_PROGRAM || owner === TOKEN_2022_PROGRAM) {
+    if (pType === "mint") return "token";
+    if (pType === "account") return "token_account";
+    // Fallback without parsed layout
+    try {
+      const raw =
+        typeof info.data?.[0] === "string"
+          ? Buffer.from(info.data[0], "base64")
+          : null;
+      const len = raw?.length ?? info.space ?? 0;
+      // classic mint 82; Token-2022 mint often 165–1000+ with extensions
+      if (len === 82 || (len >= 82 && len <= 1200 && pType !== "account")) {
+        // Prefer mint for mint-sized; token accounts are usually 165 classic
+        if (len === 165 && owner === TOKEN_PROGRAM) return "token_account";
+        return "token";
+      }
+      if (len === 165) return "token_account";
+    } catch {
+      /* ignore */
+    }
+    return "token";
   }
+
   return "wallet";
 }
 
@@ -67,13 +103,34 @@ async function scanProgram(address: string, info: any) {
   let deploySlot: number | null = null;
   let programDataAddress: string | null = null;
 
-  if (info.owner === BPF_UPGRADEABLE) {
+  // Need raw bytes for program layout — re-fetch base64 if jsonParsed
+  let raw: Buffer | null = null;
+  try {
+    if (typeof info.data?.[0] === "string") {
+      raw = Buffer.from(info.data[0], "base64");
+    } else {
+      const bare = await rpc<{ value: any }>("getAccountInfo", [
+        address,
+        { encoding: "base64" },
+      ]);
+      if (bare?.value?.data?.[0]) {
+        raw = Buffer.from(bare.value.data[0], "base64");
+      }
+    }
+  } catch {
+    raw = null;
+  }
+
+  if (info.owner === BPF_UPGRADEABLE && raw) {
     try {
-      const raw = Buffer.from(info.data[0], "base64");
       // Program account layout: [4 discriminator][32 programdata pubkey]
       if (raw.length >= 36) {
         programDataAddress = pubkeyFromBytes(raw, 4);
-        const pdInfo = await getAccountInfo(programDataAddress);
+        const pdInfoBare = await rpc<{ value: any }>("getAccountInfo", [
+          programDataAddress,
+          { encoding: "base64" },
+        ]);
+        const pdInfo = pdInfoBare?.value;
         if (pdInfo) {
           const pdRaw = Buffer.from(pdInfo.data[0], "base64");
           // ProgramData layout: [4 disc][8 slot][1 has_authority][32 authority]
@@ -126,7 +183,8 @@ type RugcheckReport = {
   rugged?: boolean;
 };
 
-async function scanToken(address: string) {
+async function scanToken(address: string, info?: any) {
+  const parsedMint = info?.data?.parsed?.info;
   const [rugcheck, jup, sigs] = await Promise.allSettled([
     fetch(`https://api.rugcheck.xyz/v1/tokens/${address}/report`, {
       headers: { Accept: "application/json" },
@@ -156,28 +214,50 @@ async function scanToken(address: string) {
     }
   }
 
+  // Token-2022 embedded metadata
+  const t22meta = Array.isArray(parsedMint?.extensions)
+    ? (parsedMint.extensions as { extension?: string; state?: Record<string, unknown> }[]).find(
+        (e) => e.extension === "tokenMetadata",
+      )?.state
+    : null;
+
   // Fetch metadata JSON from URI for description/image when rugcheck doesn't have it
   let fileMeta: { description?: string; image?: string; name?: string } | null =
     rc?.fileMeta ? { description: rc.fileMeta.description, image: rc.fileMeta.image, name: rc.fileMeta.name } : null;
-  const metaUri: string | null = rc?.tokenMeta?.uri ?? null;
+  const metaUri: string | null =
+    rc?.tokenMeta?.uri ?? (typeof t22meta?.uri === "string" ? t22meta.uri : null) ?? null;
   if (!fileMeta && metaUri) {
     fileMeta = await fetch(metaUri, { signal: AbortSignal.timeout(5_000) })
       .then((r) => (r.ok ? (r.json() as Promise<{ description?: string; image?: string; name?: string }>) : null))
       .catch(() => null);
   }
 
-  const supply = rc?.token?.supply ?? null;
-  const decimals = rc?.token?.decimals ?? jupData?.decimals ?? 0;
-  const mintAuthority: string | null = rc?.token?.mintAuthority ?? null;
-  const freezeAuthority: string | null = rc?.token?.freezeAuthority ?? null;
+  const supply = rc?.token?.supply ?? parsedMint?.supply ?? null;
+  const decimals =
+    rc?.token?.decimals ?? jupData?.decimals ?? parsedMint?.decimals ?? 0;
+  const mintAuthority: string | null =
+    rc?.token?.mintAuthority ?? parsedMint?.mintAuthority ?? null;
+  const freezeAuthority: string | null =
+    rc?.token?.freezeAuthority ?? parsedMint?.freezeAuthority ?? null;
   const name: string =
-    rc?.tokenMeta?.name ?? fileMeta?.name ?? jupData?.name ?? address.slice(0, 8);
-  const symbol: string = rc?.tokenMeta?.symbol ?? jupData?.symbol ?? "???";
+    rc?.tokenMeta?.name ??
+    fileMeta?.name ??
+    jupData?.name ??
+    (typeof t22meta?.name === "string" ? t22meta.name : null) ??
+    address.slice(0, 8);
+  const symbol: string =
+    rc?.tokenMeta?.symbol ??
+    jupData?.symbol ??
+    (typeof t22meta?.symbol === "string" ? t22meta.symbol : null) ??
+    "???";
   const imageUrl: string | null =
     fileMeta?.image ?? jupData?.logoURI ?? null;
   const description: string | null = fileMeta?.description ?? null;
   const mutable: boolean = rc?.tokenMeta?.mutable ?? false;
-  const updateAuthority: string | null = rc?.tokenMeta?.updateAuthority ?? null;
+  const updateAuthority: string | null =
+    rc?.tokenMeta?.updateAuthority ??
+    (typeof t22meta?.updateAuthority === "string" ? t22meta.updateAuthority : null) ??
+    null;
 
   let supplyFormatted: string | null = null;
   if (supply != null) {
@@ -191,8 +271,16 @@ async function scanToken(address: string) {
       : n.toLocaleString();
   }
 
+  const tokenProgram =
+    info?.owner === TOKEN_2022_PROGRAM
+      ? "token-2022"
+      : info?.owner === TOKEN_PROGRAM
+        ? "spl-token"
+        : null;
+
   return {
     type: "token" as const,
+    addressType: "token_mint" as const,
     address,
     name,
     symbol,
@@ -208,6 +296,7 @@ async function scanToken(address: string) {
     metadataUri: metaUri,
     imageUrl,
     description,
+    tokenProgram,
     score: rc?.score ?? null,
     risks: rc?.risks ?? [],
     rugged: rc?.rugged ?? false,
@@ -218,6 +307,40 @@ async function scanToken(address: string) {
     solscanUrl: `https://solscan.io/token/${address}`,
     jupiterUrl: `https://jup.ag/tokens/${address}`,
     dexscreenerUrl: `https://dexscreener.com/solana/${address}`,
+  };
+}
+
+async function scanTokenAccount(address: string, info: any) {
+  const parsed = info?.data?.parsed?.info;
+  const mint = parsed?.mint as string | undefined;
+  const owner = parsed?.owner as string | undefined;
+  const amount = parsed?.tokenAmount?.uiAmountString ?? parsed?.tokenAmount?.uiAmount ?? null;
+  const decimals = parsed?.tokenAmount?.decimals ?? null;
+  let mintMeta: Awaited<ReturnType<typeof scanToken>> | null = null;
+  if (mint) {
+    try {
+      const mintInfo = await getAccountInfo(mint);
+      mintMeta = await scanToken(mint, mintInfo);
+    } catch {
+      mintMeta = null;
+    }
+  }
+  return {
+    type: "token_account" as const,
+    addressType: "token_account" as const,
+    address,
+    mint: mint ?? null,
+    owner: owner ?? null,
+    amount,
+    decimals,
+    tokenProgram:
+      info?.owner === TOKEN_2022_PROGRAM
+        ? "token-2022"
+        : info?.owner === TOKEN_PROGRAM
+          ? "spl-token"
+          : null,
+    mintMeta,
+    solscanUrl: `https://solscan.io/account/${address}`,
   };
 }
 
@@ -236,13 +359,20 @@ export async function GET(req: NextRequest) {
 
     if (type === "program") {
       const data = await scanProgram(address, info);
-      return NextResponse.json(data);
+      return NextResponse.json({ ...data, addressType: "program" });
     }
 
     if (type === "token") {
-      const data = await scanToken(address);
+      const data = await scanToken(address, info);
       return NextResponse.json(data, {
         headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600" },
+      });
+    }
+
+    if (type === "token_account") {
+      const data = await scanTokenAccount(address, info);
+      return NextResponse.json(data, {
+        headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
       });
     }
 
@@ -299,10 +429,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         type: "wallet",
+        addressType: "wallet",
         address,
         sol,
         usdc,
         balances: { sol, usdc },
+        owner: info?.owner ?? "11111111111111111111111111111111",
+        solscanUrl: `https://solscan.io/account/${address}`,
       },
       { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } }
     );

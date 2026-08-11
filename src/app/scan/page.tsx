@@ -86,6 +86,49 @@ function Badge({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
   );
 }
 
+const ADDRESS_TYPE_META: Record<
+  string,
+  { label: string; className: string; icon: React.ElementType }
+> = {
+  token_mint: {
+    label: "Token mint",
+    className: "bg-orange-500/15 text-orange-600 dark:text-orange-300 border-orange-400/30",
+    icon: Coins,
+  },
+  token_account: {
+    label: "Token account",
+    className: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30",
+    icon: Layers,
+  },
+  program: {
+    label: "Program",
+    className: "bg-purple-500/15 text-purple-600 dark:text-purple-300 border-purple-400/30",
+    icon: Code2,
+  },
+  wallet: {
+    label: "Wallet",
+    className: "bg-sky-500/15 text-sky-600 dark:text-sky-300 border-sky-400/30",
+    icon: WalletIcon,
+  },
+};
+
+function AddressTypeBadge({ type }: { type: string }) {
+  const meta = ADDRESS_TYPE_META[type] || {
+    label: type || "Unknown",
+    className: "bg-gray-500/10 text-gray-500 border-gray-400/20",
+    icon: Search,
+  };
+  const Icon = meta.icon;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${meta.className}`}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {meta.label}
+    </span>
+  );
+}
+
 // ── Program View ──────────────────────────────────────────────────────────────
 
 type ProgramData = {
@@ -112,7 +155,7 @@ function ProgramView({ data }: { data: ProgramData }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-lg font-bold">{pw?.name ?? "Solana Program"}</h2>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-500/10 text-purple-500">Program</span>
+            <AddressTypeBadge type="program" />
           </div>
           <p className="font-mono text-xs text-gray-500 dark:text-white/40 mt-0.5 flex items-center gap-1">
             {data.address} <CopyButton text={data.address} />
@@ -204,6 +247,7 @@ type Risk = { name: string; level: string; description: string };
 
 type TokenData = {
   type: "token";
+  addressType?: string;
   address: string;
   name: string;
   symbol: string;
@@ -218,6 +262,7 @@ type TokenData = {
   metadataUri: string | null;
   imageUrl: string | null;
   description: string | null;
+  tokenProgram?: string | null;
   score: number | null;
   risks: Risk[];
   rugged: boolean;
@@ -228,6 +273,20 @@ type TokenData = {
   jupiterUrl: string;
   dexscreenerUrl: string;
 };
+
+type TokenAccountData = {
+  type: "token_account";
+  addressType?: string;
+  address: string;
+  mint: string | null;
+  owner: string | null;
+  amount: string | number | null;
+  decimals: number | null;
+  tokenProgram?: string | null;
+  mintMeta?: TokenData | null;
+  solscanUrl: string;
+};
+
 
 const RISK_COLOR: Record<string, string> = {
   danger: "text-rose-500 bg-rose-500/10 border-rose-400/20",
@@ -272,6 +331,12 @@ function TokenView({ data }: { data: TokenData }) {
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-xl font-bold">{data.name}</h2>
             <span className="text-sm text-gray-400 dark:text-white/40 font-mono">${data.symbol}</span>
+            <AddressTypeBadge type={data.addressType || "token_mint"} />
+            {data.tokenProgram && (
+              <span className="text-[10px] font-mono uppercase tracking-wide text-gray-400 border border-black/10 dark:border-white/10 rounded-full px-2 py-0.5">
+                {data.tokenProgram}
+              </span>
+            )}
           </div>
           <p className="font-mono text-xs text-gray-500 dark:text-white/40 mt-0.5 flex items-center gap-1">
             {short(data.address)} <CopyButton text={data.address} />
@@ -412,7 +477,71 @@ function WalletView({
   sol?: number;
   usdc?: number | null;
 }) {
-  return <PortfolioDefiPanel address={address} compact />;
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <AddressTypeBadge type="wallet" />
+        <span className="font-mono text-xs text-gray-500 break-all">{address}</span>
+        <CopyButton text={address} />
+      </div>
+      <PortfolioDefiPanel address={address} compact />
+    </div>
+  );
+}
+
+function TokenAccountView({ data }: { data: TokenAccountData }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <AddressTypeBadge type="token_account" />
+        {data.tokenProgram && (
+          <span className="text-[10px] font-mono uppercase tracking-wide text-gray-400 border border-black/10 dark:border-white/10 rounded-full px-2 py-0.5">
+            {data.tokenProgram}
+          </span>
+        )}
+      </div>
+      <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] px-4 py-1">
+        <Field label="Account" value={data.address} mono icon={Layers} />
+        <Field
+          label="Mint"
+          value={data.mint}
+          mono
+          url={data.mint ? `/address/${data.mint}` : undefined}
+          icon={Coins}
+        />
+        <Field
+          label="Owner"
+          value={data.owner}
+          mono
+          url={data.owner ? `/address/${data.owner}` : undefined}
+          icon={WalletIcon}
+        />
+        <Field
+          label="Balance"
+          value={
+            data.amount != null
+              ? `${data.amount}${data.mintMeta?.symbol ? ` ${data.mintMeta.symbol}` : ""}`
+              : null
+          }
+          icon={Coins}
+        />
+      </div>
+      {data.mintMeta && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Mint</p>
+          <TokenView data={data.mintMeta} />
+        </div>
+      )}
+      <a
+        href={data.solscanUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-xs text-purple-500 hover:underline"
+      >
+        Solscan <ExternalLink className="w-3 h-3" />
+      </a>
+    </div>
+  );
 }
 
 // ── Main scan result ──────────────────────────────────────────────────────────
@@ -420,9 +549,11 @@ function WalletView({
 type ScanResult =
   | ({ type: "program" } & ProgramData)
   | ({ type: "token" } & TokenData)
+  | ({ type: "token_account" } & TokenAccountData)
   | {
       type: "wallet";
       address: string;
+      addressType?: string;
       sol?: number;
       usdc?: number | null;
       balances?: { sol: number; usdc: number | null };
@@ -483,7 +614,7 @@ function ScanInner() {
               <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Scan</h1>
             </div>
             <p className="text-gray-500 dark:text-white/40 text-sm">
-              Paste any Solana address — wallet, token, or program.{" "}
+              Paste any Solana address — we detect wallet, token mint, token account, or program.{" "}
               <span className="hidden sm:inline text-gray-400 dark:text-white/30">
                 sol.new/address/…
               </span>
@@ -541,9 +672,26 @@ function ScanInner() {
           )}
 
           {result && (
-            <div className="bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-2xl p-4 sm:p-6">
+            <div className="bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-2xl p-4 sm:p-6 space-y-3">
+              <div className="flex items-center gap-2">
+                <AddressTypeBadge
+                  type={
+                    result.type === "token"
+                      ? "token_mint"
+                      : result.type === "token_account"
+                        ? "token_account"
+                        : result.type === "program"
+                          ? "program"
+                          : "wallet"
+                  }
+                />
+                <span className="text-[11px] text-gray-400">Address type detected</span>
+              </div>
               {result.type === "program" && <ProgramView data={result as ProgramData} />}
               {result.type === "token" && <TokenView data={result as TokenData} />}
+              {result.type === "token_account" && (
+                <TokenAccountView data={result as TokenAccountData} />
+              )}
               {result.type === "wallet" && (
                 <WalletView
                   address={result.address}
