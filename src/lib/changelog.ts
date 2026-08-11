@@ -15,6 +15,15 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-12",
+    title: "Passkey: stop accidental new wallets",
+    items: [
+      "Connect unlocks an existing passkey — Create only when you ask.",
+      "Pinned credential per address; wrong passkey rejected with clear error.",
+      "Find wallet + safer credential binding when switching accounts.",
+    ],
+  },
+  {
+    date: "2026-08-12",
     title: "MoneyGram Ramps sandbox",
     items: [
       "Cash in / cash out USDC via MoneyGram widget on /get (sandbox keys).",

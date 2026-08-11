@@ -32,15 +32,15 @@ interface WalletState {
   usdcBalance: number | null;
   loading: boolean;
   error: string | null;
-  connect: (username?: string) => Promise<void>;
-  recover: (opts?: { forcePicker?: boolean }) => Promise<void>;
+  connect: (username?: string | { createNew?: boolean }) => Promise<void>;
+  recover: (opts?: { forcePicker?: boolean; forAddress?: string }) => Promise<void>;
   /** Probe one passkey from the full OS list; returns address (does not auto-activate). */
   identify: () => Promise<{ publicKey: string; credentialId: string; sol: number; usdc: number }>;
   /** Save/activate a discovered wallet with a label. */
   activateWallet: (entry: WalletEntry) => void;
   renameWallet: (pubkey: string, label: string) => void;
   removeWallet: (pubkey: string) => void;
-  switchWallet: (pubkey: string) => void;
+  switchWallet: (pubkey: string) => void | Promise<void>;
   refreshWalletListBalances: () => Promise<void>;
   disconnect: () => void;
   refreshBalance: () => Promise<void>;
@@ -212,14 +212,63 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const connect = async (_username?: string) => {
+  const connect = async (username?: string | { createNew?: boolean }) => {
     setError(null);
     setLoading(true);
     try {
       if (!window.PublicKeyCredential) {
         throw new Error("Passkeys require HTTPS.");
       }
-      const result = await createPasskeyWallet();
+
+      const createNew =
+        typeof username === "object" && username?.createNew === true;
+
+      // Default Connect = unlock existing passkey. Only mint a new key when asked.
+      if (!createNew) {
+        const list = loadWallets();
+        const forcePicker =
+          list.length !== 1 || !list[0]?.credentialId;
+        try {
+          const result = await recoverPasskeyWallet({
+            forcePicker,
+            // If exactly one saved wallet with a credential, pin to it
+            forAddress:
+              list.length === 1 && list[0]?.credentialId
+                ? list[0].pubkey
+                : undefined,
+          });
+          activateWallet({
+            pubkey: result.publicKey,
+            credentialId: result.credentialId,
+            label: result.publicKey,
+          });
+          fetch("/api/wallet", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              publicKey: result.publicKey,
+              credentialId: result.credentialId,
+            }),
+          }).catch(() => {});
+          analytics.walletRecovered();
+          return;
+        } catch (e) {
+          // No existing passkey / cancelled — only fall through to create if none saved
+          const msg = e instanceof Error ? e.message.toLowerCase() : "";
+          const cancelled =
+            msg.includes("cancel") ||
+            msg.includes("not allowed") ||
+            msg.includes("abort");
+          if (list.length > 0 || cancelled) {
+            throw e;
+          }
+          // Fresh device with zero wallets: create below
+        }
+      }
+
+      const result = await createPasskeyWallet(
+        typeof username === "string" ? username : undefined,
+      );
       activateWallet({
         pubkey: result.publicKey,
         credentialId: result.credentialId,
@@ -229,25 +278,36 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       fetch("/api/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicKey: result.publicKey, credentialId: result.credentialId }),
+        body: JSON.stringify({
+          publicKey: result.publicKey,
+          credentialId: result.credentialId,
+        }),
       }).catch(() => {});
       analytics.walletCreated(result.publicKey);
     } catch (e) {
       const { friendlyError } = await import("./friendly-errors");
-      setError(friendlyError(e, "We couldn't set up your wallet. Try again."));
+      setError(
+        friendlyError(
+          e,
+          "Couldn't connect. Use your existing passkey, or Create only if you need a new wallet.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const recover = async (opts?: { forcePicker?: boolean }) => {
+  const recover = async (opts?: { forcePicker?: boolean; forAddress?: string }) => {
     setError(null);
     setLoading(true);
     try {
       if (!window.PublicKeyCredential) {
         throw new Error("Passkeys require HTTPS.");
       }
-      const result = await recoverPasskeyWallet({ forcePicker: opts?.forcePicker });
+      const result = await recoverPasskeyWallet({
+        forcePicker: opts?.forcePicker,
+        forAddress: opts?.forAddress,
+      });
       activateWallet({
         pubkey: result.publicKey,
         credentialId: result.credentialId,
@@ -256,12 +316,20 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       fetch("/api/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicKey: result.publicKey }),
+        body: JSON.stringify({
+          publicKey: result.publicKey,
+          credentialId: result.credentialId,
+        }),
       }).catch(() => {});
       analytics.walletRecovered();
     } catch (e) {
       const { friendlyError } = await import("./friendly-errors");
-      setError(friendlyError(e, "We couldn't find your wallet. Try creating a new one."));
+      setError(
+        friendlyError(
+          e,
+          "We couldn't unlock that passkey. Try Find wallet, or pick the passkey whose name is your address.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -339,10 +407,42 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const switchWallet = (pubkey: string) => {
+  const switchWallet = async (pubkey: string) => {
     const entry = loadWallets().find((w) => w.pubkey === pubkey);
     if (!entry) return;
-    activateWallet({ ...entry, label: entry.pubkey });
+
+    // Always re-bind credential when switching so signing uses the right passkey
+    setError(null);
+    setLoading(true);
+    try {
+      if (entry.credentialId) {
+        activateWallet({ ...entry, label: entry.pubkey });
+        // Soft verify later on sign; activate immediately for UX
+        setLoading(false);
+        return;
+      }
+      // No stored credentialId — force user to pick the matching passkey
+      const result = await recoverPasskeyWallet({
+        forcePicker: true,
+        forAddress: pubkey,
+      });
+      activateWallet({
+        pubkey: result.publicKey,
+        credentialId: result.credentialId,
+        label: result.publicKey,
+        userId: entry.userId,
+      });
+    } catch (e) {
+      const { friendlyError } = await import("./friendly-errors");
+      setError(
+        friendlyError(
+          e,
+          `Pick the passkey for ${pubkey.slice(0, 4)}…${pubkey.slice(-4)} (name should be the full address).`,
+        ),
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const [airdropping, setAirdropping] = useState(false);

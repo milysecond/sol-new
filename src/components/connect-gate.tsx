@@ -103,7 +103,7 @@ export function ConnectGate({
                             type="button"
                             disabled={loading}
                             onClick={() => {
-                              switchWallet(w.pubkey);
+                              void switchWallet(w.pubkey);
                             }}
                             className="w-full flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-white/50 dark:bg-white/5 px-3 py-2.5 text-left hover:border-purple-400/40 disabled:opacity-50"
                           >
@@ -149,11 +149,11 @@ export function ConnectGate({
 
                 <button
                   type="button"
-                  onClick={() => void connect()}
+                  onClick={() => void connect({ createNew: true })}
                   disabled={loading}
                   className="w-full bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white font-medium rounded-xl px-4 py-3 transition text-sm cursor-pointer disabled:opacity-40"
                 >
-                  {loading ? "Creating…" : "Create a new wallet"}
+                  {loading ? "…" : "Create a new wallet (only if needed)"}
                 </button>
 
                 {walletLabel && (
