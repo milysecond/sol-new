@@ -149,7 +149,24 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         refreshControl.endRefreshing()
     }
 
-    // MARK: WKUIDelegate — target=_blank handling
+    // MARK: WKUIDelegate — target=_blank + camera/mic for getUserMedia
+
+    @available(iOS 15.0, *)
+    func webView(
+        _ webView: WKWebView,
+        requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+        initiatedByFrame frame: WKFrameInfo,
+        type: WKMediaCaptureType,
+        decisionHandler: @escaping (WKPermissionDecision) -> Void
+    ) {
+        // Allow camera (and mic if requested) for sol.new pay QR scanning.
+        let host = origin.host
+        if host == Self.host || host.hasSuffix(".\(Self.host)") {
+            decisionHandler(.grant)
+        } else {
+            decisionHandler(.deny)
+        }
+    }
 
     func webView(
         _ webView: WKWebView,

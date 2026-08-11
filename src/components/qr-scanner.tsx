@@ -25,6 +25,26 @@ function isInAppBrowser(): boolean {
   );
 }
 
+function isSolNewNativeShell(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    if (w.__SOLNEW_NATIVE__ === true) return true;
+    if (w.__SOLNEW_APPCLIP__ === true) return true;
+    if (localStorage.getItem("solnew_native") === "1") return true;
+    if (document.documentElement?.dataset?.solnewAppclip === "1") return true;
+  } catch {
+    /* ignore */
+  }
+  // iOS WKWebView often omits Safari token
+  const ua = navigator.userAgent || "";
+  if (/iPhone|iPad|iPod/i.test(ua) && /AppleWebKit/i.test(ua) && !/Safari\//i.test(ua)) {
+    return true;
+  }
+  return false;
+}
+
 function canGetUserMedia(): boolean {
   try {
     return Boolean(
@@ -78,6 +98,7 @@ export function QrScanner({ onScan, active = true, className = "" }: Props) {
   const [torch, setTorch] = useState(false);
   const [torchOk, setTorchOk] = useState(false);
   const [inApp] = useState(() => isInAppBrowser());
+  const [nativeShell] = useState(() => isSolNewNativeShell());
   const [noStream] = useState(() => !canGetUserMedia());
   const [decoding, setDecoding] = useState(false);
 
@@ -113,9 +134,11 @@ export function QrScanner({ onScan, active = true, className = "" }: Props) {
     setError(null);
     if (!canGetUserMedia()) {
       setError(
-        inApp
-          ? "Telegram (and other in-app browsers) block the live camera. Take a photo of the QR, or open sol.new in Safari."
-          : "Camera not available. Take a photo of the QR or paste the pay link.",
+        nativeShell
+          ? "Camera needs permission in Settings → sol.new → Camera. Or use Take photo of QR."
+          : inApp
+            ? "This in-app browser blocks the live camera. Take a photo of the QR, or open sol.new in Safari."
+            : "Camera not available. Take a photo of the QR or paste the pay link.",
       );
       return;
     }
@@ -197,25 +220,28 @@ export function QrScanner({ onScan, active = true, className = "" }: Props) {
     } finally {
       setStarting(false);
     }
-  }, [emit, inApp, stop]);
+  }, [emit, inApp, nativeShell, stop]);
 
   useEffect(() => {
-    // Don't auto-start stream inside Telegram — it fails and confuses users
+    // Don't auto-start stream inside Telegram — it fails and confuses users.
+    // Native iOS shell CAN use live camera once Info.plist + WK grant are present — try it.
     if (!active) {
       stop();
       return;
     }
-    if (inApp || noStream) {
+    if (inApp && !nativeShell) {
       setError(
-        inApp
-          ? "Telegram blocks live camera. Tap Take photo to scan the QR, or Open in Safari for live scan."
-          : "Camera stream unavailable. Take a photo of the QR instead.",
+        "In-app browsers block live camera. Tap Take photo to scan the QR, or Open in Safari.",
       );
+      return;
+    }
+    if (noStream && !nativeShell) {
+      setError("Camera stream unavailable. Take a photo of the QR instead.");
       return;
     }
     void start();
     return stop;
-  }, [active, inApp, noStream, start, stop]);
+  }, [active, inApp, nativeShell, noStream, start, stop]);
 
   const toggleTorch = async () => {
     const track = streamRef.current?.getVideoTracks()[0];
@@ -276,7 +302,7 @@ export function QrScanner({ onScan, active = true, className = "" }: Props) {
     }
   };
 
-  const showLivePreview = !inApp && !noStream;
+  const showLivePreview = nativeShell || (!inApp && !noStream);
 
   return (
     <div className={`space-y-3 ${className}`}>
@@ -325,12 +351,12 @@ export function QrScanner({ onScan, active = true, className = "" }: Props) {
       ) : (
         <div className="rounded-2xl border border-violet-500/25 bg-violet-500/10 px-4 py-5 space-y-3">
           <p className="text-sm font-semibold text-gray-900 dark:text-white">
-            {inApp ? "You’re in Telegram" : "Live camera unavailable"}
+            {inApp ? "In-app browser" : "Live camera unavailable"}
           </p>
           <p className="text-xs text-gray-600 dark:text-white/55 leading-relaxed">
             {inApp
-              ? "Telegram blocks the live camera on sol.new. Snap a photo of the merchant QR, or open this page in Safari for live scan."
-              : "Use the camera shutter below to photograph the QR code."}
+              ? "This browser blocks the live camera. Snap a photo of the merchant QR, or open sol.new in Safari."
+              : "Use Take photo to photograph the QR code."}
           </p>
           {inApp && (
             <button

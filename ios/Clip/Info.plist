@@ -34,6 +34,12 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>sol.new uses the camera to scan Solana Pay QR codes so you can pay merchants.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>sol.new uses Face ID to authenticate your passkey-secured wallet.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>sol.new uses photos so you can pick an image or QR for payments.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

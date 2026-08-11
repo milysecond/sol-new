@@ -15,6 +15,13 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-09",
+    title: "iOS app camera for Pay scan",
+    items: [
+      "Native WKWebView grants camera for getUserMedia; NSCameraUsageDescription on app + Clip.",
+    ],
+  },
+  {
+    date: "2026-08-09",
     title: "Pay scan works in Telegram",
     items: [
       "Detect in-app browsers — Take photo of QR + Open in Safari when live camera is blocked.",
