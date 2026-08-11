@@ -168,6 +168,22 @@ final class ClipWebViewController: UIViewController, WKNavigationDelegate, WKUID
         return nil
     }
 
+    @available(iOS 15.0, *)
+    func webView(
+        _ webView: WKWebView,
+        requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+        initiatedByFrame frame: WKFrameInfo,
+        type: WKMediaCaptureType,
+        decisionHandler: @escaping (WKPermissionDecision) -> Void
+    ) {
+        let host = origin.host.lowercased()
+        if host == "sol.new" || host == "www.sol.new" || host.hasSuffix(".sol.new") {
+            decisionHandler(.grant)
+        } else {
+            decisionHandler(.deny)
+        }
+    }
+
     func webView(
         _ webView: WKWebView,
         runJavaScriptAlertPanelWithMessage message: String,
