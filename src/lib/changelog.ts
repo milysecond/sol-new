@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-11",
+    title: "Address URLs by default",
+    items: [
+      "Lookups live at sol.new/address/<pubkey> — /scan redirects there.",
+      "Connected wallet defaults into the address URL.",
+    ],
+  },
+  {
+    date: "2026-08-11",
     title: "Scan detects address type",
     items: [
       "Token-2022 mints no longer misread as wallets.",

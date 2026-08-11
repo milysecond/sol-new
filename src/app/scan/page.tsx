@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   Search, ExternalLink, ShieldCheck, ShieldAlert,
   ShieldX, Copy, Check, Coins, Activity, Code2, AlertTriangle,
@@ -565,11 +565,24 @@ function ScanInner() {
   const { publicKey } = useWallet();
   const params = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
 
   const [input, setInput] = useState("");
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /** Canonical shareable URL — base58 is URL-safe, no encodeURIComponent clutter */
+  const goAddress = useCallback(
+    (address: string, { replace = false }: { replace?: boolean } = {}) => {
+      const a = address.trim();
+      if (!a) return;
+      const path = `/address/${a}`;
+      if (replace) router.replace(path);
+      else router.push(path);
+    },
+    [router],
+  );
 
   const scan = useCallback(async (address: string) => {
     const a = address.trim();
@@ -591,16 +604,28 @@ function ScanInner() {
 
   useEffect(() => {
     const q = params.get("address") ?? params.get("wallet");
-    if (q) { setInput(q); scan(q); }
-    else if (publicKey) setInput(publicKey);
-  }, [params, publicKey, scan]);
+    if (q) {
+      setInput(q);
+      void scan(q);
+      // Ensure browser shows /address/<q> not /scan?address=
+      if (pathname === "/scan" || pathname?.startsWith("/scan?")) {
+        goAddress(q, { replace: true });
+      }
+      return;
+    }
+    // Default: connected wallet → /address/<pubkey>
+    if (publicKey) {
+      setInput(publicKey);
+      goAddress(publicKey, { replace: true });
+    }
+  }, [params, publicKey, scan, goAddress, pathname]);
 
   const submit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     const a = input.trim();
     if (!a) return;
-    router.push(`/address/${encodeURIComponent(a)}`);
-    scan(a);
+    goAddress(a);
+    void scan(a);
   };
 
   return (
@@ -611,7 +636,9 @@ function ScanInner() {
           <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-2 text-purple-500 dark:text-purple-400">
               <Search size={22} />
-              <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Scan</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                Address
+              </h1>
             </div>
             <p className="text-gray-500 dark:text-white/40 text-sm">
               Paste any Solana address — we detect wallet, token mint, token account, or program.{" "}
@@ -632,7 +659,13 @@ function ScanInner() {
                 className="flex-1 bg-transparent py-3 text-sm font-mono outline-none placeholder:text-gray-400 dark:placeholder:text-white/25"
               />
               {input && (
-                <button type="button" onClick={() => setInput("")} className="text-gray-400 hover:text-gray-600 dark:hover:text-white/60 text-lg leading-none">×</button>
+                <button
+                  type="button"
+                  onClick={() => setInput("")}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-white/60 text-lg leading-none"
+                >
+                  ×
+                </button>
               )}
             </div>
             <button
@@ -641,21 +674,28 @@ function ScanInner() {
               className="px-4 rounded-xl bg-purple-500/20 text-purple-600 dark:text-purple-300 border border-purple-400/50 text-sm font-medium hover:bg-purple-500/30 transition disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
             >
               {loading ? <Spinner size={20} /> : <Search size={15} />}
-              <span className="hidden sm:inline">Scan</span>
+              <span className="hidden sm:inline">Look up</span>
             </button>
           </form>
 
-          {publicKey && !result && !loading && (
+          {publicKey && !result && !loading && input !== publicKey && (
             <button
+              type="button"
               onClick={() => {
                 setInput(publicKey);
-                router.push(`/address/${encodeURIComponent(publicKey)}`);
-                scan(publicKey);
+                goAddress(publicKey);
+                void scan(publicKey);
               }}
               className="mx-auto block text-xs text-purple-500 dark:text-purple-400 hover:underline"
             >
-              Scan my connected wallet →
+              My wallet → /address/{publicKey.slice(0, 4)}…{publicKey.slice(-4)}
             </button>
+          )}
+
+          {result && (
+            <p className="text-center text-[11px] text-gray-400 dark:text-white/30 font-mono break-all">
+              sol.new/address/{result.type === "wallet" || result.type === "token" || result.type === "token_account" || result.type === "program" ? (result as { address: string }).address : input}
+            </p>
           )}
 
           {error && (

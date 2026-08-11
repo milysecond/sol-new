@@ -48,8 +48,23 @@ export function middleware(request: NextRequest) {
   }
 
   // Canonical wallet/token/program lookup: /address/<pubkey>
-  // Bare /address → scan form. Query ?address= still works via /scan.
-  if (path === "/address" || path === "/address/") {
+  // Bare /address or /scan → scan form (rewrite to /scan app route).
+  if (path === "/address" || path === "/address/" || path === "/scan" || path === "/scan/") {
+    const q = url.searchParams.get("address") || url.searchParams.get("wallet");
+    if (q && q.trim()) {
+      // Always prefer pretty /address/<pk> in the browser URL
+      const dest = request.nextUrl.clone();
+      dest.pathname = `/address/${q.trim()}`;
+      dest.search = "";
+      return NextResponse.redirect(dest, 308);
+    }
+    // Empty form: rewrite to scan page under /address in the bar
+    if (path === "/scan" || path === "/scan/") {
+      const dest = request.nextUrl.clone();
+      dest.pathname = "/address";
+      dest.search = "";
+      return NextResponse.redirect(dest, 308);
+    }
     url.pathname = "/scan";
     return NextResponse.rewrite(url);
   }
@@ -64,17 +79,6 @@ export function middleware(request: NextRequest) {
     url.pathname = "/scan";
     url.searchParams.set("address", addr);
     return NextResponse.rewrite(url);
-  }
-
-  // Legacy: /scan?address=X → pretty /address/X (shareable)
-  if (path === "/scan" || path === "/scan/") {
-    const q = url.searchParams.get("address") || url.searchParams.get("wallet");
-    if (q && q.trim()) {
-      const dest = request.nextUrl.clone();
-      dest.pathname = `/address/${encodeURIComponent(q.trim())}`;
-      dest.search = "";
-      return NextResponse.redirect(dest, 308);
-    }
   }
 
   return NextResponse.next();
