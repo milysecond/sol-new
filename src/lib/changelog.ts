@@ -15,6 +15,13 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-09",
+    title: "Pay scan works in Telegram",
+    items: [
+      "Detect in-app browsers — Take photo of QR + Open in Safari when live camera is blocked.",
+    ],
+  },
+  {
+    date: "2026-08-09",
     title: "Pay by scanning Solana Pay QR",
     items: [
       "/pay Scan & pay — camera QR, paste link, passkey send (SOL/USDC).",
