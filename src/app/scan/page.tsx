@@ -267,6 +267,9 @@ type TokenData = {
   risks: Risk[];
   rugged: boolean;
   createdAt: string | null;
+  ageRelative?: string | null;
+  ageAbsolute?: string | null;
+  ageSource?: string | null;
   topHolders: any[];
   rugcheckUrl: string;
   solscanUrl: string;
@@ -400,8 +403,12 @@ function TokenView({ data }: { data: TokenData }) {
           icon={ImageIcon}
         />
         <Field
-          label="Created"
-          value={fmtDate(data.createdAt)}
+          label="Age (on-chain)"
+          value={
+            data.ageRelative && data.ageRelative !== "unknown"
+              ? `${data.ageRelative}${data.ageAbsolute ? ` · ${data.ageAbsolute}` : ""}`
+              : fmtDate(data.createdAt)
+          }
           icon={CalendarDays}
         />
       </div>
