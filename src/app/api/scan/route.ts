@@ -1,24 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mainnetRpcUrl } from "@/lib/rpc-server";
+import { mainnetRpcCall } from "@/lib/rpc-server";
 
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const TOKEN_2022_PROGRAM = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 const BPF_UPGRADEABLE = "BPFLoaderUpgradeab1e11111111111111111111111";
 
-function heliusRpc() {
-  return mainnetRpcUrl();
-}
-
 async function rpc<T = unknown>(method: string, params: unknown[]): Promise<T> {
-  const res = await fetch(heliusRpc(), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-    signal: AbortSignal.timeout(10_000),
-  });
-  const j = (await res.json()) as { result?: T; error?: { message: string } };
-  if (j.error) throw new Error(j.error.message);
-  return j.result as T;
+  return mainnetRpcCall<T>(method, params, { timeoutMs: 12_000 });
 }
 
 async function getAccountInfo(address: string) {

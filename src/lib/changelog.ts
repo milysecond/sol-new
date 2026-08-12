@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-12",
+    title: "RPC pool failover",
+    items: [
+      "Mainnet: viviyan → velvet → cassandra backups.",
+      "Client probes healthy endpoint; server JSON-RPC fails over automatically.",
+    ],
+  },
+  {
+    date: "2026-08-12",
     title: "Passkey: stop accidental new wallets",
     items: [
       "Connect unlocks an existing passkey — Create only when you ask.",
