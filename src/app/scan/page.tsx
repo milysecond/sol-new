@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, Suspense } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   Search, ExternalLink, ShieldCheck, ShieldAlert,
@@ -578,61 +578,86 @@ function ScanInner() {
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastScanned = useRef<string>("");
 
-  /** Canonical shareable URL — base58 is URL-safe, no encodeURIComponent clutter */
+  /** Address from /address/<pk> path or ?address= / ?wallet= */
+  const pathAddress = useMemo(() => {
+    const m = pathname?.match(/^\/address\/([^/]+)\/?$/);
+    if (!m?.[1] || m[1] === "opengraph-image") return null;
+    try {
+      return decodeURIComponent(m[1]).trim();
+    } catch {
+      return m[1].trim();
+    }
+  }, [pathname]);
+
+  const queryAddress = useMemo(() => {
+    const q = params.get("address") ?? params.get("wallet");
+    return q?.trim() || null;
+  }, [params]);
+
+  const resolvedAddress = pathAddress || queryAddress;
+
+  /** Canonical shareable URL — base58 is URL-safe */
   const goAddress = useCallback(
     (address: string, { replace = false }: { replace?: boolean } = {}) => {
       const a = address.trim();
       if (!a) return;
       const path = `/address/${a}`;
+      if (pathname === path) return;
       if (replace) router.replace(path);
       else router.push(path);
     },
-    [router],
+    [router, pathname],
   );
 
-  const scan = useCallback(async (address: string) => {
+  const scan = useCallback(async (address: string, opts?: { force?: boolean }) => {
     const a = address.trim();
     if (!a) return;
+    if (!opts?.force && lastScanned.current === a) return;
+    lastScanned.current = a;
     setLoading(true);
     setError(null);
     setResult(null);
     try {
       const res = await fetch(`/api/scan?address=${encodeURIComponent(a)}`);
       const json = (await res.json()) as ScanResult & { error?: string };
-      if (!res.ok || json.error) throw new Error((json as any).error || "Scan failed");
+      if (!res.ok || json.error) throw new Error((json as { error?: string }).error || "Scan failed");
       setResult(json);
-    } catch (e: any) {
-      setError(e.message || "Something went wrong");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+      lastScanned.current = "";
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Auto-populate + scan whenever URL (or connected wallet default) has an address
   useEffect(() => {
-    const q = params.get("address") ?? params.get("wallet");
-    if (q) {
-      setInput(q);
-      void scan(q);
-      // Ensure browser shows /address/<q> not /scan?address=
-      if (pathname === "/scan" || pathname?.startsWith("/scan?")) {
-        goAddress(q, { replace: true });
+    if (resolvedAddress) {
+      setInput(resolvedAddress);
+      void scan(resolvedAddress);
+      // Pretty URL if we only had query string
+      if (!pathAddress && queryAddress) {
+        goAddress(queryAddress, { replace: true });
       }
       return;
     }
-    // Default: connected wallet → /address/<pubkey>
+
+    // Bare /address or /scan — default to connected wallet
     if (publicKey) {
       setInput(publicKey);
       goAddress(publicKey, { replace: true });
+      void scan(publicKey);
     }
-  }, [params, publicKey, scan, goAddress, pathname]);
+  }, [resolvedAddress, pathAddress, queryAddress, publicKey, scan, goAddress]);
 
   const submit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     const a = input.trim();
     if (!a) return;
     goAddress(a);
-    void scan(a);
+    void scan(a, { force: true });
   };
 
   return (
@@ -691,7 +716,7 @@ function ScanInner() {
               onClick={() => {
                 setInput(publicKey);
                 goAddress(publicKey);
-                void scan(publicKey);
+                void scan(publicKey, { force: true });
               }}
               className="mx-auto block text-xs text-purple-500 dark:text-purple-400 hover:underline"
             >
