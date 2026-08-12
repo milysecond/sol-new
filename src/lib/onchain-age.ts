@@ -2,21 +2,9 @@
  * On-chain account age from first confirmed signature (not Turso).
  */
 
-import { mainnetRpcUrl } from "@/lib/rpc-server";
+import { mainnetRpcCall } from "@/lib/rpc-server";
 
 type Sig = { signature: string; blockTime: number | null; err: unknown | null };
-
-async function rpc<T>(method: string, params: unknown[]): Promise<T> {
-  const res = await fetch(mainnetRpcUrl(), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-    signal: AbortSignal.timeout(12_000),
-  });
-  const j = (await res.json()) as { result?: T; error?: { message: string } };
-  if (j.error) throw new Error(j.error.message);
-  return j.result as T;
-}
 
 /**
  * Walk signature history until the oldest page.
@@ -36,7 +24,10 @@ export async function getOnChainCreatedAt(
       const params: { limit: number; before?: string } = { limit: pageSize };
       if (before) params.before = before;
 
-      const sigs = await rpc<Sig[]>("getSignaturesForAddress", [address, params]);
+      const sigs = await mainnetRpcCall<Sig[]>("getSignaturesForAddress", [
+        address,
+        params,
+      ]);
       if (!Array.isArray(sigs) || sigs.length === 0) break;
 
       oldest = sigs[sigs.length - 1] ?? oldest;
