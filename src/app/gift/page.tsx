@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
-import { Gift, Check, Share2, Undo2, ExternalLink, X, ChevronDown } from "lucide-react";
+import { Gift, Check, Share2, Undo2, Copy, X, ChevronDown } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
 import { SlideToSend } from "@/components/slide-to-send";
@@ -56,6 +56,7 @@ export default function GiftPage() {
   const [giftUrl, setGiftUrl] = useState<string | null>(null);
   const [giftEntry, setGiftEntry] = useState<GiftLinkEntry | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
   const [links, setLinks] = useState<GiftLinkEntry[]>([]);
   const [linkStatuses, setLinkStatuses] = useState<Record<string, string>>({});
   const [reclaiming, setReclaiming] = useState<string | null>(null);
@@ -295,11 +296,79 @@ export default function GiftPage() {
     }
   };
 
-  const copyLink = () => {
+  const copyText = async (text: string): Promise<boolean> => {
+    const value = (text || "").trim();
+    if (!value) return false;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        return true;
+      }
+    } catch {
+      /* fall through */
+    }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = value;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  };
+
+  /** Prefer absolute claim URL with hash secret intact */
+  const giftLinkHref = (entry: GiftLinkEntry): string => {
+    const raw = (entry.url || "").trim();
+    if (!raw) {
+      // Rebuild from pubkey alone is useless without secret — still return claim base
+      return `${typeof window !== "undefined" ? window.location.origin : "https://sol.new"}/gift`;
+    }
+    try {
+      // Already absolute
+      if (/^https?:\/\//i.test(raw)) return raw;
+      // Relative /gift#... or gift#...
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "https://sol.new";
+      if (raw.startsWith("/")) return `${origin}${raw}`;
+      if (raw.startsWith("#")) return `${origin}/gift${raw}`;
+      return `${origin}/${raw.replace(/^\//, "")}`;
+    } catch {
+      return raw;
+    }
+  };
+
+  const copyLink = async () => {
     if (!giftUrl) return;
-    navigator.clipboard.writeText(giftUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const ok = await copyText(giftUrl);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      const { toast } = await import("@/lib/toast");
+      toast.success("Gift link copied");
+    } else {
+      const { toast } = await import("@/lib/toast");
+      toast.error("Couldn't copy — long-press the link instead");
+    }
+  };
+
+  const copyUnclaimedLink = async (entry: GiftLinkEntry) => {
+    const href = giftLinkHref(entry);
+    const ok = await copyText(href);
+    const { toast } = await import("@/lib/toast");
+    if (ok) {
+      setCopiedLinkId(entry.pubkey);
+      setTimeout(() => setCopiedLinkId(null), 2000);
+      toast.success("Gift link copied");
+    } else {
+      toast.error("Couldn't copy link");
+    }
   };
 
   const shareLink = async () => {
@@ -656,13 +725,20 @@ export default function GiftPage() {
                       </p>
                     </div>
                     <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(l.url);
-                      }}
-                      className="text-xs text-gray-500 dark:text-white/50 hover:text-gray-900 dark:hover:text-white transition cursor-pointer flex items-center gap-1"
-                      title="Copy link"
+                      type="button"
+                      onClick={() => void copyUnclaimedLink(l)}
+                      className="text-xs text-gray-500 dark:text-white/50 hover:text-gray-900 dark:hover:text-white transition cursor-pointer flex items-center gap-1 shrink-0"
+                      title="Copy gift claim link"
                     >
-                      <ExternalLink size={12} /> Copy
+                      {copiedLinkId === l.pubkey ? (
+                        <>
+                          <Check size={12} className="text-emerald-500" /> Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={12} /> Copy
+                        </>
+                      )}
                     </button>
                     <button
                       onClick={() => handleReclaim(l)}
