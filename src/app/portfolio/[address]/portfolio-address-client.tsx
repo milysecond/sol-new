@@ -1,19 +1,56 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { PageTransition } from "@/components/page-transition";
 import { PortfolioDefiPanel } from "@/components/portfolio-defi-panel";
-import { resolveRecipient } from "@/lib/resolve-name";
+import { looksLikeDomain, resolveRecipient } from "@/lib/resolve-name";
 import { Spinner } from "@/components/spinner";
 
 export function PortfolioAddressClient({ address }: { address: string }) {
   const router = useRouter();
   const [input, setInput] = useState(address);
+  const [resolved, setResolved] = useState<string | null>(null);
+  const [domainLabel, setDomainLabel] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Auto-resolve SNS/ADNS/SKR path segments → owner pubkey
+  useEffect(() => {
+    let cancelled = false;
+    const raw = address.trim();
+    if (!raw) return;
+
+    if (!looksLikeDomain(raw) && !raw.includes(".")) {
+      setResolved(raw);
+      setDomainLabel(null);
+      return;
+    }
+
+    setResolving(true);
+    setError(null);
+    resolveRecipient(raw)
+      .then((result) => {
+        if (cancelled) return;
+        if (!result.ok) {
+          setError(result.error);
+          setResolved(null);
+          return;
+        }
+        setDomainLabel(result.resolvedAs || result.domain || raw);
+        setResolved(result.owner);
+        setInput(result.resolvedAs || result.domain || result.owner);
+      })
+      .finally(() => {
+        if (!cancelled) setResolving(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [address]);
 
   const lookup = async () => {
     const raw = input.trim();
@@ -26,7 +63,8 @@ export function PortfolioAddressClient({ address }: { address: string }) {
         setError(result.error);
         return;
       }
-      router.push(`/portfolio/${encodeURIComponent(result.owner)}`);
+      const pathKey = result.domain || result.owner;
+      router.push(`/portfolio/${encodeURIComponent(pathKey)}`);
     } finally {
       setResolving(false);
     }
@@ -43,6 +81,9 @@ export function PortfolioAddressClient({ address }: { address: string }) {
               <p className="text-sm text-gray-500 dark:text-white/45">
                 Token balances + Jupiter DeFi positions
               </p>
+              {domainLabel && (
+                <p className="text-xs font-mono text-purple-400">{domainLabel}</p>
+              )}
             </div>
 
             <div className="flex gap-2">
@@ -57,6 +98,7 @@ export function PortfolioAddressClient({ address }: { address: string }) {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") void lookup();
                   }}
+                  placeholder="wallet or name.sol / .bonk / .sns / .skr"
                   className="w-full pl-9 pr-3 py-2.5 min-h-[44px] rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm font-mono"
                   spellCheck={false}
                 />
@@ -72,7 +114,12 @@ export function PortfolioAddressClient({ address }: { address: string }) {
             </div>
             {error && <p className="text-xs text-rose-500">{error}</p>}
 
-            <PortfolioDefiPanel address={address} />
+            {resolving && !resolved && (
+              <div className="flex justify-center py-8">
+                <Spinner size={20} />
+              </div>
+            )}
+            {resolved && <PortfolioDefiPanel address={resolved} />}
           </div>
         </PageTransition>
       </main>

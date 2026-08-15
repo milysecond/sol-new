@@ -109,8 +109,47 @@ export default function IdPage() {
             {/* Header */}
             <div className="text-center space-y-2">
               <AnimatedIcon icon={Search} size={32} className="text-purple-400" />
-              <h1 className="text-3xl font-bold tracking-tight">Get your .sol domain</h1>
-              <p className="text-gray-500 dark:text-white/50 text-sm">Your identity on Solana. Paid in USDC.</p>
+              <h1 className="text-3xl font-bold tracking-tight">Solana names</h1>
+              <p className="text-gray-500 dark:text-white/50 text-sm">
+                Register .sol · look up .sol / .sns / .bonk / .skr
+              </p>
+            </div>
+
+            {/* Resolve any name */}
+            <div className="rounded-2xl border border-purple-400/25 bg-purple-500/5 p-4 space-y-3">
+              <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-white/40">
+                Look up
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  id="id-lookup"
+                  placeholder="metasal.sol · name.skr · name.bonk"
+                  className="flex-1 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-purple-400/50"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const v = (e.target as HTMLInputElement).value.trim();
+                      if (v) window.location.href = `/id/${encodeURIComponent(v)}`;
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="rounded-xl bg-purple-500 hover:bg-purple-400 text-white text-sm font-semibold px-4 py-2"
+                  onClick={() => {
+                    const el = document.getElementById("id-lookup") as HTMLInputElement | null;
+                    const v = el?.value.trim();
+                    if (v) window.location.href = `/id/${encodeURIComponent(v)}`;
+                  }}
+                >
+                  Open
+                </button>
+              </div>
+            </div>
+
+            {/* Register .sol */}
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-700 dark:text-white/70">Register a .sol</p>
             </div>
 
             {/* Search */}
@@ -185,13 +224,21 @@ export default function IdPage() {
                     {txError && <p className="text-red-400 text-xs break-all">{txError}</p>}
                   </>
                 ) : (
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-500 dark:text-white/50">This domain is already taken.</p>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-gray-500 dark:text-white/50">This domain is already taken.</p>
+                    </div>
                     <a
-                      href={`/scan?address=${result.domainKey}`}
-                      className="text-sm text-purple-400 hover:text-purple-300 flex items-center gap-1 transition"
+                      href={`/id/${encodeURIComponent(result.name + ".sol")}`}
+                      className="flex items-center justify-center gap-1.5 w-full rounded-xl border border-purple-400/40 text-purple-400 hover:bg-purple-500/10 text-sm font-medium py-2.5 transition"
                     >
-                      View on scan <ExternalLink size={12} />
+                      Open {result.name}.sol profile <ExternalLink size={12} />
+                    </a>
+                    <a
+                      href={`/address/${result.domainKey}`}
+                      className="text-sm text-gray-500 dark:text-white/50 hover:text-gray-900 dark:hover:text-white flex items-center justify-center gap-1 transition"
+                    >
+                      View domain account <ExternalLink size={12} />
                     </a>
                   </div>
                 )}
