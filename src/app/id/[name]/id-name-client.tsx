@@ -21,6 +21,7 @@ import {
   looksLikePubkey,
   supportedDomainTld,
 } from "@/lib/resolve-name";
+import { IdNameShare } from "@/components/id-name-share";
 
 type ResolveOk = {
   ok: true;
@@ -252,6 +253,12 @@ export function IdNameClient({ name }: { name: string }) {
                     Send to {displayDomain} <ArrowRight size={14} />
                   </Link>
                 </div>
+
+                <IdNameShare
+                  domain={displayDomain}
+                  owner={result.owner}
+                  kindLabel={kindLabel(result.kind, result.tld)}
+                />
 
                 <p className="text-center text-[11px] text-gray-500 dark:text-white/40">
                   <Link href="/id" className="text-purple-400 hover:underline">

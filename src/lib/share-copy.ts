@@ -119,6 +119,37 @@ export function requestFundsSharePayload(opts: {
   return { title, text, url: payUrl };
 }
 
+/** Share a resolved Solana name profile (/id/{name}) */
+export function nameIdSharePayload(opts: {
+  domain: string;
+  owner: string;
+  kindLabel?: string | null;
+  origin?: string;
+}): SharePayload {
+  const origin =
+    opts.origin ||
+    (typeof window !== "undefined" ? window.location.origin : "https://sol.new");
+  const domain = opts.domain.trim();
+  const owner = opts.owner.trim();
+  const short =
+    owner.length > 12 ? `${owner.slice(0, 4)}…${owner.slice(-4)}` : owner;
+  const url = `${origin}/id/${encodeURIComponent(domain)}`;
+  const kind = opts.kindLabel?.trim();
+  const title = `${domain} on sol.new`;
+  const text = [
+    `Solana name: ${domain}`,
+    kind ? `Network: ${kind}` : null,
+    `Owner: ${owner}`,
+    `Portfolio: ${origin}/portfolio/${encodeURIComponent(domain)}`,
+    "",
+    url,
+    `(${short})`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return { title, text, url };
+}
+
 /** Deep-link builders for request-funds channels */
 export function requestFundsChannelLinks(payload: SharePayload) {
   const full = payload.text.includes(payload.url)
