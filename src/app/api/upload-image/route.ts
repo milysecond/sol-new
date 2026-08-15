@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       emoji: "📤",
       title: "Image uploaded",
       fields: { id, type: file.type, sizeKb: Math.round(file.size / 1024), url, ip },
-    });
+    }, { req });
 
     return NextResponse.json({ url, preview: dataUrl });
   } catch (e) {
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       emoji: "⚠️",
       title: "Image upload failed",
       fields: { ip, error: String(e) },
-    });
+    }, { req });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

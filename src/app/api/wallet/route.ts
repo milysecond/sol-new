@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { initDb, saveWallet } from "@/lib/db";
-import { notifyEvent, geolocateIp } from "@/lib/notify";
+import { notifyEvent, requestIp } from "@/lib/notify";
 
 const recentIPs = new Map<string, number[]>();
 const RATE_LIMIT = 10;
@@ -17,45 +17,50 @@ function isRateLimited(ip: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+  const ip = requestIp(req);
   if (isRateLimited(ip)) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
   try {
     await initDb();
-    const { publicKey, credentialId } = (await req.json()) as { publicKey?: string; credentialId?: string };
+    const { publicKey, credentialId } = (await req.json()) as {
+      publicKey?: string;
+      credentialId?: string;
+    };
     if (!publicKey || typeof publicKey !== "string" || publicKey.length > 64) {
       return NextResponse.json({ error: "Invalid publicKey" }, { status: 400 });
     }
     const { created } = await saveWallet(publicKey, credentialId);
 
-    if (created) {
-      const ua = req.headers.get("user-agent") || "";
-      after(async () => {
-        const geo = await geolocateIp(ip);
-        await notifyEvent({
-          kind: "wallet_new",
-          emoji: "🆕",
-          title: "New wallet created",
+    // Log every register attempt with geo (new + reconnect)
+    const ua = req.headers.get("user-agent") || "";
+    after(async () => {
+      await notifyEvent(
+        {
+          kind: created ? "wallet_new" : "wallet_seen",
+          emoji: created ? "🆕" : "👋",
+          title: created ? "New wallet created" : "Wallet connected",
           fields: {
             wallet: publicKey,
             credentialId,
-            location: geo.line || undefined,
-            ip,
             ua: ua.slice(0, 120),
           },
-        });
-      });
-    }
+        },
+        { req },
+      );
+    });
     return NextResponse.json({ ok: true, created });
   } catch (e) {
-    notifyEvent({
-      kind: "wallet_register_error",
-      emoji: "⚠️",
-      title: "Wallet register failed",
-      fields: { ip, error: String(e) },
-    });
+    void notifyEvent(
+      {
+        kind: "wallet_register_error",
+        emoji: "⚠️",
+        title: "Wallet register failed",
+        fields: { error: String(e) },
+      },
+      { req },
+    );
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

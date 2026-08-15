@@ -422,7 +422,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
           assetId,
           signature: mintSignature,
         },
-      });
+      }, { req });
     }
 
     return NextResponse.json({

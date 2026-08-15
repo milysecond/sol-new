@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-15",
+    title: "solnewlog includes geolocation",
+    items: [
+      "All Telegram log events attach IP + location (CF headers + IP lookup).",
+      "Wallet connect/create logs every time with city/region/coords when available.",
+    ],
+  },
+  {
+    date: "2026-08-15",
     title: "Get funds: Stripe live + MoneyGram test only",
     items: [
       "Removed MoonPay, Transak, Bridge, and Stripe crypto on-ramp from /get.",

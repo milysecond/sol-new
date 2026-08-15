@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
           token: tok,
           network: net,
         },
-      });
+      }, { req });
     });
     return NextResponse.json({ ok: true });
   } catch (e) {
@@ -113,7 +113,7 @@ export async function PATCH(req: NextRequest) {
           emoji: "🥳",
           title: "Gift claimed",
           fields: { gift: publicKey, claimedBy },
-        });
+        }, { req });
       });
     }
     return NextResponse.json({ ok: true, updated });

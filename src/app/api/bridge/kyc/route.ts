@@ -299,7 +299,7 @@ export async function POST(req: NextRequest) {
     kind: "bridge_kyc_started",
     title: "Bridge KYC started",
     fields: { wallet, email, customerId: d.customer_id as string },
-  }).catch(() => {});
+  }, { req }).catch(() => {});
 
   const mail = await emailOnboardingLinks({
     email,

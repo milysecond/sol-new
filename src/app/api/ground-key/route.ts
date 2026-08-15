@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       emoji: "✨",
       title: "New wallet bootstrapped",
       fields: { wallet, groundKey: publicKey },
-    });
+    }, { req });
     return NextResponse.json({ ok: true });
   } catch (e) {
     notifyEvent({
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       emoji: "⚠️",
       title: "Ground key mark-used failed",
       fields: { error: String(e) },
-    });
+    }, { req });
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }
