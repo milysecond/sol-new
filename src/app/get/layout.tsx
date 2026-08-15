@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
-  title: "Get funds — USDC and SOL — sol.new",
+  title: "Get funds — sol.new",
   description:
-    "Fund your sol.new wallet. Get USDC via Bridge, receive on-chain, or use the devnet faucet.",
+    "Fund sol.new: Stripe live credits (Apple Pay / card) or MoneyGram Ramps sandbox for test cash ↔ USDC. Receive on-chain anytime.",
   path: "/get",
 });
 

@@ -288,14 +288,15 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-            MoneyGram Ramps · {envLabel}
+            MoneyGram Ramps · TEST
+            {envLabel && envLabel !== "sandbox" ? ` · ${envLabel}` : " · sandbox"}
           </p>
           <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-            Cash ↔ USDC
+            Cash ↔ USDC (test only)
           </h3>
           <p className="text-sm text-gray-500 dark:text-white/50 leading-relaxed">
-            Deposit cash at MoneyGram for USDC, or cash out USDC for pickup.
-            Sandbox: no real money. Domain must be allowlisted by MoneyGram.
+            Sandbox MoneyGram — no real cash. Live funding is Stripe credits above.
+            Domain must be allowlisted by MoneyGram for the widget.
           </p>
           {network !== "mainnet" && (
             <p className="text-[11px] text-amber-600 mt-1">

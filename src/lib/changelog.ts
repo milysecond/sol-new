@@ -14,6 +14,14 @@ export type ChangelogEntry = {
 /** Newest first. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-15",
+    title: "Get funds: Stripe live + MoneyGram test only",
+    items: [
+      "Removed MoonPay, Transak, Bridge, and Stripe crypto on-ramp from /get.",
+      "Live: Stripe A$5 credits. Test: MoneyGram Ramps sandbox.",
+    ],
+  },
+  {
     date: "2026-08-12",
     title: "RPC pool failover",
     items: [
