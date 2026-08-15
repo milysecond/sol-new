@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
             balance: String(balanceCents),
             currency: session.currency || "aud",
           },
-        }).catch(() => {});
+        }, { req }).catch(() => {});
       }
 
       return NextResponse.json({ ok: true, applied, balanceCents });

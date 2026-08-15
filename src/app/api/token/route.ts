@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
           emoji: '⚠️',
           title: 'Public-channel notify failed',
           fields: { mint: data.mintAddress, error: String(err) },
-        });
+        }, { req });
       }
       await notifyEvent({
         kind: 'token_launch',
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
           network: data.network,
           ip,
         },
-      });
+      }, { req });
     });
 
     return NextResponse.json({ ok: true, id: Number(id) });
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
       emoji: '⚠️',
       title: 'Token save failed',
       fields: { ip, error: String(e) },
-    });
+    }, { req });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

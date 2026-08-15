@@ -250,7 +250,7 @@ export async function POST(req: NextRequest) {
       state: String(d.state || ""),
       emailSent: mail.sent ? "yes" : "no",
     },
-  }).catch(() => {});
+  }, { req }).catch(() => {});
 
   return NextResponse.json({
     ok: true,

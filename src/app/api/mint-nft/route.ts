@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
         emoji: '🌳',
         title: 'Compressed NFT minted',
         fields: { name, symbol, owner, network: network || 'devnet', assetId: result.assetId, signature: result.signature },
-      });
+      }, { req });
       return NextResponse.json({ ok: true, type: "compressed", ...result });
     } else {
       // Regular NFT — return unsigned tx for client to sign
@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
         emoji: '🖼️',
         title: 'Regular NFT tx built',
         fields: { name, symbol, owner, network: network || 'devnet' },
-      });
+      }, { req });
       return NextResponse.json({ ok: true, type: "regular", ...result });
     }
   } catch (e) {
@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
       emoji: '⚠️',
       title: 'NFT mint failed',
       fields: { error: String(e) },
-    });
+    }, { req });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

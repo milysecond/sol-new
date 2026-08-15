@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       emoji: '🖼️',
       title: 'NFT saved',
       fields: { name: data.name, wallet: data.wallet, mint: data.mintAddress, ip },
-    });
+    }, { req });
     return NextResponse.json({ ok: true, id: Number(id) });
   } catch (e) {
     notifyEvent({
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       emoji: '⚠️',
       title: 'NFT save failed',
       fields: { ip, error: String(e) },
-    });
+    }, { req });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

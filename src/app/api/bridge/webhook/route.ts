@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
             tx: (object.receipt as { destination_tx_hash?: string } | undefined)
               ?.destination_tx_hash,
           },
-        }).catch(() => {});
+        }, { req }).catch(() => {});
       }
     }
 
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
         kind: "bridge_customer_event",
         title: `Bridge ${category}: ${type}`,
         fields: { objectId, status: String(event.event_object_status || "") },
-      }).catch(() => {});
+      }, { req }).catch(() => {});
     }
   } catch (e) {
     console.error("[bridge/webhook]", e);

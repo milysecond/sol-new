@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       emoji: '💧',
       title: 'Devnet airdrop sent',
       fields: { recipient: address, amount: 0.1, signature: sig },
-    });
+    }, { req });
 
     return NextResponse.json({ ok: true, signature: sig, amount: 0.1 });
   } catch (e) {
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       emoji: '⚠️',
       title: 'Airdrop failed',
       fields: { error: String(e) },
-    });
+    }, { req });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
