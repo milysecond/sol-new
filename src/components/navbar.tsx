@@ -29,6 +29,11 @@ import {
   NAV_MENU_STYLE_EVENT,
   type NavMenuStyle,
 } from "@/lib/nav-style";
+import {
+  readBottomNavHrefs,
+  resolveBottomNav,
+  BOTTOM_NAV_EVENT,
+} from "@/lib/bottom-nav";
 import { getPushPermission, subscribePush, unsubscribePush, type PushPermission } from "@/lib/push-client";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SocialLinks } from "@/components/social-links";
@@ -88,6 +93,14 @@ export function Navbar() {
   const router = useRouter();
   const [showMore, setShowMore] = useState(false);
   const [menuStyle, setMenuStyle] = useState<NavMenuStyle>("more");
+  const [bottomHrefs, setBottomHrefs] = useState<string[]>([
+    "/home",
+    "/wallet",
+    "/token",
+    "/gift",
+  ]);
+  const [navHeaderH, setNavHeaderH] = useState(56);
+  const headerRef = useRef<HTMLDivElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [portalReady, setPortalReady] = useState(false);
@@ -95,12 +108,36 @@ export function Navbar() {
   useEffect(() => {
     setPortalReady(true);
     setMenuStyle(readNavMenuStyle());
+    setBottomHrefs(readBottomNavHrefs());
     const onStyle = () => setMenuStyle(readNavMenuStyle());
+    const onBottom = () => setBottomHrefs(readBottomNavHrefs());
     window.addEventListener(NAV_MENU_STYLE_EVENT, onStyle);
+    window.addEventListener(BOTTOM_NAV_EVENT, onBottom);
     window.addEventListener("storage", onStyle);
+    window.addEventListener("storage", onBottom);
     return () => {
       window.removeEventListener(NAV_MENU_STYLE_EVENT, onStyle);
+      window.removeEventListener(BOTTOM_NAV_EVENT, onBottom);
       window.removeEventListener("storage", onStyle);
+      window.removeEventListener("storage", onBottom);
+    };
+  }, []);
+
+  // Measure sticky header so side drawer sits below it
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setNavHeaderH(Math.round(r.bottom));
+    };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
     };
   }, []);
 
@@ -158,7 +195,11 @@ export function Navbar() {
     );
   };
 
-  const primaryHrefs = ["/home", "/wallet", "/token", "/gift", "/punt", "/portfolio"];
+  const primaryHrefs = [
+    ...bottomHrefs,
+    "/punt",
+    "/portfolio",
+  ];
   const moreActive = Boolean(
     pathname &&
       pathname !== "/" &&
@@ -169,21 +210,40 @@ export function Navbar() {
 
   return (
     <nav className="relative z-[80]">
-      <div className="sticky top-0 z-[80] border-b border-black/10 dark:border-white/10 bg-white/90 dark:bg-black/90 backdrop-blur-md safe-top">
+      <div ref={headerRef} className="sticky top-0 z-[80] border-b border-black/10 dark:border-white/10 bg-white/90 dark:bg-black/90 backdrop-blur-md safe-top">
         <div className="flex items-center justify-between gap-2 px-2 sm:px-5 lg:px-6 py-2 sm:py-3 max-w-[1400px] mx-auto w-full">
           <div className="flex items-center gap-1 sm:gap-2 min-w-0">
             <PageBack className="shrink-0 -ml-0.5" />
 
-            <Link
-              href="/"
-              onDoubleClick={() => router.push("/dir")}
-              className="flex items-center gap-2 shrink-0 min-h-[40px] px-1 justify-center"
-            >
-              <img src="/icon-192.png" alt="sol.new" className="w-8 h-8 rounded-lg" />
-              <span className="text-lg sm:text-xl font-bold tracking-tight hidden md:inline">
-                sol<span className="text-purple-500 dark:text-purple-400">.new</span>
-              </span>
-            </Link>
+            {menuStyle === "sidebar" ? (
+              <button
+                type="button"
+                onClick={() => setShowMore((v) => !v)}
+                onDoubleClick={(e) => {
+                  e.preventDefault();
+                  router.push("/dir");
+                }}
+                className="flex items-center gap-2 shrink-0 min-h-[40px] px-1 justify-center cursor-pointer rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition"
+                aria-label="Open app menu"
+                title="Menu · double-tap for directory"
+              >
+                <img src="/icon-192.png" alt="sol.new" className="w-8 h-8 rounded-lg" />
+                <span className="text-lg sm:text-xl font-bold tracking-tight hidden md:inline">
+                  sol<span className="text-purple-500 dark:text-purple-400">.new</span>
+                </span>
+              </button>
+            ) : (
+              <Link
+                href="/home"
+                onDoubleClick={() => router.push("/dir")}
+                className="flex items-center gap-2 shrink-0 min-h-[40px] px-1 justify-center"
+              >
+                <img src="/icon-192.png" alt="sol.new" className="w-8 h-8 rounded-lg" />
+                <span className="text-lg sm:text-xl font-bold tracking-tight hidden md:inline">
+                  sol<span className="text-purple-500 dark:text-purple-400">.new</span>
+                </span>
+              </Link>
+            )}
 
             <button
               type="button"
@@ -533,7 +593,7 @@ export function Navbar() {
 
       {/* Phone bottom nav */}
       <div className="fixed bottom-0 left-0 right-0 z-[90] sm:hidden bg-white/95 dark:bg-black/95 backdrop-blur border-t border-black/10 dark:border-white/10 flex items-stretch justify-around px-1 pt-1 safe-bottom">
-        {MOBILE_PRIMARY.map((item) => (
+        {resolveBottomNav(bottomHrefs).map((item) => (
           <Link
             key={item.href}
             href={item.href}
@@ -566,6 +626,7 @@ export function Navbar() {
           open={showMore}
           onClose={() => setShowMore(false)}
           isActive={isActive}
+          topOffset={navHeaderH}
         />
       ) : (
         <AppNavMenu

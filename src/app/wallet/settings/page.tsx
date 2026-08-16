@@ -27,6 +27,13 @@ import {
   writeNavMenuStyle,
   type NavMenuStyle,
 } from "@/lib/nav-style";
+import {
+  BOTTOM_NAV_DEFAULT,
+  bottomNavCandidates,
+  clearBottomNavHrefs,
+  readBottomNavHrefs,
+  writeBottomNavHrefs,
+} from "@/lib/bottom-nav";
 
 const AUTO_LOCK_KEY = "sol.new.security.autoLockMin";
 
@@ -51,11 +58,13 @@ export default function WalletSettingsPage() {
   const [hideBalances, setHideBalances] = useHideBalances();
   const [autoLockMin, setAutoLockMin] = useState(15);
   const [menuStyle, setMenuStyle] = useState<NavMenuStyle>("more");
+  const [bottomTabs, setBottomTabs] = useState<string[]>([...BOTTOM_NAV_DEFAULT]);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setAutoLockMin(readAutoLock());
     setMenuStyle(readNavMenuStyle());
+    setBottomTabs(readBottomNavHrefs());
     setMounted(true);
   }, []);
 
@@ -227,6 +236,77 @@ export default function WalletSettingsPage() {
               </span>
             </button>
           </div>
+          {menuStyle === "sidebar" && (
+            <p className="text-[11px] text-violet-600 dark:text-violet-300 font-medium">
+              Tap the sol.new logo to open the left menu.
+            </p>
+          )}
+        </section>
+
+        {/* Bottom bar tabs */}
+        <section className="rounded-2xl border border-black/10 dark:border-white/10 p-4 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 flex items-center gap-1.5">
+            <LayoutGrid className="w-3.5 h-3.5" /> Bottom bar (phone)
+          </p>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Pick 4 apps for the phone tab bar. The 5th slot is always Menu / More.
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            {bottomTabs.map((href, idx) => {
+              const cand = bottomNavCandidates().find((c) => c.href === href);
+              return (
+                <div
+                  key={`${href}-${idx}`}
+                  className="rounded-xl border border-fuchsia-400/40 bg-fuchsia-500/10 px-1.5 py-2 text-center"
+                >
+                  <p className="text-[10px] text-gray-400 mb-0.5">#{idx + 1}</p>
+                  <p className="text-[11px] font-semibold truncate text-gray-900 dark:text-white">
+                    {cand?.label || href}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+          <div className="space-y-2">
+            {[0, 1, 2, 3].map((slot) => (
+              <label key={slot} className="block space-y-1">
+                <span className="text-[11px] font-medium text-gray-500">
+                  Slot {slot + 1}
+                </span>
+                <select
+                  value={bottomTabs[slot] || BOTTOM_NAV_DEFAULT[slot]}
+                  onChange={(e) => {
+                    const next = [...bottomTabs];
+                    next[slot] = e.target.value;
+                    // avoid duplicate hrefs — swap if taken
+                    const dup = next.findIndex((h, i) => i !== slot && h === e.target.value);
+                    if (dup >= 0) next[dup] = bottomTabs[slot];
+                    setBottomTabs(next);
+                    writeBottomNavHrefs(next);
+                    toast.success("Bottom bar updated");
+                  }}
+                  className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-2.5 text-sm text-gray-900 dark:text-white"
+                >
+                  {bottomNavCandidates().map((c) => (
+                    <option key={c.href} value={c.href}>
+                      {c.label} — {c.desc}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              clearBottomNavHrefs();
+              setBottomTabs([...BOTTOM_NAV_DEFAULT]);
+              toast.success("Bottom bar reset");
+            }}
+            className="w-full min-h-[40px] rounded-xl text-sm font-medium text-gray-600 dark:text-white/60 border border-black/10 dark:border-white/10"
+          >
+            Reset bottom bar to default
+          </button>
         </section>
 
         {/* Auto-lock */}

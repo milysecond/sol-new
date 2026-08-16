@@ -3,12 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  Home,
-  Search,
-  Settings,
-  X,
-} from "lucide-react";
+import { Home, Search, Settings, X } from "lucide-react";
 import {
   NAV_ITEMS,
   filterNav,
@@ -22,17 +17,20 @@ import { SocialLinks } from "@/components/social-links";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 /**
- * X / LinkedIn style left underlying drawer menu.
- * Opens from left over a dim scrim; full app catalog as list rows.
+ * X / LinkedIn style left drawer — sits **below** the sticky header.
+ * Opened via logo (when sidebar style is on) or Menu tab.
  */
 export function AppSideNav({
   open,
   onClose,
   isActive,
+  topOffset = 56,
 }: {
   open: boolean;
   onClose: () => void;
   isActive: (href: string) => boolean;
+  /** px from top of viewport — height of sticky navbar */
+  topOffset?: number;
 }) {
   const { publicKey, balance } = useWallet();
   const [hideBalances] = useHideBalances();
@@ -49,12 +47,8 @@ export function AppSideNav({
       return;
     }
     const id = requestAnimationFrame(() => setEntered(true));
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      cancelAnimationFrame(id);
-      document.body.style.overflow = prev;
-    };
+    // Don't lock body scroll entirely — drawer scrolls; page behind is dimmed
+    return () => cancelAnimationFrame(id);
   }, [open]);
 
   useEffect(() => {
@@ -80,6 +74,8 @@ export function AppSideNav({
   const shortPk = publicKey
     ? `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`
     : null;
+
+  const top = Math.max(0, topOffset);
 
   let body: React.ReactNode;
   if (searching) {
@@ -159,32 +155,36 @@ export function AppSideNav({
 
   return createPortal(
     <>
+      {/* Scrim starts below header so logo/nav stay tappable */}
       <button
         type="button"
         aria-label="Close menu"
-        className={`fixed inset-0 z-[200] bg-black/50 transition-opacity duration-200 ${
+        className={`fixed left-0 right-0 bottom-0 z-[200] bg-black/45 transition-opacity duration-200 ${
           entered ? "opacity-100" : "opacity-0"
         }`}
+        style={{ top }}
         onClick={onClose}
       />
       <aside
         role="dialog"
         aria-modal="true"
         aria-label="App menu"
-        className={`fixed top-0 left-0 bottom-0 z-[210] w-[min(86vw,320px)] max-w-full bg-white dark:bg-black border-r border-black/10 dark:border-white/10 shadow-2xl flex flex-col transition-transform duration-200 ease-out safe-top ${
+        className={`fixed left-0 bottom-0 z-[210] w-[min(86vw,300px)] max-w-full bg-white dark:bg-black border-r border-black/10 dark:border-white/10 shadow-2xl flex flex-col transition-transform duration-200 ease-out ${
           entered ? "translate-x-0" : "-translate-x-full"
         }`}
-        style={{ transform: entered ? "translateX(0)" : "translateX(-100%)" }}
+        style={{
+          top,
+          transform: entered ? "translateX(0)" : "translateX(-100%)",
+        }}
       >
-        {/* Profile strip — LinkedIn/X vibe */}
-        <div className="shrink-0 border-b border-black/10 dark:border-white/10 px-4 pt-4 pb-3">
+        <div className="shrink-0 border-b border-black/10 dark:border-white/10 px-4 pt-3 pb-3">
           <div className="flex items-start justify-between gap-2">
             <Link
               href={publicKey ? "/wallet/get" : "/onboard"}
               onClick={onClose}
               className="min-w-0 flex items-center gap-3"
             >
-              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-sm shrink-0">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-sm shrink-0">
                 {publicKey ? publicKey.slice(0, 2).toUpperCase() : "S"}
               </div>
               <div className="min-w-0">
@@ -205,11 +205,9 @@ export function AppSideNav({
               <X size={18} />
             </button>
           </div>
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1">
-              <SocialLinks />
-              <ThemeToggle />
-            </div>
+          <div className="mt-2 flex items-center gap-1">
+            <SocialLinks />
+            <ThemeToggle />
           </div>
         </div>
 
@@ -232,9 +230,9 @@ export function AppSideNav({
 
         <div className="flex-1 overflow-y-auto overscroll-contain">{body}</div>
 
-        <div className="shrink-0 border-t border-black/10 dark:border-white/10 px-4 py-3 safe-bottom">
+        <div className="shrink-0 border-t border-black/10 dark:border-white/10 px-4 py-2.5 safe-bottom">
           <p className="text-[11px] text-gray-400 dark:text-white/35 leading-relaxed">
-            Left menu · switch back to More tray in{" "}
+            Logo opens this menu · edit bottom tabs in{" "}
             <Link
               href="/wallet/settings"
               onClick={onClose}
