@@ -124,34 +124,106 @@ export async function fetchTokenMeta(mints: string[]): Promise<void> {
   await Promise.all(
     missing.slice(0, 40).map(async (mint) => {
       try {
+        // 1) Jupiter ultra search
         const r = await fetch(`/api/swap/search?q=${encodeURIComponent(mint)}`, {
-          cache: "force-cache",
+          cache: "no-store",
         });
-        const j = (await r.json()) as {
-          tokens?: {
-            id: string;
-            symbol?: string;
-            name?: string;
-            icon?: string;
-            usdPrice?: number;
-          }[];
-        };
-        const hit = (j.tokens || []).find((t) => t.id === mint);
-        if (hit) {
-          META_CACHE.set(mint, {
-            symbol: hit.symbol || shortMint(mint),
-            name: hit.name || hit.symbol || shortMint(mint),
-            icon: hit.icon,
-            priceUsd: typeof hit.usdPrice === "number" ? hit.usdPrice : undefined,
+        if (r.ok) {
+          const j = (await r.json()) as {
+            tokens?: {
+              id?: string;
+              address?: string;
+              mint?: string;
+              symbol?: string;
+              name?: string;
+              icon?: string;
+              logoURI?: string;
+              logoUri?: string;
+              usdPrice?: number;
+            }[];
+          };
+          const hit = (j.tokens || []).find((t) => {
+            const id = t.id || t.address || t.mint || "";
+            return id === mint || id.toLowerCase() === mint.toLowerCase();
           });
-        } else {
-          META_CACHE.set(mint, { symbol: shortMint(mint), name: shortMint(mint) });
+          if (hit) {
+            META_CACHE.set(mint, {
+              symbol: hit.symbol || shortMint(mint),
+              name: hit.name || hit.symbol || shortMint(mint),
+              icon: hit.icon || hit.logoURI || hit.logoUri,
+              priceUsd: typeof hit.usdPrice === "number" ? hit.usdPrice : undefined,
+            });
+            return;
+          }
         }
+        // 2) sol.new token registry
+        try {
+          const tr = await fetch(`/api/token/${encodeURIComponent(mint)}`, {
+            cache: "no-store",
+          });
+          if (tr.ok) {
+            const tj = (await tr.json()) as {
+              ok?: boolean;
+              token?: {
+                symbol?: string;
+                name?: string;
+                image_url?: string | null;
+                imageUrl?: string | null;
+              };
+            };
+            const tok = tj.token;
+            if (tok && (tok.symbol || tok.name || tok.image_url || tok.imageUrl)) {
+              META_CACHE.set(mint, {
+                symbol: tok.symbol || shortMint(mint),
+                name: tok.name || tok.symbol || shortMint(mint),
+                icon: tok.image_url || tok.imageUrl || undefined,
+              });
+              return;
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+        META_CACHE.set(mint, { symbol: shortMint(mint), name: shortMint(mint) });
       } catch {
         META_CACHE.set(mint, { symbol: shortMint(mint), name: shortMint(mint) });
       }
-    })
+    }),
   );
+}
+
+function needsMetaEnrichment(t: WalletToken): boolean {
+  if (t.isNativeSol) return false;
+  if (t.mint === USDC_MAINNET || t.mint === USDC_DEVNET) return false;
+  const short = shortMint(t.mint);
+  if (!t.icon) return true;
+  if (!t.symbol || t.symbol === short || t.symbol.includes("…")) return true;
+  if (!t.name || t.name === short || t.name.includes("…")) return true;
+  return false;
+}
+
+async function applyMetaCache(tokens: WalletToken[]): Promise<void> {
+  const need = tokens.filter(needsMetaEnrichment).map((t) => t.mint);
+  if (need.length) await fetchTokenMeta(need);
+  for (const t of tokens) {
+    if (t.isNativeSol) continue;
+    if (t.mint === USDC_MAINNET || t.mint === USDC_DEVNET) {
+      t.symbol = "USDC";
+      t.name = "USD Coin";
+      t.icon = t.icon || USDC_ICON;
+      continue;
+    }
+    const m = META_CACHE.get(t.mint);
+    if (!m) continue;
+    const short = shortMint(t.mint);
+    if (!t.symbol || t.symbol === short || t.symbol.includes("…")) t.symbol = m.symbol;
+    if (!t.name || t.name === short || t.name.includes("…")) t.name = m.name;
+    if (!t.icon && m.icon) t.icon = m.icon;
+    if (t.priceUsd == null && m.priceUsd != null) {
+      t.priceUsd = m.priceUsd;
+      t.valueUsd = t.uiAmount * m.priceUsd;
+    }
+  }
 }
 
 /**
@@ -250,6 +322,9 @@ export async function fetchWalletTokens(
           }
         }
 
+        // Portfolio often lacks meme logos/symbols — enrich via Jupiter search
+        await applyMetaCache(out);
+
         out.sort((a, b) => {
           if (a.isNativeSol) return -1;
           if (b.isNativeSol) return 1;
@@ -319,7 +394,7 @@ export async function fetchWalletTokens(
     }
   }
 
-  await fetchTokenMeta(out.map((t) => t.mint));
+  await applyMetaCache(out);
   const prices = await fetchPricesClient(out.map((t) => t.mint));
 
   for (const t of out) {
@@ -328,13 +403,6 @@ export async function fetchWalletTokens(
       t.valueUsd =
         t.priceUsd != null ? t.uiAmount * t.priceUsd : null;
       continue;
-    }
-    const m = META_CACHE.get(t.mint);
-    if (m) {
-      t.symbol = m.symbol;
-      t.name = m.name;
-      t.icon = m.icon;
-      if (m.priceUsd != null) t.priceUsd = m.priceUsd;
     }
     if (t.mint === USDC_MAINNET || t.mint === USDC_DEVNET) {
       t.symbol = "USDC";

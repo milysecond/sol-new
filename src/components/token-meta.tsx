@@ -2,7 +2,7 @@
 
 import { formatTokenUi, formatUsd, formatUsdPrice, type WalletToken } from "@/lib/wallet-tokens";
 import { useHideBalances } from "@/lib/privacy";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 /** Compact token chip: icon + symbol/name + bal + USD */
 export function TokenMetaRow({
@@ -67,30 +67,35 @@ export function TokenIcon({
   token: Pick<WalletToken, "icon" | "symbol">;
   size?: number;
 }) {
-  if (token.icon) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={token.icon}
-        alt=""
-        width={size}
-        height={size}
-        className="rounded-full bg-black/5 dark:bg-white/10 object-cover shrink-0"
-        style={{ width: size, height: size }}
-        onError={(e) => {
-          (e.target as HTMLImageElement).style.display = "none";
-          const sib = (e.target as HTMLImageElement).nextElementSibling as HTMLElement | null;
-          if (sib) sib.style.display = "flex";
-        }}
-      />
-    );
-  }
+  const [broken, setBroken] = useState(false);
+  const showImg = Boolean(token.icon) && !broken;
+  const initials = (token.symbol || "?").replace(/[.…]/g, "").slice(0, 2) || "?";
+
   return (
     <span
-      className="rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-300 flex items-center justify-center text-xs font-bold shrink-0"
+      className="relative shrink-0 inline-flex items-center justify-center"
       style={{ width: size, height: size }}
     >
-      {(token.symbol || "?").slice(0, 2)}
+      {showImg ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={token.icon}
+          alt=""
+          width={size}
+          height={size}
+          className="rounded-full bg-black/5 dark:bg-white/10 object-cover absolute inset-0"
+          style={{ width: size, height: size }}
+          onError={() => setBroken(true)}
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <span
+          className="rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-300 flex items-center justify-center text-xs font-bold absolute inset-0"
+          style={{ width: size, height: size }}
+        >
+          {initials}
+        </span>
+      )}
     </span>
   );
 }

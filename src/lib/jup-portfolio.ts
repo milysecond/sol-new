@@ -279,6 +279,39 @@ export async function jupWalletSnapshot(wallet: string): Promise<JupWalletSnapsh
 
   tokens.sort((a, b) => (b.valueUsd ?? 0) - (a.valueUsd ?? 0));
 
+  // Enrich meme coins missing logo/symbol (holdings API often has none)
+  const needMeta = tokens
+    .filter((t) => !t.logoUri || !t.symbol || !t.name)
+    .map((t) => t.mint)
+    .slice(0, 24);
+  if (needMeta.length) {
+    try {
+      const { tokenSearch } = await import("@/lib/jup-ultra");
+      await Promise.all(
+        needMeta.map(async (mint) => {
+          try {
+            const hits = await tokenSearch(mint);
+            const hit = hits.find((h) => h.id === mint || h.id?.toLowerCase() === mint.toLowerCase());
+            if (!hit) return;
+            const t = tokens.find((x) => x.mint === mint);
+            if (!t) return;
+            if (!t.symbol && hit.symbol) t.symbol = hit.symbol;
+            if (!t.name && hit.name) t.name = hit.name;
+            if (!t.logoUri && hit.icon) t.logoUri = hit.icon;
+            if (t.priceUsd == null && typeof hit.usdPrice === "number") {
+              t.priceUsd = hit.usdPrice;
+              t.valueUsd = t.uiAmount * hit.usdPrice;
+            }
+          } catch {
+            /* skip mint */
+          }
+        }),
+      );
+    } catch {
+      /* ignore enrich failures */
+    }
+  }
+
   const positions = Array.isArray(positionsRes?.elements) ? positionsRes!.elements! : [];
   const positionsUsd = positions.reduce((acc, el) => {
     const v = typeof el.value === "number" ? el.value : 0;
