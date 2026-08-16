@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
         signature: body.signature,
         amount: 0.1,
         method: "client_broadcast",
-        explorer: `https://solscan.io/tx/${body.signature}?cluster=devnet`,
+        explorer: `/receipt/${body.signature}`,
       });
     }
 
@@ -216,7 +216,7 @@ export async function POST(req: NextRequest) {
         signature: sent.signature,
         amount: 0.1,
         method: sent.method,
-        explorer: `https://solscan.io/tx/${sent.signature}?cluster=devnet`,
+        explorer: `/receipt/${sent.signature}`,
       });
     }
 

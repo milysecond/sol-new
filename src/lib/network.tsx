@@ -9,6 +9,7 @@ import {
   ReactNode,
 } from "react";
 import { analytics } from "./analytics";
+import { addressPath } from "./explorer";
 
 export type Network = "mainnet" | "devnet";
 
@@ -35,11 +36,6 @@ export const RPC: Record<Network, string> = {
     "https://api.devnet.solana.com",
 };
 
-const EXPLORER: Record<Network, string> = {
-  mainnet: "https://solscan.io",
-  devnet: "https://solscan.io",
-};
-
 interface NetworkState {
   network: Network;
   rpc: string;
@@ -47,6 +43,7 @@ interface NetworkState {
   mainnetPool: readonly string[];
   /** Force next mainnet RPC after errors. */
   rotateMainnetRpc: () => string;
+  /** In-app address page only (never external explorers). */
   explorerUrl: (address: string) => string;
   toggle: () => void;
 }
@@ -56,7 +53,7 @@ const NetworkContext = createContext<NetworkState>({
   rpc: RPC.mainnet,
   mainnetPool: MAINNET_RPC_POOL,
   rotateMainnetRpc: () => MAINNET_RPC_POOL[0],
-  explorerUrl: (a) => `${EXPLORER.mainnet}/account/${a}`,
+  explorerUrl: (a) => addressPath(a),
   toggle: () => {},
 });
 
@@ -156,10 +153,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     analytics.networkSwitched(next);
   };
 
-  const explorerUrl = (address: string) =>
-    network === "devnet"
-      ? `${EXPLORER.devnet}/account/${address}?cluster=devnet`
-      : `${EXPLORER.mainnet}/account/${address}`;
+  const explorerUrl = (address: string) => addressPath(address);
 
   const rpc = network === "mainnet" ? mainnetRpc : RPC.devnet;
 

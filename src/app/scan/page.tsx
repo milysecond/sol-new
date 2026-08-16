@@ -189,7 +189,7 @@ function ProgramView({ data }: { data: ProgramData }) {
             label="Upgrade Authority"
             value={data.upgradeAuthority ?? "No authority (immutable)"}
             mono={!!data.upgradeAuthority}
-            url={data.upgradeAuthority ? `https://solscan.io/account/${data.upgradeAuthority}` : undefined}
+            url={data.upgradeAuthority ? `/address/${data.upgradeAuthority}` : undefined}
             icon={ShieldAlert}
           />
         )}
@@ -212,7 +212,7 @@ function ProgramView({ data }: { data: ProgramData }) {
                 </span>
                 <span className="flex-1 truncate font-mono text-xs">{u.authority ?? u.signer ?? "—"}</span>
                 {u.signature && (
-                  <a href={`https://solscan.io/tx/${u.signature}`} target="_blank" rel="noopener noreferrer">
+                  <a href={`/receipt/${u.signature}`} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="w-3.5 h-3.5 text-gray-400 hover:text-purple-500" />
                   </a>
                 )}
@@ -230,7 +230,7 @@ function ProgramView({ data }: { data: ProgramData }) {
         </a>
         <a href={data.solscanUrl} target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition">
-          <ExternalLink className="w-3.5 h-3.5" /> Solscan
+          <ExternalLink className="w-3.5 h-3.5" /> sol.new
         </a>
         <a href={data.explorerUrl} target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition">
@@ -371,21 +371,21 @@ function TokenView({ data }: { data: TokenData }) {
           label="Mint Authority"
           value={data.mintAuthority ?? "None (fixed)"}
           mono={!!data.mintAuthority}
-          url={data.mintAuthority ? `https://solscan.io/account/${data.mintAuthority}` : undefined}
+          url={data.mintAuthority ? `/address/${data.mintAuthority}` : undefined}
           icon={data.mintable ? Unlock : Lock}
         />
         <Field
           label="Freeze Authority"
           value={data.freezeAuthority ?? "None"}
           mono={!!data.freezeAuthority}
-          url={data.freezeAuthority ? `https://solscan.io/account/${data.freezeAuthority}` : undefined}
+          url={data.freezeAuthority ? `/address/${data.freezeAuthority}` : undefined}
           icon={Lock}
         />
         <Field
           label="Update Authority"
           value={data.updateAuthority ?? "None"}
           mono={!!data.updateAuthority}
-          url={data.updateAuthority ? `https://solscan.io/account/${data.updateAuthority}` : undefined}
+          url={data.updateAuthority ? `/address/${data.updateAuthority}` : undefined}
           icon={ShieldAlert}
         />
         <Field
@@ -441,7 +441,7 @@ function TokenView({ data }: { data: TokenData }) {
             {data.topHolders.map((h: any, i: number) => (
               <div key={i} className="flex items-center gap-3 px-4 py-2 text-xs">
                 <span className="w-5 text-gray-400 dark:text-white/30">{i + 1}</span>
-                <a href={`https://solscan.io/account/${h.address}`} target="_blank" rel="noopener noreferrer"
+                <a href={`/address/${h.address}`} target="_blank" rel="noopener noreferrer"
                   className="flex-1 font-mono text-gray-600 dark:text-white/60 hover:text-purple-500 dark:hover:text-purple-400 truncate">
                   {h.address}
                 </a>
@@ -468,7 +468,7 @@ function TokenView({ data }: { data: TokenData }) {
         </a>
         <a href={data.solscanUrl} target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition">
-          <ExternalLink className="w-3.5 h-3.5" /> Solscan
+          <ExternalLink className="w-3.5 h-3.5" /> sol.new
         </a>
       </div>
     </div>
@@ -545,7 +545,7 @@ function TokenAccountView({ data }: { data: TokenAccountData }) {
         rel="noopener noreferrer"
         className="inline-flex items-center gap-1 text-xs text-purple-500 hover:underline"
       >
-        Solscan <ExternalLink className="w-3 h-3" />
+        sol.new <ExternalLink className="w-3 h-3" />
       </a>
     </div>
   );

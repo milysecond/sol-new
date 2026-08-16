@@ -273,7 +273,7 @@ export default function PortfolioPage() {
                             )}
                             {nft.mint_address && (
                               <a
-                                href={`https://solscan.io/token/${nft.mint_address}${clusterParam}`}
+                                href={`/token/${nft.mint_address}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-0.5 text-xs text-purple-600 dark:text-purple-400"

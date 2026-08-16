@@ -13,6 +13,9 @@ import {
 import { useWallet } from "@/lib/wallet-context";
 import { Spinner } from "@/components/spinner";
 import { ParticleReveal } from "@/components/canvasui/ParticleReveal";
+import { Navbar } from "@/components/navbar";
+import { HomeIconGrid } from "@/components/home-icon-grid";
+import { FaucetFooter } from "@/components/faucet-footer";
 import {
   Coins,
   Image as ImageIcon,
@@ -108,8 +111,99 @@ function KineticHeadline({ lines }: { lines: string[] }) {
   );
 }
 
-export default function MarketingSplash() {
+export default function HomePage() {
   const { publicKey, connect, loading } = useWallet();
+  const [ready, setReady] = useState(false);
+  const [onboarded, setOnboarded] = useState(false);
+
+  useEffect(() => {
+    try {
+      setOnboarded(
+        localStorage.getItem("sol.new.onboard.done") === "1" ||
+          Boolean(localStorage.getItem("sol.new.wallet")),
+      );
+    } catch {
+      /* ignore */
+    }
+    setReady(true);
+  }, [publicKey]);
+
+  // Signed-in / already onboarded → app home (not marketing landing)
+  if (ready && (publicKey || onboarded)) {
+    return (
+      <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
+        <Navbar />
+        <main className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6 pb-28">
+          <header className="space-y-1">
+            <p className="text-[11px] uppercase tracking-wider text-violet-500 font-semibold">
+              sol.new
+            </p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              {publicKey ? "Your apps" : "Welcome back"}
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-white/45">
+              {publicKey
+                ? `Wallet ${publicKey.slice(0, 4)}…${publicKey.slice(-4)} · pick a tool`
+                : "Connect your passkey wallet, then jump into any app."}
+            </p>
+          </header>
+          {!publicKey && (
+            <button
+              type="button"
+              onClick={() => void connect()}
+              disabled={loading}
+              className="w-full sm:w-auto min-h-[48px] px-6 rounded-2xl bg-violet-600 hover:bg-violet-500 text-white font-semibold disabled:opacity-50"
+            >
+              {loading ? "Connecting…" : "Connect wallet"}
+            </button>
+          )}
+          <HomeIconGrid />
+          <div className="flex flex-wrap gap-3 text-sm">
+            <Link
+              href="/wallet/get"
+              className="text-violet-600 dark:text-violet-400 font-medium hover:underline"
+            >
+              Open wallet →
+            </Link>
+            <Link
+              href="/get"
+              className="text-gray-500 hover:text-violet-500 font-medium"
+            >
+              Get funds
+            </Link>
+            <Link
+              href="/whats-new"
+              className="text-gray-500 hover:text-violet-500 font-medium"
+            >
+              What&apos;s new
+            </Link>
+          </div>
+        </main>
+        <FaucetFooter />
+      </div>
+    );
+  }
+
+  if (!ready) {
+    return (
+      <div className="min-h-dvh bg-[#08070d] text-white flex items-center justify-center">
+        <Spinner size={28} />
+      </div>
+    );
+  }
+
+  return <MarketingSplash connect={connect} loading={loading} publicKey={publicKey} />;
+}
+
+function MarketingSplash({
+  publicKey,
+  connect,
+  loading,
+}: {
+  publicKey: string | null;
+  connect: (u?: string | { createNew?: boolean }) => Promise<string | null>;
+  loading: boolean;
+}) {
   const heroRef = useRef<HTMLDivElement>(null);
 
   const mx = useMotionValue(0.5);

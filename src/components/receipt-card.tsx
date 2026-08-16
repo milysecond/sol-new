@@ -377,12 +377,12 @@ export const ReceiptCard = forwardRef<HTMLDivElement, { tx: ReceiptData }>(
             </div>
 
             <a
-              href={`https://solscan.io/tx/${tx.signature}`}
+              href={`/receipt/${tx.signature}`}
               target="_blank"
               rel="noopener noreferrer"
               className="print:hidden flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-emerald-400 text-white text-sm font-semibold hover:opacity-90 transition"
             >
-              View on Solscan <ExternalLink className="w-4 h-4" />
+              View on sol.new <ExternalLink className="w-4 h-4" />
             </a>
           </div>
 

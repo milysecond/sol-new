@@ -373,7 +373,7 @@ export default function ClaimPage() {
                     : "The SOL is in your wallet."}
               </p>
               <a
-                href={`https://explorer.solana.com/tx/${claimed.signature}${network === "devnet" ? "?cluster=devnet" : ""}`}
+                href={`/receipt/${claimed.signature}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-xs text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition"

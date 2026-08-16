@@ -252,7 +252,7 @@ export default function PoapClaimPage() {
                         </a>
                         {mintSig && (
                           <a
-                            href={`https://solscan.io/tx/${mintSig}`}
+                            href={`/receipt/${mintSig}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-xs font-medium text-gray-500"

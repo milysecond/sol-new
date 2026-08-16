@@ -175,8 +175,8 @@ export default function PosPage() {
   const explorer =
     signature &&
     (network === "devnet"
-      ? `https://solscan.io/tx/${signature}?cluster=devnet`
-      : `https://solscan.io/tx/${signature}`);
+      ? `/receipt/${signature}`
+      : `/receipt/${signature}`);
 
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">

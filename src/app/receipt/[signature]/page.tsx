@@ -111,7 +111,7 @@ export default function ReceiptSignaturePage() {
               </p>
               {valid && (
                 <a
-                  href={`https://solscan.io/tx/${signature}`}
+                  href={`/receipt/${signature}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-block text-sm font-medium text-gray-600 dark:text-white/60 hover:text-purple-500 transition"

@@ -292,7 +292,7 @@ export function PrivateSendSheet() {
               <p className="text-xs font-medium text-green-600 dark:text-green-400">Done!</p>
             </div>
             <a
-              href={`https://solscan.io/tx/${doneTx}`}
+              href={`/receipt/${doneTx}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-green-600 dark:text-green-400 hover:underline flex items-center gap-1"
