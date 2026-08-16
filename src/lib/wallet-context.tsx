@@ -33,8 +33,8 @@ interface WalletState {
   usdcBalance: number | null;
   loading: boolean;
   error: string | null;
-  connect: (username?: string | { createNew?: boolean }) => Promise<void>;
-  recover: (opts?: { forcePicker?: boolean; forAddress?: string }) => Promise<void>;
+  connect: (username?: string | { createNew?: boolean }) => Promise<string | null>;
+  recover: (opts?: { forcePicker?: boolean; forAddress?: string }) => Promise<string | null>;
   /** Probe one passkey from the full OS list; returns address (does not auto-activate). */
   identify: () => Promise<{ publicKey: string; credentialId: string; sol: number; usdc: number }>;
   /** Save/activate a discovered wallet with a label. */
@@ -59,8 +59,8 @@ const WalletContext = createContext<WalletState>({
   usdcBalance: null,
   loading: false,
   error: null,
-  connect: async () => {},
-  recover: async () => {},
+  connect: async () => null,
+  recover: async () => null,
   identify: async () => ({ publicKey: "", credentialId: "", sol: 0, usdc: 0 }),
   activateWallet: () => {},
   renameWallet: () => {},
@@ -213,12 +213,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const connect = async (username?: string | { createNew?: boolean }) => {
+  const connect = async (username?: string | { createNew?: boolean }): Promise<string | null> => {
     setError(null);
     setLoading(true);
     try {
       if (!window.PublicKeyCredential) {
-        throw new Error("Passkeys require HTTPS.");
+        throw new Error("Passkeys require HTTPS (or localhost).");
       }
 
       const createNew =
@@ -232,7 +232,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         try {
           const result = await recoverPasskeyWallet({
             forcePicker,
-            // If exactly one saved wallet with a credential, pin to it
             forAddress:
               list.length === 1 && list[0]?.credentialId
                 ? list[0].pubkey
@@ -252,14 +251,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             }),
           }).catch(() => {});
           analytics.walletRecovered();
-          return;
+          return result.publicKey;
         } catch (e) {
-          // No existing passkey / cancelled — only fall through to create if none saved
           const msg = e instanceof Error ? e.message.toLowerCase() : "";
           const cancelled =
             msg.includes("cancel") ||
             msg.includes("not allowed") ||
-            msg.includes("abort");
+            msg.includes("abort") ||
+            msg.includes("denied");
           if (list.length > 0 || cancelled) {
             throw e;
           }
@@ -270,6 +269,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const result = await createPasskeyWallet(
         typeof username === "string" ? username : undefined,
       );
+      if (!result?.publicKey || result.publicKey.length < 32) {
+        throw new Error("Passkey created but no wallet address was derived.");
+      }
       activateWallet({
         pubkey: result.publicKey,
         credentialId: result.credentialId,
@@ -285,30 +287,37 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }),
       }).catch(() => {});
       analytics.walletCreated(result.publicKey);
+      return result.publicKey;
     } catch (e) {
       const { friendlyError } = await import("./friendly-errors");
-      setError(
-        friendlyError(
-          e,
-          "Couldn't connect. Use your existing passkey, or Create only if you need a new wallet.",
-        ),
+      const msg = friendlyError(
+        e,
+        "Couldn't create or unlock wallet. Try again, or use Find wallet.",
       );
+      setError(msg);
+      return null;
     } finally {
       setLoading(false);
     }
   };
 
-  const recover = async (opts?: { forcePicker?: boolean; forAddress?: string }) => {
+  const recover = async (opts?: {
+    forcePicker?: boolean;
+    forAddress?: string;
+  }): Promise<string | null> => {
     setError(null);
     setLoading(true);
     try {
       if (!window.PublicKeyCredential) {
-        throw new Error("Passkeys require HTTPS.");
+        throw new Error("Passkeys require HTTPS (or localhost).");
       }
       const result = await recoverPasskeyWallet({
         forcePicker: opts?.forcePicker,
         forAddress: opts?.forAddress,
       });
+      if (!result?.publicKey) {
+        throw new Error("Passkey unlocked but no address was derived.");
+      }
       activateWallet({
         pubkey: result.publicKey,
         credentialId: result.credentialId,
@@ -323,14 +332,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }),
       }).catch(() => {});
       analytics.walletRecovered();
+      return result.publicKey;
     } catch (e) {
       const { friendlyError } = await import("./friendly-errors");
-      setError(
-        friendlyError(
-          e,
-          "We couldn't unlock that passkey. Try Find wallet, or pick the passkey whose name is your address.",
-        ),
+      const msg = friendlyError(
+        e,
+        "We couldn't unlock that passkey. Try Find wallet, or pick the passkey named with your address.",
       );
+      setError(msg);
+      return null;
     } finally {
       setLoading(false);
     }
