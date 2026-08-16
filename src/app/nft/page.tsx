@@ -308,7 +308,7 @@ export default function NftPage() {
                     target="_blank"
                     className="flex items-center justify-center gap-1.5 w-full bg-green-500 hover:bg-green-400 text-white font-semibold rounded-xl px-4 py-3.5 transition text-center"
                   >
-                    View your NFT on Orb <ExternalLink className="w-3.5 h-3.5 inline ml-1" />
+                    View your NFT on sol.new <ExternalLink className="w-3.5 h-3.5 inline ml-1" />
                   </a>
                 )}
 
