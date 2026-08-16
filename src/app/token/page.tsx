@@ -218,17 +218,43 @@ function TopTokensBrowse() {
     { name: string; symbol: string; mint_address: string; image_url: string | null; created_at: string }[]
   >([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    fetch(`/api/tokens/recent?limit=12&network=${network}`)
-      .then((r) => r.json())
-      .then((d) => {
-        const data = d as { tokens?: typeof tokens };
-        setTokens(data.tokens || []);
+    setLoadError(null);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 12_000);
+    fetch(`/api/tokens/recent?limit=12&network=${network}`, {
+      cache: "no-store",
+      signal: ctrl.signal,
+    })
+      .then(async (r) => {
+        const ct = r.headers.get("content-type") || "";
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        if (!ct.includes("application/json")) throw new Error("Bad response");
+        return r.json() as Promise<{ tokens?: typeof tokens; error?: string }>;
       })
-      .catch(() => setTokens([]))
-      .finally(() => setLoading(false));
+      .then((d) => {
+        if (cancelled) return;
+        setTokens(Array.isArray(d.tokens) ? d.tokens : []);
+        if (d.error && !d.tokens?.length) setLoadError(d.error);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setTokens([]);
+        setLoadError(e instanceof Error ? e.message : "Load failed");
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      ctrl.abort();
+    };
   }, [network]);
 
   return (
@@ -240,7 +266,33 @@ function TopTokensBrowse() {
         </Link>
       </div>
       {loading ? (
-        <p className="text-xs text-gray-400 text-center py-4">Loading…</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-14 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.04] animate-pulse"
+            />
+          ))}
+        </div>
+      ) : loadError && tokens.length === 0 ? (
+        <div className="text-center py-4 space-y-2">
+          <p className="text-xs text-gray-400">Couldn&apos;t load recent launches.</p>
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              setLoadError(null);
+              fetch(`/api/tokens/recent?limit=12&network=${network}`, { cache: "no-store" })
+                .then((r) => r.json() as Promise<{ tokens?: typeof tokens }>)
+                .then((d) => setTokens(d.tokens || []))
+                .catch(() => setTokens([]))
+                .finally(() => setLoading(false));
+            }}
+            className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline"
+          >
+            Retry
+          </button>
+        </div>
       ) : tokens.length === 0 ? (
         <p className="text-xs text-gray-400 text-center py-4">No launches yet on this network.</p>
       ) : (

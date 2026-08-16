@@ -1,6 +1,6 @@
 import { permanentRedirect } from "next/navigation";
 
-// /track → /address (pretty) or bare address scan
+/** /track is an alias — always 308 to /address (no duplicate content/metadata). */
 export default async function TrackRedirect({
   searchParams,
 }: {

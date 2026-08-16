@@ -10,12 +10,36 @@ type Costs = { solUsd: number | null; priceSource: string | null; updatedAt: str
 
 export default function DocsPage() {
   const [costs, setCosts] = useState<Costs | null>(null);
+  const [costsError, setCostsError] = useState<string | null>(null);
+  const [costsLoading, setCostsLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/costs", { cache: "no-store" })
-      .then((r) => r.json() as Promise<Costs>)
-      .then(setCosts)
-      .catch(() => {});
+    let cancelled = false;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12_000);
+    fetch("/api/costs", { cache: "no-store", signal: ctrl.signal })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<Costs>;
+      })
+      .then((d) => {
+        if (!cancelled) {
+          setCosts(d);
+          setCostsError(null);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setCostsError(e instanceof Error ? e.message : "Failed");
+      })
+      .finally(() => {
+        clearTimeout(t);
+        if (!cancelled) setCostsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+      ctrl.abort();
+    };
   }, []);
 
   const fmtSol = (n: number) =>
@@ -54,7 +78,11 @@ export default function DocsPage() {
             <span className="text-xs text-gray-400 dark:text-white/30">
               {costs?.solUsd != null
                 ? `1 SOL = $${costs.solUsd.toFixed(2)} · ${costs.priceSource}`
-                : "loading..."}
+                : costsLoading
+                  ? "loading..."
+                  : costsError
+                    ? "price unavailable"
+                    : "—"}
             </span>
           </div>
           <div className="overflow-x-auto rounded-xl border border-black/10 dark:border-white/10">
@@ -67,7 +95,26 @@ export default function DocsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                {(costs?.actions ?? []).map((a) => (
+                {costsLoading &&
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={`sk-${i}`}>
+                      <td className="px-4 py-3" colSpan={3}>
+                        <div className="h-8 rounded-lg bg-black/5 dark:bg-white/5 animate-pulse" />
+                      </td>
+                    </tr>
+                  ))}
+                {!costsLoading && costsError && (costs?.actions?.length ?? 0) === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-4 py-6 text-center text-xs text-gray-400">
+                      Couldn&apos;t load costs.{" "}
+                      <a href="/api/costs" className="text-violet-500 hover:underline">
+                        Open /api/costs
+                      </a>
+                    </td>
+                  </tr>
+                )}
+                {!costsLoading &&
+                  (costs?.actions ?? []).map((a) => (
                   <tr key={a.id}>
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900 dark:text-white">{a.label}</div>

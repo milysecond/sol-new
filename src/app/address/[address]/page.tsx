@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { pageMeta } from "@/lib/seo";
+import ScanPage from "@/app/scan/page";
 
 type Props = { params: Promise<{ address: string }> };
 
@@ -21,12 +22,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const path = `/address/${address}`;
   const ogImage = `https://sol.new/address/${encodeURIComponent(address)}/opengraph-image`;
 
-  // Best-effort live title from scan
   let title = `${short} — sol.new`;
   let description = `Look up Solana address ${short} on sol.new.`;
   try {
+    const base =
+      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://sol.new";
     const res = await fetch(
-      `https://sol.new/api/scan?address=${encodeURIComponent(address)}`,
+      `${base}/api/scan?address=${encodeURIComponent(address)}`,
       { next: { revalidate: 300 } },
     );
     if (res.ok) {
@@ -64,10 +66,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-/**
- * Pretty URL shell. Middleware rewrites `/address/<pk>` → `/scan?address=<pk>`
- * so the scan UI renders while the browser keeps `/address/…`.
- */
-export default function AddressPage() {
-  return null;
+/** Pretty URL — Scan UI reads address from pathname. */
+export default async function AddressPage({ params }: Props) {
+  await params; // ensure dynamic
+  return <ScanPage />;
 }

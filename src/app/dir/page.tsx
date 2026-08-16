@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Navbar } from "@/components/navbar";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Directory — sol.new",
-  description: "Everything on sol.new, on one page.",
-};
+  description: "Everything on sol.new, on one page. Features, create tools, wallet, and more.",
+  path: "/dir",
+});
 
 // ─── The directory ────────────────────────────────────────────────────────────
 // Add new links here — one line each. `href` starting with http = external (↗).
