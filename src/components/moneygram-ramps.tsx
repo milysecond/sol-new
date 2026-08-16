@@ -295,14 +295,12 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
             Cash ↔ USDC (test only)
           </h3>
           <p className="text-sm text-gray-500 dark:text-white/50 leading-relaxed">
-            Sandbox MoneyGram — no real cash. Live funding is Stripe credits above.
-            Domain must be allowlisted by MoneyGram for the widget.
+            Sandbox MoneyGram on <strong>test network</strong> — no real cash.
+            Switch to mainnet for live Stripe credits.
           </p>
-          {network !== "mainnet" && (
-            <p className="text-[11px] text-amber-600 mt-1">
-              Tip: sandbox often expects devnet USDC — switch network if transfers fail.
-            </p>
-          )}
+          <p className="text-[11px] text-amber-600 mt-1">
+            You’re on devnet · MoneyGram sandbox only
+          </p>
         </div>
       </div>
 
