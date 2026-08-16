@@ -76,16 +76,19 @@ export function SlideToSend({
     } catch {
       /* ignore */
     }
+    let failed = false;
     try {
       await onConfirm();
+    } catch {
+      failed = true;
     } finally {
-      // parent sets loading; if not, snap back
-      if (!loading) {
-        setTimeout(() => {
+      // Always allow retry after cancel/error; parent may still set loading briefly
+      setTimeout(() => {
+        if (failed || !loading) {
           setOffset(0);
           confirmed.current = false;
-        }, 400);
-      }
+        }
+      }, failed ? 100 : 400);
     }
   }, [locked, max, onConfirm, loading]);
 

@@ -8,8 +8,11 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
   const m = msg.toLowerCase();
 
   // Passkey / WebAuthn cancellation
-  if (m.includes("notallowederror") || m.includes("user cancelled") || m.includes("the operation either timed out") || m.includes("the user denied")) {
-    return "Face ID was cancelled. Tap the button to try again.";
+  if (m.includes("gift was not sent")) {
+    return "Passkey was cancelled. Gift was not sent — slide again and approve Face ID / fingerprint to continue.";
+  }
+  if (m.includes("notallowederror") || m.includes("user cancelled") || m.includes("the operation either timed out") || m.includes("the user denied") || m.includes("passkey authentication cancelled")) {
+    return "Passkey was cancelled. Nothing was sent — try again and approve Face ID / fingerprint.";
   }
   if (m.includes("document is not focused") || m.includes("is not focused")) {
     return "Tap Slide to send again — Face ID needs the page focused.";

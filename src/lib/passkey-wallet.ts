@@ -511,6 +511,21 @@ async function authPasskeyOnce(opts?: {
 export async function getPasskeyKeypair(
   expectedPublicKey?: string
 ): Promise<{ address: string; keypair: Keypair }> {
+  const isUserCancel = (e: unknown) => {
+    const name = e instanceof DOMException ? e.name : e instanceof Error ? e.name : "";
+    const msg = (e instanceof Error ? e.message : String(e || "")).toLowerCase();
+    return (
+      name === "NotAllowedError" ||
+      name === "AbortError" ||
+      msg.includes("notallowed") ||
+      msg.includes("cancel") ||
+      msg.includes("denied") ||
+      msg.includes("abort") ||
+      msg.includes("timed out") ||
+      msg.includes("the operation either timed out")
+    );
+  };
+
   // 1) Try pinned credential for this wallet
   try {
     const first = await authPasskeyOnce({ forAddress: expectedPublicKey, forcePicker: false });
@@ -518,19 +533,33 @@ export async function getPasskeyKeypair(
       rememberCredential(first.address, first.credential.rawId);
       return { address: first.address, keypair: first.keypair };
     }
-  } catch {
-    /* pinned missing/wrong — fall through to picker */
+    // Wrong passkey for pinned path — ask user to pick the right one
+  } catch (e) {
+    // User cancelled / denied — STOP. Do not open a second prompt.
+    if (isUserCancel(e)) {
+      throw e instanceof Error
+        ? e
+        : new Error("Passkey authentication cancelled");
+    }
+    /* pinned missing/broken — fall through to picker */
   }
 
   // 2) Full picker — user must pick the passkey that derives expected address
-  const second = await authPasskeyOnce({ forcePicker: true });
-  if (expectedPublicKey && second.address !== expectedPublicKey) {
-    throw new Error(
-      `Wrong passkey. Connected wallet is ${expectedPublicKey.slice(0, 4)}…${expectedPublicKey.slice(-4)}, but that passkey is ${second.address.slice(0, 4)}…${second.address.slice(-4)}. Choose the passkey named with your full address.`,
-    );
+  try {
+    const second = await authPasskeyOnce({ forcePicker: true });
+    if (expectedPublicKey && second.address !== expectedPublicKey) {
+      throw new Error(
+        `Wrong passkey. Connected wallet is ${expectedPublicKey.slice(0, 4)}…${expectedPublicKey.slice(-4)}, but that passkey is ${second.address.slice(0, 4)}…${second.address.slice(-4)}. Choose the passkey named with your full address.`,
+      );
+    }
+    rememberCredential(second.address, second.credential.rawId);
+    return { address: second.address, keypair: second.keypair };
+  } catch (e) {
+    if (isUserCancel(e)) {
+      throw new Error("Passkey authentication cancelled. Gift was not sent.");
+    }
+    throw e;
   }
-  rememberCredential(second.address, second.credential.rawId);
-  return { address: second.address, keypair: second.keypair };
 }
 
 /**
