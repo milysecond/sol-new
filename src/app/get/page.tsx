@@ -253,13 +253,11 @@ export default function GetPage() {
               </div>
             )}
 
-            {/* On-ramps: MoneyGram (test) · Stripe credits (live) */}
-            {network === "mainnet" && (
-              <>
-                <CreditsBuySection />
-                <MoneyGramRampsCard />
-              </>
-            )}
+            {/* Stripe live credits — mainnet only */}
+            {network === "mainnet" && <CreditsBuySection />}
+
+            {/* MoneyGram sandbox — test/devnet only */}
+            {network === "devnet" && <MoneyGramRampsCard />}
 
             {/* View on explorer */}
             <a
