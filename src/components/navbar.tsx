@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Coins,
   Wallet,
@@ -79,6 +80,13 @@ export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [showMore, setShowMore] = useState(false);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   useEffect(() => {
     setPushPermission(getPushPermission());
@@ -89,6 +97,39 @@ export function Navbar() {
     setShowMore(false);
     setShowMenu(false);
   }, [pathname]);
+
+  // Position menu in viewport coords (escape transform stacking contexts)
+  useEffect(() => {
+    if (!showMenu) {
+      setMenuPos(null);
+      return;
+    }
+    const place = () => {
+      const el = menuBtnRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const right = Math.max(8, window.innerWidth - r.right);
+      const top = r.bottom + 8;
+      setMenuPos({ top, right });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [showMenu]);
+
+  // Lock body scroll lightly while menu open
+  useEffect(() => {
+    if (!showMenu) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [showMenu]);
 
   const shortKey = publicKey ? `${publicKey.slice(0, 4)}...${publicKey.slice(-4)}` : null;
 
@@ -111,8 +152,8 @@ export function Navbar() {
   );
 
   return (
-    <nav>
-      <div className="sticky top-0 z-30 border-b border-black/10 dark:border-white/10 bg-white/80 dark:bg-black/80 backdrop-blur-md safe-top">
+    <nav className="relative z-[80]">
+      <div className="sticky top-0 z-[80] border-b border-black/10 dark:border-white/10 bg-white/90 dark:bg-black/90 backdrop-blur-md safe-top">
         <div className="flex items-center justify-between gap-2 px-2 sm:px-5 lg:px-6 py-2 sm:py-3 max-w-[1400px] mx-auto w-full">
           <div className="flex items-center gap-1 sm:gap-2 min-w-0">
             <PageBack className="shrink-0 -ml-0.5" />
@@ -205,8 +246,11 @@ export function Navbar() {
             {publicKey ? (
               <div className="relative">
                 <button
+                  ref={menuBtnRef}
                   type="button"
                   onClick={() => setShowMenu(!showMenu)}
+                  aria-expanded={showMenu}
+                  aria-haspopup="menu"
                   className="flex items-center gap-1.5 sm:gap-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-2.5 sm:px-3 py-2 min-h-[40px] text-xs sm:text-sm hover:border-purple-400/30 transition cursor-pointer"
                 >
                   <Wallet size={14} className="text-purple-500 dark:text-purple-400 sm:hidden" />
@@ -231,10 +275,21 @@ export function Navbar() {
                   </span>
                 </button>
 
-                {showMenu && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                    <div className="absolute right-0 top-full mt-2 z-50 bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-xl overflow-hidden min-w-[220px] max-w-[min(100vw-1.5rem,320px)] shadow-lg">
+                {showMenu &&
+                  portalReady &&
+                  menuPos &&
+                  createPortal(
+                    <>
+                      <div
+                        className="fixed inset-0 z-[200] bg-black/40"
+                        onClick={() => setShowMenu(false)}
+                        aria-hidden
+                      />
+                      <div
+                        role="menu"
+                        className="fixed z-[210] bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-xl overflow-y-auto max-h-[min(70vh,520px)] min-w-[240px] w-[min(100vw-1rem,320px)] shadow-2xl"
+                        style={{ top: menuPos.top, right: menuPos.right }}
+                      >
                       <div className="px-4 py-3 border-b border-black/10 dark:border-white/10">
                         {publicKey && (
                           <p
@@ -415,9 +470,10 @@ export function Navbar() {
                       >
                         <LogOut size={14} className="inline mr-1.5" /> Disconnect
                       </button>
-                    </div>
-                  </>
-                )}
+                      </div>
+                    </>,
+                    document.body,
+                  )}
               </div>
             ) : (
               <div className="flex items-center gap-1.5">
@@ -451,7 +507,7 @@ export function Navbar() {
       </div>
 
       {/* Phone bottom nav */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-white/95 dark:bg-black/95 backdrop-blur border-t border-black/10 dark:border-white/10 flex items-stretch justify-around px-1 pt-1 safe-bottom">
+      <div className="fixed bottom-0 left-0 right-0 z-[90] sm:hidden bg-white/95 dark:bg-black/95 backdrop-blur border-t border-black/10 dark:border-white/10 flex items-stretch justify-around px-1 pt-1 safe-bottom">
         {MOBILE_PRIMARY.map((item) => (
           <Link
             key={item.href}

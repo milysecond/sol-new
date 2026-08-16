@@ -61,7 +61,7 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1 flex flex-col px-4 py-4 sm:px-6 sm:py-8 sm:items-center">
         <ConnectGate action="view your wallet">
           <div className="w-full sm:max-w-lg space-y-3">
-            <div className="sticky top-0 z-30 flex items-center justify-between bg-white/95 dark:bg-black/95 backdrop-blur border border-black/10 dark:border-white/10 rounded-xl px-4 py-3">
+            <div className="sticky top-0 z-20 flex items-center justify-between bg-white/95 dark:bg-black/95 backdrop-blur border border-black/10 dark:border-white/10 rounded-xl px-4 py-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-full bg-fuchsia-500/20 flex items-center justify-center shrink-0">
                   <Wallet size={20} className="text-fuchsia-400" />
