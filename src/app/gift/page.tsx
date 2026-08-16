@@ -65,7 +65,7 @@ export default function GiftPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cancelTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const { publicKey, walletLabel, balance, usdcBalance, refreshBalance } = useWallet();
+  const { publicKey, walletLabel, balance, usdcBalance, refreshBalance, walletKind } = useWallet();
   const { network, rpc } = useNetwork();
 
   const token: GiftToken = selected
@@ -168,7 +168,11 @@ export default function GiftPage() {
 
   const handleCreate = async () => {
     if (!publicKey || !selected) return;
+    // Hard gate: never call create API until passkey/external auth succeeds
     setError(null);
+    setGiftUrl(null);
+    setGiftEntry(null);
+    setStatus("auth");
 
     try {
       const parsed = parseFloat(amount);
@@ -192,12 +196,21 @@ export default function GiftPage() {
         }
       }
 
-      setStatus("auth");
-      const { keypair: sender } = await getPasskeyKeypair(publicKey);
-      if (sender.publicKey.toBase58() !== publicKey) {
-        throw new Error(
-          `That passkey belongs to a different wallet. Pick the passkey for ${walletLabel || `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`}, or switch wallets in the menu.`
-        );
+      // Auth first — cancel must abort (no create, no fund)
+      let sender: import("@solana/web3.js").Keypair | null = null;
+      if (walletKind === "external") {
+        const { getInjectedProvider } = await import("@/lib/external-wallet");
+        if (!getInjectedProvider()) {
+          throw new Error("Browser wallet disconnected. Reconnect and try again.");
+        }
+      } else {
+        const { keypair } = await getPasskeyKeypair(publicKey);
+        if (keypair.publicKey.toBase58() !== publicKey) {
+          throw new Error(
+            `That passkey belongs to a different wallet. Pick the passkey for ${walletLabel || `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`}, or switch wallets in the menu.`
+          );
+        }
+        sender = keypair;
       }
 
       setStatus("sending");
@@ -232,11 +245,25 @@ export default function GiftPage() {
 
       const connection = new Connection(rpc, "confirmed");
       const tx = Transaction.from(Buffer.from(created.transaction, "base64"));
-      tx.partialSign(sender);
-      const signature = await connection.sendRawTransaction(tx.serialize(), {
-        skipPreflight: false,
-        maxRetries: 3,
-      });
+
+      let signature: string;
+      if (walletKind === "external") {
+        setStatus("auth");
+        const { signTransactionWithInjected } = await import("@/lib/external-wallet");
+        const signed = await signTransactionWithInjected(tx);
+        setStatus("sending");
+        signature = await connection.sendRawTransaction(signed.serialize(), {
+          skipPreflight: false,
+          maxRetries: 3,
+        });
+      } else {
+        if (!sender) throw new Error("Passkey authentication required. Gift was not sent.");
+        tx.partialSign(sender);
+        signature = await connection.sendRawTransaction(tx.serialize(), {
+          skipPreflight: false,
+          maxRetries: 3,
+        });
+      }
       setStatus("confirming");
       const bh = created.blockhash;
       const lv = created.lastValidBlockHeight;
@@ -291,8 +318,17 @@ export default function GiftPage() {
       }
     } catch (err) {
       const { friendlyError } = await import("@/lib/friendly-errors");
-      setError(friendlyError(err, "We couldn't create the gift. Try again."));
+      const msg = friendlyError(err, "We couldn't create the gift. Try again.");
+      setError(msg);
       setStatus("error");
+      setGiftUrl(null);
+      setGiftEntry(null);
+      try {
+        const { toast } = await import("@/lib/toast");
+        toast.error(msg);
+      } catch {
+        /* ignore */
+      }
     }
   };
 
