@@ -471,26 +471,105 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setAirdropping(true);
     setAirdropDone(false);
     try {
-      const res = await fetch("/api/airdrop", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: publicKey }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        ok?: boolean;
-        error?: string;
-        signature?: string;
+      const run = async (body: Record<string, unknown>) => {
+        const res = await fetch("/api/airdrop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          error?: string;
+          signature?: string;
+          needsClientBroadcast?: boolean;
+          needsBlockhash?: boolean;
+          transaction?: string;
+        };
+        return { res, data };
       };
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || `Airdrop failed (${res.status})`);
+
+      let { res, data } = await run({ address: publicKey });
+
+      if (res.ok && data.ok && data.signature) {
+        await new Promise((r) => setTimeout(r, 1200));
+        await refreshBalance();
+        setAirdropDone(true);
+        const { toast } = await import("@/lib/toast");
+        toast.money("0.1 SOL airdropped!");
+        setTimeout(() => setAirdropDone(false), 3000);
+        return;
       }
-      // Wait briefly then refresh — only after confirmed success
-      await new Promise((r) => setTimeout(r, 1500));
-      await refreshBalance();
-      setAirdropDone(true);
-      const { toast } = await import("@/lib/toast");
-      toast.money("0.1 SOL airdropped!");
-      setTimeout(() => setAirdropDone(false), 3000);
+
+      // Browser path: blockhash → server signs → browser broadcasts (CF IP blocked from public devnet)
+      if (data.needsClientBroadcast || data.needsBlockhash) {
+        const { Connection } = await import("@solana/web3.js");
+        const endpoints = [
+          "https://api.devnet.solana.com",
+          "https://endpoints.omniatech.io/v1/sol/devnet/public",
+        ];
+        let conn: InstanceType<typeof Connection> | null = null;
+        let blockhash = "";
+        let lastValidBlockHeight = 0;
+        let lastErr: Error | null = null;
+        for (const url of endpoints) {
+          try {
+            const c = new Connection(url, "confirmed");
+            const bh = await c.getLatestBlockhash("finalized");
+            conn = c;
+            blockhash = bh.blockhash;
+            lastValidBlockHeight = bh.lastValidBlockHeight;
+            break;
+          } catch (e) {
+            lastErr = e instanceof Error ? e : new Error(String(e));
+          }
+        }
+        if (!conn || !blockhash) {
+          throw lastErr || new Error("Could not reach devnet from browser");
+        }
+
+        if (!data.transaction) {
+          ({ res, data } = await run({
+            address: publicKey,
+            blockhash,
+            lastValidBlockHeight,
+          }));
+        }
+        if (!data.transaction) {
+          throw new Error(data.error || "No signed airdrop transaction");
+        }
+
+        const raw = Uint8Array.from(atob(data.transaction), (c) => c.charCodeAt(0));
+        const sig = await conn.sendRawTransaction(raw, {
+          skipPreflight: false,
+          maxRetries: 5,
+        });
+        for (let i = 0; i < 30; i++) {
+          const st = await conn.getSignatureStatuses([sig]);
+          const v = st.value[0];
+          if (v?.err) throw new Error(`Tx failed: ${JSON.stringify(v.err)}`);
+          if (
+            v?.confirmationStatus === "confirmed" ||
+            v?.confirmationStatus === "finalized"
+          ) {
+            break;
+          }
+          if ((await conn.getBlockHeight("confirmed")) > lastValidBlockHeight) {
+            throw new Error("Airdrop expired before confirm — try again");
+          }
+          await new Promise((r) => setTimeout(r, 800));
+        }
+
+        await run({ address: publicKey, signature: sig });
+        await new Promise((r) => setTimeout(r, 1200));
+        await refreshBalance();
+        setAirdropDone(true);
+        const { toast } = await import("@/lib/toast");
+        toast.money("0.1 SOL airdropped!");
+        setTimeout(() => setAirdropDone(false), 3000);
+        return;
+      }
+
+      throw new Error(data.error || `Airdrop failed (${res.status})`);
     } catch (e) {
       const { toast } = await import("@/lib/toast");
       const { friendlyError } = await import("./friendly-errors");

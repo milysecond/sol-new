@@ -1,120 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  Connection,
   Keypair,
   PublicKey,
   SystemProgram,
   Transaction,
   LAMPORTS_PER_SOL,
+  Connection,
 } from "@solana/web3.js";
 import { notifyEvent } from "@/lib/notify";
 import { devnetRpcEndpoints } from "@/lib/rpc-server";
 
 const AIRDROP_AMOUNT = 0.1 * LAMPORTS_PER_SOL;
 
-function getFaucetKeypair(): Keypair | null {
+function getFaucetKeypair(): Keypair {
   const raw = process.env.FAUCET_PRIVATE_KEY?.trim();
-  if (!raw) return null;
-  try {
-    const key = JSON.parse(raw) as number[];
-    if (!Array.isArray(key) || key.length < 32) return null;
-    return Keypair.fromSecretKey(new Uint8Array(key));
-  } catch {
-    return null;
+  if (!raw) throw new Error("FAUCET_PRIVATE_KEY not configured");
+  const key = JSON.parse(raw) as number[];
+  if (!Array.isArray(key) || key.length < 32) {
+    throw new Error("FAUCET_PRIVATE_KEY invalid");
   }
+  return Keypair.fromSecretKey(new Uint8Array(key));
 }
 
-
-function isRetryableRpcError(msg: string): boolean {
-  const m = msg.toLowerCase();
-  return (
-    m.includes("429") ||
-    m.includes("too many") ||
-    m.includes("max usage") ||
-    m.includes("403") ||
-    m.includes("401") ||
-    m.includes("fetch failed") ||
-    m.includes("network") ||
-    m.includes("econnrefused") ||
-    m.includes("timeout") ||
-    m.includes("502") ||
-    m.includes("503") ||
-    m.includes("blocked") ||
-    m.includes("access forbidden")
-  );
-}
-
-async function confirmSig(conn: Connection, sig: string, lastValidBlockHeight?: number) {
-  for (let i = 0; i < 30; i++) {
-    const st = await conn.getSignatureStatuses([sig], {
-      searchTransactionHistory: true,
-    });
-    const v = st.value[0];
-    if (v?.err) {
-      throw new Error(`Tx failed on-chain: ${JSON.stringify(v.err)}`);
-    }
-    if (
-      v?.confirmationStatus === "confirmed" ||
-      v?.confirmationStatus === "finalized"
-    ) {
-      return;
-    }
-    if (lastValidBlockHeight != null) {
-      try {
-        const height = await conn.getBlockHeight("confirmed");
-        if (height > lastValidBlockHeight) {
-          throw new Error("Blockhash expired before confirmation");
-        }
-      } catch (e) {
-        if (e instanceof Error && e.message.includes("expired")) throw e;
-      }
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  throw new Error(`Not confirmed after 30s (${sig.slice(0, 12)}…)`);
-}
-
-/**
- * 1) Solana requestAirdrop (network faucet)
- * 2) Our funded faucet key transfer
- * Tries multiple RPCs.
- */
-async function sendDevnetAirdrop(recipient: PublicKey): Promise<{
-  signature: string;
-  method: "requestAirdrop" | "faucet";
-}> {
-  const errors: string[] = [];
-  const faucet = getFaucetKeypair();
-
+async function tryServerSend(
+  recipient: PublicKey,
+  faucet: Keypair,
+): Promise<{ signature: string; method: string } | null> {
   for (const url of devnetRpcEndpoints()) {
-    const conn = new Connection(url, {
-      commitment: "confirmed",
-      confirmTransactionInitialTimeout: 60_000,
-    });
-    const host = url.replace(/^https?:\/\//, "").split("/")[0] || url;
-
-    // Path A — official cluster faucet
+    const host = url.replace(/^https?:\/\//, "").split(/[/?]/)[0] || "rpc";
     try {
-      const sig = await conn.requestAirdrop(recipient, AIRDROP_AMOUNT);
-      const { lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
-      await confirmSig(conn, sig, lastValidBlockHeight);
-      return { signature: sig, method: "requestAirdrop" };
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      errors.push(`airdrop@${host}: ${msg.slice(0, 120)}`);
-      if (!isRetryableRpcError(msg) && !msg.toLowerCase().includes("airdrop")) {
-        // keep trying other RPCs anyway
+      const conn = new Connection(url, "confirmed");
+      try {
+        const sig = await conn.requestAirdrop(recipient, AIRDROP_AMOUNT);
+        for (let i = 0; i < 20; i++) {
+          const st = await conn.getSignatureStatuses([sig]);
+          const v = st.value[0];
+          if (v?.err) throw new Error(JSON.stringify(v.err));
+          if (
+            v?.confirmationStatus === "confirmed" ||
+            v?.confirmationStatus === "finalized"
+          ) {
+            return { signature: sig, method: `requestAirdrop@${host}` };
+          }
+          await new Promise((r) => setTimeout(r, 800));
+        }
+      } catch {
+        /* try faucet transfer */
       }
-    }
 
-    // Path B — our faucet wallet
-    if (!faucet) continue;
-    try {
-      const balance = await conn.getBalance(faucet.publicKey, "confirmed");
-      if (balance < AIRDROP_AMOUNT + 10_000) {
-        errors.push(`faucet@${host}: empty (${(balance / LAMPORTS_PER_SOL).toFixed(4)} SOL)`);
-        continue;
-      }
+      const bal = await conn.getBalance(faucet.publicKey, "confirmed");
+      if (bal < AIRDROP_AMOUNT + 10_000) continue;
+
       const { blockhash, lastValidBlockHeight } =
         await conn.getLatestBlockhash("confirmed");
       const tx = new Transaction().add(
@@ -129,59 +65,76 @@ async function sendDevnetAirdrop(recipient: PublicKey): Promise<{
       tx.sign(faucet);
       const sig = await conn.sendRawTransaction(tx.serialize(), {
         skipPreflight: false,
-        maxRetries: 5,
-        preflightCommitment: "confirmed",
+        maxRetries: 3,
       });
-      await confirmSig(conn, sig, lastValidBlockHeight);
-      return { signature: sig, method: "faucet" };
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      errors.push(`transfer@${host}: ${msg.slice(0, 120)}`);
+      for (let i = 0; i < 20; i++) {
+        const st = await conn.getSignatureStatuses([sig]);
+        const v = st.value[0];
+        if (v?.err) throw new Error(JSON.stringify(v.err));
+        if (
+          v?.confirmationStatus === "confirmed" ||
+          v?.confirmationStatus === "finalized"
+        ) {
+          return { signature: sig, method: `faucet@${host}` };
+        }
+        if ((await conn.getBlockHeight("confirmed")) > lastValidBlockHeight) {
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 800));
+      }
+    } catch {
+      /* next rpc */
     }
   }
-
-  throw new Error(
-    errors.length
-      ? `Airdrop failed on all RPCs. ${errors.slice(0, 4).join(" · ")}`
-      : "Airdrop failed — no RPC available",
-  );
+  return null;
 }
 
 export async function GET() {
-  const faucet = getFaucetKeypair();
-  const address = faucet?.publicKey.toBase58() || null;
-  let balance: number | null = null;
-  let error: string | undefined;
-
-  if (faucet) {
+  try {
+    const faucet = getFaucetKeypair();
+    let balance: number | null = null;
     for (const url of devnetRpcEndpoints()) {
       try {
         const conn = new Connection(url, "confirmed");
-        balance = (await conn.getBalance(faucet.publicKey, "confirmed")) / LAMPORTS_PER_SOL;
+        balance =
+          (await conn.getBalance(faucet.publicKey, "confirmed")) /
+          LAMPORTS_PER_SOL;
         break;
-      } catch (e) {
-        error = e instanceof Error ? e.message : String(e);
+      } catch {
+        /* next */
       }
     }
-  } else {
-    error = "FAUCET_PRIVATE_KEY not set (requestAirdrop still works on POST)";
+    return NextResponse.json({
+      ok: true,
+      address: faucet.publicKey.toBase58(),
+      balance,
+    });
+  } catch (e) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+        address: null,
+        balance: null,
+      },
+      { status: 503 },
+    );
   }
-
-  return NextResponse.json({
-    ok: balance != null,
-    address,
-    balance,
-    ...(balance == null && error ? { error } : {}),
-  });
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { address } = (await req.json()) as { address?: string };
+    const body = (await req.json()) as {
+      address?: string;
+      signature?: string;
+      /** Client-fetched devnet blockhash for faucet-signed tx */
+      blockhash?: string;
+      lastValidBlockHeight?: number;
+    };
+    const address = body.address?.trim();
     if (!address) {
       return NextResponse.json({ ok: false, error: "Missing address" }, { status: 400 });
     }
-
     let recipient: PublicKey;
     try {
       recipient = new PublicKey(address);
@@ -189,29 +142,93 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Invalid address" }, { status: 400 });
     }
 
-    const { signature, method } = await sendDevnetAirdrop(recipient);
+    const faucet = getFaucetKeypair();
 
-    void notifyEvent(
-      {
-        kind: "airdrop",
-        emoji: "💧",
-        title: "Devnet airdrop sent",
-        fields: {
-          recipient: address,
-          amount: 0.1,
-          signature,
-          method,
+    // Client confirmed broadcast
+    if (body.signature && body.signature.length >= 64 && !body.blockhash) {
+      void notifyEvent(
+        {
+          kind: "airdrop",
+          emoji: "💧",
+          title: "Devnet airdrop sent",
+          fields: {
+            recipient: address,
+            amount: 0.1,
+            signature: body.signature,
+            method: "client_broadcast",
+          },
         },
-      },
-      { req },
-    );
+        { req },
+      );
+      return NextResponse.json({
+        ok: true,
+        signature: body.signature,
+        amount: 0.1,
+        method: "client_broadcast",
+        explorer: `https://solscan.io/tx/${body.signature}?cluster=devnet`,
+      });
+    }
 
+    // Client provides blockhash → we sign → client broadcasts
+    if (body.blockhash) {
+      const tx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: faucet.publicKey,
+          toPubkey: recipient,
+          lamports: AIRDROP_AMOUNT,
+        }),
+      );
+      tx.recentBlockhash = body.blockhash;
+      tx.feePayer = faucet.publicKey;
+      tx.sign(faucet);
+      return NextResponse.json({
+        ok: false,
+        needsClientBroadcast: true,
+        transaction: Buffer.from(
+          tx.serialize({ requireAllSignatures: true }),
+        ).toString("base64"),
+        blockhash: body.blockhash,
+        lastValidBlockHeight: body.lastValidBlockHeight ?? null,
+        faucet: faucet.publicKey.toBase58(),
+        amount: 0.1,
+      });
+    }
+
+    // Try server-side first
+    const sent = await tryServerSend(recipient, faucet);
+    if (sent) {
+      void notifyEvent(
+        {
+          kind: "airdrop",
+          emoji: "💧",
+          title: "Devnet airdrop sent",
+          fields: {
+            recipient: address,
+            amount: 0.1,
+            signature: sent.signature,
+            method: sent.method,
+          },
+        },
+        { req },
+      );
+      return NextResponse.json({
+        ok: true,
+        signature: sent.signature,
+        amount: 0.1,
+        method: sent.method,
+        explorer: `https://solscan.io/tx/${sent.signature}?cluster=devnet`,
+      });
+    }
+
+    // Tell client to fetch blockhash and retry with client broadcast path
     return NextResponse.json({
-      ok: true,
-      signature,
+      ok: false,
+      needsClientBroadcast: true,
+      needsBlockhash: true,
+      error:
+        "Worker cannot reach devnet RPC (IP blocked). Client will fetch blockhash and broadcast.",
+      faucet: faucet.publicKey.toBase58(),
       amount: 0.1,
-      method,
-      explorer: `https://solscan.io/tx/${signature}?cluster=devnet`,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

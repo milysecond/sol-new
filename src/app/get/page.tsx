@@ -149,11 +149,9 @@ function CreditsBuySection() {
 
 
 export default function GetPage() {
-  const { publicKey, refreshBalance } = useWallet();
+  const { publicKey, refreshBalance, handleAirdrop, airdropping, airdropDone } = useWallet();
   const { network } = useNetwork();
   const [copied, setCopied] = useState(false);
-  const [airdropping, setAirdropping] = useState(false);
-  const [airdropDone, setAirdropDone] = useState(false);
 
   const copyAddress = useCallback(() => {
     if (!publicKey) return;
@@ -162,36 +160,6 @@ export default function GetPage() {
     setTimeout(() => setCopied(false), 2000);
   }, [publicKey]);
 
-  const handleAirdrop = useCallback(async () => {
-    if (!publicKey || network !== "devnet") return;
-    setAirdropping(true);
-    setAirdropDone(false);
-    try {
-      const res = await fetch("/api/airdrop", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: publicKey }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        ok?: boolean;
-        error?: string;
-      };
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || `Airdrop failed (${res.status})`);
-      }
-      await new Promise((r) => setTimeout(r, 1500));
-      await refreshBalance();
-      setAirdropDone(true);
-      const { toast } = await import("@/lib/toast");
-      toast.money("0.1 SOL airdropped!");
-      setTimeout(() => setAirdropDone(false), 3000);
-    } catch (e) {
-      const { toast } = await import("@/lib/toast");
-      toast.error(e instanceof Error ? e.message : "Airdrop failed — try again");
-    } finally {
-      setAirdropping(false);
-    }
-  }, [publicKey, network, refreshBalance]);
 
   const solscanUrl = publicKey
     ? `https://orbmarkets.io/address/${publicKey}${network === "devnet" ? "?cluster=devnet&hideSpam=true" : "?hideSpam=true"}`
