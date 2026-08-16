@@ -116,11 +116,20 @@ function markOnboardDone() {
  */
 export default function OnboardPage() {
   const router = useRouter();
-  const { publicKey, connect, recover, loading, error: walletError } = useWallet();
+  const { publicKey, connect, recover, loading, error: walletError, clearLoading } =
+    useWallet();
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+
+  const busy = creating || loading;
+
+  const cancelBusy = () => {
+    setCreating(false);
+    clearLoading();
+    setError("Cancelled — tap Create again when ready.");
+  };
 
   const goalMeta = useMemo(
     () => GOALS.find((g) => g.id === goal) || GOALS[3]!,
@@ -333,7 +342,7 @@ export default function OnboardPage() {
         {step === 2 && (
           <div className="space-y-6 text-center">
             <div className="flex justify-center py-2">
-              {creating || loading ? (
+              {busy ? (
                 <Spinner size={64} state="composing" label="Creating wallet" />
               ) : (
                 <div className="w-16 h-16 rounded-2xl bg-violet-500/15 text-violet-600 dark:text-violet-400 flex items-center justify-center">
@@ -343,12 +352,18 @@ export default function OnboardPage() {
             </div>
             <div className="space-y-2">
               <h1 className="text-2xl font-bold tracking-tight">
-                {publicKey ? "Wallet ready" : "Create your wallet"}
+                {publicKey
+                  ? "Wallet ready"
+                  : busy
+                    ? "Approve passkey…"
+                    : "Create your wallet"}
               </h1>
               <p className="text-sm text-gray-500 max-w-sm mx-auto">
                 {publicKey
                   ? "You're connected. Next we’ll open your first step."
-                  : "Tap once — Face ID creates a passkey wallet. No seed phrase."}
+                  : busy
+                    ? "Look for a fingerprint / face / screen-lock prompt. If nothing appears, cancel and try again."
+                    : "Tap once — your phone’s passkey creates a wallet. No seed phrase."}
               </p>
             </div>
             {(error || walletError) && (
@@ -372,27 +387,37 @@ export default function OnboardPage() {
                 <button
                   type="button"
                   onClick={() => void createWallet()}
-                  disabled={creating || loading}
+                  disabled={busy}
                   className="w-full min-h-[52px] rounded-2xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
                 >
-                  {(creating || loading) && (
-                    <Spinner size={20} state="composing" />
-                  )}
-                  {creating || loading ? "Creating…" : "Create with Face ID"}
+                  {busy && <Spinner size={20} state="composing" />}
+                  {busy ? "Waiting for passkey…" : "Create with passkey"}
                 </button>
                 <button
                   type="button"
                   onClick={() => void unlockExisting()}
-                  disabled={creating || loading}
-                  className="w-full min-h-[48px] rounded-2xl border border-black/10 dark:border-white/10 text-sm font-medium text-gray-700 dark:text-white/70"
+                  disabled={busy}
+                  className="w-full min-h-[48px] rounded-2xl border border-black/10 dark:border-white/10 text-sm font-medium text-gray-700 dark:text-white/70 disabled:opacity-50"
                 >
                   I already have a passkey
                 </button>
+                {busy && (
+                  <button
+                    type="button"
+                    onClick={cancelBusy}
+                    className="w-full min-h-[48px] rounded-2xl bg-black/5 dark:bg-white/5 text-sm font-semibold text-amber-700 dark:text-amber-300"
+                  >
+                    Cancel — try again
+                  </button>
+                )}
               </>
             )}
             <button
               type="button"
-              onClick={() => setStep(1)}
+              onClick={() => {
+                cancelBusy();
+                setStep(1);
+              }}
               className="w-full text-xs text-gray-400"
             >
               Back

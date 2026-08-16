@@ -45,6 +45,8 @@ interface WalletState {
   refreshWalletListBalances: () => Promise<void>;
   disconnect: () => void;
   refreshBalance: () => Promise<void>;
+  /** Clear stuck Authenticating / Creating spinner (WebAuthn hang recovery). */
+  clearLoading: () => void;
   airdropping: boolean;
   airdropDone: boolean;
   handleAirdrop: () => Promise<void>;
@@ -69,6 +71,7 @@ const WalletContext = createContext<WalletState>({
   refreshWalletListBalances: async () => {},
   disconnect: () => {},
   refreshBalance: async () => {},
+  clearLoading: () => {},
   airdropping: false,
   airdropDone: false,
   handleAirdrop: async () => {},
@@ -589,6 +592,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [publicKey, network, refreshBalance]);
 
+  const clearLoading = () => {
+    setLoading(false);
+    setError(null);
+  };
+
   const disconnect = () => {
     setPublicKey(null);
     setWalletLabel(null);
@@ -620,6 +628,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         refreshWalletListBalances,
         disconnect,
         refreshBalance,
+        clearLoading,
         airdropping,
         airdropDone,
         handleAirdrop,
