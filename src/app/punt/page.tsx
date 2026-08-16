@@ -245,6 +245,7 @@ export default function PuntPage() {
   const [extMarkets, setExtMarkets] = useState<ExtMarket[]>([]);
   const [extLoading, setExtLoading] = useState(false);
   const [extError, setExtError] = useState<string | null>(null);
+  const [extNote, setExtNote] = useState<string | null>(null);
   const [q, setQ] = useState("");
 
   useEffect(() => {
@@ -252,6 +253,7 @@ export default function PuntPage() {
     let cancelled = false;
     setExtLoading(true);
     setExtError(null);
+    setExtNote(null);
     setExtMarkets([]);
     (async () => {
       try {
@@ -292,13 +294,15 @@ export default function PuntPage() {
             }),
           );
         } else {
-          // Kalshi via same-origin proxy (browser CORS blocks elections API)
+          // Kalshi via same-origin proxy (CORS + rate-limit handled server-side)
           const res = await fetch(`/api/punt/kalshi?limit=40`, {
             cache: "no-store",
           });
-          const data = (await res.json()) as {
+          const data = (await res.json().catch(() => ({}))) as {
             ok?: boolean;
             error?: string;
+            warning?: string;
+            source?: string;
             markets?: Array<{
               id: string;
               title: string;
@@ -307,12 +311,13 @@ export default function PuntPage() {
               volume: string | null;
             }>;
           };
-          if (!res.ok || data.ok === false) {
-            throw new Error(data.error || "Could not load Kalshi");
-          }
           if (cancelled) return;
+          const list = Array.isArray(data.markets) ? data.markets : [];
+          if (list.length === 0) {
+            throw new Error(data.error || data.warning || "Could not load Kalshi");
+          }
           setExtMarkets(
-            (data.markets || []).slice(0, 30).map((m, i) => ({
+            list.slice(0, 30).map((m, i) => ({
               id: m.id || String(i),
               title: m.title || "Market",
               url: m.url || "https://kalshi.com",
@@ -320,6 +325,18 @@ export default function PuntPage() {
               volume: m.volume,
             })),
           );
+          // Soft warning (rate-limit / fallback) — not a hard fail
+          if (data.warning || data.source === "fallback" || data.source === "stale") {
+            setExtError(null);
+            setExtNote(
+              data.warning ||
+                (data.source === "fallback"
+                  ? "Showing Kalshi browse links (live feed busy)"
+                  : null),
+            );
+          } else {
+            setExtNote(null);
+          }
         }
       } catch (e) {
         if (!cancelled) setExtError(e instanceof Error ? e.message : "Load failed");
@@ -497,6 +514,11 @@ export default function PuntPage() {
                   {source}
                 </a>{" "}
                 directly.
+              </div>
+            )}
+            {extNote && !extError && (
+              <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl px-4 py-2.5 text-amber-800 dark:text-amber-200 text-xs text-center">
+                {extNote}
               </div>
             )}
             {!extLoading &&
