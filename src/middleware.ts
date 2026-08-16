@@ -24,8 +24,14 @@ export function middleware(request: NextRequest) {
   // - finished onboard (cookie) → wallet app (not marketing “Create anything”)
   if (path === "/" || path === "") {
     const done = request.cookies.get("sol_new_onboard_done")?.value === "1";
-    url.pathname = done ? "/wallet" : "/onboard";
+    url.pathname = done ? "/wallet/get" : "/onboard";
     return NextResponse.rewrite(url);
+  }
+
+  // Bare /wallet → Get (main wallet content). Avoid empty client-only redirect shell.
+  if (path === "/wallet" || path === "/wallet/") {
+    url.pathname = "/wallet/get";
+    return NextResponse.redirect(url, 308);
   }
 
   // Common crawler dead-ends

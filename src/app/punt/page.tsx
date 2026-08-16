@@ -292,41 +292,33 @@ export default function PuntPage() {
             }),
           );
         } else {
-          // Kalshi public market list (best effort)
-          const res = await fetch(
-            "https://api.elections.kalshi.com/trade-api/v2/markets?limit=40&status=open",
-            { cache: "no-store" },
-          );
-          if (!res.ok) throw new Error("Could not load Kalshi");
+          // Kalshi via same-origin proxy (browser CORS blocks elections API)
+          const res = await fetch(`/api/punt/kalshi?limit=40`, {
+            cache: "no-store",
+          });
           const data = (await res.json()) as {
+            ok?: boolean;
+            error?: string;
             markets?: Array<{
-              ticker?: string;
-              title?: string;
-              yes_bid?: number;
-              yes_ask?: number;
-              volume_24h?: number;
+              id: string;
+              title: string;
+              url: string;
+              price: string | null;
+              volume: string | null;
             }>;
           };
+          if (!res.ok || data.ok === false) {
+            throw new Error(data.error || "Could not load Kalshi");
+          }
           if (cancelled) return;
           setExtMarkets(
-            (data.markets || []).slice(0, 30).map((m, i) => {
-              const mid =
-                m.yes_bid != null && m.yes_ask != null
-                  ? (m.yes_bid + m.yes_ask) / 2
-                  : m.yes_bid ?? m.yes_ask;
-              return {
-                id: m.ticker || String(i),
-                title: m.title || m.ticker || "Market",
-                url: m.ticker
-                  ? `https://kalshi.com/markets/${m.ticker.toLowerCase()}`
-                  : "https://kalshi.com",
-                price: mid != null ? `${Math.round(mid)}¢` : null,
-                volume:
-                  m.volume_24h != null
-                    ? `${Math.round(m.volume_24h).toLocaleString()} contracts`
-                    : null,
-              };
-            }),
+            (data.markets || []).slice(0, 30).map((m, i) => ({
+              id: m.id || String(i),
+              title: m.title || "Market",
+              url: m.url || "https://kalshi.com",
+              price: m.price,
+              volume: m.volume,
+            })),
           );
         }
       } catch (e) {
