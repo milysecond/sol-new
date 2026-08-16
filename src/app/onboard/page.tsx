@@ -167,11 +167,16 @@ export default function OnboardPage() {
     setCreating(true);
     try {
       // Explicit new wallet for onboarding (not unlock-existing)
-      await connect({ createNew: true });
+      const pk = await connect({ createNew: true });
+      if (!pk || pk.length < 32) {
+        setError("Wallet was not created. Approve Face ID / passkey and try again.");
+        return;
+      }
+      // Only leave step 2 after a real address is live
       markOnboardDone();
       setStep(3);
     } catch (e) {
-      setError(friendlyError(e, "Couldn't create wallet"));
+      setError(friendlyError(e, "Couldn't create wallet — try again"));
     } finally {
       setCreating(false);
     }
@@ -181,20 +186,37 @@ export default function OnboardPage() {
     setError(null);
     setCreating(true);
     try {
-      await recover({ forcePicker: true });
+      const pk = await recover({ forcePicker: true });
+      if (!pk || pk.length < 32) {
+        setError("Could not unlock a wallet from that passkey. Try again or Find wallet.");
+        return;
+      }
       markOnboardDone();
       setStep(3);
     } catch (e) {
-      setError(friendlyError(e, "Couldn't unlock passkey"));
+      setError(friendlyError(e, "Couldn't unlock passkey — try again"));
     } finally {
       setCreating(false);
     }
   };
 
   const finish = (href?: string) => {
+    if (!publicKey) {
+      setStep(2);
+      setError("Create your wallet first — Face ID is required.");
+      return;
+    }
     markOnboardDone();
     router.replace(href || goalMeta.href);
   };
+
+  // Never stay on success screen without a live wallet
+  useEffect(() => {
+    if (step === 3 && !publicKey) {
+      setStep(2);
+      setError((e) => e || "Wallet missing — create it with Face ID");
+    }
+  }, [step, publicKey]);
 
   return (
     <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">

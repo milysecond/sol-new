@@ -155,9 +155,10 @@ export async function createPasskeyWallet(_username?: string): Promise<{
   userId: string;
 }> {
   ensureDocumentFocusForPasskey();
-  // Provisional WebAuthn name until we derive the Solana address
+  // Brief yield so iOS Safari treats the user gesture as still active after React re-render
+  await new Promise((r) => setTimeout(r, 50));
+
   const provisional = `sol.new-${Date.now().toString(36)}`;
-  // Stable random user handle — needed later to rename the passkey in the browser via Signal API
   const userIdBytes = crypto.getRandomValues(new Uint8Array(32));
   const userId = btoa(String.fromCharCode(...userIdBytes));
 
@@ -167,37 +168,65 @@ export async function createPasskeyWallet(_username?: string): Promise<{
     transports: ["internal", "hybrid"] as AuthenticatorTransport[],
   }));
 
-  const credential = (await navigator.credentials.create({
-    publicKey: {
-      challenge: CHALLENGE,
-      rp: { name: "sol.new", id: getRpId() },
-      user: {
-        id: userIdBytes,
-        // Browser passkey list — updated to full address after PRF derive
-        name: provisional,
-        displayName: "sol.new wallet",
-      },
-      pubKeyCredParams: [
-        { alg: -7, type: "public-key" },
-        { alg: -257, type: "public-key" },
-      ],
-      authenticatorSelection: {
-        authenticatorAttachment: "platform",
-        residentKey: "required",
-        requireResidentKey: true,
-        userVerification: "required",
-      },
-      // Discourage accidental re-enroll of the same authenticator slot when we already know IDs
-      ...(excludeCredentials.length ? { excludeCredentials } : {}),
-      extensions: {
-        prf: {
-          eval: {
-            first: CHALLENGE,
-          },
+  // Prefer platform authenticator, but don't hard-require attachment —
+  // some mobile browsers fail create() when only "platform" is allowed.
+  const basePublicKey: PublicKeyCredentialCreationOptions = {
+    challenge: CHALLENGE,
+    rp: { name: "sol.new", id: getRpId() },
+    user: {
+      id: userIdBytes,
+      name: provisional,
+      displayName: "sol.new wallet",
+    },
+    pubKeyCredParams: [
+      { alg: -7, type: "public-key" },
+      { alg: -257, type: "public-key" },
+    ],
+    authenticatorSelection: {
+      authenticatorAttachment: "platform",
+      residentKey: "required",
+      requireResidentKey: true,
+      userVerification: "required",
+    },
+    timeout: 120_000,
+    ...(excludeCredentials.length ? { excludeCredentials } : {}),
+    extensions: {
+      prf: {
+        eval: {
+          first: CHALLENGE,
         },
       },
     },
-  })) as PublicKeyCredential;
+  };
+
+  let credential: PublicKeyCredential | null = null;
+  try {
+    credential = (await navigator.credentials.create({
+      publicKey: basePublicKey,
+    })) as PublicKeyCredential | null;
+  } catch (firstErr) {
+    // Retry without platform attachment (helps some Android / in-app browsers)
+    const msg = firstErr instanceof Error ? firstErr.message.toLowerCase() : "";
+    const retryable =
+      msg.includes("not allowed") ||
+      msg.includes("not supported") ||
+      msg.includes("security") ||
+      msg.includes("abort") ||
+      msg.includes("invalid");
+    if (!retryable) throw firstErr;
+
+    ensureDocumentFocusForPasskey();
+    await new Promise((r) => setTimeout(r, 80));
+    const loose = { ...basePublicKey };
+    loose.authenticatorSelection = {
+      residentKey: "required",
+      requireResidentKey: true,
+      userVerification: "required",
+    };
+    credential = (await navigator.credentials.create({
+      publicKey: loose,
+    })) as PublicKeyCredential | null;
+  }
 
   if (!credential) throw new Error("Passkey creation cancelled");
 
@@ -208,7 +237,37 @@ export async function createPasskeyWallet(_username?: string): Promise<{
   if (prfResult) {
     seed = await sha256(new Uint8Array(prfResult));
   } else {
-    seed = await sha256(new Uint8Array(credential.rawId));
+    // No PRF on create — run an immediate get() with PRF so seed matches unlock path.
+    // If PRF still unavailable, fall back to rawId (same as get without PRF).
+    try {
+      ensureDocumentFocusForPasskey();
+      const assertion = (await navigator.credentials.get({
+        publicKey: {
+          challenge: CHALLENGE,
+          rpId: getRpId(),
+          allowCredentials: [
+            {
+              id: credential.rawId,
+              type: "public-key",
+              transports: ["internal", "hybrid"],
+            },
+          ],
+          userVerification: "required",
+          timeout: 60_000,
+          extensions: {
+            prf: { eval: { first: CHALLENGE } },
+          },
+        },
+      })) as PublicKeyCredential | null;
+      const prf2 = assertion?.getClientExtensionResults()?.prf?.results?.first;
+      if (prf2) {
+        seed = await sha256(new Uint8Array(prf2));
+      } else {
+        seed = await sha256(new Uint8Array(credential.rawId));
+      }
+    } catch {
+      seed = await sha256(new Uint8Array(credential.rawId));
+    }
   }
 
   const keypair = Keypair.fromSeed(seed.slice(0, 32));
@@ -216,7 +275,15 @@ export async function createPasskeyWallet(_username?: string): Promise<{
   const credentialId = bytesToCredId(credential.rawId);
   rememberCredential(publicKey, credential.rawId);
 
-  // Wallet name === address (browser passkey list + UI)
+  // Persist active session immediately so re-render / refresh keeps the wallet
+  try {
+    localStorage.setItem("sol.new.wallet", publicKey);
+    localStorage.setItem("sol.new.walletLabel", publicKey);
+    localStorage.setItem("sol.new.credentialId", credentialId);
+  } catch {
+    /* ignore */
+  }
+
   await signalPasskeyUserDetails({
     userId,
     name: publicKey,
