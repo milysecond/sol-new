@@ -165,12 +165,12 @@ export function requestFundsChannelLinks(payload: SharePayload) {
     whatsapp: `https://wa.me/?text=${enc}`,
     telegram: `https://t.me/share/url?url=${encUrl}&text=${encTitle}%0A%0A${enc}`,
     /**
-     * X has no public “compose DM with body” without a recipient id.
-     * Intent tweet posts the ask; users can also open Messages from X app.
-     * Also expose messages home for manual DM paste.
+     * X has no public compose-DM-with-body without a recipient.
+     * intent/post is reliable on mobile web + app. Avoid x.com/messages (Unable to load).
      */
-    xPost: `https://x.com/intent/tweet?text=${enc}`,
-    xMessages: "https://x.com/messages",
+    xPost: `https://x.com/intent/post?text=${enc}`,
+    /** @deprecated alias of xPost */
+    xMessages: `https://x.com/intent/post?text=${enc}`,
     nativeText: full,
   };
 }
