@@ -289,6 +289,9 @@ export async function fetchWalletTokens(
           if (!(ui > 0)) continue;
           seen.add(t.mint);
           const isUsdc = t.mint === USDC_MAINNET || t.mint === USDC_DEVNET;
+          const prog =
+            t.programId ||
+            (isUsdc ? TOKEN_PROGRAM_ID.toBase58() : TOKEN_PROGRAM_ID.toBase58());
           out.push({
             mint: t.mint,
             symbol: t.symbol || (isUsdc ? "USDC" : shortMint(t.mint)),
@@ -297,7 +300,8 @@ export async function fetchWalletTokens(
             uiAmount: ui,
             amount: t.amount || String(Math.round(ui * 10 ** (t.decimals ?? 6))),
             icon: t.logoUri || t.icon || (isUsdc ? USDC_ICON : undefined),
-            programId: t.programId || TOKEN_PROGRAM_ID.toBase58(),
+            // Keep programId when Jupiter provides it; gift create re-resolves on server
+            programId: prog,
             priceUsd: t.priceUsd ?? null,
             valueUsd: t.valueUsd ?? null,
           });

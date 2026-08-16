@@ -56,7 +56,8 @@ async function resolveMintMeta(
   mintStr: string
 ): Promise<{ decimals: number; programId: string }> {
   const mint = new PublicKey(mintStr);
-  for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
+  // Token-2022 first — most meme mints; wrong Tokenkeg → "incorrect program id"
+  for (const programId of [TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID]) {
     try {
       const m = await getMint(connection, mint, "confirmed", programId);
       return { decimals: m.decimals, programId: programId.toBase58() };
@@ -134,13 +135,22 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Amount too large" }, { status: 400 });
       }
     } else {
-      if (typeof body.decimals === "number" && body.decimals >= 0 && body.decimals <= 12) {
+      // Always resolve mint on-chain — client programId is often wrong (Tokenkeg vs Token-2022)
+      const meta = await resolveMintMeta(connection, token);
+      decimals = meta.decimals;
+      programId = meta.programId;
+      // Prefer client decimals only if they match chain (ignore if off)
+      if (
+        typeof body.decimals === "number" &&
+        body.decimals >= 0 &&
+        body.decimals <= 12 &&
+        body.decimals === meta.decimals
+      ) {
         decimals = body.decimals;
+      }
+      // If client claimed a programId, only keep it when it matches chain
+      if (body.programId && body.programId === meta.programId) {
         programId = body.programId;
-      } else {
-        const meta = await resolveMintMeta(connection, token);
-        decimals = meta.decimals;
-        programId = meta.programId;
       }
       if (amountUi > 1e15) {
         return NextResponse.json({ error: "Amount too large" }, { status: 400 });

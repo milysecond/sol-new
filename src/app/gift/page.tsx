@@ -258,7 +258,13 @@ export default function GiftPage() {
           amount: parsed,
           token,
           decimals: selected.decimals,
-          programId: selected.isNativeSol ? undefined : selected.programId,
+          // Server always resolves Token vs Token-2022; only pass if Token-2022 known
+          programId:
+            selected.isNativeSol || selected.symbol === "USDC"
+              ? undefined
+              : selected.programId?.includes("Tokenz")
+                ? selected.programId
+                : undefined,
           symbol: selected.symbol,
           network,
           message: message || undefined,
