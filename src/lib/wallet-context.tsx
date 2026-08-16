@@ -14,8 +14,9 @@ import { useNetwork } from "./network";
 import { analytics } from "./analytics";
 import { getUsdcBalance } from "./usdc";
 import {
+  openWalletPicker,
+  disconnectExternalWallet,
   connectInjectedWallet,
-  getInjectedProvider,
 } from "./external-wallet";
 
 export interface WalletEntry {
@@ -51,9 +52,12 @@ interface WalletState {
   refreshBalance: () => Promise<void>;
   /** Clear stuck Authenticating / Creating spinner (WebAuthn hang recovery). */
   clearLoading: () => void;
-  /** passkey = Face ID wallet; external = Phantom/Solflare/etc */
+  /** passkey = Face ID wallet; external = ConnectorKit / inject */
   walletKind: "passkey" | "external";
+  /** Opens multi-wallet picker (ConnectorKit). */
   connectExternal: () => Promise<string | null>;
+  /** Called by ConnectorKit bridge after a wallet connects. */
+  activateExternal: (pubkey: string, label: string) => void;
   airdropping: boolean;
   airdropDone: boolean;
   handleAirdrop: () => Promise<void>;
@@ -81,6 +85,7 @@ const WalletContext = createContext<WalletState>({
   clearLoading: () => {},
   walletKind: "passkey",
   connectExternal: async () => null,
+  activateExternal: () => {},
   airdropping: false,
   airdropDone: false,
   handleAirdrop: async () => {},
@@ -607,20 +612,20 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setError(null);
   };
 
-  const connectExternal = async (): Promise<string | null> => {
+  const activateExternal = useCallback((pk: string, label: string) => {
     setError(null);
-    setLoading(true);
+    setPublicKey(pk);
+    setWalletLabel(label || "Wallet");
+    setWalletKind("external");
     try {
-      const { publicKey: pk, label } = await connectInjectedWallet();
-      setPublicKey(pk);
-      setWalletLabel(label);
-      setWalletKind("external");
-      try {
-        sessionStorage.setItem("sol.new.wallet.kind", "external");
-        sessionStorage.setItem("sol.new.wallet", pk);
-      } catch { /* ignore */ }
+      sessionStorage.setItem("sol.new.wallet.kind", "external");
+      sessionStorage.setItem("sol.new.wallet", pk);
+    } catch { /* ignore */ }
+    try {
       analytics.walletConnected("external");
-      // balances
+    } catch { /* ignore */ }
+    // refresh balances
+    void (async () => {
       try {
         const { Connection, PublicKey, LAMPORTS_PER_SOL } = await import("@solana/web3.js");
         const conn = new Connection(rpc, "confirmed");
@@ -633,21 +638,41 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         setBalance(null);
         setUsdcBalance(null);
       }
-      return pk;
+    })();
+  }, [rpc, network]);
+
+  const connectExternal = async (): Promise<string | null> => {
+    setError(null);
+    try {
+      openWalletPicker();
+      return null; // address arrives via activateExternal after user picks
     } catch (e) {
-      const { friendlyError } = await import("./friendly-errors");
-      setError(friendlyError(e, "Could not connect browser wallet"));
-      return null;
-    } finally {
-      setLoading(false);
+      // Fallback: legacy inject if picker not mounted
+      try {
+        setLoading(true);
+        const { publicKey: pk, label } = await connectInjectedWallet();
+        activateExternal(pk, label);
+        return pk;
+      } catch (e2) {
+        const { friendlyError } = await import("./friendly-errors");
+        const msg = e2 instanceof Error && e2.message === "PICKER_OPENED"
+          ? null
+          : friendlyError(e2, "Could not open wallet picker");
+        if (msg) setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
   const disconnect = () => {
+    const wasExternal = walletKind === "external";
     setPublicKey(null);
     setWalletLabel(null);
     setWalletKind("passkey");
     try { sessionStorage.removeItem("sol.new.wallet.kind"); } catch { /* */ }
+    if (wasExternal) void disconnectExternalWallet();
     setBalance(null);
     setUsdcBalance(null);
     localStorage.removeItem("sol.new.wallet");
@@ -679,6 +704,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         clearLoading,
         walletKind,
         connectExternal,
+        activateExternal,
         airdropping,
         airdropDone,
         handleAirdrop,

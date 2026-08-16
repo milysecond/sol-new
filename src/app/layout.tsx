@@ -12,6 +12,8 @@ import { PushPrompt } from "@/components/push-prompt";
 import { SiteFooter } from "@/components/site-footer";
 import { WalletBrowserTitle } from "@/components/wallet-browser-title";
 import { RouteTransition } from "@/components/route-transition";
+import { SolanaConnectorProvider } from "@/components/solana-connector-provider";
+import { ExternalWalletBridge } from "@/components/external-wallet-bridge";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -132,15 +134,18 @@ export default function RootLayout({
         <ThemeProvider>
         <NetworkProvider>
           <WalletProvider>
-            <WalletBrowserTitle />
-            <PodPlayerProvider>
-              <div className="min-h-screen flex flex-col overflow-x-hidden">
-                <div className="flex-1 flex flex-col min-h-0">
-                  <RouteTransition>{children}</RouteTransition>
+            <SolanaConnectorProvider>
+              <ExternalWalletBridge />
+              <WalletBrowserTitle />
+              <PodPlayerProvider>
+                <div className="min-h-screen flex flex-col overflow-x-hidden">
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <RouteTransition>{children}</RouteTransition>
+                  </div>
+                  <SiteFooter />
                 </div>
-                <SiteFooter />
-              </div>
-            </PodPlayerProvider>
+              </PodPlayerProvider>
+            </SolanaConnectorProvider>
           </WalletProvider>
         </NetworkProvider>
           <AppToaster />

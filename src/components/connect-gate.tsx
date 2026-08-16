@@ -36,21 +36,9 @@ export function ConnectGate({
   const { publicKey, walletLabel, wallets, connect, recover, switchWallet, loading, error, clearLoading, connectExternal } =
     useWallet();
   const [isTgWebView, setIsTgWebView] = useState(false);
-  const [hasBrowserWallet, setHasBrowserWallet] = useState(false);
 
   useEffect(() => {
     setIsTgWebView(isTelegramWebView());
-    try {
-      // lazy detect Phantom etc without import cycle issues
-      const w = window as unknown as {
-        solana?: unknown;
-        phantom?: { solana?: unknown };
-        solflare?: unknown;
-      };
-      setHasBrowserWallet(Boolean(w.phantom?.solana || w.solflare || w.solana));
-    } catch {
-      setHasBrowserWallet(false);
-    }
   }, []);
 
   // Already in wallet-context session — use it (no second connect stack)
@@ -194,13 +182,11 @@ export function ConnectGate({
                   className="w-full flex items-center justify-center gap-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-gray-800 dark:text-white/80 font-semibold rounded-xl px-4 py-3.5 transition text-sm cursor-pointer disabled:opacity-40"
                 >
                   <Wallet className="w-4 h-4 text-violet-500" />
-                  {hasBrowserWallet
-                    ? "Connect Phantom / browser wallet"
-                    : "Connect external wallet"}
+                  Connect Phantom / Solflare / other wallets
                 </button>
                 <p className="text-[11px] text-gray-400 dark:text-white/35 leading-relaxed">
-                  Use funds already in Phantom, Solflare, or another injected wallet. Install the
-                  extension/app first if you don&apos;t see a prompt.
+                  Opens a wallet picker (Wallet Standard via ConnectorKit). Use funds already in
+                  Phantom, Solflare, Backpack, Glow, OKX, and more.
                 </p>
 
                 {walletLabel && (
