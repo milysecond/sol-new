@@ -113,23 +113,47 @@ export function OrbitGallery() {
     (async () => {
       let tokens: Token[] = [];
       try {
-        const res = await fetch(`/api/tokens/recent?limit=${MAX_FRAMES}&network=${network}`);
-        const data = (await res.json()) as { tokens?: Token[] };
-        tokens = Array.isArray(data?.tokens) ? data.tokens : [];
+        // Prefer selected network; fall back to all networks so gallery never starves
+        const tryUrls = [
+          `/api/tokens/recent?limit=${MAX_FRAMES}&network=${network}`,
+          `/api/tokens/recent?limit=${MAX_FRAMES}`,
+        ];
+        for (const u of tryUrls) {
+          const res = await fetch(u, { cache: "no-store" });
+          if (!res.ok) continue;
+          const data = (await res.json()) as { tokens?: Token[] };
+          const list = Array.isArray(data?.tokens) ? data.tokens : [];
+          if (list.length > 0) {
+            tokens = list;
+            break;
+          }
+        }
       } catch {
         tokens = [];
       }
       if (disposed) return;
 
-      const emptyEl = root.querySelector<HTMLDivElement>(".empty")!;
-      const loaderEl = root.querySelector<HTMLDivElement>(".loader")!;
+      const emptyEl = root.querySelector<HTMLDivElement>(".empty");
+      const loaderEl = root.querySelector<HTMLDivElement>(".loader");
+      if (!emptyEl || !loaderEl) return;
+
       if (tokens.length === 0) {
         loaderEl.style.display = "none";
         emptyEl.style.display = "flex";
         return;
       }
 
-      cleanup = buildScene(root, tokens);
+      try {
+        cleanup = buildScene(root, tokens);
+      } catch (e) {
+        console.error("[gallery] buildScene failed", e);
+        loaderEl.style.display = "none";
+        emptyEl.style.display = "flex";
+        const title = emptyEl.querySelector(".empty__title");
+        const copy = emptyEl.querySelector(".empty__copy");
+        if (title) title.textContent = "Gallery failed to load";
+        if (copy) copy.textContent = "Refresh the page or try again later.";
+      }
     })();
 
     return () => {
@@ -283,23 +307,41 @@ export function OrbitGallery() {
 
     let revealed = false;
     let settled = 0;
+    const safetyTimer = window.setTimeout(() => {
+      // Never leave the user on 0% forever (CORS/hangs)
+      if (!revealed) {
+        settled = count;
+        loaderPct.textContent = "100";
+        loaderBar.style.width = "100%";
+        reveal();
+      }
+    }, 10_000);
+
     function onAssetDone() {
+      if (revealed) return;
       settled++;
-      const pct = Math.round((settled / count) * 100);
+      const pct = Math.min(100, Math.round((settled / count) * 100));
       loaderPct.textContent = String(pct);
       loaderBar.style.width = pct + "%";
-      if (settled >= count) reveal();
+      if (settled >= count) {
+        window.clearTimeout(safetyTimer);
+        reveal();
+      }
     }
 
     const plateShape = roundedRect(PLANE_W, PLANE_H, 0.12);
 
     for (let i = 0; i < count; i++) {
-      const token = tokens[i % tokens.length];
+      const token = tokens[i % tokens.length]!;
       const pos = fibSpherePoint(i, count).multiplyScalar(SPHERE_RADIUS);
 
       const planeGeo = new THREE.PlaneGeometry(PLANE_W, PLANE_H, 1, 1);
       const planeMat = new THREE.MeshBasicMaterial({
-        map: placeholderTexture(token), side: THREE.DoubleSide, transparent: true, opacity: 0, toneMapped: false,
+        map: placeholderTexture(token),
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0,
+        toneMapped: false,
       });
       const mesh = new THREE.Mesh(planeGeo, planeMat);
       mesh.position.copy(pos);
@@ -307,34 +349,57 @@ export function OrbitGallery() {
 
       const plateGeo = new THREE.ShapeGeometry(plateShape);
       const plateMat = new THREE.MeshBasicMaterial({
-        color: 0x14101c, transparent: true, opacity: 0, side: THREE.DoubleSide,
+        color: 0x14101c,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
       });
       const plate = new THREE.Mesh(plateGeo, plateMat);
       plate.position.copy(pos).multiplyScalar(1.012);
       plate.lookAt(0, 0, 0);
       group.add(plate);
 
-      // Swap in the real token image when it loads; placeholder stays on failure.
+      // Real image with hard timeout so CORS hangs never freeze the loader
       if (token.image_url) {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          onAssetDone();
+        };
+        const kill = window.setTimeout(finish, 4_500);
         loader.load(
           token.image_url,
           (tex) => {
-            tex.colorSpace = THREE.SRGBColorSpace;
-            tex.minFilter = THREE.LinearMipmapLinearFilter;
-            tex.generateMipmaps = true;
-            planeMat.map?.dispose();
-            planeMat.map = tex;
-            planeMat.needsUpdate = true;
-            onAssetDone();
+            window.clearTimeout(kill);
+            try {
+              tex.colorSpace = THREE.SRGBColorSpace;
+              tex.minFilter = THREE.LinearMipmapLinearFilter;
+              tex.generateMipmaps = true;
+              planeMat.map?.dispose();
+              planeMat.map = tex;
+              planeMat.needsUpdate = true;
+            } catch {
+              /* keep placeholder */
+            }
+            finish();
           },
           undefined,
-          () => onAssetDone(),
+          () => {
+            window.clearTimeout(kill);
+            finish();
+          },
         );
       } else {
         onAssetDone();
       }
 
-      (mesh.userData as FrameData) = { index: i, basePos: pos.clone(), token, frame: plate };
+      (mesh.userData as FrameData) = {
+        index: i,
+        basePos: pos.clone(),
+        token,
+        frame: plate,
+      };
       group.add(mesh);
       frames.push(mesh);
     }
@@ -553,6 +618,7 @@ export function OrbitGallery() {
     window.addEventListener("resize", onResize);
 
     return () => {
+      window.clearTimeout(safetyTimer);
       cancelAnimationFrame(raf);
       clearTimeout(fallback);
       gsap.killTweensOf("*");
