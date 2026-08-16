@@ -13,6 +13,10 @@ import {
 import { useNetwork } from "./network";
 import { analytics } from "./analytics";
 import { getUsdcBalance } from "./usdc";
+import {
+  connectInjectedWallet,
+  getInjectedProvider,
+} from "./external-wallet";
 
 export interface WalletEntry {
   pubkey: string;
@@ -47,6 +51,9 @@ interface WalletState {
   refreshBalance: () => Promise<void>;
   /** Clear stuck Authenticating / Creating spinner (WebAuthn hang recovery). */
   clearLoading: () => void;
+  /** passkey = Face ID wallet; external = Phantom/Solflare/etc */
+  walletKind: "passkey" | "external";
+  connectExternal: () => Promise<string | null>;
   airdropping: boolean;
   airdropDone: boolean;
   handleAirdrop: () => Promise<void>;
@@ -72,6 +79,8 @@ const WalletContext = createContext<WalletState>({
   disconnect: () => {},
   refreshBalance: async () => {},
   clearLoading: () => {},
+  walletKind: "passkey",
+  connectExternal: async () => null,
   airdropping: false,
   airdropDone: false,
   handleAirdrop: async () => {},
@@ -116,6 +125,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [walletBalances, setWalletBalances] = useState<WalletBalances>({});
   const [balance, setBalance] = useState<number | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
+  const [walletKind, setWalletKind] = useState<"passkey" | "external">("passkey");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { rpc, network } = useNetwork();
@@ -597,9 +607,47 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setError(null);
   };
 
+  const connectExternal = async (): Promise<string | null> => {
+    setError(null);
+    setLoading(true);
+    try {
+      const { publicKey: pk, label } = await connectInjectedWallet();
+      setPublicKey(pk);
+      setWalletLabel(label);
+      setWalletKind("external");
+      try {
+        sessionStorage.setItem("sol.new.wallet.kind", "external");
+        sessionStorage.setItem("sol.new.wallet", pk);
+      } catch { /* ignore */ }
+      analytics.walletConnected("external");
+      // balances
+      try {
+        const { Connection, PublicKey, LAMPORTS_PER_SOL } = await import("@solana/web3.js");
+        const conn = new Connection(rpc, "confirmed");
+        const owner = new PublicKey(pk);
+        const bal = await conn.getBalance(owner, "confirmed");
+        setBalance(bal / LAMPORTS_PER_SOL);
+        const u = await getUsdcBalance(conn, owner, network === "devnet" ? "devnet" : "mainnet");
+        setUsdcBalance(u);
+      } catch {
+        setBalance(null);
+        setUsdcBalance(null);
+      }
+      return pk;
+    } catch (e) {
+      const { friendlyError } = await import("./friendly-errors");
+      setError(friendlyError(e, "Could not connect browser wallet"));
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const disconnect = () => {
     setPublicKey(null);
     setWalletLabel(null);
+    setWalletKind("passkey");
+    try { sessionStorage.removeItem("sol.new.wallet.kind"); } catch { /* */ }
     setBalance(null);
     setUsdcBalance(null);
     localStorage.removeItem("sol.new.wallet");
@@ -629,6 +677,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         disconnect,
         refreshBalance,
         clearLoading,
+        walletKind,
+        connectExternal,
         airdropping,
         airdropDone,
         handleAirdrop,

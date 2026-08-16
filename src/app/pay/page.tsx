@@ -56,7 +56,7 @@ function short(a: string) {
 
 export default function PayPage() {
   const [mode, setMode] = useState<Mode>("request");
-  const { publicKey, balance, usdcBalance, refreshBalance } = useWallet();
+  const { publicKey, balance, usdcBalance, refreshBalance, walletKind } = useWallet();
   const { network, rpc } = useNetwork();
   const [defaultToken] = useDefaultToken();
 
@@ -169,7 +169,6 @@ export default function PayPage() {
       if (to.equals(from)) throw new Error("This request is to your own wallet");
 
       ensureDocumentFocusForPasskey();
-      const { keypair } = await getPasskeyKeypair(publicKey);
       setStatus("sending");
 
       const connection = new Connection(rpc, "confirmed");
@@ -248,12 +247,26 @@ export default function PayPage() {
         await connection.getLatestBlockhash("confirmed");
       tx.recentBlockhash = blockhash;
       tx.feePayer = from;
-      tx.sign(keypair);
 
-      const signature = await connection.sendRawTransaction(tx.serialize(), {
-        skipPreflight: false,
-        maxRetries: 3,
-      });
+      let signature: string;
+      if (walletKind === "external") {
+        setStatus("auth");
+        const { signTransactionWithInjected } = await import("@/lib/external-wallet");
+        const signed = await signTransactionWithInjected(tx);
+        signature = await connection.sendRawTransaction(signed.serialize(), {
+          skipPreflight: false,
+          maxRetries: 3,
+        });
+      } else {
+        setStatus("auth");
+        const { keypair } = await getPasskeyKeypair(publicKey);
+        setStatus("sending");
+        tx.sign(keypair);
+        signature = await connection.sendRawTransaction(tx.serialize(), {
+          skipPreflight: false,
+          maxRetries: 3,
+        });
+      }
       setStatus("confirming");
       await connection.confirmTransaction(
         { signature, blockhash, lastValidBlockHeight },
