@@ -471,20 +471,30 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setAirdropping(true);
     setAirdropDone(false);
     try {
-      await fetch("/api/airdrop", {
+      const res = await fetch("/api/airdrop", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: publicKey }),
       });
-      await new Promise((r) => setTimeout(r, 3000));
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        signature?: string;
+      };
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || `Airdrop failed (${res.status})`);
+      }
+      // Wait briefly then refresh — only after confirmed success
+      await new Promise((r) => setTimeout(r, 1500));
       await refreshBalance();
       setAirdropDone(true);
       const { toast } = await import("@/lib/toast");
       toast.money("0.1 SOL airdropped!");
       setTimeout(() => setAirdropDone(false), 3000);
-    } catch {
+    } catch (e) {
       const { toast } = await import("@/lib/toast");
-      toast.error("Airdrop failed — try again");
+      const { friendlyError } = await import("./friendly-errors");
+      toast.error(friendlyError(e, "Airdrop failed — try again"));
     } finally {
       setAirdropping(false);
     }
