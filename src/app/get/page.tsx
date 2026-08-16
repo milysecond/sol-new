@@ -172,15 +172,22 @@ export default function GetPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: publicKey }),
       });
-      const data = (await res.json()) as { ok?: boolean };
-      if (data.ok) {
-        await new Promise((r) => setTimeout(r, 2000));
-        await refreshBalance();
-        setAirdropDone(true);
-        setTimeout(() => setAirdropDone(false), 3000);
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+      };
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || `Airdrop failed (${res.status})`);
       }
-    } catch {
-      // silently fail
+      await new Promise((r) => setTimeout(r, 1500));
+      await refreshBalance();
+      setAirdropDone(true);
+      const { toast } = await import("@/lib/toast");
+      toast.money("0.1 SOL airdropped!");
+      setTimeout(() => setAirdropDone(false), 3000);
+    } catch (e) {
+      const { toast } = await import("@/lib/toast");
+      toast.error(e instanceof Error ? e.message : "Airdrop failed — try again");
     } finally {
       setAirdropping(false);
     }
