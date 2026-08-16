@@ -52,7 +52,13 @@ function MenuTile({
   );
 }
 
-function DragRow({ item }: { item: NavItem }) {
+function DragRow({
+  item,
+  onNavigate,
+}: {
+  item: NavItem;
+  onNavigate: () => void;
+}) {
   const controls = useDragControls();
   const Icon = item.icon;
   return (
@@ -60,23 +66,29 @@ function DragRow({ item }: { item: NavItem }) {
       value={item.href}
       dragListener={false}
       dragControls={controls}
-      className="flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-black px-3 py-2.5 touch-none list-none"
+      className="flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-black px-3 py-2.5 list-none"
       whileDrag={{ scale: 1.02, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 20 }}
     >
       <button
         type="button"
-        className="shrink-0 p-2 -ml-1 rounded-lg text-gray-400 active:bg-black/5 dark:active:bg-white/10 cursor-grab active:cursor-grabbing"
+        className="shrink-0 p-2 -ml-1 rounded-lg text-gray-400 active:bg-black/5 dark:active:bg-white/10 cursor-grab active:cursor-grabbing touch-none"
         aria-label={`Drag ${item.label}`}
         onPointerDown={(e) => controls.start(e)}
         style={{ touchAction: "none" }}
       >
         <GripVertical size={18} />
       </button>
-      <Icon size={18} className={item.color} />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold truncate">{item.label}</p>
-        <p className="text-[11px] text-gray-500 dark:text-white/40 truncate">{item.desc}</p>
-      </div>
+      <Link
+        href={item.href}
+        onClick={onNavigate}
+        className="min-w-0 flex-1 flex items-center gap-3 py-0.5 touch-manipulation"
+      >
+        <Icon size={18} className={item.color} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold truncate">{item.label}</p>
+          <p className="text-[11px] text-gray-500 dark:text-white/40 truncate">{item.desc}</p>
+        </div>
+      </Link>
     </Reorder.Item>
   );
 }
@@ -171,7 +183,7 @@ export function AppNavMenu({
     body = (
       <div className="space-y-2">
         <p className="text-[11px] text-gray-400 px-1">
-          Drag to set your order. Saved on this device.
+          Drag the handle to reorder. Tap a row to open. Saved on this device.
         </p>
         {hydrated && (
           <Reorder.Group
@@ -181,7 +193,7 @@ export function AppNavMenu({
             className="flex flex-col gap-2 list-none m-0 p-0"
           >
             {ordered.map((item) => (
-              <DragRow key={item.href} item={item} />
+              <DragRow key={item.href} item={item} onNavigate={onClose} />
             ))}
           </Reorder.Group>
         )}
