@@ -119,6 +119,8 @@ export const ReceiptCard = forwardRef<HTMLDivElement, { tx: ReceiptData }>(
           symbol,
           signature: tx.signature,
           counterparty: tx.to || tx.from || null,
+          direction: failed ? null : "sent",
+          failed,
         });
 
         if (navigator.share && navigator.canShare?.({ files: [file] })) {
@@ -177,20 +179,43 @@ export const ReceiptCard = forwardRef<HTMLDivElement, { tx: ReceiptData }>(
     };
 
     const title =
-      tx.type === "spl-transfer"
-        ? `${symbol} Transfer`
-        : tx.type === "sol-transfer"
-          ? "SOL Transfer"
-          : "Transaction";
+      failed
+        ? tx.type === "spl-transfer"
+          ? `Failed ${symbol} transfer`
+          : tx.type === "sol-transfer"
+            ? "Failed SOL transfer"
+            : "Failed transaction"
+        : tx.type === "spl-transfer"
+          ? `${symbol} Transfer`
+          : tx.type === "sol-transfer"
+            ? "SOL Transfer"
+            : "Transaction";
+
+    const statusLabel =
+      tx.status === "failed"
+        ? "Failed"
+        : tx.status === "finalized"
+          ? "Finalized"
+          : "Confirmed";
 
     return (
       <div
         ref={ref}
-        className="rounded-3xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/10 dark:border-white/10 shadow-lg"
+        className={`rounded-3xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border shadow-lg ${
+          failed
+            ? "border-rose-500/40"
+            : "border-black/10 dark:border-white/10"
+        }`}
       >
         <div className="m-1 rounded-2xl overflow-hidden bg-white dark:bg-[#111113] border border-black/5 dark:border-white/5">
           {/* Header */}
-          <div className="p-4 flex items-center justify-between bg-gradient-to-r from-purple-500/10 to-emerald-400/10">
+          <div
+            className={`p-4 flex items-center justify-between bg-gradient-to-r ${
+              failed
+                ? "from-rose-500/15 to-rose-400/5"
+                : "from-purple-500/10 to-emerald-400/10"
+            }`}
+          >
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-12 h-12 rounded-full bg-white dark:bg-white/10 flex items-center justify-center shadow-sm shrink-0 text-purple-500">
                 {tx.tokenLogoURI ? (
@@ -219,21 +244,35 @@ export const ReceiptCard = forwardRef<HTMLDivElement, { tx: ReceiptData }>(
             <div
               className={`px-2.5 py-1 rounded-full flex items-center gap-1 text-xs font-medium shrink-0 ${
                 failed
-                  ? "bg-rose-500/10 text-rose-500"
+                  ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
                   : "bg-emerald-500/10 text-emerald-500"
               }`}
             >
               {failed ? (
                 <>
-                  <XCircle className="w-3.5 h-3.5" /> Failed
+                  <XCircle className="w-3.5 h-3.5" /> {statusLabel}
                 </>
               ) : (
                 <>
-                  <Check className="w-3.5 h-3.5" /> Confirmed
+                  <Check className="w-3.5 h-3.5" /> {statusLabel}
                 </>
               )}
             </div>
           </div>
+
+          {failed && (
+            <div className="mx-4 mt-3 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
+              <p className="font-semibold mb-0.5">This transaction failed on-chain</p>
+              <p className="opacity-90 break-all">
+                {tx.error
+                  ? String(tx.error).slice(0, 280)
+                  : "The network rejected or reverted this transfer. No funds should have moved."}
+              </p>
+              <p className="mt-1 opacity-80">
+                Status is <strong>Failed</strong> only — it was not successfully sent.
+              </p>
+            </div>
+          )}
 
           <TicketDivider />
 

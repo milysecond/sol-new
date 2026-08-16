@@ -97,7 +97,19 @@ export default function NewsPage() {
           >
             <div className="flex items-center gap-4">
               {lead.image ? (
-                <img src={lead.image} alt="" className="w-20 h-20 rounded-xl object-cover ring-1 ring-sky-400/30 shrink-0" />
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={lead.image}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  className="w-20 h-20 rounded-xl object-cover ring-1 ring-sky-400/30 shrink-0 bg-sky-500/10"
+                  onError={(e) => {
+                    const el = e.currentTarget;
+                    if (el.dataset.fb) return;
+                    el.dataset.fb = "1";
+                    el.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(lead.source.slice(0, 12))}&background=0ea5e9&color=fff&size=128&bold=true`;
+                  }}
+                />
               ) : (
                 <div className="w-20 h-20 rounded-xl bg-sky-500/10 flex items-center justify-center shrink-0">
                   <Newspaper className="w-7 h-7 text-sky-400" />
@@ -148,7 +160,19 @@ export default function NewsPage() {
                 className="group flex items-center gap-3 px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition"
               >
                 {n.image ? (
-                  <img src={n.image} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={n.image}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    className="w-12 h-12 rounded-lg object-cover shrink-0 bg-black/5 dark:bg-white/10"
+                    onError={(e) => {
+                      const el = e.currentTarget;
+                      if (el.dataset.fb) return;
+                      el.dataset.fb = "1";
+                      el.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(n.source.slice(0, 10))}&background=7c3aed&color=fff&size=96&bold=true`;
+                    }}
+                  />
                 ) : (
                   <div className="w-12 h-12 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center shrink-0">
                     <Newspaper className="w-5 h-5 text-gray-300 dark:text-white/20" />

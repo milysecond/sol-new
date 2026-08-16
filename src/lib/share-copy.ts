@@ -46,6 +46,7 @@ export function receiptSharePayload(opts: {
   direction?: "sent" | "received" | null;
   counterparty?: string | null;
   origin?: string;
+  failed?: boolean;
 }): SharePayload {
   const origin = opts.origin || (typeof window !== "undefined" ? window.location.origin : "https://sol.new");
   const url = `${origin}/receipt/${opts.signature}`;
@@ -57,14 +58,19 @@ export function receiptSharePayload(opts: {
     : null;
 
   let line1 = `Solana payment: ${amt}`;
-  if (opts.direction === "sent" && who) line1 = `Sent ${amt} to ${who}`;
-  if (opts.direction === "received" && who) line1 = `Received ${amt} from ${who}`;
+  if (opts.failed) {
+    line1 = `Failed transfer: ${amt} (not completed)`;
+  } else if (opts.direction === "sent" && who) {
+    line1 = `Sent ${amt} to ${who}`;
+  } else if (opts.direction === "received" && who) {
+    line1 = `Received ${amt} from ${who}`;
+  }
 
   return {
-    title: `${amt} on Solana`,
+    title: opts.failed ? `Failed: ${amt}` : `${amt} on Solana`,
     text: [
       line1,
-      "Verified receipt on sol.new",
+      opts.failed ? "On-chain status: FAILED" : "Verified receipt on sol.new",
       url,
     ].join("\n"),
     url,
