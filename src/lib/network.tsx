@@ -15,14 +15,14 @@ export type Network = "mainnet" | "devnet";
 
 /**
  * Client-safe mainnet RPCs — Helius Fast dedicated endpoints only.
- * Order: healthy backups first; cassandra last (often exhausted).
+ * aex402 is x402-paywalled (402) — keep last, not first.
  * Never fall back to free public Solana RPC.
  */
 export const MAINNET_RPC_POOL = [
-  "https://rpc.aex402.com",
   "https://viviyan-bkj12u-fast-mainnet.helius-rpc.com",
   "https://velvet-hw7q70-fast-mainnet.helius-rpc.com",
   "https://cassandra-bq5oqs-fast-mainnet.helius-rpc.com",
+  "https://rpc.aex402.com",
 ] as const;
 
 const RPC_PREF_KEY = "sol.new.rpc.mainnet";
@@ -101,7 +101,16 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem("sol.new.network") as Network | null;
     if (saved === "devnet" || saved === "mainnet") setNetwork(saved);
 
-    const pref = localStorage.getItem(RPC_PREF_KEY);
+    // Demote paywalled aex402 if it was sticky-preferred
+    let pref = localStorage.getItem(RPC_PREF_KEY);
+    if (pref && /aex402/i.test(pref)) {
+      try {
+        localStorage.removeItem(RPC_PREF_KEY);
+      } catch {
+        /* ignore */
+      }
+      pref = null;
+    }
     let cancelled = false;
 
     (async () => {
