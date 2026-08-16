@@ -2,15 +2,14 @@
  * Server-only RPC URLs. Never import this from client components.
  *
  * Mainnet pool (paid only — never free public Solana RPC):
- *   1. aex402
- *   2. Helius Fast: viviyan-bkj12u
- *   3. Helius Fast: velvet-hw7q70
- *   4. Helius Fast: cassandra-bq5oqs (backup)
+ *   1. Helius Fast: viviyan-bkj12u
+ *   2. Helius Fast: velvet-hw7q70
+ *   3. Helius Fast: cassandra-bq5oqs
+ *   4. HELIUS_API_KEY → mainnet.helius-rpc.com
  *   5. Flux RPC (FLUXRPC_URL secret)
- *   6. HELIUS_API_KEY → mainnet.helius-rpc.com
+ *   6. aex402 (x402 paywalled — last resort only)
  *   7. MAINNET_RPC override (primary when set)
  */
-
 export const AEX402_MAINNET = "https://rpc.aex402.com";
 export const HELIUS_MAINNET_VIVIYAN =
   "https://viviyan-bkj12u-fast-mainnet.helius-rpc.com";
@@ -26,19 +25,22 @@ function normalizeRpc(url: string): string {
 /** Ordered paid mainnet endpoints for failover. No free public nodes. */
 export function mainnetRpcEndpoints(): string[] {
   const list: string[] = [
-    AEX402_MAINNET,
+    // Helius dedicated first — aex402 is x402-paywalled and returns 402
     HELIUS_MAINNET_VIVIYAN,
     HELIUS_MAINNET_VELVET,
     HELIUS_MAINNET_CASSANDRA,
   ];
 
-  const flux = process.env.FLUXRPC_URL?.trim();
-  if (flux) list.push(flux);
-
   const heliusKey = process.env.HELIUS_API_KEY?.trim();
   if (heliusKey) {
     list.push(`https://mainnet.helius-rpc.com/?api-key=${heliusKey}`);
   }
+
+  const flux = process.env.FLUXRPC_URL?.trim();
+  if (flux) list.push(flux);
+
+  // aex402 last — often 402 Payment Required without prepaid credits
+  list.push(AEX402_MAINNET);
 
   const override = process.env.MAINNET_RPC?.trim();
   if (override) list.unshift(override);
@@ -64,11 +66,8 @@ export function devnetRpcEndpoints(): string[] {
   const override = process.env.DEVNET_RPC?.trim();
   if (override) list.push(override);
   const helius = process.env.HELIUS_API_KEY?.trim();
-  // Fresh Helius key first for devnet airdrops
   if (helius) list.push(`https://devnet.helius-rpc.com/?api-key=${helius}`);
   list.push("https://api.devnet.solana.com");
-  list.push("https://rpc.ankr.com/solana_devnet");
-  list.push("https://endpoints.omniatech.io/v1/sol/devnet/public");
   const seen = new Set<string>();
   return list.filter((u) => {
     const k = normalizeRpc(u).toLowerCase();
@@ -86,12 +85,15 @@ export function rpcUrlFor(network: "mainnet" | "devnet"): string {
   return network === "devnet" ? devnetRpcUrl() : mainnetRpcUrl();
 }
 
-function isRateLimitedMessage(msg: string): boolean {
+export function isRateLimitedMessage(msg: string): boolean {
   const m = msg.toLowerCase();
   return (
     m.includes("429") ||
+    m.includes("402") ||
     m.includes("rate limit") ||
     m.includes("too many requests") ||
+    m.includes("payment required") ||
+    m.includes("pay $") ||
     m.includes("exhausted") ||
     m.includes("credit") ||
     m.includes("quota") ||
@@ -125,6 +127,7 @@ export async function mainnetRpcCall<T = unknown>(
       if (!res.ok) {
         lastErr = new Error(`RPC HTTP ${res.status} @ ${url}`);
         if (
+          res.status === 402 ||
           res.status === 429 ||
           res.status >= 500 ||
           res.status === 401 ||
@@ -143,7 +146,7 @@ export async function mainnetRpcCall<T = unknown>(
         lastErr = new Error(msg);
         if (
           isRateLimitedMessage(msg) ||
-          (j.error.code != null && j.error.code === 429)
+          (j.error.code != null && (j.error.code === 429 || j.error.code === -32099))
         ) {
           continue;
         }
@@ -152,7 +155,30 @@ export async function mainnetRpcCall<T = unknown>(
       return j.result as T;
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e));
+      if (isRateLimitedMessage(lastErr.message)) continue;
     }
   }
   throw lastErr || new Error("All mainnet RPC endpoints failed");
+}
+
+/** Send a signed base64 transaction via the paid mainnet pool. */
+export async function sendRawTransactionMainnet(
+  base64Tx: string,
+  opts?: { skipPreflight?: boolean; maxRetries?: number },
+): Promise<string> {
+  const skipPreflight = opts?.skipPreflight ?? false;
+  const maxRetries = opts?.maxRetries ?? 3;
+  const sig = await mainnetRpcCall<string>("sendTransaction", [
+    base64Tx,
+    {
+      encoding: "base64",
+      skipPreflight,
+      maxRetries,
+      preflightCommitment: "confirmed",
+    },
+  ]);
+  if (!sig || typeof sig !== "string") {
+    throw new Error("RPC did not return a signature");
+  }
+  return sig;
 }

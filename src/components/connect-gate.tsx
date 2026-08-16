@@ -161,10 +161,23 @@ export function ConnectGate({
                   type="button"
                   onClick={() => void connect({ createNew: true })}
                   disabled={loading}
-                  className="w-full bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white font-medium rounded-xl px-4 py-3 transition text-sm cursor-pointer disabled:opacity-40"
+                  className={`w-full font-semibold rounded-xl px-4 py-3.5 transition text-sm cursor-pointer disabled:opacity-40 ${
+                    hasSaved
+                      ? "bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/70"
+                      : "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-600/25 ring-2 ring-violet-400/40 animate-pulse"
+                  }`}
                 >
-                  {loading ? "…" : "Create a new passkey wallet (only if needed)"}
+                  {loading
+                    ? "…"
+                    : hasSaved
+                      ? "Create a new passkey wallet (only if needed)"
+                      : "✨ Create a new passkey wallet"}
                 </button>
+                {!hasSaved && (
+                  <p className="text-[11px] text-violet-600 dark:text-violet-300 font-medium -mt-1">
+                    New here? Tap above — Face ID / fingerprint, no seed phrase.
+                  </p>
+                )}
 
                 <div className="relative py-1">
                   <div className="absolute inset-0 flex items-center">

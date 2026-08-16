@@ -6,6 +6,7 @@ import { Navbar } from "@/components/navbar";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
+import { broadcastSignedTx } from "@/lib/broadcast-tx";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { uploadImage, uploadMetadata } from "@/lib/api";
 import { useImagePaste } from "@/lib/use-image-paste";
@@ -91,7 +92,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { publicKey, refreshBalance } = useWallet();
-  const { rpc } = useNetwork();
+  const { rpc, rotateMainnetRpc } = useNetwork();
 
   const acceptImage = useCallback((file: File) => {
     setImageFile(file);
@@ -105,7 +106,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
     setError(null);
     try {
       setStatus("auth");
-      const { keypair: userKeypair } = await getPasskeyKeypair();
+      const { keypair: userKeypair } = await getPasskeyKeypair(publicKey);
 
       setStatus("uploading");
       const uploaded = await uploadImage(imageFile);
@@ -129,14 +130,24 @@ function CreateModal({ onClose }: { onClose: () => void }) {
       const tx = Transaction.from(txBytes);
       tx.partialSign(userKeypair);
 
-      const connection = new Connection(rpc, "confirmed");
-      const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
+      const sig = await broadcastSignedTx(tx, {
+        rpc,
+        rotateMainnetRpc,
+        skipPreflight: false,
+      });
 
       setStatus("confirming");
-      await connection.confirmTransaction(
-        { signature: sig, blockhash: data.blockhash!, lastValidBlockHeight: data.lastValidBlockHeight! },
-        "confirmed",
-      );
+      const connection = new Connection(rpc, "confirmed");
+      try {
+        await connection.confirmTransaction(
+          { signature: sig, blockhash: data.blockhash!, lastValidBlockHeight: data.lastValidBlockHeight! },
+          "confirmed",
+        );
+      } catch {
+        // confirmation may fail on flaky RPC — verify signature exists
+        const st = await connection.getSignatureStatuses([sig]);
+        if (!st?.value?.[0]) throw new Error("Transaction sent but not confirmed yet — check your wallet");
+      }
 
       // Save to our DB
       await fetch("/api/token", {
@@ -149,7 +160,12 @@ function CreateModal({ onClose }: { onClose: () => void }) {
       router.push(`/launch/${data.mint}`);
       onClose();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      const raw = e instanceof Error ? e.message : String(e);
+      setError(
+        /402|rate limit|payment required|pay \$/i.test(raw)
+          ? "Network was busy (RPC limit). Wait a few seconds and try Launch again."
+          : raw
+      );
       setStatus("error");
     }
   };

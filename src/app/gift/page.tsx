@@ -11,6 +11,7 @@ import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { useDefaultToken } from "@/lib/currency-pref";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
+import { broadcastSignedTx } from "@/lib/broadcast-tx";
 import {
   CLAIM_FEE_LAMPORTS,
   SPL_GIFT_FUND_LAMPORTS,
@@ -66,7 +67,7 @@ export default function GiftPage() {
   const cancelTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { publicKey, walletLabel, balance, usdcBalance, refreshBalance, walletKind } = useWallet();
-  const { network, rpc } = useNetwork();
+  const { network, rpc, rotateMainnetRpc } = useNetwork();
 
   const token: GiftToken = selected
     ? selected.isNativeSol
@@ -89,16 +90,43 @@ export default function GiftPage() {
         const conn = new Connection(rpc, "confirmed");
         const list = await fetchWalletTokens(conn, publicKey, { solBalance: balance });
         if (cancelled) return;
-        setHoldings(list);
+        // Prefer live wallet balance for native SOL (portfolio API can return 0)
+        const solBal = typeof balance === "number" ? balance : null;
+        const merged = list.map((t) => {
+          if (t.isNativeSol && solBal != null && Number.isFinite(solBal)) {
+            return {
+              ...t,
+              uiAmount: solBal,
+              amount: String(Math.round(solBal * 1e9)),
+            };
+          }
+          return t;
+        });
+        // If no SOL row, inject one
+        if (solBal != null && !merged.some((t) => t.isNativeSol)) {
+          merged.unshift({
+            mint: "So11111111111111111111111111111111111111112",
+            symbol: "SOL",
+            name: "Solana",
+            decimals: 9,
+            uiAmount: solBal,
+            amount: String(Math.round(solBal * 1e9)),
+            isNativeSol: true,
+            programId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            priceUsd: null,
+            valueUsd: null,
+          } as (typeof list)[0]);
+        }
+        setHoldings(merged);
         setSelected((prev) => {
           if (prev) {
-            const again = list.find((t) => t.mint === prev.mint);
+            const again = merged.find((t) => t.mint === prev.mint);
             if (again) return again;
           }
           if (defaultToken === "USDC") {
-            return list.find((t) => t.symbol === "USDC") || list[0] || null;
+            return merged.find((t) => t.symbol === "USDC") || merged[0] || null;
           }
-          return list[0] || null;
+          return merged[0] || null;
         });
       } catch {
         if (!cancelled) setHoldings([]);
@@ -284,9 +312,10 @@ export default function GiftPage() {
                   verifySignatures: false,
                 })
               : Buffer.from(signed as unknown as ArrayBuffer);
-          signature = await connection.sendRawTransaction(raw, {
+          signature = await broadcastSignedTx(raw, {
+            rpc,
+            rotateMainnetRpc,
             skipPreflight: false,
-            maxRetries: 3,
           });
         }
       } else {
@@ -305,9 +334,10 @@ export default function GiftPage() {
           if (created.blockhash) tx.recentBlockhash = created.blockhash;
         }
         tx.partialSign(sender);
-        signature = await connection.sendRawTransaction(tx.serialize(), {
+        signature = await broadcastSignedTx(tx, {
+          rpc,
+          rotateMainnetRpc,
           skipPreflight: false,
-          maxRetries: 3,
         });
         created.blockhash = confirmBh;
         created.lastValidBlockHeight = confirmLv;
