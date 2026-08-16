@@ -19,9 +19,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  // Default product entry: onboarding (URL stays `/`)
+  // Default product entry:
+  // - first visit → onboard
+  // - finished onboard (cookie) → wallet app (not marketing “Create anything”)
   if (path === "/" || path === "") {
-    url.pathname = "/onboard";
+    const done = request.cookies.get("sol_new_onboard_done")?.value === "1";
+    url.pathname = done ? "/wallet" : "/onboard";
     return NextResponse.rewrite(url);
   }
 

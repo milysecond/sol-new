@@ -7,10 +7,13 @@ import {
   ArrowLeftRight,
   ArrowRight,
   Check,
+  Compass,
   Gift,
   Landmark,
   Sparkles,
   Wallet,
+  Download,
+  LayoutGrid,
 } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { Spinner } from "@/components/spinner";
@@ -54,56 +57,99 @@ const GOALS: {
   {
     id: "explore",
     title: "Just explore",
-    blurb: "Wallet, portfolio, POAPs, and the rest of sol.new.",
-    href: "/home",
-    cta: "See everything",
+    blurb: "See your wallet, get funds, then browse the full app.",
+    href: "/wallet",
+    cta: "Open my wallet",
     icon: Sparkles,
   },
 ];
 
+/** Extra “what’s next” tiles after explore (not the marketing splash). */
+const EXPLORE_NEXT = [
+  {
+    href: "/wallet",
+    title: "Your wallet",
+    blurb: "Balance, address, send & receive",
+    icon: Wallet,
+  },
+  {
+    href: "/get",
+    title: "Get funds",
+    blurb: "Credits or receive SOL / USDC",
+    icon: Download,
+  },
+  {
+    href: "/gift",
+    title: "Send a gift",
+    blurb: "Share a claim link with anyone",
+    icon: Gift,
+  },
+  {
+    href: "/home#products",
+    title: "Browse all apps",
+    blurb: "Tokens, pay, stake, draw, and more",
+    icon: LayoutGrid,
+  },
+] as const;
+
 const ONBOARD_KEY = "sol.new.onboard.done";
 const GOAL_KEY = "sol.new.onboard.goal";
+const COOKIE = "sol_new_onboard_done";
+
+function markOnboardDone() {
+  try {
+    localStorage.setItem(ONBOARD_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+  try {
+    // 1 year — middleware reads this so `/` doesn’t restart onboard
+    document.cookie = `${COOKIE}=1; path=/; max-age=31536000; samesite=lax`;
+  } catch {
+    /* ignore */
+  }
+}
 
 /**
- * Onboarding playbook (activation first):
- * 1) activation moment = passkey wallet live
- * 2) value before effort
- * 3) one useful question (goal)
- * 4) one action per screen
- * 5) motion (Thinking Orbs)
- * 6) personal result
- * 7) end with next action — not empty home
+ * Onboarding:
+ * value → goal → create wallet → personal next step (never loop to marketing splash).
  */
 export default function OnboardPage() {
   const router = useRouter();
-  const { publicKey, connect, loading, error: walletError } = useWallet();
+  const { publicKey, connect, recover, loading, error: walletError } = useWallet();
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   const goalMeta = useMemo(
-    () => GOALS.find((g) => g.id === goal) || GOALS[3],
-    [goal]
+    () => GOALS.find((g) => g.id === goal) || GOALS[3]!,
+    [goal],
   );
 
-  // Restore goal + already-done state
   useEffect(() => {
     try {
       const saved = localStorage.getItem(GOAL_KEY) as Goal | null;
       if (saved && GOALS.some((g) => g.id === saved)) setGoal(saved);
+      // Returning user who already finished — go to wallet/home, not step 0
+      if (localStorage.getItem(ONBOARD_KEY) === "1") {
+        markOnboardDone(); // ensure cookie
+      }
     } catch {
       /* ignore */
     }
   }, []);
 
-  const skipToHome = () => {
-    try {
-      localStorage.setItem(ONBOARD_KEY, "1");
-    } catch {
-      /* ignore */
+  // If they already have a wallet mid-flow, don’t force create
+  useEffect(() => {
+    if (publicKey && step === 2) {
+      // stay on step 2 with “Wallet ready”
     }
-    router.push("/home");
+  }, [publicKey, step]);
+
+  const skipToApp = () => {
+    markOnboardDone();
+    router.replace("/wallet");
   };
 
   const pickGoal = (id: Goal) => {
@@ -120,13 +166,10 @@ export default function OnboardPage() {
     setError(null);
     setCreating(true);
     try {
-      await connect();
+      // Explicit new wallet for onboarding (not unlock-existing)
+      await connect({ createNew: true });
+      markOnboardDone();
       setStep(3);
-      try {
-        localStorage.setItem(ONBOARD_KEY, "1");
-      } catch {
-        /* ignore */
-      }
     } catch (e) {
       setError(friendlyError(e, "Couldn't create wallet"));
     } finally {
@@ -134,20 +177,29 @@ export default function OnboardPage() {
     }
   };
 
-  const finish = () => {
+  const unlockExisting = async () => {
+    setError(null);
+    setCreating(true);
     try {
-      localStorage.setItem(ONBOARD_KEY, "1");
-    } catch {
-      /* ignore */
+      await recover({ forcePicker: true });
+      markOnboardDone();
+      setStep(3);
+    } catch (e) {
+      setError(friendlyError(e, "Couldn't unlock passkey"));
+    } finally {
+      setCreating(false);
     }
-    router.push(goalMeta.href);
+  };
+
+  const finish = (href?: string) => {
+    markOnboardDone();
+    router.replace(href || goalMeta.href);
   };
 
   return (
     <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
       <main className="flex-1 w-full max-w-md mx-auto px-4 pt-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
-        {/* progress */}
         <div className="flex gap-1.5 mb-8">
           {[0, 1, 2, 3].map((i) => (
             <div
@@ -159,7 +211,6 @@ export default function OnboardPage() {
           ))}
         </div>
 
-        {/* 0 — value before effort */}
         {step === 0 && (
           <div className="space-y-8 text-center">
             <div className="flex justify-center py-4">
@@ -173,8 +224,8 @@ export default function OnboardPage() {
                 A Solana wallet in your Face&nbsp;ID
               </h1>
               <p className="text-sm text-gray-500 dark:text-white/50 max-w-sm mx-auto">
-                No seed phrase. No app store. Send, swap, gift, stake — secured by
-                the same passkey that unlocks your phone.
+                No seed phrase. Send, swap, gift, stake — secured by the same
+                passkey that unlocks your phone.
               </p>
             </div>
             <ul className="text-left space-y-2.5 max-w-sm mx-auto">
@@ -203,8 +254,8 @@ export default function OnboardPage() {
             </button>
             <p className="text-[11px] text-gray-400">
               Already set up?{" "}
-              <button type="button" onClick={skipToHome} className="text-violet-500">
-                Go to home
+              <button type="button" onClick={skipToApp} className="text-violet-500">
+                Open wallet
               </button>
               {" · "}
               <Link href="/wallet/find" className="text-violet-500">
@@ -214,7 +265,6 @@ export default function OnboardPage() {
           </div>
         )}
 
-        {/* 1 — one useful question */}
         {step === 1 && (
           <div className="space-y-6">
             <div className="text-center space-y-2">
@@ -222,7 +272,7 @@ export default function OnboardPage() {
                 What do you want first?
               </h1>
               <p className="text-sm text-gray-500">
-                We’ll tailor your next step — one tap.
+                We’ll take you there after your wallet is ready.
               </p>
             </div>
             <div className="space-y-2">
@@ -258,7 +308,6 @@ export default function OnboardPage() {
           </div>
         )}
 
-        {/* 2 — activation: create wallet */}
         {step === 2 && (
           <div className="space-y-6 text-center">
             <div className="flex justify-center py-2">
@@ -276,8 +325,8 @@ export default function OnboardPage() {
               </h1>
               <p className="text-sm text-gray-500 max-w-sm mx-auto">
                 {publicKey
-                  ? "You're connected. One more step to personalise."
-                  : "Tap once — Face ID creates a passkey wallet. No seed phrase to write down."}
+                  ? "You're connected. Next we’ll open your first step."
+                  : "Tap once — Face ID creates a passkey wallet. No seed phrase."}
               </p>
             </div>
             {(error || walletError) && (
@@ -288,21 +337,36 @@ export default function OnboardPage() {
             {publicKey ? (
               <button
                 type="button"
-                onClick={() => setStep(3)}
+                onClick={() => {
+                  markOnboardDone();
+                  setStep(3);
+                }}
                 className="w-full min-h-[52px] rounded-2xl bg-violet-600 hover:bg-violet-500 text-white font-semibold"
               >
-                Continue
+                See what&apos;s next
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={() => void createWallet()}
-                disabled={creating || loading}
-                className="w-full min-h-[52px] rounded-2xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
-              >
-                {(creating || loading) && <Spinner size={20} state="composing" />}
-                {creating || loading ? "Creating…" : "Create with Face ID"}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => void createWallet()}
+                  disabled={creating || loading}
+                  className="w-full min-h-[52px] rounded-2xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
+                >
+                  {(creating || loading) && (
+                    <Spinner size={20} state="composing" />
+                  )}
+                  {creating || loading ? "Creating…" : "Create with Face ID"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void unlockExisting()}
+                  disabled={creating || loading}
+                  className="w-full min-h-[48px] rounded-2xl border border-black/10 dark:border-white/10 text-sm font-medium text-gray-700 dark:text-white/70"
+                >
+                  I already have a passkey
+                </button>
+              </>
             )}
             <button
               type="button"
@@ -314,7 +378,6 @@ export default function OnboardPage() {
           </div>
         )}
 
-        {/* 3 — meaningful result */}
         {step === 3 && (
           <div className="space-y-6 text-center">
             <div className="flex justify-center">
@@ -324,10 +387,14 @@ export default function OnboardPage() {
             </div>
             <div className="space-y-2">
               <h1 className="text-2xl font-bold tracking-tight">
-                You’re set for {goalMeta.title.toLowerCase()}
+                {goal === "explore"
+                  ? "You’re in — here’s what’s next"
+                  : `You’re set for ${goalMeta.title.toLowerCase()}`}
               </h1>
               <p className="text-sm text-gray-500 max-w-sm mx-auto">
-                {goalMeta.blurb}
+                {goal === "explore"
+                  ? "Pick a next step. You won’t be sent back to the start screen."
+                  : goalMeta.blurb}
               </p>
               {publicKey && (
                 <p className="text-xs font-mono text-violet-600 dark:text-violet-400 bg-violet-500/10 border border-violet-500/20 rounded-full inline-flex px-3 py-1 mt-1">
@@ -335,20 +402,53 @@ export default function OnboardPage() {
                 </p>
               )}
             </div>
-            <div className="rounded-2xl border border-black/10 dark:border-white/10 p-4 text-left space-y-2">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">
-                Your first move
-              </p>
-              <p className="font-semibold">{goalMeta.title}</p>
-              <p className="text-sm text-gray-500">{goalMeta.blurb}</p>
-            </div>
-            <button
-              type="button"
-              onClick={finish}
-              className="w-full min-h-[52px] rounded-2xl bg-violet-600 hover:bg-violet-500 text-white font-semibold flex items-center justify-center gap-2"
-            >
-              {goalMeta.cta} <ArrowRight className="w-4 h-4" />
-            </button>
+
+            {goal === "explore" ? (
+              <div className="space-y-2 text-left">
+                {EXPLORE_NEXT.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.href}
+                      type="button"
+                      onClick={() => finish(item.href)}
+                      className="w-full rounded-2xl border border-black/10 dark:border-white/10 hover:border-violet-500/40 hover:bg-violet-500/5 px-4 py-3.5 flex items-start gap-3 transition text-left"
+                    >
+                      <span className="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400 flex items-center justify-center shrink-0">
+                        <Icon className="w-5 h-5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold text-sm">
+                          {item.title}
+                        </span>
+                        <span className="block text-xs text-gray-500 mt-0.5">
+                          {item.blurb}
+                        </span>
+                      </span>
+                      <ArrowRight className="w-4 h-4 text-gray-400 mt-3 shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <>
+                <div className="rounded-2xl border border-black/10 dark:border-white/10 p-4 text-left space-y-2">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                    <Compass className="w-3.5 h-3.5" /> Your first move
+                  </p>
+                  <p className="font-semibold">{goalMeta.title}</p>
+                  <p className="text-sm text-gray-500">{goalMeta.blurb}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => finish()}
+                  className="w-full min-h-[52px] rounded-2xl bg-violet-600 hover:bg-violet-500 text-white font-semibold flex items-center justify-center gap-2"
+                >
+                  {goalMeta.cta} <ArrowRight className="w-4 h-4" />
+                </button>
+              </>
+            )}
+
             {!publicKey && (
               <button
                 type="button"
@@ -358,9 +458,13 @@ export default function OnboardPage() {
                 Wallet missing — create it
               </button>
             )}
-            <Link href="/get" className="block text-xs text-gray-400">
-              Need SOL first? Get funds →
-            </Link>
+            <button
+              type="button"
+              onClick={() => finish("/wallet")}
+              className="w-full text-xs text-gray-400"
+            >
+              Skip to wallet
+            </button>
           </div>
         )}
       </main>
