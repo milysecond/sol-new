@@ -33,7 +33,7 @@ export function ConnectGate({
   children: React.ReactNode;
   action: string;
 }) {
-  const { publicKey, walletLabel, wallets, connect, recover, switchWallet, loading, error } =
+  const { publicKey, walletLabel, wallets, connect, recover, switchWallet, loading, error, clearLoading } =
     useWallet();
   const [isTgWebView, setIsTgWebView] = useState(false);
 
@@ -139,6 +139,16 @@ export function ConnectGate({
                     "I already have a passkey wallet"
                   )}
                 </button>
+
+                {loading && (
+                  <button
+                    type="button"
+                    onClick={() => clearLoading()}
+                    className="w-full text-sm font-medium text-amber-600 dark:text-amber-300 py-2"
+                  >
+                    Cancel — prompt stuck?
+                  </button>
+                )}
 
                 <a
                   href="/wallet/find"
