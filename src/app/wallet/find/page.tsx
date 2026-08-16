@@ -15,6 +15,7 @@ import { PageTransition } from "@/components/page-transition";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { friendlyError } from "@/lib/friendly-errors";
+import { formatQty, formatSol, formatUsd, useHideBalances } from "@/lib/privacy";
 
 function short(pk: string) {
   return `${pk.slice(0, 4)}…${pk.slice(-4)}`;
@@ -25,6 +26,7 @@ function normAddr(s: string) {
 }
 
 export default function WalletFindPage() {
+  const [hideBalances] = useHideBalances();
   const {
     publicKey,
     wallets,
@@ -177,11 +179,11 @@ export default function WalletFindPage() {
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-xl bg-black/5 dark:bg-white/5 px-3 py-2">
                   <p className="text-[11px] text-gray-500">SOL</p>
-                  <p className="font-mono font-semibold tabular-nums">{last.sol.toFixed(6)}</p>
+                  <p className="font-mono font-semibold tabular-nums">{formatQty(hideBalances, last.sol, 6)}</p>
                 </div>
                 <div className="rounded-xl bg-black/5 dark:bg-white/5 px-3 py-2">
                   <p className="text-[11px] text-gray-500">USDC</p>
-                  <p className="font-mono font-semibold tabular-nums">{last.usdc.toFixed(2)}</p>
+                  <p className="font-mono font-semibold tabular-nums">{formatQty(hideBalances, last.usdc, 2)}</p>
                 </div>
               </div>
               <div>
@@ -250,7 +252,9 @@ export default function WalletFindPage() {
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5 tabular-nums">
                           {bal
-                            ? `${bal.sol.toFixed(4)} SOL · $${bal.usdc.toFixed(2)} USDC`
+                            ? hideBalances
+                              ? "•••• SOL · $•••• USDC"
+                              : `${bal.sol.toFixed(4)} SOL · $${bal.usdc.toFixed(2)} USDC`
                             : "—"}
                         </p>
                       </div>

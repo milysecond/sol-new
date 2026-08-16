@@ -26,6 +26,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Spinner } from "@/components/spinner";
 import { PageBack } from "@/components/page-back";
 import { useDefaultToken } from "@/lib/currency-pref";
+import { formatSol, useHideBalances } from "@/lib/privacy";
 import type { LucideIcon } from "lucide-react";
 
 /** Desktop top nav — short, high-traffic only. */
@@ -68,6 +69,7 @@ export function Navbar() {
     airdropDone,
     handleAirdrop,
   } = useWallet();
+  const [hideBalances] = useHideBalances();
   const { network, toggle } = useNetwork();
   const [defaultToken, setDefaultToken] = useDefaultToken();
   const [showMenu, setShowMenu] = useState(false);
@@ -208,8 +210,14 @@ export function Navbar() {
                   <Wallet size={14} className="text-purple-500 dark:text-purple-400 sm:hidden" />
                   {balance !== null ? (
                     <span className="text-purple-600 dark:text-purple-400 font-mono">
-                      {balance.toFixed(balance < 1 ? 3 : 2)}
-                      <span className="hidden sm:inline"> SOL</span>
+                      {hideBalances ? (
+                        "••••"
+                      ) : (
+                        <>
+                          {balance.toFixed(balance < 1 ? 3 : 2)}
+                          <span className="hidden sm:inline"> SOL</span>
+                        </>
+                      )}
                     </span>
                   ) : (
                     <span className="inline-flex items-center text-purple-500">
@@ -237,7 +245,7 @@ export function Navbar() {
                         <p className="text-[10px] text-gray-400 mt-1">Wallet name = address</p>
                         {balance !== null ? (
                           <p className="text-sm font-mono text-purple-600 dark:text-purple-400 mt-2">
-                            {balance.toFixed(4)} SOL
+                            {formatSol(hideBalances, balance, 4)}
                           </p>
                         ) : (
                           <p className="text-sm font-mono text-purple-500 mt-2 flex items-center gap-1.5">

@@ -19,17 +19,9 @@ import {
 import { WalletShell } from "@/components/wallet-shell";
 import { useWallet } from "@/lib/wallet-context";
 import { toast } from "@/lib/toast";
+import { useHideBalances } from "@/lib/privacy";
 
-const HIDE_BAL_KEY = "sol.new.privacy.hideBalances";
 const AUTO_LOCK_KEY = "sol.new.security.autoLockMin";
-
-function readHideBalances(): boolean {
-  try {
-    return localStorage.getItem(HIDE_BAL_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
 
 function readAutoLock(): number {
   try {
@@ -49,12 +41,11 @@ export default function WalletSettingsPage() {
     switchWallet,
     loading,
   } = useWallet();
-  const [hideBalances, setHideBalances] = useState(false);
+  const [hideBalances, setHideBalances] = useHideBalances();
   const [autoLockMin, setAutoLockMin] = useState(15);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setHideBalances(readHideBalances());
     setAutoLockMin(readAutoLock());
     setMounted(true);
   }, []);
@@ -80,18 +71,8 @@ export default function WalletSettingsPage() {
   }, [mounted, autoLockMin, publicKey, disconnect]);
 
   const toggleHide = useCallback(() => {
-    setHideBalances((v) => {
-      const next = !v;
-      try {
-        localStorage.setItem(HIDE_BAL_KEY, next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      // Notify other tabs / wallet shell via storage event
-      window.dispatchEvent(new Event("sol.new.privacy"));
-      return next;
-    });
-  }, []);
+    setHideBalances(!hideBalances);
+  }, [hideBalances, setHideBalances]);
 
   const setLock = (mins: number) => {
     setAutoLockMin(mins);
@@ -162,7 +143,7 @@ export default function WalletSettingsPage() {
               ) : (
                 <Eye className="w-4 h-4 text-gray-400" />
               )}
-              Hide balances on this device
+              Hide balances everywhere
             </span>
             <span
               className={`text-xs font-semibold px-2 py-1 rounded-full ${
@@ -174,6 +155,10 @@ export default function WalletSettingsPage() {
               {hideBalances ? "On" : "Off"}
             </span>
           </button>
+          <p className="text-[11px] text-gray-500 leading-relaxed">
+            Masks SOL, USDC, token amounts, and USD values in the navbar, wallet,
+            portfolio, find-wallet list, and send screens on this device.
+          </p>
         </section>
 
         {/* Auto-lock */}

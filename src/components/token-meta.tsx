@@ -1,6 +1,7 @@
 "use client";
 
 import { formatTokenUi, formatUsd, formatUsdPrice, type WalletToken } from "@/lib/wallet-tokens";
+import { useHideBalances } from "@/lib/privacy";
 import type { ReactNode } from "react";
 
 /** Compact token chip: icon + symbol/name + bal + USD */
@@ -15,6 +16,7 @@ export function TokenMetaRow({
   right?: ReactNode;
   dense?: boolean;
 }) {
+  const [hide] = useHideBalances();
   const amt = amountUi != null ? amountUi : token.uiAmount;
   const lineUsd =
     token.priceUsd != null && Number.isFinite(amt)
@@ -29,7 +31,7 @@ export function TokenMetaRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-1.5 min-w-0">
           <p className="font-semibold text-sm truncate">{token.symbol}</p>
-          {token.priceUsd != null && (
+          {!hide && token.priceUsd != null && (
             <span className="text-[11px] text-gray-400 tabular-nums shrink-0">
               {formatUsdPrice(token.priceUsd)}
             </span>
@@ -37,15 +39,17 @@ export function TokenMetaRow({
         </div>
         <p className="text-xs text-gray-500 dark:text-white/45 truncate">{token.name}</p>
         <p className="text-[11px] text-gray-400 dark:text-white/35 tabular-nums mt-0.5">
-          {formatTokenUi(token.uiAmount, token.decimals)} {token.symbol}
-          {token.valueUsd != null && (
+          {hide
+            ? `•••• ${token.symbol}`
+            : `${formatTokenUi(token.uiAmount, token.decimals)} ${token.symbol}`}
+          {!hide && token.valueUsd != null && (
             <span className="text-gray-500 dark:text-white/40">
               {" · "}
               {formatUsd(token.valueUsd, { compact: true })}
             </span>
           )}
         </p>
-        {amountUi != null && lineUsd != null && (
+        {!hide && amountUi != null && lineUsd != null && (
           <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 tabular-nums mt-0.5">
             ≈ {formatUsd(lineUsd)}
           </p>
@@ -99,6 +103,8 @@ export function AmountUsdHint({
   amount: string;
   priceUsd?: number | null;
 }) {
+  const [hide] = useHideBalances();
+  if (hide) return null;
   const n = parseFloat(amount);
   if (!amount || !Number.isFinite(n) || n <= 0 || priceUsd == null) {
     return priceUsd != null ? (

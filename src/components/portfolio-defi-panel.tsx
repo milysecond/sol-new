@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Spinner } from "@/components/spinner";
 import Link from "next/link";
+import { useHideBalances } from "@/lib/privacy";
 
 export type PortfolioApi = {
   ok?: boolean;
@@ -46,19 +47,7 @@ export type PortfolioApi = {
 
 const short = (s: string) => (s.length > 16 ? `${s.slice(0, 6)}…${s.slice(-6)}` : s);
 
-const fmtUsd = (n: number | null | undefined) => {
-  if (n == null || !Number.isFinite(n)) return "—";
-  const abs = Math.abs(n);
-  const sign = n < 0 ? "-" : "";
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
-  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(2)}K`;
-  return `${sign}$${abs.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-};
-
-const fmtAmt = (n: number) =>
-  n.toLocaleString(undefined, {
-    maximumFractionDigits: n >= 1 ? 4 : 6,
-  });
+// Module-level formatters kept for non-private contexts; panel uses hook-local versions.
 
 function Card({
   label,
@@ -98,6 +87,24 @@ export function PortfolioDefiPanel({
 }) {
   const [data, setData] = useState<PortfolioApi | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hideBalances] = useHideBalances();
+
+  const fmtUsd = (n: number | null | undefined) => {
+    if (hideBalances) return "$••••";
+    if (n == null || !Number.isFinite(n)) return "—";
+    const abs = Math.abs(n);
+    const sign = n < 0 ? "-" : "";
+    if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
+    if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(2)}K`;
+    return `${sign}$${abs.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  };
+
+  const fmtAmt = (n: number) =>
+    hideBalances
+      ? "••••"
+      : n.toLocaleString(undefined, {
+          maximumFractionDigits: n >= 1 ? 4 : 6,
+        });
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"tokens" | "defi">("tokens");
 
