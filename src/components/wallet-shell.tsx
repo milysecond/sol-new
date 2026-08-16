@@ -35,7 +35,7 @@ const tabs = [
 ];
 
 export function WalletShell({ children }: { children: React.ReactNode }) {
-  const { publicKey, balance } = useWallet();
+  const { publicKey, balance, walletKind } = useWallet();
   const pathname = usePathname();
   const router = useRouter();
   const [copiedAddress, setCopiedAddress] = useState(false);
@@ -47,7 +47,7 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
 
   const copyAddress = () => {
     if (!publicKey) return;
-    navigator.clipboard.writeText(publicKey);
+    void navigator.clipboard.writeText(publicKey);
     setCopiedAddress(true);
     setTimeout(() => setCopiedAddress(false), 2000);
   };
@@ -55,41 +55,59 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
   const balLabel =
     balance === null ? null : formatSol(hideBalances, balance, 4);
 
+  /** Longer id for Seeker sticky status — 6…6 */
+  const idLabel = publicKey
+    ? publicKey.length > 16
+      ? `${publicKey.slice(0, 6)}…${publicKey.slice(-6)}`
+      : publicKey
+    : null;
+
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">
       <Navbar />
-      <main className="flex-1 flex flex-col px-4 py-4 sm:px-6 sm:py-8 sm:items-center">
+      <main className="flex-1 flex flex-col px-3 py-3 sm:px-6 sm:py-8 sm:items-center">
         <ConnectGate action="view your wallet">
-          <div className="w-full sm:max-w-lg space-y-3">
-            <div className="sticky top-0 z-20 flex items-center justify-between bg-white/95 dark:bg-black/95 backdrop-blur border border-black/10 dark:border-white/10 rounded-xl px-4 py-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-full bg-fuchsia-500/20 flex items-center justify-center shrink-0">
-                  <Wallet size={20} className="text-fuchsia-400" />
+          <div className="w-full sm:max-w-lg space-y-2.5 sm:space-y-3">
+            <div className="sticky top-0 z-20 flex items-center justify-between gap-2 bg-white/95 dark:bg-black/95 backdrop-blur border border-black/10 dark:border-white/10 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-fuchsia-500/20 flex items-center justify-center shrink-0">
+                  <Wallet size={18} className="text-fuchsia-400 sm:hidden" />
+                  <Wallet size={20} className="text-fuchsia-400 hidden sm:block" />
                 </div>
                 <div className="min-w-0">
                   {balLabel !== null ? (
-                    <p className="text-fuchsia-500 dark:text-fuchsia-400 font-mono font-bold text-lg leading-tight">
+                    <p className="text-fuchsia-500 dark:text-fuchsia-400 font-mono font-bold text-base sm:text-lg leading-tight">
                       {balLabel}
                     </p>
                   ) : (
-                    <p className="text-fuchsia-500 dark:text-fuchsia-400 font-mono font-bold text-lg leading-tight flex items-center gap-2">
+                    <p className="text-fuchsia-500 dark:text-fuchsia-400 font-mono font-bold text-base sm:text-lg leading-tight flex items-center gap-2">
                       <Spinner size={16} className="text-fuchsia-400" />
-                      <span className="text-sm font-normal opacity-60">
-                        fetching…
-                      </span>
+                      <span className="text-sm font-normal opacity-60">fetching…</span>
                     </p>
                   )}
-                  <p className="text-gray-400 dark:text-white/40 text-xs font-mono truncate">
-                    {publicKey?.slice(0, 6)}...{publicKey?.slice(-4)}
-                  </p>
+                  {/* Full id on one line when possible — status identity */}
+                  <button
+                    type="button"
+                    onClick={copyAddress}
+                    className="text-left max-w-full group"
+                    title={publicKey || undefined}
+                  >
+                    <p className="text-gray-500 dark:text-white/50 text-[11px] sm:text-xs font-mono truncate group-active:text-fuchsia-400">
+                      {idLabel}
+                      {walletKind === "external" && (
+                        <span className="ml-1.5 text-[10px] font-sans text-violet-500 dark:text-violet-400">
+                          ext
+                        </span>
+                      )}
+                    </p>
+                  </button>
                 </div>
               </div>
-              <div className="flex gap-1.5 shrink-0">
-                {/* Settings only via tab row below — no duplicate gear */}
+              <div className="flex gap-1 shrink-0">
                 <button
                   type="button"
                   onClick={copyAddress}
-                  className="p-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 rounded-lg transition"
+                  className="p-2.5 min-h-[40px] min-w-[40px] flex items-center justify-center bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 rounded-lg transition"
                   title="Copy address"
                   aria-label="Copy address"
                 >
@@ -102,7 +120,7 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
                 {publicKey && (
                   <Link
                     href={addressPath(publicKey)}
-                    className="p-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 rounded-lg transition"
+                    className="p-2.5 min-h-[40px] min-w-[40px] flex items-center justify-center bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 rounded-lg transition"
                     title={EXPLORER_LABEL}
                     aria-label={EXPLORER_LABEL}
                   >
@@ -112,7 +130,7 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            <div className="flex gap-1 overflow-x-auto pb-0.5">
+            <div className="flex gap-1 overflow-x-auto pb-0.5 -mx-0.5 px-0.5">
               {tabs.map((t) => (
                 <button
                   key={t.id}
@@ -125,13 +143,13 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
                     }
                     router.push(t.path);
                   }}
-                  className={`flex-1 min-w-[3.1rem] flex flex-col items-center gap-1 px-1.5 py-2 rounded-xl text-[10px] sm:text-[11px] transition cursor-pointer active:scale-95 ${
+                  className={`flex-1 min-w-[2.85rem] flex flex-col items-center gap-0.5 px-1 py-1.5 sm:py-2 rounded-xl text-[10px] sm:text-[11px] transition cursor-pointer active:scale-95 ${
                     activeTab === t.id
                       ? "bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-400/50"
                       : "bg-black/5 dark:bg-white/5 text-gray-500 dark:text-white/50 border border-black/10 dark:border-white/10"
                   }`}
                 >
-                  <t.icon size={16} />
+                  <t.icon size={15} />
                   <span>{t.label}</span>
                 </button>
               ))}
