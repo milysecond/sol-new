@@ -389,6 +389,16 @@ export const NAV_ITEMS: NavItem[] = [
     home: true,
   },
   {
+    href: "/traction",
+    label: "Traction",
+    title: "Traction",
+    desc: "Daily signups (UTC)",
+    icon: TrendingUp,
+    color: "text-emerald-500 dark:text-emerald-400",
+    category: "info",
+    home: true,
+  },
+  {
     href: "/home",
     label: "Home",
     title: "Home",
@@ -438,6 +448,7 @@ export const HOME_DEFAULT_ORDER: string[] = [
   "/starter",
   "/news",
   "/whats-new",
+  "/traction",
 ];
 
 export function sortNavAlpha(items: NavItem[]): NavItem[] {
