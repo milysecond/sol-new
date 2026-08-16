@@ -264,7 +264,7 @@ export default function MarketingSplash() {
               >
                 {publicKey ? (
                   <Link
-                    href="/"
+                    href="/wallet"
                     className="group inline-flex items-center justify-center gap-2 rounded-full bg-white text-black font-semibold px-7 py-4 text-base hover:bg-white/90 transition-colors"
                   >
                     Open your wallet

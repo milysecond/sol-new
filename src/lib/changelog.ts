@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-15",
+    title: "Onboard: Just explore doesn’t loop",
+    items: [
+      "After setup, explore shows What’s next (wallet, funds, gift, apps).",
+      "Done cookie so / opens wallet, not Create anything again.",
+    ],
+  },
+  {
+    date: "2026-08-15",
     title: "Traction dashboard",
     items: [
       "/traction — daily signups & activity in UTC+0.",
