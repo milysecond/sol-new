@@ -46,6 +46,7 @@ const STATIC_ROUTES: {
   { path: "/features", priority: 0.8, freq: "weekly" },
   { path: "/changelog", priority: 0.7, freq: "weekly" },
   { path: "/whats-new", priority: 0.7, freq: "hourly" },
+  { path: "/traction", priority: 0.75, freq: "daily" },
   { path: "/nfts", priority: 0.7, freq: "weekly" },
   { path: "/stocks", priority: 0.8, freq: "hourly" },
   { path: "/earn", priority: 0.7, freq: "weekly" },

@@ -1278,6 +1278,236 @@ export async function getStats() {
   };
 }
 
+export type TractionDay = {
+  /** UTC calendar day YYYY-MM-DD */
+  day: string;
+  signups: number;
+  tokens: number;
+  nfts: number;
+  gifts: number;
+  giftClaims: number;
+  creditsTx: number;
+  creditsCents: number;
+  shortLinks: number;
+  draws: number;
+  raffleEntries: number;
+  multisigs: number;
+  poapClaims: number;
+};
+
+export type TractionReport = {
+  timezone: "UTC";
+  generatedAt: string;
+  days: number;
+  totals: {
+    signups: number;
+    tokens: number;
+    nfts: number;
+    gifts: number;
+    giftClaims: number;
+    creditsTx: number;
+    creditsCents: number;
+    shortLinks: number;
+    draws: number;
+    raffleEntries: number;
+    multisigs: number;
+    poapClaims: number;
+    walletsAllTime: number;
+    tokensAllTime: number;
+    nftsAllTime: number;
+  };
+  today: TractionDay | null;
+  series: TractionDay[];
+};
+
+function emptyDay(day: string): TractionDay {
+  return {
+    day,
+    signups: 0,
+    tokens: 0,
+    nfts: 0,
+    gifts: 0,
+    giftClaims: 0,
+    creditsTx: 0,
+    creditsCents: 0,
+    shortLinks: 0,
+    draws: 0,
+    raffleEntries: 0,
+    multisigs: 0,
+    poapClaims: 0,
+  };
+}
+
+async function countByUtcDay(
+  sql: string,
+  args: (string | number)[] = [],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  try {
+    const r = await db.execute({ sql, args });
+    for (const row of r.rows) {
+      const day = String((row as { day?: unknown }).day || "").slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+      const c = Number((row as { c?: unknown }).c || 0);
+      map.set(day, (map.get(day) || 0) + (Number.isFinite(c) ? c : 0));
+    }
+  } catch {
+    /* table may not exist yet */
+  }
+  return map;
+}
+
+/** Daily activity buckets in UTC (date(created_at) is UTC for Turso/SQLite). */
+export async function getTractionReport(days = 30): Promise<TractionReport> {
+  const n = Math.min(90, Math.max(7, Math.floor(days) || 30));
+  // Inclusive window: last n UTC calendar days including today
+  const sinceExpr = `datetime('now', '-${n - 1} days', 'start of day')`;
+
+  const [
+    signups,
+    tokens,
+    nfts,
+    gifts,
+    giftClaims,
+    credits,
+    shortLinks,
+    draws,
+    raffleEntries,
+    multisigs,
+    poapClaims,
+    allTime,
+  ] = await Promise.all([
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM wallets
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM tokens
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM nfts
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM claim_links
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(COALESCE(claimed_at, created_at)) AS day, COUNT(*) AS c FROM claim_links
+       WHERE status IN ('claimed','reclaimed')
+         AND COALESCE(claimed_at, created_at) >= ${sinceExpr}
+       GROUP BY date(COALESCE(claimed_at, created_at))`,
+    ),
+    // credit_ledger: count txs + sum positive deltas
+    (async () => {
+      const count = await countByUtcDay(
+        `SELECT date(created_at) AS day, COUNT(*) AS c FROM credit_ledger
+         WHERE created_at >= ${sinceExpr} AND delta_cents > 0
+         GROUP BY date(created_at)`,
+      );
+      const cents = new Map<string, number>();
+      try {
+        const r = await db.execute(
+          `SELECT date(created_at) AS day, COALESCE(SUM(delta_cents),0) AS c FROM credit_ledger
+           WHERE created_at >= ${sinceExpr} AND delta_cents > 0
+           GROUP BY date(created_at)`,
+        );
+        for (const row of r.rows) {
+          const day = String((row as { day?: unknown }).day || "").slice(0, 10);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+          cents.set(day, Number((row as { c?: unknown }).c || 0));
+        }
+      } catch {
+        /* ignore */
+      }
+      return { count, cents };
+    })(),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM short_links
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM vrf_draws
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM fair_raffle_entries
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM multisigs
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM poap_claims
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    getStats(),
+  ]);
+
+  // Build UTC day list newest → oldest
+  const series: TractionDay[] = [];
+  const now = new Date();
+  for (let i = 0; i < n; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
+    const day = d.toISOString().slice(0, 10);
+    const row = emptyDay(day);
+    row.signups = signups.get(day) || 0;
+    row.tokens = tokens.get(day) || 0;
+    row.nfts = nfts.get(day) || 0;
+    row.gifts = gifts.get(day) || 0;
+    row.giftClaims = giftClaims.get(day) || 0;
+    row.creditsTx = credits.count.get(day) || 0;
+    row.creditsCents = credits.cents.get(day) || 0;
+    row.shortLinks = shortLinks.get(day) || 0;
+    row.draws = draws.get(day) || 0;
+    row.raffleEntries = raffleEntries.get(day) || 0;
+    row.multisigs = multisigs.get(day) || 0;
+    row.poapClaims = poapClaims.get(day) || 0;
+    series.push(row);
+  }
+
+  const sum = (key: keyof TractionDay) =>
+    series.reduce((a, r) => a + (typeof r[key] === "number" ? (r[key] as number) : 0), 0);
+
+  const totals = {
+    signups: sum("signups"),
+    tokens: sum("tokens"),
+    nfts: sum("nfts"),
+    gifts: sum("gifts"),
+    giftClaims: sum("giftClaims"),
+    creditsTx: sum("creditsTx"),
+    creditsCents: sum("creditsCents"),
+    shortLinks: sum("shortLinks"),
+    draws: sum("draws"),
+    raffleEntries: sum("raffleEntries"),
+    multisigs: sum("multisigs"),
+    poapClaims: sum("poapClaims"),
+    walletsAllTime: Number(allTime.wallets || 0),
+    tokensAllTime: Number(allTime.tokens || 0),
+    nftsAllTime: Number(allTime.nfts || 0),
+  };
+
+  return {
+    timezone: "UTC",
+    generatedAt: new Date().toISOString(),
+    days: n,
+    totals,
+    today: series[0] || null,
+    series,
+  };
+}
+
 // ─── Creator profiles ─────────────────────────────────────────────────────────
 
 export async function upsertCreatorProfile(data: {

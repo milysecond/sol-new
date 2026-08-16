@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-15",
+    title: "Traction dashboard",
+    items: [
+      "/traction — daily signups & activity in UTC+0.",
+      "API /api/traction?days=7|14|30|90",
+    ],
+  },
+  {
+    date: "2026-08-15",
     title: "solnewlog includes geolocation",
     items: [
       "All Telegram log events attach IP + location (CF headers + IP lookup).",
