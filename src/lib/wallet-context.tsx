@@ -7,6 +7,7 @@ import {
   createPasskeyWallet,
   recoverPasskeyWallet,
   identifyPasskeyWallet,
+  provePasskeyWallet,
   signalPasskeyUserDetails,
 } from "./passkey-wallet";
 import { useNetwork } from "./network";
@@ -410,36 +411,53 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const switchWallet = async (pubkey: string) => {
     const entry = loadWallets().find((w) => w.pubkey === pubkey);
     if (!entry) return;
+    if (publicKey === pubkey) return;
 
-    // Always re-bind credential when switching so signing uses the right passkey
+    // Require passkey signature (challenge) before activating another wallet
     setError(null);
     setLoading(true);
     try {
-      if (entry.credentialId) {
-        activateWallet({ ...entry, label: entry.pubkey });
-        // Soft verify later on sign; activate immediately for UX
-        setLoading(false);
-        return;
+      const { toast } = await import("@/lib/toast");
+      toast.info(
+        `Authenticate to switch to ${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`,
+      );
+
+      const result = await provePasskeyWallet(pubkey);
+      if (result.publicKey !== pubkey) {
+        throw new Error("Passkey does not match that wallet");
       }
-      // No stored credentialId — force user to pick the matching passkey
-      const result = await recoverPasskeyWallet({
-        forcePicker: true,
-        forAddress: pubkey,
-      });
+
       activateWallet({
         pubkey: result.publicKey,
         credentialId: result.credentialId,
         label: result.publicKey,
         userId: entry.userId,
       });
+
+      fetch("/api/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          publicKey: result.publicKey,
+          credentialId: result.credentialId,
+        }),
+      }).catch(() => {});
+
+      toast.success(`Switched to ${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`);
     } catch (e) {
       const { friendlyError } = await import("./friendly-errors");
       setError(
         friendlyError(
           e,
-          `Pick the passkey for ${pubkey.slice(0, 4)}…${pubkey.slice(-4)} (name should be the full address).`,
+          `Sign with the passkey for ${pubkey.slice(0, 4)}…${pubkey.slice(-4)} to switch.`,
         ),
       );
+      try {
+        const { toast } = await import("@/lib/toast");
+        toast.error("Wallet switch cancelled or passkey mismatch");
+      } catch {
+        /* ignore */
+      }
     } finally {
       setLoading(false);
     }

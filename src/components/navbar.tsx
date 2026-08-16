@@ -363,7 +363,7 @@ export function Navbar() {
                               key={w.pubkey}
                               type="button"
                               onClick={() => {
-                                switchWallet(w.pubkey);
+                                void switchWallet(w.pubkey);
                                 setShowMenu(false);
                               }}
                               className={`flex items-center justify-between w-full px-4 py-2 text-sm cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 ${

@@ -264,6 +264,11 @@ export async function recoverPasskeyWallet(opts?: {
   forcePicker?: boolean;
   /** Pin to this wallet's saved credential when known. */
   forAddress?: string;
+  /**
+   * Purpose of this auth (shown only in our errors; WebAuthn challenge is purpose-bound).
+   * Default: unlock. Use "switch" when changing active wallet.
+   */
+  purpose?: "unlock" | "switch" | "identify";
 }): Promise<{
   publicKey: string;
   credentialId: string;
@@ -273,21 +278,53 @@ export async function recoverPasskeyWallet(opts?: {
   const allowCredentials = opts?.forcePicker
     ? undefined
     : getAllowCredentials(opts?.forAddress);
-  const credential = (await navigator.credentials.get({
-    publicKey: {
-      challenge: CHALLENGE,
-      rpId: getRpId(),
-      userVerification: "required",
-      ...(allowCredentials && { allowCredentials }),
-      extensions: {
-        prf: {
-          eval: {
-            first: CHALLENGE,
+
+  // Purpose-bound challenge so each switch is a fresh signature (PRF seed still uses CHALLENGE).
+  const purpose = opts?.purpose || "unlock";
+  const challenge = new TextEncoder().encode(
+    `sol.new:${purpose}:${opts?.forAddress || "any"}:${Date.now()}:${crypto.getRandomValues(new Uint8Array(8)).join("")}`,
+  );
+
+  let credential: PublicKeyCredential | null = null;
+  try {
+    credential = (await navigator.credentials.get({
+      publicKey: {
+        challenge,
+        rpId: getRpId(),
+        userVerification: "required",
+        timeout: 120_000,
+        ...(allowCredentials && { allowCredentials }),
+        extensions: {
+          prf: {
+            eval: {
+              first: CHALLENGE,
+            },
           },
         },
       },
-    },
-  })) as PublicKeyCredential;
+    })) as PublicKeyCredential;
+  } catch (e) {
+    // Pinned credential missing/wrong — retry with full picker when switching to a known address
+    if (!opts?.forcePicker && opts?.forAddress) {
+      credential = (await navigator.credentials.get({
+        publicKey: {
+          challenge,
+          rpId: getRpId(),
+          userVerification: "required",
+          timeout: 120_000,
+          extensions: {
+            prf: {
+              eval: {
+                first: CHALLENGE,
+              },
+            },
+          },
+        },
+      })) as PublicKeyCredential;
+    } else {
+      throw e;
+    }
+  }
 
   if (!credential) throw new Error("Passkey authentication cancelled");
 
@@ -315,6 +352,24 @@ export async function recoverPasskeyWallet(opts?: {
     publicKey,
     credentialId,
   };
+}
+
+/**
+ * Prove control of a wallet via passkey (message/challenge sign).
+ * Required when switching active accounts.
+ */
+export async function provePasskeyWallet(address: string): Promise<{
+  publicKey: string;
+  credentialId: string;
+}> {
+  const a = address.trim();
+  if (!a) throw new Error("Missing wallet address");
+  // Try pinned credential first; recoverPasskeyWallet falls back to picker
+  return recoverPasskeyWallet({
+    forAddress: a,
+    forcePicker: false,
+    purpose: "switch",
+  });
 }
 
 /** Open the full passkey list and reveal the Solana address for the chosen one. */
