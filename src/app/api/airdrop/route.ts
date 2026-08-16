@@ -8,6 +8,7 @@ import {
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import { notifyEvent } from "@/lib/notify";
+import { devnetRpcEndpoints } from "@/lib/rpc-server";
 
 const AIRDROP_AMOUNT = 0.1 * LAMPORTS_PER_SOL;
 
@@ -23,27 +24,6 @@ function getFaucetKeypair(): Keypair | null {
   }
 }
 
-/** Helius last — often exhausted (429 max usage). */
-function devnetRpcEndpoints(): string[] {
-  const list: string[] = [
-    "https://api.devnet.solana.com",
-    "https://rpc.ankr.com/solana_devnet",
-    "https://endpoints.omniatech.io/v1/sol/devnet/public",
-  ];
-  const override = process.env.DEVNET_RPC?.trim();
-  if (override) list.unshift(override);
-  const helius = process.env.HELIUS_API_KEY?.trim();
-  // Put paid Helius at the end so we don't burn it first when exhausted
-  if (helius) list.push(`https://devnet.helius-rpc.com/?api-key=${helius}`);
-
-  const seen = new Set<string>();
-  return list.filter((u) => {
-    const k = u.replace(/\/+$/, "").toLowerCase();
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
-}
 
 function isRetryableRpcError(msg: string): boolean {
   const m = msg.toLowerCase();

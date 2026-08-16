@@ -2,15 +2,16 @@
  * Server-only RPC URLs. Never import this from client components.
  *
  * Mainnet pool (paid only — never free public Solana RPC):
- *   1. Helius Fast: viviyan-bkj12u
- *   2. Helius Fast: velvet-hw7q70
- *   3. Helius Fast: cassandra-bq5oqs (may be rate-limited / exhausted)
- *   4. Flux RPC (FLUXRPC_URL secret)
- *   5. HELIUS_API_KEY → mainnet.helius-rpc.com
- *   6. MAINNET_RPC override
+ *   1. aex402
+ *   2. Helius Fast: viviyan-bkj12u
+ *   3. Helius Fast: velvet-hw7q70
+ *   4. Helius Fast: cassandra-bq5oqs (backup)
+ *   5. Flux RPC (FLUXRPC_URL secret)
+ *   6. HELIUS_API_KEY → mainnet.helius-rpc.com
+ *   7. MAINNET_RPC override (primary when set)
  */
 
-/** Dedicated Helius Fast mainnet endpoints (auth in subdomain). */
+export const AEX402_MAINNET = "https://rpc.aex402.com";
 export const HELIUS_MAINNET_VIVIYAN =
   "https://viviyan-bkj12u-fast-mainnet.helius-rpc.com";
 export const HELIUS_MAINNET_VELVET =
@@ -25,6 +26,7 @@ function normalizeRpc(url: string): string {
 /** Ordered paid mainnet endpoints for failover. No free public nodes. */
 export function mainnetRpcEndpoints(): string[] {
   const list: string[] = [
+    AEX402_MAINNET,
     HELIUS_MAINNET_VIVIYAN,
     HELIUS_MAINNET_VELVET,
     HELIUS_MAINNET_CASSANDRA,
@@ -39,7 +41,6 @@ export function mainnetRpcEndpoints(): string[] {
   }
 
   const override = process.env.MAINNET_RPC?.trim();
-  // Prefer explicit override as primary when set
   if (override) list.unshift(override);
 
   const seen = new Set<string>();
@@ -58,10 +59,27 @@ export function mainnetRpcUrl(): string {
   return mainnetRpcEndpoints()[0];
 }
 
-export function devnetRpcUrl(): string {
+export function devnetRpcEndpoints(): string[] {
+  const list: string[] = [];
+  const override = process.env.DEVNET_RPC?.trim();
+  if (override) list.push(override);
   const helius = process.env.HELIUS_API_KEY?.trim();
-  if (helius) return `https://devnet.helius-rpc.com/?api-key=${helius}`;
-  return process.env.DEVNET_RPC?.trim() || "https://api.devnet.solana.com";
+  // Fresh Helius key first for devnet airdrops
+  if (helius) list.push(`https://devnet.helius-rpc.com/?api-key=${helius}`);
+  list.push("https://api.devnet.solana.com");
+  list.push("https://rpc.ankr.com/solana_devnet");
+  list.push("https://endpoints.omniatech.io/v1/sol/devnet/public");
+  const seen = new Set<string>();
+  return list.filter((u) => {
+    const k = normalizeRpc(u).toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+export function devnetRpcUrl(): string {
+  return devnetRpcEndpoints()[0] || "https://api.devnet.solana.com";
 }
 
 export function rpcUrlFor(network: "mainnet" | "devnet"): string {
@@ -77,13 +95,14 @@ function isRateLimitedMessage(msg: string): boolean {
     m.includes("exhausted") ||
     m.includes("credit") ||
     m.includes("quota") ||
-    m.includes("capacity")
+    m.includes("capacity") ||
+    m.includes("max usage") ||
+    m.includes("forbidden")
   );
 }
 
 /**
  * JSON-RPC POST against the mainnet pool with automatic failover.
- * Retries next endpoint on network/HTTP/rate-limit/RPC errors.
  */
 export async function mainnetRpcCall<T = unknown>(
   method: string,
@@ -105,9 +124,14 @@ export async function mainnetRpcCall<T = unknown>(
       });
       if (!res.ok) {
         lastErr = new Error(`RPC HTTP ${res.status} @ ${url}`);
-        if (res.status === 429 || res.status >= 500) continue;
-        // other 4xx may be method-specific; still try next on 403/401
-        if (res.status === 401 || res.status === 403) continue;
+        if (
+          res.status === 429 ||
+          res.status >= 500 ||
+          res.status === 401 ||
+          res.status === 403
+        ) {
+          continue;
+        }
         continue;
       }
       const j = (await res.json()) as {
@@ -117,16 +141,17 @@ export async function mainnetRpcCall<T = unknown>(
       if (j.error) {
         const msg = j.error.message || JSON.stringify(j.error);
         lastErr = new Error(msg);
-        if (isRateLimitedMessage(msg) || (j.error.code != null && j.error.code === 429)) {
+        if (
+          isRateLimitedMessage(msg) ||
+          (j.error.code != null && j.error.code === 429)
+        ) {
           continue;
         }
-        // Non-rate-limit RPC errors (e.g. invalid params) — don't burn the pool
         throw lastErr;
       }
       return j.result as T;
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e));
-      // try next endpoint
     }
   }
   throw lastErr || new Error("All mainnet RPC endpoints failed");
