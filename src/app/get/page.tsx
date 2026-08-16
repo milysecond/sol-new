@@ -162,7 +162,7 @@ export default function GetPage() {
 
 
   const solscanUrl = publicKey
-    ? `https://orbmarkets.io/address/${publicKey}${network === "devnet" ? "?cluster=devnet&hideSpam=true" : "?hideSpam=true"}`
+    ? `/address/${publicKey}`
     : "#";
 
   return (

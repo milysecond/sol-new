@@ -141,7 +141,7 @@ function SignSection({ onSigned }: { onSigned: (r: { message: string; signature:
                   <Check size={16} /> Your message is on the blockchain — forever.
                 </div>
                 <a
-                  href={`https://explorer.solana.com/tx/${onchain.signature}${network === "devnet" ? "?cluster=devnet" : ""}`}
+                  href={`/receipt/${onchain.signature}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-1.5 w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white transition"

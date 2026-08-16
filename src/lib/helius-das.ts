@@ -71,7 +71,7 @@ export function toNftCard(a: DasAsset): NftCard {
     interface: a.interface || null,
     meUrl: `https://magiceden.io/item-details/${mint}`,
     tensorUrl: `https://www.tensor.trade/item/${mint}`,
-    solscanUrl: `https://solscan.io/token/${mint}`,
+    solscanUrl: `/token/${mint}`,
   };
 }
 

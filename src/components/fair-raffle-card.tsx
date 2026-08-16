@@ -401,7 +401,7 @@ export function FairRaffleCard() {
                 )}
                 {r.payoutSig && (
                   <a
-                    href={`https://solscan.io/tx/${r.payoutSig}`}
+                    href={`/receipt/${r.payoutSig}`}
                     target="_blank"
                     rel="noreferrer"
                     className="text-emerald-500 hover:underline"

@@ -239,7 +239,10 @@ export default function NftPage() {
     }
   };
 
-  const explorerBase = "https://orbmarkets.io";
+  const explorerBase = "";
+  // prefer in-app token/address routes (never external explorers)
+  const mintHref = (mint: string) => `/token/${mint}`;
+  const addressHref = (id: string) => `/address/${id}`;
   const clusterParam = network === "devnet" ? "?cluster=devnet&hideSpam=true" : "?hideSpam=true";
 
   return (
@@ -274,7 +277,7 @@ export default function NftPage() {
                     <div>
                       <p className="text-xs text-gray-500 dark:text-white/40">Mint address</p>
                       <a
-                        href={`${explorerBase}/address/${result.mint}${clusterParam}`}
+                        href={mintHref(result.mint)}
                         target="_blank"
                         className="text-green-400 text-sm break-all hover:text-green-300"
                       >
@@ -301,7 +304,7 @@ export default function NftPage() {
                 {/* View NFT button */}
                 {result.mint && (
                   <a
-                    href={`${explorerBase}/address/${result.mint}${clusterParam}`}
+                    href={mintHref(result.mint)}
                     target="_blank"
                     className="flex items-center justify-center gap-1.5 w-full bg-green-500 hover:bg-green-400 text-white font-semibold rounded-xl px-4 py-3.5 transition text-center"
                   >
@@ -314,7 +317,7 @@ export default function NftPage() {
                   onClick={() => {
                     const id = result.mint || (result.assetId && result.assetId !== "pending" ? result.assetId : "");
                     if (!id) return;
-                    const url = `${explorerBase}/address/${id}${clusterParam}`;
+                    const url = addressHref(id);
                     navigator.clipboard.writeText(url);
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);

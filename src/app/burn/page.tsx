@@ -266,7 +266,7 @@ export default function BurnPage() {
                   {doneSigs.map((s) => (
                     <a
                       key={s}
-                      href={`https://solscan.io/tx/${s}`}
+                      href={`/receipt/${s}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block font-mono truncate hover:underline"

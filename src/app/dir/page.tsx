@@ -148,12 +148,12 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
   {
     section: "explorers & data",
     links: [
-      { label: "solscan", href: "https://solscan.io" },
-      { label: "solana explorer", href: "https://explorer.solana.com" },
+      { label: "scan", href: "/address" },
+      { label: "address", href: "/address" },
       { label: "dexscreener", href: "https://dexscreener.com/solana" },
       { label: "birdeye", href: "https://birdeye.so" },
       { label: "coingecko", href: "https://www.coingecko.com" },
-      { label: "orb markets", href: "https://orbmarkets.io" },
+      { label: "wallet", href: "/wallet" },
     ],
   },
   {

@@ -520,7 +520,7 @@ export default function MultisigDetailPage() {
 
   const networkOfRecord = view?.foundOnNetwork ?? network;
   const cluster = networkOfRecord === "devnet" ? "?cluster=devnet" : "";
-  const explorer = (a: string) => `https://solscan.io/account/${a}${cluster}`;
+  const explorer = (a: string) => `/address/${a}`;
   const isMember = view?.members.some((m) => publicKey && m.key === publicKey);
   const networkMismatch = view && view.foundOnNetwork !== network;
 

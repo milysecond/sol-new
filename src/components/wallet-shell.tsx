@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Wallet,
   Download,
@@ -16,12 +17,12 @@ import {
   Settings,
 } from "lucide-react";
 import { useWallet } from "@/lib/wallet-context";
-import { useNetwork } from "@/lib/network";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { Spinner } from "@/components/spinner";
 import { FaucetFooter } from "@/components/faucet-footer";
 import { formatSol, useHideBalances } from "@/lib/privacy";
+import { addressPath, EXPLORER_LABEL } from "@/lib/explorer";
 
 const tabs = [
   { id: "get", label: "Get", icon: Download, path: "/wallet/get" },
@@ -35,14 +36,11 @@ const tabs = [
 
 export function WalletShell({ children }: { children: React.ReactNode }) {
   const { publicKey, balance } = useWallet();
-  const { network } = useNetwork();
   const pathname = usePathname();
   const router = useRouter();
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [hideBalances] = useHideBalances();
 
-  const clusterParam =
-    network === "devnet" ? "?cluster=devnet&hideSpam=true" : "?hideSpam=true";
   const activeTab =
     tabs.find((t) => pathname === t.path || pathname?.startsWith(t.path + "/"))
       ?.id || "get";
@@ -87,19 +85,13 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
               <div className="flex gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => router.push("/wallet/settings")}
-                  className="p-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 rounded-lg transition"
-                  title="Settings"
-                  aria-label="Wallet settings"
-                >
-                  <Settings className="w-4 h-4 text-gray-500 dark:text-white/50" />
-                </button>
+                {/* Settings only via tab row below — no duplicate gear */}
                 <button
                   type="button"
                   onClick={copyAddress}
                   className="p-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 rounded-lg transition"
+                  title="Copy address"
+                  aria-label="Copy address"
                 >
                   {copiedAddress ? (
                     <Check className="w-4 h-4 text-green-400" />
@@ -107,14 +99,16 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
                     <Copy className="w-4 h-4 text-gray-500 dark:text-white/50" />
                   )}
                 </button>
-                <a
-                  href={`https://orbmarkets.io/address/${publicKey}${clusterParam}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="p-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 rounded-lg transition"
-                >
-                  <ExternalLink className="w-4 h-4 text-gray-500 dark:text-white/50" />
-                </a>
+                {publicKey && (
+                  <Link
+                    href={addressPath(publicKey)}
+                    className="p-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 rounded-lg transition"
+                    title={EXPLORER_LABEL}
+                    aria-label={EXPLORER_LABEL}
+                  >
+                    <ExternalLink className="w-4 h-4 text-gray-500 dark:text-white/50" />
+                  </Link>
+                )}
               </div>
             </div>
 

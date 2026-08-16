@@ -152,8 +152,8 @@ async function scanProgram(address: string, info: any) {
     programDataAddress,
     programwatchData: pwData,
     programwatchUrl: `https://programwatch.xyz/program/${address}`,
-    solscanUrl: `https://solscan.io/account/${address}`,
-    explorerUrl: `https://explorer.solana.com/address/${address}`,
+    solscanUrl: `/address/${address}`,
+    explorerUrl: `/address/${address}`,
   };
 }
 
@@ -286,7 +286,7 @@ async function scanToken(address: string, info?: any) {
     topHolders: (rc?.topHolders ?? []).slice(0, 10),
     markets: (rc?.markets ?? []).slice(0, 5),
     rugcheckUrl: `https://rugcheck.xyz/tokens/${address}`,
-    solscanUrl: `https://solscan.io/token/${address}`,
+    solscanUrl: `/token/${address}`,
     jupiterUrl: `https://jup.ag/tokens/${address}`,
     dexscreenerUrl: `https://dexscreener.com/solana/${address}`,
   };
@@ -322,7 +322,7 @@ async function scanTokenAccount(address: string, info: any) {
           ? "spl-token"
           : null,
     mintMeta,
-    solscanUrl: `https://solscan.io/account/${address}`,
+    solscanUrl: `/address/${address}`,
   };
 }
 
@@ -426,7 +426,7 @@ export async function GET(req: NextRequest) {
         ageRelative: age.relative,
         ageAbsolute: age.absolute,
         ageSource: "chain",
-        solscanUrl: `https://solscan.io/account/${address}`,
+        solscanUrl: `/address/${address}`,
       },
       { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } }
     );

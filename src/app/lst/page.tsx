@@ -379,7 +379,7 @@ export default function LstPage() {
 
               {sig && (
                 <a
-                  href={`https://solscan.io/tx/${sig}`}
+                  href={`/receipt/${sig}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block text-xs text-cyan-400 font-mono truncate hover:underline"

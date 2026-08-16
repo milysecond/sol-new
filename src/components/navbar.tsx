@@ -291,14 +291,13 @@ export function Navbar() {
                           ))}
                         </div>
                       </div>
-                      <a
-                        href={`https://orbmarkets.io/address/${publicKey}${network === "devnet" ? "?cluster=devnet&hideSpam=true" : "?hideSpam=true"}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <Link
+                        href={`/address/${publicKey}`}
+                        onClick={() => setShowMenu(false)}
                         className="block px-4 py-2.5 text-sm text-gray-700 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5"
                       >
-                        <ExternalLink size={14} className="inline mr-1.5" /> View on Orb
-                      </a>
+                        <ExternalLink size={14} className="inline mr-1.5" /> View address
+                      </Link>
                       <button
                         type="button"
                         onClick={() => {

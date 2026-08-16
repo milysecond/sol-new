@@ -93,8 +93,8 @@ export async function POST(req: NextRequest) {
       lastValidBlockHeight,
       meteoraUrl: `https://app.meteora.ag/pools/${poolAddr}`,
       solscanUrl: network === "devnet"
-        ? `https://orbmarkets.io/address/${mintAddress}?cluster=devnet&hideSpam=true`
-        : `https://orbmarkets.io/address/${mintAddress}?hideSpam=true`,
+        ? `/token/${mintAddress}`
+        : `/token/${mintAddress}`,
     });
   } catch (e: any) {
     console.error("DBC pool creation error:", e);

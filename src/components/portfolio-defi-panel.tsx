@@ -155,12 +155,12 @@ export function PortfolioDefiPanel({
           {short(address)}
         </span>
         <a
-          href={`https://solscan.io/account/${address}`}
+          href={`/address/${address}`}
           target="_blank"
           rel="noopener noreferrer"
           className="text-xs text-purple-600 dark:text-purple-400 inline-flex items-center gap-0.5"
         >
-          Solscan <ExternalLink className="w-3 h-3" />
+          sol.new <ExternalLink className="w-3 h-3" />
         </a>
         {!compact && (
           <Link

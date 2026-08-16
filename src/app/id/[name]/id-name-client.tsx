@@ -266,7 +266,7 @@ export function IdNameClient({ name }: { name: string }) {
                   </Link>
                   {" · "}
                   <a
-                    href={`https://solscan.io/account/${result.owner}`}
+                    href={`/address/${result.owner}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:underline"

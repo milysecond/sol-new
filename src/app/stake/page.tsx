@@ -496,7 +496,7 @@ export default function StakePage() {
 
               {sig && (
                 <a
-                  href={`https://solscan.io/tx/${sig}`}
+                  href={`/receipt/${sig}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block text-xs text-purple-400 font-mono truncate hover:underline"

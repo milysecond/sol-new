@@ -446,7 +446,7 @@ export default function LaunchTokenPage() {
               {[
                 { label: "pump.fun", href: `https://pump.fun/coin/${mint}` },
                 { label: "DexScreener", href: `https://dexscreener.com/solana/${mint}` },
-                { label: "Solscan", href: `https://solscan.io/token/${mint}` },
+                { label: "Solscan", href: `/token/${mint}` },
                 ...(token.twitter ? [{ label: "X", href: token.twitter }] : []),
                 ...(token.telegram ? [{ label: "Telegram", href: token.telegram }] : []),
                 ...(token.website ? [{ label: "Website", href: token.website }] : []),
