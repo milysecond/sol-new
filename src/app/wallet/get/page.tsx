@@ -169,7 +169,7 @@ export default function WalletGetPage() {
                 target="_blank"
                 className="flex items-center justify-center gap-1.5 w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition text-center text-sm"
               >
-                View on Orb Markets <ExternalLink className="w-3.5 h-3.5 inline ml-1" />
+                View on sol.new <ExternalLink className="w-3.5 h-3.5 inline ml-1" />
               </a>
             </div>
           </>
