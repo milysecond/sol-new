@@ -8,7 +8,6 @@ import {
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import { notifyEvent } from "@/lib/notify";
-import { devnetRpcUrl } from "@/lib/rpc-server";
 
 const AIRDROP_AMOUNT = 0.1 * LAMPORTS_PER_SOL;
 
@@ -27,31 +26,67 @@ function getFaucetKeypair(): Keypair {
   return Keypair.fromSecretKey(new Uint8Array(key));
 }
 
-function devnetConnection(): Connection {
-  // Prefer Helius / DEVNET_RPC — public api.devnet often 403s from Workers
-  const url =
-    process.env.DEVNET_RPC?.trim() ||
-    devnetRpcUrl() ||
-    "https://api.devnet.solana.com";
-  return new Connection(url, {
-    commitment: "confirmed",
-    confirmTransactionInitialTimeout: 60_000,
+function devnetRpcEndpoints(): string[] {
+  const list: string[] = [];
+  const override = process.env.DEVNET_RPC?.trim();
+  if (override) list.push(override);
+  const helius = process.env.HELIUS_API_KEY?.trim();
+  if (helius) list.push(`https://devnet.helius-rpc.com/?api-key=${helius}`);
+  // Public / alt fallbacks when Helius is exhausted
+  list.push("https://api.devnet.solana.com");
+  list.push("https://rpc.ankr.com/solana_devnet");
+  const seen = new Set<string>();
+  return list.filter((u) => {
+    const k = u.replace(/\/+$/, "").toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
   });
+}
+
+async function withDevnetRpc<T>(
+  fn: (conn: Connection) => Promise<T>,
+): Promise<T> {
+  let lastErr: Error | null = null;
+  for (const url of devnetRpcEndpoints()) {
+    try {
+      const conn = new Connection(url, {
+        commitment: "confirmed",
+        confirmTransactionInitialTimeout: 60_000,
+      });
+      return await fn(conn);
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+      const msg = lastErr.message.toLowerCase();
+      // try next on rate limit / network
+      if (
+        msg.includes("429") ||
+        msg.includes("too many") ||
+        msg.includes("max usage") ||
+        msg.includes("403") ||
+        msg.includes("fetch failed") ||
+        msg.includes("econnrefused") ||
+        msg.includes("timeout")
+      ) {
+        continue;
+      }
+      // other errors (e.g. bad pubkey) still try next for balance, else rethrow after pool
+      continue;
+    }
+  }
+  throw lastErr || new Error("All devnet RPCs failed");
 }
 
 export async function GET() {
   try {
     const faucet = getFaucetKeypair();
-    const conn = devnetConnection();
-    const balance = await conn.getBalance(faucet.publicKey, "confirmed");
+    const balance = await withDevnetRpc((conn) =>
+      conn.getBalance(faucet.publicKey, "confirmed"),
+    );
     return NextResponse.json({
       ok: true,
       address: faucet.publicKey.toBase58(),
       balance: balance / LAMPORTS_PER_SOL,
-      rpc: (process.env.DEVNET_RPC || "helius-or-default").replace(
-        /api-key=[^&]+/i,
-        "api-key=***",
-      ),
     });
   } catch (e) {
     return NextResponse.json(
@@ -81,101 +116,92 @@ export async function POST(req: NextRequest) {
     }
 
     const faucet = getFaucetKeypair();
-    const conn = devnetConnection();
 
-    let balance: number;
-    try {
-      balance = await conn.getBalance(faucet.publicKey, "confirmed");
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return NextResponse.json(
-        { ok: false, error: `Devnet RPC failed: ${msg}` },
-        { status: 502 },
+    const result = await withDevnetRpc(async (conn) => {
+      const balance = await conn.getBalance(faucet.publicKey, "confirmed");
+      if (balance < AIRDROP_AMOUNT + 10_000) {
+        throw new Error(
+          `Faucet empty (${(balance / LAMPORTS_PER_SOL).toFixed(4)} SOL). Try again later.`,
+        );
+      }
+
+      const { blockhash, lastValidBlockHeight } =
+        await conn.getLatestBlockhash("confirmed");
+      const tx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: faucet.publicKey,
+          toPubkey: recipient,
+          lamports: AIRDROP_AMOUNT,
+        }),
       );
-    }
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = faucet.publicKey;
+      tx.sign(faucet);
 
-    if (balance < AIRDROP_AMOUNT + 10_000) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: `Faucet empty (${(balance / LAMPORTS_PER_SOL).toFixed(4)} SOL). Try again later.`,
-        },
-        { status: 503 },
-      );
-    }
-
-    const { blockhash, lastValidBlockHeight } =
-      await conn.getLatestBlockhash("confirmed");
-    const tx = new Transaction().add(
-      SystemProgram.transfer({
-        fromPubkey: faucet.publicKey,
-        toPubkey: recipient,
-        lamports: AIRDROP_AMOUNT,
-      }),
-    );
-    tx.recentBlockhash = blockhash;
-    tx.feePayer = faucet.publicKey;
-    tx.sign(faucet);
-
-    const sig = await conn.sendRawTransaction(tx.serialize(), {
-      skipPreflight: false,
-      maxRetries: 5,
-      preflightCommitment: "confirmed",
-    });
-
-    // Poll confirmation — do NOT return ok until confirmed (or fail)
-    let confirmed = false;
-    let lastErr: string | null = null;
-    for (let i = 0; i < 30; i++) {
-      const st = await conn.getSignatureStatuses([sig], {
-        searchTransactionHistory: true,
+      const sig = await conn.sendRawTransaction(tx.serialize(), {
+        skipPreflight: false,
+        maxRetries: 5,
+        preflightCommitment: "confirmed",
       });
-      const v = st.value[0];
-      if (v?.err) {
-        throw new Error(`Airdrop tx failed on-chain: ${JSON.stringify(v.err)}`);
-      }
-      if (
-        v?.confirmationStatus === "confirmed" ||
-        v?.confirmationStatus === "finalized"
-      ) {
-        confirmed = true;
-        break;
-      }
-      // block height expiry
-      try {
-        const height = await conn.getBlockHeight("confirmed");
-        if (height > lastValidBlockHeight) {
-          lastErr = "Blockhash expired before confirmation";
+
+      let confirmed = false;
+      let lastErr: string | null = null;
+      for (let i = 0; i < 30; i++) {
+        const st = await conn.getSignatureStatuses([sig], {
+          searchTransactionHistory: true,
+        });
+        const v = st.value[0];
+        if (v?.err) {
+          throw new Error(`Airdrop tx failed on-chain: ${JSON.stringify(v.err)}`);
+        }
+        if (
+          v?.confirmationStatus === "confirmed" ||
+          v?.confirmationStatus === "finalized"
+        ) {
+          confirmed = true;
           break;
         }
-      } catch {
-        /* ignore */
+        try {
+          const height = await conn.getBlockHeight("confirmed");
+          if (height > lastValidBlockHeight) {
+            lastErr = "Blockhash expired before confirmation";
+            break;
+          }
+        } catch {
+          /* ignore */
+        }
+        await new Promise((r) => setTimeout(r, 1000));
       }
-      await new Promise((r) => setTimeout(r, 1000));
-    }
 
-    if (!confirmed) {
-      throw new Error(
-        lastErr ||
-          `Airdrop not confirmed after 30s (sig ${sig.slice(0, 12)}…). RPC may be slow — check explorer.`,
-      );
-    }
+      if (!confirmed) {
+        throw new Error(
+          lastErr ||
+            `Airdrop not confirmed after 30s (sig ${sig.slice(0, 12)}…). Check explorer.`,
+        );
+      }
+
+      return { sig, balance };
+    });
 
     void notifyEvent(
       {
         kind: "airdrop",
         emoji: "💧",
         title: "Devnet airdrop sent",
-        fields: { recipient: address, amount: 0.1, signature: sig },
+        fields: {
+          recipient: address,
+          amount: 0.1,
+          signature: result.sig,
+        },
       },
       { req },
     );
 
     return NextResponse.json({
       ok: true,
-      signature: sig,
+      signature: result.sig,
       amount: 0.1,
-      explorer: `https://solscan.io/tx/${sig}?cluster=devnet`,
+      explorer: `https://solscan.io/tx/${result.sig}?cluster=devnet`,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -188,6 +214,10 @@ export async function POST(req: NextRequest) {
       },
       { req },
     );
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    const status =
+      msg.toLowerCase().includes("empty") ? 503 :
+      msg.toLowerCase().includes("invalid") ? 400 :
+      500;
+    return NextResponse.json({ ok: false, error: msg }, { status });
   }
 }
