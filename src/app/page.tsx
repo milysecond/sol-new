@@ -49,7 +49,7 @@ function GetStarted({
   recover,
   loading,
 }: {
-  recover: () => Promise<void>;
+  recover: () => Promise<string | null>;
   loading: boolean;
 }) {
   const [isTg, setIsTg] = useState(false);
