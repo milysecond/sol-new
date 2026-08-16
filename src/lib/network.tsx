@@ -18,6 +18,7 @@ export type Network = "mainnet" | "devnet";
  * Never fall back to free public Solana RPC.
  */
 export const MAINNET_RPC_POOL = [
+  "https://rpc.aex402.com",
   "https://viviyan-bkj12u-fast-mainnet.helius-rpc.com",
   "https://velvet-hw7q70-fast-mainnet.helius-rpc.com",
   "https://cassandra-bq5oqs-fast-mainnet.helius-rpc.com",
