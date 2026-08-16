@@ -41,6 +41,9 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
   ) {
     return "Not enough SOL for this action (amount + network fee). Open Get funds, add SOL, then try again.";
   }
+  if (m.includes("incorrect program id")) {
+    return "This token uses Token-2022. Refresh and try again — we fixed the gift builder.";
+  }
   if (m.includes("failed to sign transaction") || m.includes("signing_failed") || m.includes("signing failed")) {
     return "Wallet couldn't sign. Reconnect your wallet or use a passkey, then try again.";
   }

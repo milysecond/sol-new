@@ -53,6 +53,8 @@ export type TokenHit = {
   decimals?: number;
   mcap?: number;
   usdPrice?: number;
+  tokenProgram?: string;
+  [k: string]: unknown;
 };
 
 export async function ultraOrder(params: {

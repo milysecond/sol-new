@@ -86,6 +86,7 @@ export type JupTokenBalance = {
   symbol?: string | null;
   name?: string | null;
   logoUri?: string | null;
+  programId?: string | null;
 };
 
 // ── Portfolio positions ───────────────────────────────────────────────────────
@@ -148,12 +149,14 @@ function sumUi(accounts: JupHoldingAccount[] | undefined): {
   amount: string;
   decimals: number;
   isFrozen?: boolean;
+  programId?: string;
 } {
   if (!accounts?.length) return { uiAmount: 0, amount: "0", decimals: 0 };
   let ui = 0;
   let raw = BigInt(0);
   let decimals = accounts[0]?.decimals ?? 0;
   let isFrozen = false;
+  let programId = accounts[0]?.programId;
   for (const a of accounts) {
     if (typeof a.uiAmount === "number") ui += a.uiAmount;
     else if (a.uiAmountString) ui += Number(a.uiAmountString) || 0;
@@ -166,12 +169,14 @@ function sumUi(accounts: JupHoldingAccount[] | undefined): {
     }
     if (a.decimals != null) decimals = a.decimals;
     if (a.isFrozen) isFrozen = true;
+    if (a.programId) programId = a.programId;
   }
   return {
     uiAmount: ui,
     amount: raw.toString(),
     decimals,
     isFrozen: isFrozen || undefined,
+    programId,
   };
 }
 
@@ -274,6 +279,7 @@ export async function jupWalletSnapshot(wallet: string): Promise<JupWalletSnapsh
       symbol: meta?.symbol ?? (mint === USDC ? "USDC" : mint === WSOL ? "SOL" : null),
       name: meta?.name ?? null,
       logoUri: meta?.logoURI ?? null,
+      programId: s.programId ?? null,
     });
   }
 
@@ -281,7 +287,7 @@ export async function jupWalletSnapshot(wallet: string): Promise<JupWalletSnapsh
 
   // Enrich meme coins missing logo/symbol (holdings API often has none)
   const needMeta = tokens
-    .filter((t) => !t.logoUri || !t.symbol || !t.name)
+    .filter((t) => !t.logoUri || !t.symbol || !t.name || !t.programId)
     .map((t) => t.mint)
     .slice(0, 24);
   if (needMeta.length) {
@@ -291,13 +297,18 @@ export async function jupWalletSnapshot(wallet: string): Promise<JupWalletSnapsh
         needMeta.map(async (mint) => {
           try {
             const hits = await tokenSearch(mint);
-            const hit = hits.find((h) => h.id === mint || h.id?.toLowerCase() === mint.toLowerCase());
+            const hit = hits.find(
+              (h) => h.id === mint || h.id?.toLowerCase() === mint.toLowerCase(),
+            ) as
+              | (import("@/lib/jup-ultra").TokenHit & { tokenProgram?: string })
+              | undefined;
             if (!hit) return;
             const t = tokens.find((x) => x.mint === mint);
             if (!t) return;
             if (!t.symbol && hit.symbol) t.symbol = hit.symbol;
             if (!t.name && hit.name) t.name = hit.name;
             if (!t.logoUri && hit.icon) t.logoUri = hit.icon;
+            if (!t.programId && hit.tokenProgram) t.programId = hit.tokenProgram;
             if (t.priceUsd == null && typeof hit.usdPrice === "number") {
               t.priceUsd = hit.usdPrice;
               t.valueUsd = t.uiAmount * hit.usdPrice;
