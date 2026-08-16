@@ -28,16 +28,18 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
     return "A wallet in this transaction has 0 SOL (often the network-fee payer). Try again — fees may come from your balance.";
   }
 
-  // Insufficient SOL (system program 0x1 / simulation logs)
+  // Insufficient SOL (system program 0x1 / simulation logs / Phantom wording)
   if (
     m.includes("insufficient lamports") ||
     m.includes("insufficient funds") ||
+    m.includes("not enough sol") ||
+    m.includes("insufficient sol") ||
     (m.includes("0x1") && (m.includes("transfer") || m.includes("simulation") || m.includes("custom program error")))
   ) {
-    if (m.includes("insufficient lamports") || m.includes("need ")) {
-      return "Not enough SOL after the network fee. Tap Max to send what you can, or add a little more SOL.";
-    }
-    return "Not enough SOL in your wallet. Add some from the Get page.";
+    return "Not enough SOL for this action (amount + network fee). Open Get funds, add SOL, then try again.";
+  }
+  if (m.includes("user rejected") || m.includes("rejected the request") || m.includes("user denied transaction")) {
+    return "Transaction cancelled in the wallet app.";
   }
 
   // Network / RPC
