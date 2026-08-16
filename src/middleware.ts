@@ -57,38 +57,31 @@ export function middleware(request: NextRequest) {
   }
 
   // Canonical wallet/token/program lookup: /address/<pubkey>
-  // Bare /address or /scan → scan form (rewrite to /scan app route).
-  if (path === "/address" || path === "/address/" || path === "/scan" || path === "/scan/") {
+  // Do NOT rewrite /address → /scan (that steals metadata + confuses crawlers).
+  // Scan UI already resolves both /address and /address/<pk> pathnames.
+  if (path === "/scan" || path === "/scan/") {
+    const q = url.searchParams.get("address") || url.searchParams.get("wallet");
+    const dest = request.nextUrl.clone();
+    if (q && q.trim()) {
+      dest.pathname = `/address/${q.trim()}`;
+      dest.search = "";
+      return NextResponse.redirect(dest, 308);
+    }
+    dest.pathname = "/address";
+    dest.search = "";
+    return NextResponse.redirect(dest, 308);
+  }
+  if (path === "/address" || path === "/address/") {
     const q = url.searchParams.get("address") || url.searchParams.get("wallet");
     if (q && q.trim()) {
-      // Always prefer pretty /address/<pk> in the browser URL
       const dest = request.nextUrl.clone();
       dest.pathname = `/address/${q.trim()}`;
       dest.search = "";
       return NextResponse.redirect(dest, 308);
     }
-    // Empty form: rewrite to scan page under /address in the bar
-    if (path === "/scan" || path === "/scan/") {
-      const dest = request.nextUrl.clone();
-      dest.pathname = "/address";
-      dest.search = "";
-      return NextResponse.redirect(dest, 308);
-    }
-    url.pathname = "/scan";
-    return NextResponse.rewrite(url);
+    return NextResponse.next();
   }
-  const addressLookup = path.match(/^\/address\/([^/]+)\/?$/);
-  if (addressLookup?.[1]) {
-    let addr = addressLookup[1];
-    try {
-      addr = decodeURIComponent(addr);
-    } catch {
-      /* keep raw */
-    }
-    url.pathname = "/scan";
-    url.searchParams.set("address", addr);
-    return NextResponse.rewrite(url);
-  }
+  // /address/<pk> — let the app route handle (metadata + Scan UI). No rewrite.
 
   return NextResponse.next();
 }

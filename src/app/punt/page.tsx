@@ -178,7 +178,10 @@ export default function PuntPage() {
   const load = useCallback(async (manual = false) => {
     if (manual) setRefreshing(true);
     try {
-      const r = await fetch("/api/punt", { cache: "no-store" });
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 15_000);
+      const r = await fetch("/api/punt", { cache: "no-store", signal: ctrl.signal });
+      clearTimeout(timer);
       const j = (await r.json()) as { matches?: PuntMatch[]; updatedAt?: number; error?: string };
       if (!r.ok || !j.matches) throw new Error(j.error || `HTTP ${r.status}`);
       setMatches(j.matches);
@@ -186,6 +189,8 @@ export default function PuntPage() {
       setError(null);
     } catch (e) {
       setError(String(e instanceof Error ? e.message : e));
+      // Leave loading: null → [] so UI shows error instead of infinite spinner
+      setMatches((prev) => prev ?? []);
     } finally {
       setRefreshing(false);
     }

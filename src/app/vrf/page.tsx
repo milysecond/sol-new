@@ -1,6 +1,6 @@
 import { permanentRedirect } from "next/navigation";
 
-/** Legacy alias → /draw */
+/** Legacy VRF alias → Fair Draw (default wheel). */
 export default function VrfAlias() {
-  permanentRedirect("/draw");
+  permanentRedirect("/draw?mode=wheel");
 }
