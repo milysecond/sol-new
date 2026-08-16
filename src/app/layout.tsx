@@ -11,6 +11,7 @@ import { InstallPrompt } from "@/components/install-prompt";
 import { PushPrompt } from "@/components/push-prompt";
 import { SiteFooter } from "@/components/site-footer";
 import { WalletBrowserTitle } from "@/components/wallet-browser-title";
+import { RouteTransition } from "@/components/route-transition";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -133,8 +134,10 @@ export default function RootLayout({
           <WalletProvider>
             <WalletBrowserTitle />
             <PodPlayerProvider>
-              <div className="min-h-screen flex flex-col">
-                <div className="flex-1 flex flex-col">{children}</div>
+              <div className="min-h-screen flex flex-col overflow-x-hidden">
+                <div className="flex-1 flex flex-col min-h-0">
+                  <RouteTransition>{children}</RouteTransition>
+                </div>
                 <SiteFooter />
               </div>
             </PodPlayerProvider>

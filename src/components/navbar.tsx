@@ -23,6 +23,7 @@ import {
 import { AppNavMenu } from "@/components/app-nav-menu";
 import { getPushPermission, subscribePush, unsubscribePush, type PushPermission } from "@/lib/push-client";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { SocialLinks } from "@/components/social-links";
 import { Spinner } from "@/components/spinner";
 import { PageBack } from "@/components/page-back";
 import { useDefaultToken } from "@/lib/currency-pref";
@@ -198,7 +199,8 @@ export function Navbar() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+            <SocialLinks />
             <ThemeToggle />
             {publicKey ? (
               <div className="relative">

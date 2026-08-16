@@ -2,14 +2,22 @@
 
 import { motion, useReducedMotion } from "motion/react";
 
-/** Default page enter: soft slide + fade (disabled when reduced motion). */
+/**
+ * Optional local page enter (for sections that don't use RouteTransition key).
+ * Prefer RouteTransition at app root for full-page mobile slides.
+ */
 export function PageTransition({ children }: { children: React.ReactNode }) {
   const reduce = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, x: reduce ? 0 : 16 }}
+      initial={reduce ? false : { opacity: 0.92, x: 10 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: reduce ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] }}
+      transition={
+        reduce
+          ? { duration: 0 }
+          : { type: "spring", stiffness: 420, damping: 36, mass: 0.8 }
+      }
+      className="w-full"
     >
       {children}
     </motion.div>
