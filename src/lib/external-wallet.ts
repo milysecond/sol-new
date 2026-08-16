@@ -8,10 +8,12 @@ type AnyTx = Transaction | VersionedTransaction;
 
 type OpenPicker = () => void;
 type SignTx = <T extends AnyTx>(tx: T) => Promise<T>;
+type SignAndSend = (tx: AnyTx) => Promise<string>;
 type DisconnectExt = () => Promise<void> | void;
 
 let openPickerFn: OpenPicker | null = null;
 let signTxFn: SignTx | null = null;
+let signAndSendFn: SignAndSend | null = null;
 let disconnectFn: DisconnectExt | null = null;
 
 export function registerWalletPicker(fn: OpenPicker | null) {
@@ -22,8 +24,16 @@ export function registerExternalSigner(fn: SignTx | null) {
   signTxFn = fn;
 }
 
+export function registerExternalSignAndSend(fn: SignAndSend | null) {
+  signAndSendFn = fn;
+}
+
 export function registerExternalDisconnect(fn: DisconnectExt | null) {
   disconnectFn = fn;
+}
+
+export function hasConnectorSigner(): boolean {
+  return Boolean(signTxFn || signAndSendFn);
 }
 
 /** Open multi-wallet picker (ConnectorKit). */
@@ -56,6 +66,7 @@ export type InjectedSolanaProvider = {
   signTransaction: <T extends AnyTx>(tx: T) => Promise<T>;
   signAndSendTransaction?: (
     tx: AnyTx,
+    opts?: { skipPreflight?: boolean; maxRetries?: number },
   ) => Promise<{ signature: string } | string>;
 };
 
@@ -92,16 +103,88 @@ export function hasInjectedWallet(): boolean {
   return Boolean(getInjectedProvider());
 }
 
-/** Prefer ConnectorKit signer; fall back to window.solana inject. */
+export function hasExternalWalletSession(): boolean {
+  return hasConnectorSigner() || Boolean(getInjectedProvider()?.publicKey);
+}
+
+function unwrapSig(r: { signature: string } | string): string {
+  if (typeof r === "string") return r;
+  if (r && typeof r.signature === "string") return r.signature;
+  throw new Error("Wallet did not return a transaction signature");
+}
+
+/**
+ * Sign a legacy web3.js transaction with ConnectorKit or inject.
+ * Prefer this when you will sendRawTransaction yourself.
+ */
 export async function signTransactionWithInjected<T extends AnyTx>(tx: T): Promise<T> {
+  const errors: string[] = [];
+
   if (signTxFn) {
-    return signTxFn(tx);
+    try {
+      return await signTxFn(tx);
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
+    }
   }
+
   const p = getInjectedProvider();
-  if (!p) {
-    throw new Error("Browser wallet disconnected. Reconnect and try again.");
+  if (p) {
+    try {
+      // Ensure wallet is connected
+      if (!p.publicKey) {
+        await p.connect();
+      }
+      return await p.signTransaction(tx);
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
+    }
   }
-  return p.signTransaction(tx);
+
+  const detail = errors.filter(Boolean).join(" · ") || "no wallet available";
+  if (/reject|denied|cancel|notallowed/i.test(detail)) {
+    throw new Error("Wallet signature cancelled. Gift was not sent.");
+  }
+  throw new Error(
+    `Could not sign with your browser wallet (${detail}). Reconnect the wallet and try again, or use a passkey wallet.`,
+  );
+}
+
+/**
+ * Sign + send in one step when the wallet supports it (best UX on mobile).
+ * Returns signature string, or null if caller should fall back to sign+sendRaw.
+ */
+export async function signAndSendWithExternal(
+  tx: AnyTx,
+  opts?: { skipPreflight?: boolean; maxRetries?: number },
+): Promise<string | null> {
+  if (signAndSendFn) {
+    try {
+      return await signAndSendFn(tx);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/reject|denied|cancel|notallowed/i.test(msg)) {
+        throw new Error("Wallet signature cancelled. Gift was not sent.");
+      }
+      // fall through to inject / manual
+    }
+  }
+
+  const p = getInjectedProvider();
+  if (p?.signAndSendTransaction) {
+    try {
+      if (!p.publicKey) await p.connect();
+      return unwrapSig(await p.signAndSendTransaction(tx, opts));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/reject|denied|cancel|notallowed/i.test(msg)) {
+        throw new Error("Wallet signature cancelled. Gift was not sent.");
+      }
+      // fall through
+    }
+  }
+
+  return null;
 }
 
 /** @deprecated Use openWalletPicker + ConnectorKit. Kept for fallback. */
@@ -109,7 +192,6 @@ export async function connectInjectedWallet(): Promise<{
   publicKey: string;
   label: string;
 }> {
-  // Prefer picker when available
   if (openPickerFn) {
     openPickerFn();
     throw new Error("PICKER_OPENED");

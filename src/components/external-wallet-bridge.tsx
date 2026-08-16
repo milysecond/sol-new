@@ -10,6 +10,7 @@ import { useWallet } from "@/lib/wallet-context";
 import {
   registerExternalDisconnect,
   registerExternalSigner,
+  registerExternalSignAndSend,
   registerWalletPicker,
 } from "@/lib/external-wallet";
 
@@ -62,10 +63,17 @@ export function ExternalWalletBridge() {
         const signed = await signer.signTransaction(tx);
         return signed as T;
       });
+      registerExternalSignAndSend(async (tx) => {
+        return signer.signAndSendTransaction(tx, { skipPreflight: false, maxRetries: 3 });
+      });
     } else {
       registerExternalSigner(null);
+      registerExternalSignAndSend(null);
     }
-    return () => registerExternalSigner(null);
+    return () => {
+      registerExternalSigner(null);
+      registerExternalSignAndSend(null);
+    };
   }, [walletKind, signer, ready]);
 
   useEffect(() => {

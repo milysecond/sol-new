@@ -41,6 +41,12 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
   ) {
     return "Not enough SOL for this action (amount + network fee). Open Get funds, add SOL, then try again.";
   }
+  if (m.includes("failed to sign transaction") || m.includes("signing_failed") || m.includes("signing failed")) {
+    return "Wallet couldn't sign. Reconnect your wallet or use a passkey, then try again.";
+  }
+  if (m.includes("failed to send transaction") || m.includes("send_failed")) {
+    return "Wallet signed but send failed. Check balance/fees and try again.";
+  }
   if (m.includes("user rejected") || m.includes("rejected the request") || m.includes("user denied transaction")) {
     return "Transaction cancelled in the wallet app.";
   }
