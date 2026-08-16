@@ -15,11 +15,18 @@ import {
   Check,
   AlertTriangle,
   Info,
+  PanelLeft,
+  LayoutGrid,
 } from "lucide-react";
 import { WalletShell } from "@/components/wallet-shell";
 import { useWallet } from "@/lib/wallet-context";
 import { toast } from "@/lib/toast";
 import { useHideBalances } from "@/lib/privacy";
+import {
+  readNavMenuStyle,
+  writeNavMenuStyle,
+  type NavMenuStyle,
+} from "@/lib/nav-style";
 
 const AUTO_LOCK_KEY = "sol.new.security.autoLockMin";
 
@@ -43,10 +50,12 @@ export default function WalletSettingsPage() {
   } = useWallet();
   const [hideBalances, setHideBalances] = useHideBalances();
   const [autoLockMin, setAutoLockMin] = useState(15);
+  const [menuStyle, setMenuStyle] = useState<NavMenuStyle>("more");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setAutoLockMin(readAutoLock());
+    setMenuStyle(readNavMenuStyle());
     setMounted(true);
   }, []);
 
@@ -159,6 +168,65 @@ export default function WalletSettingsPage() {
             Masks SOL, USDC, token amounts, and USD values in the navbar, wallet,
             portfolio, find-wallet list, and send screens on this device.
           </p>
+        </section>
+
+        {/* Navigation chrome */}
+        <section className="rounded-2xl border border-black/10 dark:border-white/10 p-4 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 flex items-center gap-1.5">
+            <PanelLeft className="w-3.5 h-3.5" /> App menu style
+          </p>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Choose how the full app list opens from the bottom bar (and desktop
+            Menu). Default is the More tray; left drawer matches X / LinkedIn.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setMenuStyle("more");
+                writeNavMenuStyle("more");
+                toast.success("More tray menu");
+              }}
+              className={`flex flex-col items-start gap-1.5 rounded-xl border px-3 py-3 text-left transition min-h-[88px] ${
+                menuStyle === "more"
+                  ? "border-fuchsia-400/60 bg-fuchsia-500/10"
+                  : "border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03]"
+              }`}
+            >
+              <LayoutGrid
+                className={`w-5 h-5 ${
+                  menuStyle === "more" ? "text-fuchsia-400" : "text-gray-400"
+                }`}
+              />
+              <span className="text-sm font-semibold">More tray</span>
+              <span className="text-[11px] text-gray-500 leading-snug">
+                Bottom sheet with groups, A–Z, custom order
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuStyle("sidebar");
+                writeNavMenuStyle("sidebar");
+                toast.success("Left side menu on");
+              }}
+              className={`flex flex-col items-start gap-1.5 rounded-xl border px-3 py-3 text-left transition min-h-[88px] ${
+                menuStyle === "sidebar"
+                  ? "border-fuchsia-400/60 bg-fuchsia-500/10"
+                  : "border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03]"
+              }`}
+            >
+              <PanelLeft
+                className={`w-5 h-5 ${
+                  menuStyle === "sidebar" ? "text-fuchsia-400" : "text-gray-400"
+                }`}
+              />
+              <span className="text-sm font-semibold">Left menu</span>
+              <span className="text-[11px] text-gray-500 leading-snug">
+                X / LinkedIn style drawer under the chrome
+              </span>
+            </button>
+          </div>
         </section>
 
         {/* Auto-lock */}

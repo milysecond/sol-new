@@ -20,8 +20,15 @@ import {
   Gift,
   Trophy,
   FolderOpen,
+  Menu,
 } from "lucide-react";
 import { AppNavMenu } from "@/components/app-nav-menu";
+import { AppSideNav } from "@/components/app-side-nav";
+import {
+  readNavMenuStyle,
+  NAV_MENU_STYLE_EVENT,
+  type NavMenuStyle,
+} from "@/lib/nav-style";
 import { getPushPermission, subscribePush, unsubscribePush, type PushPermission } from "@/lib/push-client";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SocialLinks } from "@/components/social-links";
@@ -80,12 +87,21 @@ export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [showMore, setShowMore] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<NavMenuStyle>("more");
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [portalReady, setPortalReady] = useState(false);
 
   useEffect(() => {
     setPortalReady(true);
+    setMenuStyle(readNavMenuStyle());
+    const onStyle = () => setMenuStyle(readNavMenuStyle());
+    window.addEventListener(NAV_MENU_STYLE_EVENT, onStyle);
+    window.addEventListener("storage", onStyle);
+    return () => {
+      window.removeEventListener(NAV_MENU_STYLE_EVENT, onStyle);
+      window.removeEventListener("storage", onStyle);
+    };
   }, []);
 
   useEffect(() => {
@@ -234,8 +250,17 @@ export function Navbar() {
                     : "text-gray-500 dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5"
                 }`}
               >
-                <MoreHorizontal size={15} className="inline mr-1" />
-                More
+                {menuStyle === "sidebar" ? (
+                  <>
+                    <Menu size={15} className="inline mr-1" />
+                    Menu
+                  </>
+                ) : (
+                  <>
+                    <MoreHorizontal size={15} className="inline mr-1" />
+                    More
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -529,16 +554,26 @@ export function Navbar() {
             moreActive ? "text-purple-600 dark:text-purple-400" : "text-gray-500 dark:text-white/40"
           }`}
         >
-          <MoreHorizontal size={22} />
-          <span className="text-[10px] font-medium">More</span>
+          {menuStyle === "sidebar" ? <Menu size={22} /> : <MoreHorizontal size={22} />}
+          <span className="text-[10px] font-medium">
+            {menuStyle === "sidebar" ? "Menu" : "More"}
+          </span>
         </button>
       </div>
 
-      <AppNavMenu
-        open={showMore}
-        onClose={() => setShowMore(false)}
-        isActive={isActive}
-      />
+      {menuStyle === "sidebar" ? (
+        <AppSideNav
+          open={showMore}
+          onClose={() => setShowMore(false)}
+          isActive={isActive}
+        />
+      ) : (
+        <AppNavMenu
+          open={showMore}
+          onClose={() => setShowMore(false)}
+          isActive={isActive}
+        />
+      )}
 
       {airdropping && (
         <div className="fixed bottom-20 sm:bottom-6 right-6 z-[100] bg-yellow-500/10 backdrop-blur-sm border border-yellow-500/30 rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg">
