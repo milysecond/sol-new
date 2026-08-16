@@ -66,14 +66,21 @@ function DragRow({
       value={item.href}
       dragListener={false}
       dragControls={controls}
-      className="flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-black px-3 py-2.5 list-none"
-      whileDrag={{ scale: 1.02, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 20 }}
+      className="flex items-center gap-2 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 py-2 touch-pan-y list-none"
+      whileDrag={{
+        scale: 1.02,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+        zIndex: 20,
+      }}
     >
       <button
         type="button"
-        className="shrink-0 p-2 -ml-1 rounded-lg text-gray-400 active:bg-black/5 dark:active:bg-white/10 cursor-grab active:cursor-grabbing touch-none"
+        className="shrink-0 p-2 rounded-lg text-gray-400 active:bg-black/5 dark:active:bg-white/10 cursor-grab active:cursor-grabbing"
         aria-label={`Drag ${item.label}`}
-        onPointerDown={(e) => controls.start(e)}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          controls.start(e);
+        }}
         style={{ touchAction: "none" }}
       >
         <GripVertical size={18} />
@@ -81,13 +88,20 @@ function DragRow({
       <Link
         href={item.href}
         onClick={onNavigate}
-        className="min-w-0 flex-1 flex items-center gap-3 py-0.5 touch-manipulation"
+        className="min-w-0 flex-1 flex items-center gap-3 py-1.5 pr-2 rounded-lg active:bg-black/5 dark:active:bg-white/5 touch-manipulation"
       >
         <Icon size={18} className={item.color} />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold truncate">{item.label}</p>
-          <p className="text-[11px] text-gray-500 dark:text-white/40 truncate">{item.desc}</p>
+        <div className="min-w-0 flex-1 text-left">
+          <p className="text-sm font-semibold truncate text-gray-900 dark:text-white">
+            {item.label}
+          </p>
+          <p className="text-[11px] text-gray-500 dark:text-white/40 truncate">
+            {item.desc}
+          </p>
         </div>
+        <span className="text-[11px] text-violet-500 font-medium shrink-0">
+          Open
+        </span>
       </Link>
     </Reorder.Item>
   );
