@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Wallet,
@@ -21,6 +21,7 @@ import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { Spinner } from "@/components/spinner";
 import { FaucetFooter } from "@/components/faucet-footer";
+import { formatSol, useHideBalances } from "@/lib/privacy";
 
 const tabs = [
   { id: "get", label: "Get", icon: Download, path: "/wallet/get" },
@@ -38,24 +39,7 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [copiedAddress, setCopiedAddress] = useState(false);
-  const [hideBalances, setHideBalances] = useState(false);
-
-  useEffect(() => {
-    const read = () => {
-      try {
-        setHideBalances(localStorage.getItem("sol.new.privacy.hideBalances") === "1");
-      } catch {
-        setHideBalances(false);
-      }
-    };
-    read();
-    window.addEventListener("sol.new.privacy", read);
-    window.addEventListener("storage", read);
-    return () => {
-      window.removeEventListener("sol.new.privacy", read);
-      window.removeEventListener("storage", read);
-    };
-  }, []);
+  const [hideBalances] = useHideBalances();
 
   const clusterParam =
     network === "devnet" ? "?cluster=devnet&hideSpam=true" : "?hideSpam=true";
@@ -71,7 +55,7 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
   };
 
   const balLabel =
-    balance === null ? null : hideBalances ? "••••" : `${balance.toFixed(4)} SOL`;
+    balance === null ? null : formatSol(hideBalances, balance, 4);
 
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">

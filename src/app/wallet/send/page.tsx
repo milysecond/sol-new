@@ -6,6 +6,7 @@ import { PageTransition } from "@/components/page-transition";
 import { Coins, Image as ImageIcon, Check, ExternalLink, ChevronDown } from "lucide-react";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
+import { formatQty, useHideBalances } from "@/lib/privacy";
 import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair, ensureDocumentFocusForPasskey } from "@/lib/passkey-wallet";
 import { PrivateSendSheet } from "@/components/private-send-sheet";
@@ -63,6 +64,7 @@ export default function SendPage() {
   const resolveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { publicKey, balance, usdcBalance, refreshBalance } = useWallet();
+  const [hideBalances] = useHideBalances();
   const { network, rpc } = useNetwork();
 
   const loadTokens = useCallback(async () => {
@@ -558,8 +560,10 @@ export default function SendPage() {
                     token={t}
                     right={
                       <span className="font-mono text-xs tabular-nums text-right shrink-0">
-                        {formatTokenUi(t.uiAmount, t.decimals)}
-                        {t.valueUsd != null && (
+                        {hideBalances
+                          ? "••••"
+                          : formatTokenUi(t.uiAmount, t.decimals)}
+                        {!hideBalances && t.valueUsd != null && (
                           <span className="block text-[10px] text-gray-400">
                             {t.valueUsd >= 0.01
                               ? `$${t.valueUsd.toFixed(2)}`
