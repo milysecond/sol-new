@@ -168,7 +168,6 @@ export default function GiftPage() {
 
   const handleCreate = async () => {
     if (!publicKey || !selected) return;
-    // Hard gate: never call create API until passkey/external auth succeeds
     setError(null);
     setGiftUrl(null);
     setGiftEntry(null);
@@ -182,13 +181,16 @@ export default function GiftPage() {
 
       if (selected.isNativeSol) {
         const amountBase = Math.round(parsed * LAMPORTS_PER_SOL);
-        if (amountBase + CLAIM_FEE_LAMPORTS * 2 > balanceLamports) {
-          throw new Error(`Not enough SOL. You have ${balance?.toFixed(4) ?? 0} SOL`);
+        // rent-exempt gift account + claim buffer + fee
+        if (amountBase + CLAIM_FEE_LAMPORTS * 2 + 5_000 > balanceLamports) {
+          throw new Error(
+            `Not enough SOL. Need gift amount + ~0.003 SOL for fees (you have ${balance?.toFixed(4) ?? 0} SOL)`,
+          );
         }
       } else {
         if (parsed > selected.uiAmount + 1e-12) {
           throw new Error(
-            `Not enough ${selected.symbol}. You have ${formatTokenUi(selected.uiAmount, selected.decimals)}`
+            `Not enough ${selected.symbol}. You have ${formatTokenUi(selected.uiAmount, selected.decimals)}`,
           );
         }
         if (balanceLamports < SPL_GIFT_SENDER_LAMPORTS + CLAIM_FEE_LAMPORTS) {
@@ -196,18 +198,24 @@ export default function GiftPage() {
         }
       }
 
-      // Auth first — cancel must abort (no create, no fund)
+      // ── Auth first ────────────────────────────────────────────────
       let sender: import("@solana/web3.js").Keypair | null = null;
+      const {
+        hasExternalWalletSession,
+        getInjectedProvider,
+      } = await import("@/lib/external-wallet");
+
       if (walletKind === "external") {
-        const { getInjectedProvider } = await import("@/lib/external-wallet");
-        if (!getInjectedProvider()) {
-          throw new Error("Browser wallet disconnected. Reconnect and try again.");
+        if (!hasExternalWalletSession() && !getInjectedProvider()) {
+          throw new Error(
+            "Browser wallet disconnected. Tap connect and pick a wallet again.",
+          );
         }
       } else {
         const { keypair } = await getPasskeyKeypair(publicKey);
         if (keypair.publicKey.toBase58() !== publicKey) {
           throw new Error(
-            `That passkey belongs to a different wallet. Pick the passkey for ${walletLabel || `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`}, or switch wallets in the menu.`
+            `That passkey belongs to a different wallet. Pick the passkey for ${walletLabel || `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`}, or switch wallets in the menu.`,
           );
         }
         sender = keypair;
@@ -244,33 +252,74 @@ export default function GiftPage() {
       }
 
       const connection = new Connection(rpc, "confirmed");
-      const tx = Transaction.from(Buffer.from(created.transaction, "base64"));
+      let tx = Transaction.from(Buffer.from(created.transaction, "base64"));
+      // Ensure fee payer + blockhash are set for wallet simulators
+      tx.feePayer = new PublicKey(publicKey);
+      if (created.blockhash) tx.recentBlockhash = created.blockhash;
 
       let signature: string;
+
       if (walletKind === "external") {
         setStatus("auth");
-        const { signTransactionWithInjected } = await import("@/lib/external-wallet");
-        const signed = await signTransactionWithInjected(tx);
-        setStatus("sending");
-        signature = await connection.sendRawTransaction(signed.serialize(), {
+        const {
+          signAndSendWithExternal,
+          signTransactionWithInjected,
+        } = await import("@/lib/external-wallet");
+
+        // Prefer wallet-native sign+send (mobile Phantom etc.)
+        const sent = await signAndSendWithExternal(tx, {
           skipPreflight: false,
           maxRetries: 3,
         });
+        if (sent) {
+          signature = sent;
+        } else {
+          const signed = await signTransactionWithInjected(tx);
+          setStatus("sending");
+          // signed may be Transaction or opaque — normalize serialize
+          const raw =
+            typeof (signed as Transaction).serialize === "function"
+              ? (signed as Transaction).serialize({
+                  requireAllSignatures: false,
+                  verifySignatures: false,
+                })
+              : Buffer.from(signed as unknown as ArrayBuffer);
+          signature = await connection.sendRawTransaction(raw, {
+            skipPreflight: false,
+            maxRetries: 3,
+          });
+        }
       } else {
         if (!sender) throw new Error("Passkey authentication required. Gift was not sent.");
+        // Fresh blockhash after Face ID so the tx doesn't expire mid-prompt
+        let confirmBh = created.blockhash;
+        let confirmLv = created.lastValidBlockHeight;
+        try {
+          const latest = await connection.getLatestBlockhash("confirmed");
+          tx.recentBlockhash = latest.blockhash;
+          tx.feePayer = sender.publicKey;
+          confirmBh = latest.blockhash;
+          confirmLv = latest.lastValidBlockHeight;
+        } catch {
+          tx.feePayer = sender.publicKey;
+          if (created.blockhash) tx.recentBlockhash = created.blockhash;
+        }
         tx.partialSign(sender);
         signature = await connection.sendRawTransaction(tx.serialize(), {
           skipPreflight: false,
           maxRetries: 3,
         });
+        created.blockhash = confirmBh;
+        created.lastValidBlockHeight = confirmLv;
       }
+
       setStatus("confirming");
       const bh = created.blockhash;
       const lv = created.lastValidBlockHeight;
       if (bh && lv != null) {
         await connection.confirmTransaction(
           { signature, blockhash: bh, lastValidBlockHeight: lv },
-          "confirmed"
+          "confirmed",
         );
       } else {
         await connection.confirmTransaction(signature, "confirmed");
@@ -299,7 +348,7 @@ export default function GiftPage() {
             amountLamports: created.amountLamports,
             network,
             token,
-          }
+          },
         ),
       }).catch(() => {});
       analytics.giftLinkCreated(parsed);
@@ -317,8 +366,20 @@ export default function GiftPage() {
         /* ignore */
       }
     } catch (err) {
+      console.error("[gift create]", err);
       const { friendlyError } = await import("@/lib/friendly-errors");
-      const msg = friendlyError(err, "We couldn't create the gift. Try again.");
+      const raw = err instanceof Error ? err.message : String(err);
+      let msg = friendlyError(err, "We couldn't create the gift. Try again.");
+      // Surface real cause when generic connector message
+      if (/failed to sign/i.test(raw) || /failed to sign/i.test(msg)) {
+        msg =
+          walletKind === "external"
+            ? "Wallet couldn't sign the gift. Reconnect your wallet (or use a passkey), approve the prompt, and try again."
+            : "Couldn't sign with passkey. Slide again and approve Face ID / fingerprint.";
+      }
+      if (/simulation|insufficient|0x1/i.test(raw)) {
+        msg = friendlyError(err, "Not enough SOL for gift amount + fees.");
+      }
       setError(msg);
       setStatus("error");
       setGiftUrl(null);
