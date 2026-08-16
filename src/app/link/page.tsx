@@ -14,6 +14,7 @@ import {
   CUSTOM_LINK_FEE_LAMPORTS,
   CUSTOM_LINK_FEE_SOL,
   LINK_FEE_VAULT,
+  normalizeTargetUrl,
 } from "@/lib/short-link";
 import { buildSolanaPayTransferUrl, findSignatureByReference } from "@/lib/solana-pay";
 
@@ -117,6 +118,10 @@ function LinkPageInner() {
 
   const finishCreate = useCallback(
     async (paymentSig?: string, payerWallet?: string | null) => {
+      const checked = normalizeTargetUrl(url);
+      if (!checked.ok) {
+        throw new Error(checked.error);
+      }
       setStatusLabel("Creating link…");
       // null = do not bind wallet (Solana Pay QR payer may differ from connected passkey)
       const wallet =
@@ -125,7 +130,7 @@ function LinkPageInner() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          url,
+          url: checked.url,
           code: custom.trim() || undefined,
           title: title.trim() || undefined,
           wallet,
@@ -171,6 +176,9 @@ function LinkPageInner() {
     setStatusLabel(null);
     setQrPay(null);
     try {
+      const checked = normalizeTargetUrl(url);
+      if (!checked.ok) throw new Error(checked.error);
+
       let paymentSig: string | undefined;
 
       if (wantsCustom) {
