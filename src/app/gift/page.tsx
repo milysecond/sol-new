@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
-import { Gift, Check, Share2, Undo2, Copy, X, ChevronDown } from "lucide-react";
+import { Gift, Check, Share2, Undo2, Copy, X, ChevronDown, Link2, Globe, ExternalLink } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
 import { SlideToSend } from "@/components/slide-to-send";
@@ -22,10 +22,14 @@ import {
   saveGiftLink,
   removeGiftLink,
   giftTokenLabel,
+  giftPublicUrl,
+  giftClaimUrlAbsolute,
   isNativeGiftToken,
   type GiftLinkEntry,
   type GiftToken,
 } from "@/lib/gift-link";
+import { addressPath } from "@/lib/explorer";
+import { TokenIcon } from "@/components/token-meta";
 import { analytics } from "@/lib/analytics";
 import { Connection, PublicKey, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import QRCode from "qrcode";
@@ -141,6 +145,58 @@ export default function GiftPage() {
   useEffect(() => {
     refreshLinks();
   }, [refreshLinks]);
+
+  // Enrich old gifts that only stored truncated mint as symbol
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const list = loadGiftLinks();
+      let changed = false;
+      const next = await Promise.all(
+        list.map(async (l) => {
+          const tok = l.token;
+          if (!tok || tok === "SOL" || tok === "USDC" || tok.length < 32) return l;
+          const badSym =
+            !l.symbol ||
+            l.symbol.includes("…") ||
+            l.symbol.length > 20 ||
+            /^[1-9A-HJ-NP-Za-km-z]{3,4}…/.test(l.symbol);
+          if (!badSym && l.icon) return l;
+          try {
+            const r = await fetch(`/api/swap/search?q=${encodeURIComponent(tok)}`, {
+              cache: "no-store",
+            });
+            if (!r.ok) return l;
+            const j = (await r.json()) as {
+              tokens?: { id?: string; symbol?: string; name?: string; icon?: string }[];
+            };
+            const hit = (j.tokens || []).find(
+              (x) => x.id === tok || x.id?.toLowerCase() === tok.toLowerCase(),
+            );
+            if (!hit) return l;
+            changed = true;
+            return {
+              ...l,
+              symbol: hit.symbol || l.symbol,
+              icon: hit.icon || l.icon,
+            };
+          } catch {
+            return l;
+          }
+        }),
+      );
+      if (cancelled || !changed) return;
+      try {
+        localStorage.setItem("sol.new.giftLinks", JSON.stringify(next.slice(0, 50)));
+      } catch {
+        /* ignore */
+      }
+      setLinks(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Fetch claim status for listed links
   useEffect(() => {
@@ -368,6 +424,7 @@ export default function GiftPage() {
         amount: parsed,
         token,
         symbol: selected.symbol,
+        icon: selected.icon,
         decimals: selected.decimals,
         network,
         createdAt: new Date().toISOString(),
@@ -456,25 +513,13 @@ export default function GiftPage() {
     }
   };
 
-  /** Prefer absolute claim URL with hash secret intact */
-  const giftLinkHref = (entry: GiftLinkEntry): string => {
-    const raw = (entry.url || "").trim();
-    if (!raw) {
-      // Rebuild from pubkey alone is useless without secret — still return claim base
-      return `${typeof window !== "undefined" ? window.location.origin : "https://sol.new"}/gift`;
-    }
-    try {
-      // Already absolute
-      if (/^https?:\/\//i.test(raw)) return raw;
-      // Relative /gift#... or gift#...
-      const origin =
-        typeof window !== "undefined" ? window.location.origin : "https://sol.new";
-      if (raw.startsWith("/")) return `${origin}${raw}`;
-      if (raw.startsWith("#")) return `${origin}/gift${raw}`;
-      return `${origin}/${raw.replace(/^\//, "")}`;
-    } catch {
-      return raw;
-    }
+  const giftLinkHref = (entry: GiftLinkEntry): string =>
+    giftClaimUrlAbsolute(entry);
+
+  const publicGiftHref = (entry: GiftLinkEntry): string => {
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "https://sol.new";
+    return giftPublicUrl(entry.pubkey, origin);
   };
 
   const copyLink = async () => {
@@ -491,14 +536,17 @@ export default function GiftPage() {
     }
   };
 
-  const copyUnclaimedLink = async (entry: GiftLinkEntry) => {
-    const href = giftLinkHref(entry);
+  const copyUnclaimedLink = async (
+    entry: GiftLinkEntry,
+    kind: "claim" | "public" = "claim",
+  ) => {
+    const href = kind === "public" ? publicGiftHref(entry) : giftLinkHref(entry);
     const ok = await copyText(href);
     const { toast } = await import("@/lib/toast");
     if (ok) {
-      setCopiedLinkId(entry.pubkey);
+      setCopiedLinkId(`${entry.pubkey}:${kind}`);
       setTimeout(() => setCopiedLinkId(null), 2000);
-      toast.success("Gift link copied");
+      toast.success(kind === "public" ? "Public gift address copied" : "Claim link copied");
     } else {
       toast.error("Couldn't copy link");
     }
@@ -605,7 +653,7 @@ export default function GiftPage() {
       l.pubkey !== giftEntry?.pubkey
   );
   const fmtEntry = (l: GiftLinkEntry) => {
-    const sym = giftTokenLabel(l.token, l.symbol);
+    const sym = giftTokenLabel(l.token, l.symbol || l.tokenSymbol);
     if (sym === "USDC") return `$${l.amount} USDC`;
     if (sym === "SOL") return `${l.amount} SOL`;
     return `${l.amount} ${sym}`;
@@ -845,43 +893,115 @@ export default function GiftPage() {
                 <h2 className="text-sm font-semibold text-gray-600 dark:text-white/60">
                   Your unclaimed gifts
                 </h2>
-                {pendingLinks.map((l) => (
-                  <div
-                    key={l.pubkey}
-                    className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 flex items-center gap-3"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">{fmtEntry(l)}</p>
-                      <p className="text-xs text-gray-400 dark:text-white/30 truncate">
-                        {new Date(l.createdAt).toLocaleDateString()} · {l.pubkey.slice(0, 4)}…
-                        {l.pubkey.slice(-4)}
-                      </p>
+                {pendingLinks.map((l) => {
+                  const claimHref = giftLinkHref(l);
+                  const pubHref = publicGiftHref(l);
+                  const tokenChip = {
+                    mint: typeof l.token === "string" && l.token.length > 20 ? l.token : l.pubkey,
+                    symbol: giftTokenLabel(l.token, l.symbol || l.tokenSymbol),
+                    icon: l.icon,
+                  };
+                  return (
+                    <div
+                      key={l.pubkey}
+                      className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-3 space-y-2.5"
+                    >
+                      <div className="flex items-center gap-3">
+                        <TokenIcon token={tokenChip} size={36} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold">{fmtEntry(l)}</p>
+                          <p className="text-[11px] text-gray-400 dark:text-white/35 truncate font-mono">
+                            {new Date(l.createdAt).toLocaleDateString()} · {l.pubkey.slice(0, 4)}…
+                            {l.pubkey.slice(-4)}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void handleReclaim(l)}
+                          disabled={reclaiming === l.pubkey}
+                          className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 transition cursor-pointer flex items-center gap-1 disabled:opacity-50 shrink-0 font-medium"
+                        >
+                          {reclaiming === l.pubkey ? (
+                            <Spinner size={12} />
+                          ) : (
+                            <Undo2 size={12} />
+                          )}{" "}
+                          Reclaim
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="rounded-lg bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/10 px-2.5 py-2 space-y-1.5">
+                          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold flex items-center gap-1">
+                            <Link2 size={11} className="text-amber-500" /> Claim link
+                          </p>
+                          <p className="text-[10px] font-mono text-gray-500 dark:text-white/40 truncate">
+                            {claimHref.replace(/^https?:\/\//, "")}
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void copyUnclaimedLink(l, "claim")}
+                              className="flex-1 text-[11px] font-medium py-1.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 flex items-center justify-center gap-1"
+                            >
+                              {copiedLinkId === `${l.pubkey}:claim` ? (
+                                <>
+                                  <Check size={11} /> Copied
+                                </>
+                              ) : (
+                                <>
+                                  <Copy size={11} /> Copy claim
+                                </>
+                              )}
+                            </button>
+                            <a
+                              href={claimHref}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2 py-1.5 rounded-md border border-black/10 dark:border-white/10 text-gray-500 flex items-center"
+                              title="Open claim link"
+                            >
+                              <ExternalLink size={12} />
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/10 px-2.5 py-2 space-y-1.5">
+                          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold flex items-center gap-1">
+                            <Globe size={11} className="text-violet-500" /> Public link
+                          </p>
+                          <p className="text-[10px] font-mono text-gray-500 dark:text-white/40 truncate">
+                            sol.new{addressPath(l.pubkey)}
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void copyUnclaimedLink(l, "public")}
+                              className="flex-1 text-[11px] font-medium py-1.5 rounded-md bg-violet-500/15 text-violet-700 dark:text-violet-300 flex items-center justify-center gap-1"
+                            >
+                              {copiedLinkId === `${l.pubkey}:public` ? (
+                                <>
+                                  <Check size={11} /> Copied
+                                </>
+                              ) : (
+                                <>
+                                  <Copy size={11} /> Copy public
+                                </>
+                              )}
+                            </button>
+                            <a
+                              href={pubHref}
+                              className="px-2 py-1.5 rounded-md border border-black/10 dark:border-white/10 text-gray-500 flex items-center"
+                              title="View gift wallet on sol.new"
+                            >
+                              <ExternalLink size={12} />
+                            </a>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => void copyUnclaimedLink(l)}
-                      className="text-xs text-gray-500 dark:text-white/50 hover:text-gray-900 dark:hover:text-white transition cursor-pointer flex items-center gap-1 shrink-0"
-                      title="Copy gift claim link"
-                    >
-                      {copiedLinkId === l.pubkey ? (
-                        <>
-                          <Check size={12} className="text-emerald-500" /> Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy size={12} /> Copy
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => handleReclaim(l)}
-                      disabled={reclaiming === l.pubkey}
-                      className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 transition cursor-pointer flex items-center gap-1 disabled:opacity-50"
-                    >
-                      {reclaiming === l.pubkey ? <Spinner size={12} /> : <Undo2 size={12} />} Reclaim
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
