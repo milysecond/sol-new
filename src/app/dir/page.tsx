@@ -33,7 +33,6 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
       { label: "get a .sol name", href: "/id" },
       { label: "start a multisig", href: "/multisig" },
       { label: "pods", href: "/pods" },
-      { label: "frame (OpenToSolana)", href: "/frame" },
       { label: "POAP drops", href: "/poap" },
     ],
   },

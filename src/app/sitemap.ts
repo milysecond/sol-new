@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Indexable product URLs only.
- * Do NOT list pure redirects (/wheel→/draw, /flip, /dice, /splash, /vrf, /track)
+ * Do NOT list pure redirects (/wheel→/draw, /flip, /dice, /splash, /frame, /vrf, /track)
  * or short-link destinations (/link/<code>) — GSC flags those as "Page with redirect".
  */
 const STATIC_ROUTES: {
@@ -54,7 +54,6 @@ const STATIC_ROUTES: {
   { path: "/swap", priority: 0.85, freq: "hourly" },
   { path: "/starter", priority: 0.9, freq: "weekly" },
   { path: "/clip", priority: 0.85, freq: "weekly" },
-  { path: "/frame", priority: 0.75, freq: "weekly" },
   { path: "/stake", priority: 0.7, freq: "weekly" },
   { path: "/lst", priority: 0.7, freq: "weekly" },
   { path: "/burn", priority: 0.6, freq: "weekly" },

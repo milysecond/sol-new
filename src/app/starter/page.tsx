@@ -83,7 +83,6 @@ const more = [
   { href: "/gift", label: "Gift" },
   { href: "/token", label: "Launch a token" },
   { href: "/loan", label: "Loan" },
-  { href: "/frame", label: "LinkedIn frame" },
 ];
 
 export default function StarterPage() {
