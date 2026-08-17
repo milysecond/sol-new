@@ -2,35 +2,36 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["dev.sol.new", "192.168.1.105"],
+  // Keep fat browser/WASM stacks out of the Cloudflare Worker bundle
+  serverExternalPackages: [
+    "privacycash",
+    "@lightprotocol/hasher.rs",
+    "three",
+    "gsap",
+    "canvas-confetti",
+  ],
   async redirects() {
     return [
-      // /launch/:mint was the post-launch page until 2026-05-03.
-      // Permanent redirect so any previously-shared links keep working.
       {
         source: "/launch/:mint",
         destination: "/token/:mint",
         permanent: true,
       },
-      // /dev aliases the staging Pages deployment.
       {
         source: "/dev",
         destination: "https://dev.sol.new",
         permanent: false,
       },
-      // /learn aliases the learn subdomain.
       {
         source: "/learn",
         destination: "https://learn.sol.new",
         permanent: false,
       },
-      // Legacy playbook path → primary starter host (full Solly curriculum).
-      // /starter is an in-app page on sol.new (home tile) — do not redirect it away.
       {
         source: "/playbook",
         destination: "https://starter.sol.new",
         permanent: false,
       },
-      // /memes → meme generator app
       {
         source: "/memes",
         destination: "https://memes.metasal.xyz",
@@ -41,8 +42,16 @@ const nextConfig: NextConfig = {
         destination: "https://memes.metasal.xyz",
         permanent: false,
       },
-
-      // --- GSC indexing cleanup: dead / legacy paths that were returning 404 ---
+      {
+        source: "/frame",
+        destination: "/home",
+        permanent: true,
+      },
+      {
+        source: "/frame/:path*",
+        destination: "/home",
+        permanent: true,
+      },
       { source: "/copyright", destination: "/privacy", permanent: true },
       { source: "/about", destination: "/", permanent: true },
       { source: "/blog", destination: "/whats-new", permanent: true },
