@@ -9,7 +9,11 @@ import { useWallet } from "@/lib/wallet-context";
 import { formatQty, useHideBalances } from "@/lib/privacy";
 import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair, ensureDocumentFocusForPasskey } from "@/lib/passkey-wallet";
-import { PrivateSendSheet } from "@/components/private-send-sheet";
+import dynamic from "next/dynamic";
+const PrivateSendSheet = dynamic(
+  () => import("@/components/private-send-sheet").then((m) => m.PrivateSendSheet),
+  { ssr: false },
+);
 import { SlideToSend } from "@/components/slide-to-send";
 import { resolveRecipient, looksLikeDomain, NAME_PLACEHOLDER } from "@/lib/resolve-name";
 import {
