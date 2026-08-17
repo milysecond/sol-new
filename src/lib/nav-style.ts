@@ -1,7 +1,7 @@
 /**
  * App navigation chrome style.
- * - more: bottom sheet / More tray (default)
- * - sidebar: X / LinkedIn style left drawer
+ * - sidebar: X / LinkedIn style left drawer (**default**)
+ * - more: bottom sheet / More tray
  */
 export type NavMenuStyle = "more" | "sidebar";
 
@@ -9,12 +9,14 @@ export const NAV_MENU_STYLE_KEY = "sol.new.nav.menuStyle";
 export const NAV_MENU_STYLE_EVENT = "sol.new.nav.menuStyle";
 
 export function readNavMenuStyle(): NavMenuStyle {
-  if (typeof window === "undefined") return "more";
+  if (typeof window === "undefined") return "sidebar";
   try {
     const v = localStorage.getItem(NAV_MENU_STYLE_KEY);
-    return v === "sidebar" ? "sidebar" : "more";
+    // unset → left menu default; only "more" opts into tray
+    if (v === "more") return "more";
+    return "sidebar";
   } catch {
-    return "more";
+    return "sidebar";
   }
 }
 
