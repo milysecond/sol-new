@@ -195,7 +195,7 @@ export default function HomePage() {
   return <MarketingSplash connect={connect} loading={loading} publicKey={publicKey} />;
 }
 
-function MarketingSplash({
+export function MarketingSplash({
   publicKey,
   connect,
   loading,
