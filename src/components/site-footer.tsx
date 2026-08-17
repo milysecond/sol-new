@@ -1,15 +1,31 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useWallet } from "@/lib/wallet-context";
 
 /**
  * Site-wide public footer. Keep links stable and crawlable.
- * Skipped on /home (marketing page has its own footer).
+ * Skipped on /home and /welcome (marketing splash has its own footer).
  */
 export function SiteFooter() {
   const pathname = usePathname();
-  if (pathname === "/home") return null;
+  const { publicKey } = useWallet();
+  const [loggedOut, setLoggedOut] = useState(false);
+
+  useEffect(() => {
+    try {
+      const onboarded =
+        localStorage.getItem("sol.new.onboard.done") === "1" ||
+        Boolean(localStorage.getItem("sol.new.wallet"));
+      setLoggedOut(!publicKey && !onboarded);
+    } catch {
+      setLoggedOut(!publicKey);
+    }
+  }, [publicKey]);
+
+  if (pathname === "/home" || pathname === "/welcome") return null;
 
   return (
     <footer className="border-t border-black/10 dark:border-white/10 mt-auto">
@@ -25,7 +41,10 @@ export function SiteFooter() {
           <span>Solana tools, passkey-first</span>
         </div>
         <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-          <Link href="/changelog" className="hover:text-purple-400 transition font-medium text-purple-400/90">
+          <Link
+            href="/changelog"
+            className="hover:text-purple-400 transition font-medium text-purple-400/90"
+          >
             Changelog
           </Link>
           <Link href="/features" className="hover:text-purple-400 transition">
@@ -34,9 +53,20 @@ export function SiteFooter() {
           <Link href="/docs" className="hover:text-purple-400 transition">
             Docs
           </Link>
+          <Link href="/dir" className="hover:text-purple-400 transition">
+            Directory
+          </Link>
           <Link href="/whats-new" className="hover:text-purple-400 transition">
             What&apos;s new
           </Link>
+          {loggedOut && (
+            <Link
+              href="/welcome"
+              className="hover:text-purple-400 transition text-gray-400"
+            >
+              Landing
+            </Link>
+          )}
           <Link href="/privacy" className="hover:text-purple-400 transition">
             Privacy
           </Link>
