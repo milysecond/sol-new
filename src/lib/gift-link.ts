@@ -365,6 +365,8 @@ export interface GiftLinkEntry {
   /** @deprecated use symbol */
   tokenSymbol?: string;
   decimals?: number;
+  /** Optional logo for unclaimed list */
+  icon?: string;
   network: Network;
   createdAt: string;
 }
@@ -395,5 +397,37 @@ export function removeGiftLink(pubkey: string) {
 export function giftTokenLabel(token?: GiftToken, symbol?: string): string {
   if (!token || isNativeGiftToken(token)) return "SOL";
   if (token === "USDC") return "USDC";
-  return symbol || `${token.slice(0, 4)}…`;
+  if (symbol && !symbol.includes("…") && symbol.length <= 16) return symbol;
+  // Avoid mint-looking symbols like fEbi…
+  if (symbol && /^[1-9A-HJ-NP-Za-km-z]{3,4}…/.test(symbol)) {
+    /* fall through */
+  } else if (symbol) {
+    return symbol;
+  }
+  if (typeof token === "string" && token.length >= 32) {
+    return `${token.slice(0, 4)}…${token.slice(-4)}`;
+  }
+  return String(token || "TOKEN");
+}
+
+/** Public on-chain gift wallet page (no secret). */
+export function giftPublicUrl(pubkey: string, origin = "https://sol.new"): string {
+  return `${origin.replace(/\/$/, "")}/address/${pubkey}`;
+}
+
+/** Absolute claim URL preserving #secret. */
+export function giftClaimUrlAbsolute(
+  entry: Pick<GiftLinkEntry, "url">,
+  origin = typeof window !== "undefined" ? window.location.origin : "https://sol.new",
+): string {
+  const raw = (entry.url || "").trim();
+  if (!raw) return `${origin}/gift`;
+  try {
+    if (/^https?:\/\//i.test(raw)) return raw;
+    if (raw.startsWith("/")) return `${origin}${raw}`;
+    if (raw.startsWith("#")) return `${origin}/claim${raw}`;
+    return `${origin}/${raw.replace(/^\//, "")}`;
+  } catch {
+    return raw;
+  }
 }
