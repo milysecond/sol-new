@@ -57,7 +57,7 @@ export default function WalletSettingsPage() {
   } = useWallet();
   const [hideBalances, setHideBalances] = useHideBalances();
   const [autoLockMin, setAutoLockMin] = useState(15);
-  const [menuStyle, setMenuStyle] = useState<NavMenuStyle>("more");
+  const [menuStyle, setMenuStyle] = useState<NavMenuStyle>("sidebar");
   const [bottomTabs, setBottomTabs] = useState<string[]>([...BOTTOM_NAV_DEFAULT]);
   const [mounted, setMounted] = useState(false);
 
@@ -186,9 +186,33 @@ export default function WalletSettingsPage() {
           </p>
           <p className="text-xs text-gray-500 leading-relaxed">
             Choose how the full app list opens from the bottom bar (and desktop
-            Menu). Default is the More tray; left drawer matches X / LinkedIn.
+            Menu). Default is the left drawer (X / LinkedIn style). More tray is optional.
           </p>
           <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setMenuStyle("sidebar");
+                writeNavMenuStyle("sidebar");
+                toast.success("Left side menu on");
+              }}
+              className={`flex flex-col items-start gap-1.5 rounded-xl border px-3 py-3 text-left transition min-h-[88px] ${
+                menuStyle === "sidebar"
+                  ? "border-fuchsia-400/60 bg-fuchsia-500/10"
+                  : "border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03]"
+              }`}
+            >
+              <PanelLeft
+                className={`w-5 h-5 ${
+                  menuStyle === "sidebar" ? "text-fuchsia-400" : "text-gray-400"
+                }`}
+              />
+              <span className="text-sm font-semibold">Left menu</span>
+              <span className="text-[10px] text-fuchsia-500 font-medium">Default</span>
+              <span className="text-[11px] text-gray-500 leading-snug">
+                X / LinkedIn drawer · logo opens menu
+              </span>
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -210,29 +234,6 @@ export default function WalletSettingsPage() {
               <span className="text-sm font-semibold">More tray</span>
               <span className="text-[11px] text-gray-500 leading-snug">
                 Bottom sheet with groups, A–Z, custom order
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMenuStyle("sidebar");
-                writeNavMenuStyle("sidebar");
-                toast.success("Left side menu on");
-              }}
-              className={`flex flex-col items-start gap-1.5 rounded-xl border px-3 py-3 text-left transition min-h-[88px] ${
-                menuStyle === "sidebar"
-                  ? "border-fuchsia-400/60 bg-fuchsia-500/10"
-                  : "border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03]"
-              }`}
-            >
-              <PanelLeft
-                className={`w-5 h-5 ${
-                  menuStyle === "sidebar" ? "text-fuchsia-400" : "text-gray-400"
-                }`}
-              />
-              <span className="text-sm font-semibold">Left menu</span>
-              <span className="text-[11px] text-gray-500 leading-snug">
-                X / LinkedIn style drawer under the chrome
               </span>
             </button>
           </div>

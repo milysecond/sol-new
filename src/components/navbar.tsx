@@ -92,7 +92,7 @@ export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [showMore, setShowMore] = useState(false);
-  const [menuStyle, setMenuStyle] = useState<NavMenuStyle>("more");
+  const [menuStyle, setMenuStyle] = useState<NavMenuStyle>("sidebar");
   const [bottomHrefs, setBottomHrefs] = useState<string[]>([
     "/home",
     "/wallet",
@@ -212,9 +212,8 @@ export function Navbar() {
     <nav className="relative z-[80]">
       <div ref={headerRef} className="sticky top-0 z-[80] border-b border-black/10 dark:border-white/10 bg-white/90 dark:bg-black/90 backdrop-blur-md safe-top">
         <div className="flex items-center justify-between gap-2 px-2 sm:px-5 lg:px-6 py-2 sm:py-3 max-w-[1400px] mx-auto w-full">
-          <div className="flex items-center gap-1 sm:gap-2 min-w-0">
-            <PageBack className="shrink-0 -ml-0.5" />
-
+          <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+            {/* Logo first (leftmost) — menu activator in sidebar mode */}
             {menuStyle === "sidebar" ? (
               <button
                 type="button"
@@ -223,7 +222,7 @@ export function Navbar() {
                   e.preventDefault();
                   router.push("/dir");
                 }}
-                className="flex items-center gap-2 shrink-0 min-h-[40px] px-1 justify-center cursor-pointer rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition"
+                className="flex items-center gap-2 shrink-0 min-h-[40px] pl-0.5 pr-1 justify-center cursor-pointer rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition"
                 aria-label="Open app menu"
                 title="Menu · double-tap for directory"
               >
@@ -236,7 +235,7 @@ export function Navbar() {
               <Link
                 href="/home"
                 onDoubleClick={() => router.push("/dir")}
-                className="flex items-center gap-2 shrink-0 min-h-[40px] px-1 justify-center"
+                className="flex items-center gap-2 shrink-0 min-h-[40px] pl-0.5 pr-1 justify-center rounded-xl"
               >
                 <img src="/icon-192.png" alt="sol.new" className="w-8 h-8 rounded-lg" />
                 <span className="text-lg sm:text-xl font-bold tracking-tight hidden md:inline">
@@ -244,6 +243,9 @@ export function Navbar() {
                 </span>
               </Link>
             )}
+
+            {/* Back sits after logo — nested routes only */}
+            <PageBack />
 
             <button
               type="button"
