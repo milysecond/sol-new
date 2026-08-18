@@ -1,14 +1,15 @@
 /**
  * Server-only RPC URLs. Never import this from client components.
  *
- * Mainnet pool (paid only — never free public Solana RPC):
+ * Mainnet pool (paid first; PublicNode is the only public secondary):
  *   1. Helius Fast: viviyan-bkj12u
  *   2. Helius Fast: velvet-hw7q70
  *   3. Helius Fast: cassandra-bq5oqs
- *   4. HELIUS_API_KEY → mainnet.helius-rpc.com
- *   5. Flux RPC (FLUXRPC_URL secret)
- *   6. aex402 (x402 paywalled — last resort only)
- *   7. MAINNET_RPC override (primary when set)
+ *   4. PublicNode (https://solana.publicnode.com) — secondary public fallback
+ *   5. HELIUS_API_KEY → mainnet.helius-rpc.com
+ *   6. Flux RPC (FLUXRPC_URL secret)
+ *   7. aex402 (x402 paywalled — last resort only)
+ *   8. MAINNET_RPC override (primary when set)
  */
 export const AEX402_MAINNET = "https://rpc.aex402.com";
 export const HELIUS_MAINNET_VIVIYAN =
@@ -17,6 +18,7 @@ export const HELIUS_MAINNET_VELVET =
   "https://velvet-hw7q70-fast-mainnet.helius-rpc.com";
 export const HELIUS_MAINNET_CASSANDRA =
   "https://cassandra-bq5oqs-fast-mainnet.helius-rpc.com";
+export const PUBLICNODE_MAINNET = "https://solana.publicnode.com";
 
 function normalizeRpc(url: string): string {
   return url.replace(/\/+$/, "");
@@ -29,6 +31,7 @@ export function mainnetRpcEndpoints(): string[] {
     HELIUS_MAINNET_VIVIYAN,
     HELIUS_MAINNET_VELVET,
     HELIUS_MAINNET_CASSANDRA,
+    PUBLICNODE_MAINNET,
   ];
 
   const heliusKey = process.env.HELIUS_API_KEY?.trim();
