@@ -76,9 +76,9 @@ export function PortfolioAddressClient({ address }: { address: string }) {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 flex flex-col px-3 sm:px-6 py-4 sm:py-8 sm:items-center pb-24">
-        <PageTransition>
-          <div className="w-full sm:max-w-2xl space-y-5">
+      <main className="flex-1 w-full pb-24">
+        <PageTransition className="w-full">
+          <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-5">
             <div className="text-center space-y-1.5">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Portfolio</h1>
               <p className="text-sm text-gray-500 dark:text-white/45">
