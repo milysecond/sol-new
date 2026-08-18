@@ -120,10 +120,49 @@ html.dark .img-skeleton {
   }
 }
 
-/* Smooth transitions */
+/* Smooth transitions + relevant pointers */
 a, button {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+
+/* Pointers always relevant:
+   clickable → pointer · disabled → not-allowed · text fields → text */
+a[href],
+button:not(:disabled):not([aria-disabled="true"]),
+[role="button"]:not([aria-disabled="true"]),
+[role="tab"]:not([aria-disabled="true"]),
+[role="menuitem"]:not([aria-disabled="true"]),
+[role="option"]:not([aria-disabled="true"]),
+[role="switch"]:not([aria-disabled="true"]),
+[role="link"]:not([aria-disabled="true"]),
+input[type="submit"]:not(:disabled),
+input[type="button"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+input[type="file"]:not(:disabled),
+input[type="range"]:not(:disabled),
+select:not(:disabled),
+summary,
+label[for],
+[data-clickable="true"] {
+  cursor: pointer;
+}
+
+button:disabled,
+button[aria-disabled="true"],
+[role="button"][aria-disabled="true"],
+input:disabled,
+select:disabled,
+textarea:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+input:not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not(:disabled),
+textarea:not(:disabled) {
+  cursor: text;
 }
 
 /* Electrify animation */
