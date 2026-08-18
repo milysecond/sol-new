@@ -8,16 +8,17 @@ import { PageTransition } from "@/components/page-transition";
 import { PortfolioDefiPanel } from "@/components/portfolio-defi-panel";
 import { looksLikeDomain, resolveRecipient } from "@/lib/resolve-name";
 import { Spinner } from "@/components/spinner";
+import { useWallet } from "@/lib/wallet-context";
 
 export function PortfolioAddressClient({ address }: { address: string }) {
   const router = useRouter();
+  const { publicKey } = useWallet();
   const [input, setInput] = useState(address);
   const [resolved, setResolved] = useState<string | null>(null);
   const [domainLabel, setDomainLabel] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-resolve SNS/ADNS/SKR path segments → owner pubkey
   useEffect(() => {
     let cancelled = false;
     const raw = address.trim();
@@ -70,6 +71,8 @@ export function PortfolioAddressClient({ address }: { address: string }) {
     }
   };
 
+  const isOther = Boolean(resolved && publicKey && resolved !== publicKey);
+
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
@@ -112,6 +115,28 @@ export function PortfolioAddressClient({ address }: { address: string }) {
                 {resolving ? <Spinner size={14} /> : "Go"}
               </button>
             </div>
+            {publicKey && (
+              <div className="flex flex-wrap gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(`/portfolio/${encodeURIComponent(publicKey)}`)
+                  }
+                  className={`px-2.5 py-1.5 rounded-lg border transition ${
+                    resolved === publicKey
+                      ? "border-purple-500/50 bg-purple-500/10 text-purple-600 dark:text-purple-300"
+                      : "border-black/10 dark:border-white/10 text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  My wallet
+                </button>
+                {isOther && (
+                  <span className="px-2.5 py-1.5 text-amber-600 dark:text-amber-300">
+                    Viewing someone else&apos;s address
+                  </span>
+                )}
+              </div>
+            )}
             {error && <p className="text-xs text-rose-500">{error}</p>}
 
             {resolving && !resolved && (

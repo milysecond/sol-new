@@ -285,41 +285,70 @@ export async function jupWalletSnapshot(wallet: string): Promise<JupWalletSnapsh
 
   tokens.sort((a, b) => (b.valueUsd ?? 0) - (a.valueUsd ?? 0));
 
-  // Enrich meme coins missing logo/symbol (holdings API often has none)
-  const needMeta = tokens
-    .filter((t) => !t.logoUri || !t.symbol || !t.name || !t.programId)
-    .map((t) => t.mint)
-    .slice(0, 24);
+  // Enrich meme coins missing logo/symbol (holdings API often has none).
+  // Sequential-ish batches so Jupiter search isn't rate-limited on Workers.
+  const needMeta = tokens.filter((t) => !t.logoUri || !t.symbol || !t.name).slice(0, 24);
   if (needMeta.length) {
     try {
       const { tokenSearch } = await import("@/lib/jup-ultra");
-      await Promise.all(
-        needMeta.map(async (mint) => {
-          try {
-            const hits = await tokenSearch(mint);
-            const hit = hits.find(
-              (h) => h.id === mint || h.id?.toLowerCase() === mint.toLowerCase(),
-            ) as
-              | (import("@/lib/jup-ultra").TokenHit & { tokenProgram?: string })
-              | undefined;
-            if (!hit) return;
-            const t = tokens.find((x) => x.mint === mint);
-            if (!t) return;
-            if (!t.symbol && hit.symbol) t.symbol = hit.symbol;
-            if (!t.name && hit.name) t.name = hit.name;
-            if (!t.logoUri && hit.icon) t.logoUri = hit.icon;
-            if (!t.programId && hit.tokenProgram) t.programId = hit.tokenProgram;
-            if (t.priceUsd == null && typeof hit.usdPrice === "number") {
-              t.priceUsd = hit.usdPrice;
-              t.valueUsd = t.uiAmount * hit.usdPrice;
+      const applyHit = (
+        t: JupTokenBalance,
+        hit: {
+          id?: string;
+          symbol?: string;
+          name?: string;
+          icon?: string;
+          usdPrice?: number;
+          tokenProgram?: string;
+        },
+      ) => {
+        if (!t.symbol && hit.symbol) t.symbol = hit.symbol;
+        if (!t.name && hit.name) t.name = hit.name;
+        if (!t.logoUri && hit.icon) t.logoUri = hit.icon;
+        if (!t.programId && hit.tokenProgram) t.programId = hit.tokenProgram;
+        if (t.priceUsd == null && typeof hit.usdPrice === "number" && Number.isFinite(hit.usdPrice)) {
+          t.priceUsd = hit.usdPrice;
+          t.valueUsd = t.uiAmount * hit.usdPrice;
+        }
+      };
+
+      for (let i = 0; i < needMeta.length; i += 4) {
+        const batch = needMeta.slice(i, i + 4);
+        await Promise.all(
+          batch.map(async (t) => {
+            try {
+              const hits = await tokenSearch(t.mint);
+              const hit =
+                hits.find((h) => h.id === t.mint) ||
+                hits.find((h) => h.id?.toLowerCase() === t.mint.toLowerCase()) ||
+                hits[0];
+              if (hit && (hit.id === t.mint || hit.id?.toLowerCase() === t.mint.toLowerCase() || hits.length === 1)) {
+                applyHit(t, hit);
+              }
+            } catch {
+              /* skip */
             }
-          } catch {
-            /* skip mint */
-          }
-        }),
-      );
+            // Local Turso registry fallback (TOKENSHIT etc.)
+            if (!t.symbol || !t.logoUri) {
+              try {
+                const { getTokenByMint } = await import("@/lib/db");
+                const row = (await getTokenByMint(t.mint)) as
+                  | { symbol?: string; name?: string; image_url?: string | null }
+                  | null;
+                if (row) {
+                  if (!t.symbol && row.symbol) t.symbol = String(row.symbol);
+                  if (!t.name && row.name) t.name = String(row.name);
+                  if (!t.logoUri && row.image_url) t.logoUri = String(row.image_url);
+                }
+              } catch {
+                /* db optional on edge */
+              }
+            }
+          }),
+        );
+      }
     } catch {
-      /* ignore enrich failures */
+      /* ignore */
     }
   }
 

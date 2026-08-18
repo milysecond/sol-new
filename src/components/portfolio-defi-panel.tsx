@@ -11,6 +11,8 @@ import {
 import { Spinner } from "@/components/spinner";
 import Link from "next/link";
 import { useHideBalances } from "@/lib/privacy";
+import { useWallet } from "@/lib/wallet-context";
+import { TokenIcon } from "@/components/token-meta";
 
 export type PortfolioApi = {
   ok?: boolean;
@@ -47,7 +49,10 @@ export type PortfolioApi = {
 
 const short = (s: string) => (s.length > 16 ? `${s.slice(0, 6)}…${s.slice(-6)}` : s);
 
-// Module-level formatters kept for non-private contexts; panel uses hook-local versions.
+function looksLikeMint(sym?: string | null) {
+  if (!sym) return true;
+  return sym.includes("…") || sym.includes("...") || sym.length > 20;
+}
 
 function Card({
   label,
@@ -77,6 +82,63 @@ function positionTitle(p: PortfolioApi["positions"][number]) {
   return p.name || p.label || p.type || p.platformId || "Position";
 }
 
+async function clientEnrichToken(mint: string): Promise<{
+  symbol?: string;
+  name?: string;
+  icon?: string;
+  usdPrice?: number;
+}> {
+  try {
+    const r = await fetch(`/api/swap/search?q=${encodeURIComponent(mint)}`, {
+      cache: "no-store",
+    });
+    if (r.ok) {
+      const j = (await r.json()) as {
+        tokens?: {
+          id?: string;
+          symbol?: string;
+          name?: string;
+          icon?: string;
+          usdPrice?: number;
+        }[];
+      };
+      const hit = (j.tokens || []).find(
+        (t) => t.id === mint || t.id?.toLowerCase() === mint.toLowerCase(),
+      );
+      if (hit) {
+        return {
+          symbol: hit.symbol,
+          name: hit.name,
+          icon: hit.icon,
+          usdPrice: hit.usdPrice,
+        };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const r = await fetch(`/api/token/${encodeURIComponent(mint)}`, {
+      cache: "no-store",
+    });
+    if (r.ok) {
+      const j = (await r.json()) as {
+        token?: { symbol?: string; name?: string; image_url?: string | null };
+      };
+      if (j.token) {
+        return {
+          symbol: j.token.symbol,
+          name: j.token.name,
+          icon: j.token.image_url || undefined,
+        };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return {};
+}
+
 export function PortfolioDefiPanel({
   address,
   compact,
@@ -85,6 +147,7 @@ export function PortfolioDefiPanel({
   /** Tighter layout for /address scan embed */
   compact?: boolean;
 }) {
+  const { publicKey } = useWallet();
   const [data, setData] = useState<PortfolioApi | null>(null);
   const [loading, setLoading] = useState(true);
   const [hideBalances] = useHideBalances();
@@ -108,6 +171,8 @@ export function PortfolioDefiPanel({
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"tokens" | "defi">("tokens");
 
+  const isSelf = Boolean(publicKey && publicKey === address);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -119,7 +184,38 @@ export function PortfolioDefiPanel({
         if (!r.ok || j.ok === false) throw new Error(j.error || "Failed to load");
         return j;
       })
-      .then((j) => {
+      .then(async (j) => {
+        // Client-side meta fill when API still returns bare mints
+        const tokens = [...(j.tokens || [])];
+        const need = tokens.filter((t) => !t.logoUri || looksLikeMint(t.symbol));
+        if (need.length) {
+          await Promise.all(
+            need.slice(0, 16).map(async (t) => {
+              const m = await clientEnrichToken(t.mint);
+              if (m.symbol) t.symbol = m.symbol;
+              if (m.name) t.name = m.name;
+              if (m.icon) t.logoUri = m.icon;
+              if (t.priceUsd == null && m.usdPrice != null) {
+                t.priceUsd = m.usdPrice;
+                t.valueUsd = t.uiAmount * m.usdPrice;
+              }
+            }),
+          );
+          // recompute tokensUsd / net worth if we got prices
+          const tokensUsd = tokens.reduce((a, t) => a + (t.valueUsd ?? 0), 0);
+          j = {
+            ...j,
+            tokens,
+            totals: {
+              ...j.totals,
+              tokensUsd: tokensUsd || j.totals.tokensUsd,
+              netWorthUsd:
+                (tokensUsd || j.totals.tokensUsd) +
+                (j.totals.positionsUsd || 0) +
+                (j.totals.stakedJupUsd || 0),
+            },
+          };
+        }
         if (!cancelled) setData(j);
       })
       .catch((e) => {
@@ -149,19 +245,36 @@ export function PortfolioDefiPanel({
 
   return (
     <div className={compact ? "space-y-4" : "space-y-5"}>
+      {!isSelf && !compact && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200 flex flex-wrap items-center gap-2">
+          <span>Looking up another wallet — not your connected passkey.</span>
+          {publicKey && (
+            <Link
+              href={`/portfolio/${encodeURIComponent(publicKey)}`}
+              className="font-semibold underline underline-offset-2"
+            >
+              My portfolio →
+            </Link>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center gap-2 flex-wrap">
         <WalletIcon className="w-4 h-4 text-purple-500" />
         <span className="font-mono text-xs text-gray-500 dark:text-white/45">
           {short(address)}
         </span>
-        <a
-          href={`/address/${address}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        {isSelf && (
+          <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-300">
+            You
+          </span>
+        )}
+        <Link
+          href={`/address/${encodeURIComponent(address)}`}
           className="text-xs text-purple-600 dark:text-purple-400 inline-flex items-center gap-0.5"
         >
           sol.new <ExternalLink className="w-3 h-3" />
-        </a>
+        </Link>
         {!compact && (
           <Link
             href={`/address/${encodeURIComponent(address)}`}
@@ -216,7 +329,7 @@ export function PortfolioDefiPanel({
       {loading && !data && (
         <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-400">
           <Spinner size={16} className="w-4 h-4 text-purple-500" />
-          Loading Jupiter balances…
+          Loading balances…
         </div>
       )}
 
@@ -233,7 +346,7 @@ export function PortfolioDefiPanel({
               }`}
             >
               <Coins className="w-3.5 h-3.5 inline mr-1" />
-              Tokens ({tokens.length})
+              Tokens ({tokens.length + (data.sol > 0 ? 1 : 0)})
             </button>
             <button
               type="button"
@@ -256,65 +369,59 @@ export function PortfolioDefiPanel({
               <div className="space-y-2">
                 {data.sol > 0 && (
                   <div className="flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] px-3.5 py-2.5">
-                    <div className="w-9 h-9 rounded-lg bg-purple-500/15 flex items-center justify-center">
-                      <WalletIcon className="w-4 h-4 text-purple-500" />
-                    </div>
+                    <TokenIcon
+                      token={{ symbol: "SOL", icon: "/solanaLogoMark.svg" }}
+                      size={36}
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium">SOL</p>
                       <p className="text-xs text-gray-500 tabular-nums">
                         {fmtAmt(data.sol)}
                       </p>
                     </div>
-                    <p className="text-sm font-semibold tabular-nums">
-                      {fmtUsd(
-                        data.totals.tokensUsd > 0 && tokens.length === 0
-                          ? data.totals.tokensUsd
-                          : null
-                      )}
-                    </p>
+                    <p className="text-sm font-semibold tabular-nums text-gray-400">—</p>
                   </div>
                 )}
-                {tokens.map((t) => (
-                  <div
-                    key={t.mint}
-                    className="flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] px-3.5 py-2.5"
-                  >
-                    {t.logoUri ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={t.logoUri}
-                        alt=""
-                        className="w-9 h-9 rounded-lg object-cover"
+                {tokens.map((t) => {
+                  const label = !looksLikeMint(t.symbol)
+                    ? t.symbol!
+                    : t.name && !looksLikeMint(t.name)
+                      ? t.name
+                      : short(t.mint);
+                  return (
+                    <div
+                      key={t.mint}
+                      className="flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] px-3.5 py-2.5"
+                    >
+                      <TokenIcon
+                        token={{
+                          symbol: label,
+                          icon: t.logoUri || undefined,
+                        }}
+                        size={36}
                       />
-                    ) : (
-                      <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-                        <Coins className="w-4 h-4 text-emerald-500" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{label}</p>
+                        <p className="text-xs text-gray-500 tabular-nums truncate">
+                          {fmtAmt(t.uiAmount)}
+                          {t.name && t.name !== label ? ` · ${t.name}` : ""}
+                          {t.priceUsd != null ? ` · ${fmtUsd(t.priceUsd)}` : ""}
+                        </p>
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {t.symbol || short(t.mint)}
-                      </p>
-                      <p className="text-xs text-gray-500 tabular-nums">
-                        {fmtAmt(t.uiAmount)}
-                        {t.priceUsd != null ? ` · ${fmtUsd(t.priceUsd)}` : ""}
-                      </p>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-semibold tabular-nums">
+                          {fmtUsd(t.valueUsd)}
+                        </p>
+                        <Link
+                          href={`/token/${t.mint}`}
+                          className="text-[11px] text-purple-600 dark:text-purple-400"
+                        >
+                          Token
+                        </Link>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold tabular-nums">
-                        {fmtUsd(t.valueUsd)}
-                      </p>
-                      <a
-                        href={`https://jup.ag/tokens/${t.mint}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] text-purple-600 dark:text-purple-400"
-                      >
-                        Jup
-                      </a>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )
           ) : positions.length === 0 ? (
