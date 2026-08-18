@@ -14,14 +14,14 @@ import { addressPath } from "./explorer";
 export type Network = "mainnet" | "devnet";
 
 /**
- * Client-safe mainnet RPCs — Helius Fast dedicated endpoints only.
- * aex402 is x402-paywalled (402) — keep last, not first.
- * Never fall back to free public Solana RPC.
+ * Client-safe mainnet RPCs — Helius Fast first, PublicNode secondary,
+ * aex402 last (x402-paywalled).
  */
 export const MAINNET_RPC_POOL = [
   "https://viviyan-bkj12u-fast-mainnet.helius-rpc.com",
   "https://velvet-hw7q70-fast-mainnet.helius-rpc.com",
   "https://cassandra-bq5oqs-fast-mainnet.helius-rpc.com",
+  "https://solana.publicnode.com",
   "https://rpc.aex402.com",
 ] as const;
 
