@@ -316,6 +316,16 @@ export const NAV_ITEMS: NavItem[] = [
     home: true,
   },
   {
+    href: "/explorer",
+    label: "Explorer",
+    title: "Explorer",
+    desc: "Wallets, txs, tokens — in-app",
+    icon: Activity,
+    color: "text-rose-600 dark:text-rose-400",
+    category: "tools",
+    home: true,
+  },
+  {
     href: "/address",
     label: "Address",
     title: "Address",
@@ -323,7 +333,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Activity,
     color: "text-rose-600 dark:text-rose-400",
     category: "tools",
-    home: true,
+    home: false,
   },
   {
     href: "/burn",
@@ -428,6 +438,7 @@ export const HOME_DEFAULT_ORDER: string[] = [
   "/receipt",
   "/link",
   "/id",
+  "/explorer",
   "/address",
   "/burn",
   "/multisig",
