@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Connection,
   PublicKey,
@@ -12,7 +13,7 @@ import {
   getAssociatedTokenAddressSync,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { Banknote, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { Banknote, ArrowDownToLine, ArrowUpFromLine, X } from "lucide-react";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
@@ -40,6 +41,13 @@ type RampsInstance = {
   destroy: () => void;
 };
 
+type PendingSession = {
+  mode: Mode;
+  sessionToken: string;
+  widgetUrl: string;
+  sdkUrl: string;
+};
+
 declare global {
   interface Window {
     RampsSDK?: {
@@ -59,7 +67,9 @@ function loadSdk(url: string): Promise<void> {
     );
     if (existing) {
       existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("SDK load failed")));
+      existing.addEventListener("error", () =>
+        reject(new Error("SDK load failed")),
+      );
       return;
     }
     const s = document.createElement("script");
@@ -96,8 +106,16 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState<PendingSession | null>(null);
+  const [mounted, setMounted] = useState(false);
   const rampsRef = useRef<RampsInstance | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const publicKeyRef = useRef(publicKey);
+  publicKeyRef.current = publicKey;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     fetch("/api/moneygram/session")
@@ -126,20 +144,46 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   const isLive = envLabel === "production";
-  // Hide on mainnet if not enabled yet; always OK on devnet for sandbox testing
   const allowedHere =
     network === "devnet" || (network === "mainnet" && mainnetEnabled);
 
+  const destroyWidget = useCallback(() => {
+    try {
+      rampsRef.current?.close();
+    } catch {
+      /* ignore */
+    }
+    try {
+      rampsRef.current?.destroy();
+    } catch {
+      /* ignore */
+    }
+    rampsRef.current = null;
+    setPending(null);
+    setOpen(false);
+    setBusy(false);
+  }, []);
+
   const signAndSendUsdc = useCallback(
     async (tx: OnChainTx): Promise<string> => {
-      if (!publicKey) throw new Error("Connect wallet first");
+      const pk = publicKeyRef.current;
+      if (!pk) throw new Error("Connect wallet first");
       if (!tx.to || !tx.tokenAddress || tx.tokenDecimals == null) {
         throw new Error("Incomplete transfer payload from MoneyGram");
       }
 
       const connection = new Connection(rpc, "confirmed");
-      const from = new PublicKey(publicKey);
+      const from = new PublicKey(pk);
       const to = new PublicKey(tx.to);
       const mint = new PublicKey(tx.tokenAddress);
       const decimals = Number(tx.tokenDecimals);
@@ -184,10 +228,9 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
       transaction.feePayer = from;
 
       await ensureDocumentFocusForPasskey();
-      const { keypair } = await getPasskeyKeypair(publicKey);
+      const { keypair } = await getPasskeyKeypair(pk);
       transaction.sign(keypair);
 
-      // Prefer server broadcast pool on mainnet
       try {
         const signature = await broadcastSignedTx(transaction);
         await connection.confirmTransaction(
@@ -207,15 +250,119 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
         return signature;
       }
     },
-    [publicKey, rpc],
+    [rpc],
   );
 
-  const openWidget = async (mode: Mode) => {
+  // Mount SDK once full-screen portal + container exist
+  useEffect(() => {
+    if (!open || !pending || !publicKey) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setBusy(true);
+        await loadSdk(pending.sdkUrl);
+        if (cancelled) return;
+        if (!window.RampsSDK?.createRamps) {
+          throw new Error("MoneyGram SDK not available");
+        }
+
+        // Wait for portal paint
+        await new Promise<void>((r) => requestAnimationFrame(() => r()));
+        await new Promise<void>((r) => requestAnimationFrame(() => r()));
+        if (cancelled) return;
+
+        const container = containerRef.current;
+        if (!container) throw new Error("Missing widget container");
+
+        try {
+          rampsRef.current?.destroy();
+        } catch {
+          /* ignore */
+        }
+        container.innerHTML = "";
+        Object.assign(container.style, {
+          width: "100%",
+          height: "100%",
+          minHeight: "100%",
+          flex: "1",
+          display: "block",
+          position: "relative",
+        });
+
+        const widgetUrl = new URL(pending.widgetUrl);
+        widgetUrl.searchParams.set("mode", pending.mode);
+
+        const ramps = window.RampsSDK.createRamps({
+          container,
+          sessionToken: pending.sessionToken,
+          widgetUrl: widgetUrl.toString(),
+          address: publicKey,
+          chain: "solana",
+          asset: "USDC",
+          appName: "sol.new",
+          theme: "dark",
+          onSignTransaction: async (tx: OnChainTx) => {
+            try {
+              const sig = await signAndSendUsdc(tx);
+              toast.success("USDC sent for cash-out");
+              return sig;
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Sign failed";
+              toast.error(msg);
+              throw e;
+            }
+          },
+          onError: (err: unknown) => {
+            const msg =
+              typeof err === "string"
+                ? err
+                : err && typeof err === "object" && "message" in err
+                  ? String((err as { message: unknown }).message)
+                  : "Widget error";
+            setError(msg);
+          },
+          onClose: () => {
+            destroyWidget();
+          },
+        });
+
+        if (cancelled) {
+          try {
+            ramps.destroy();
+          } catch {
+            /* ignore */
+          }
+          return;
+        }
+
+        rampsRef.current = ramps;
+        ramps.open();
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to open MoneyGram");
+          destroyWidget();
+        }
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, pending, publicKey, signAndSendUsdc, destroyWidget]);
+
+  const start = async (mode: Mode) => {
     if (!publicKey) return;
     setBusy(true);
     setError(null);
     try {
-      rampsRef.current?.destroy();
+      try {
+        rampsRef.current?.destroy();
+      } catch {
+        /* ignore */
+      }
       rampsRef.current = null;
 
       const res = await fetch("/api/moneygram/session", { method: "POST" });
@@ -230,68 +377,19 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
         throw new Error(session.error || "Could not start MoneyGram session");
       }
 
-      await loadSdk(
-        session.sdkUrl ||
+      setPending({
+        mode,
+        sessionToken: session.sessionToken,
+        widgetUrl: session.widgetUrl,
+        sdkUrl:
+          session.sdkUrl ||
           (isLive
             ? "https://api.xramps.moneygram.com/sdk/index.global.js"
             : "https://playground.xramps.moneygram.com/sdk/index.global.js"),
-      );
-      if (!window.RampsSDK?.createRamps) {
-        throw new Error("MoneyGram SDK not available");
-      }
-
-      const widgetUrl = new URL(session.widgetUrl);
-      widgetUrl.searchParams.set("mode", mode);
-
-      const container = containerRef.current;
-      if (!container) throw new Error("Missing widget container");
-
-      const ramps = window.RampsSDK.createRamps({
-        container,
-        sessionToken: session.sessionToken,
-        widgetUrl: widgetUrl.toString(),
-        address: publicKey,
-        chain: "solana",
-        asset: "USDC",
-        appName: "sol.new",
-        onSignTransaction: async (tx: OnChainTx) => {
-          try {
-            const sig = await signAndSendUsdc(tx);
-            toast.success("USDC sent for cash-out");
-            return sig;
-          } catch (e) {
-            const msg = e instanceof Error ? e.message : "Sign failed";
-            toast.error(msg);
-            throw e;
-          }
-        },
-        onReady: () => setOpen(true),
-        onError: (err: unknown) => {
-          const msg =
-            typeof err === "string"
-              ? err
-              : err && typeof err === "object" && "message" in err
-                ? String((err as { message: unknown }).message)
-                : "Widget error";
-          setError(msg);
-        },
-        onClose: () => {
-          setOpen(false);
-          try {
-            ramps.destroy();
-          } catch {
-            /* ignore */
-          }
-          rampsRef.current = null;
-        },
       });
-
-      rampsRef.current = ramps;
-      ramps.open();
       setOpen(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to open MoneyGram");
-    } finally {
       setBusy(false);
     }
   };
@@ -311,71 +409,121 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
     );
   }
 
+  const overlay =
+    mounted && open
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[200] flex flex-col bg-zinc-950"
+            role="dialog"
+            aria-modal="true"
+            aria-label="MoneyGram Ramps"
+          >
+            <div className="flex items-center justify-between gap-3 px-3 sm:px-4 py-2.5 bg-zinc-950 border-b border-white/10 shrink-0 safe-pt">
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-wider text-emerald-400 font-semibold">
+                  MoneyGram {isLive ? "Live" : "Sandbox"}
+                  {pending?.mode === "on-ramp"
+                    ? " · Cash in"
+                    : pending?.mode === "off-ramp"
+                      ? " · Cash out"
+                      : ""}
+                </p>
+                <p className="text-sm text-white/80 truncate">
+                  {publicKey
+                    ? `${publicKey.slice(0, 6)}…${publicKey.slice(-6)}`
+                    : "Wallet"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={destroyWidget}
+                className="inline-flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] px-3 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-medium"
+                aria-label="Close MoneyGram"
+              >
+                <X size={18} /> Close
+              </button>
+            </div>
+            <div className="relative flex-1 min-h-0 w-full">
+              <div
+                ref={containerRef}
+                id="moneygram-ramps-widget"
+                className="absolute inset-0 w-full h-full bg-black"
+              />
+              {busy && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 pointer-events-none">
+                  <div className="flex items-center gap-2 text-white text-sm">
+                    <Spinner size={18} /> Opening MoneyGram…
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
-    <div
-      className={`rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/10 via-transparent to-violet-500/5 p-5 space-y-3 ${className}`}
-    >
-      <div className="flex items-start gap-3">
-        <div className="w-11 h-11 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 flex items-center justify-center shrink-0">
-          <Banknote className="w-5 h-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-            MoneyGram Ramps
-            {isLive ? " · Live" : " · Sandbox"}
-          </p>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-            {isLive ? "Cash ↔ USDC" : "Cash ↔ USDC (test)"}
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-white/50 leading-relaxed">
-            {isLive
-              ? "Buy USDC with cash at MoneyGram, or cash out USDC to cash. Funds go to your connected wallet."
-              : "Sandbox MoneyGram — no real cash. Production keys switch this to live automatically."}
-          </p>
-          {!isLive && network === "mainnet" && (
-            <p className="text-[11px] text-amber-600 mt-1">
-              Partner approved · still on sandbox keys until live keys are set
-            </p>
-          )}
-        </div>
-      </div>
-
-      <ConnectGate action="use MoneyGram cash ramps">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <button
-            type="button"
-            disabled={busy || open}
-            onClick={() => void openWidget("on-ramp")}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold py-3 cursor-pointer min-h-[48px]"
-          >
-            {busy ? <Spinner size={16} /> : <ArrowDownToLine className="w-4 h-4" />}
-            Cash in → USDC
-          </button>
-          <button
-            type="button"
-            disabled={busy || open}
-            onClick={() => void openWidget("off-ramp")}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-50 text-emerald-900 dark:text-emerald-100 font-semibold py-3 cursor-pointer min-h-[48px]"
-          >
-            {busy ? <Spinner size={16} /> : <ArrowUpFromLine className="w-4 h-4" />}
-            USDC → cash out
-          </button>
-        </div>
-      </ConnectGate>
-
-      {error && (
-        <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-          {error}
-        </p>
-      )}
-
+    <>
       <div
-        ref={containerRef}
-        id="moneygram-ramps-widget"
-        className={
-          open ? "min-h-[480px] w-full rounded-xl overflow-hidden" : "hidden"
-        }
-      />
-    </div>
+        className={`rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/10 via-transparent to-violet-500/5 p-5 space-y-3 ${className}`}
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 flex items-center justify-center shrink-0">
+            <Banknote className="w-5 h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              MoneyGram Ramps
+              {isLive ? " · Live" : " · Sandbox"}
+            </p>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              {isLive ? "Cash ↔ USDC" : "Cash ↔ USDC (test)"}
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-white/50 leading-relaxed">
+              Opens full-screen so you can search locations and complete cash in
+              / out.
+            </p>
+          </div>
+        </div>
+
+        <ConnectGate action="use MoneyGram cash ramps">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={busy || open}
+              onClick={() => void start("on-ramp")}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold py-3 cursor-pointer min-h-[48px]"
+            >
+              {busy && pending?.mode === "on-ramp" ? (
+                <Spinner size={16} />
+              ) : (
+                <ArrowDownToLine className="w-4 h-4" />
+              )}
+              Cash in → USDC
+            </button>
+            <button
+              type="button"
+              disabled={busy || open}
+              onClick={() => void start("off-ramp")}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-50 text-emerald-900 dark:text-emerald-100 font-semibold py-3 cursor-pointer min-h-[48px]"
+            >
+              {busy && pending?.mode === "off-ramp" ? (
+                <Spinner size={16} />
+              ) : (
+                <ArrowUpFromLine className="w-4 h-4" />
+              )}
+              USDC → cash out
+            </button>
+          </div>
+        </ConnectGate>
+
+        {error && (
+          <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
+      </div>
+      {overlay}
+    </>
   );
 }
