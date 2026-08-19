@@ -13,6 +13,7 @@ import { Navbar } from "@/components/navbar";
 import { useWallet } from "@/lib/wallet-context";
 import { analytics } from "@/lib/analytics";
 import { PortfolioDefiPanel } from "@/components/portfolio-defi-panel";
+import { AddressTxHistory } from "@/components/address-tx-history";
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 
@@ -228,15 +229,16 @@ function ProgramView({ data }: { data: ProgramData }) {
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition">
           <Activity className="w-3.5 h-3.5" /> Programwatch
         </a>
-        <a href={data.solscanUrl} target="_blank" rel="noopener noreferrer"
+        <a href={`/address/${data.address}`}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition">
           <ExternalLink className="w-3.5 h-3.5" /> sol.new
         </a>
-        <a href={data.explorerUrl} target="_blank" rel="noopener noreferrer"
+        <a href={`/explorer/address/${data.address}`}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition">
           <ExternalLink className="w-3.5 h-3.5" /> Explorer
         </a>
       </div>
+      <AddressTxHistory address={data.address} title="Program transactions" />
     </div>
   );
 }
@@ -466,11 +468,15 @@ function TokenView({ data }: { data: TokenData }) {
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition">
           <LineChart className="w-3.5 h-3.5" /> DexScreener
         </a>
-        <a href={data.solscanUrl} target="_blank" rel="noopener noreferrer"
+        <a href={`/address/${data.address}`} 
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition">
           <ExternalLink className="w-3.5 h-3.5" /> sol.new
         </a>
       </div>
+      <AddressTxHistory
+          address={data.address}
+          title="Mint transactions"
+        />
     </div>
   );
 }
@@ -485,13 +491,14 @@ function WalletView({
   usdc?: number | null;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-5">
       <div className="flex items-center gap-2 flex-wrap">
         <AddressTypeBadge type="wallet" />
         <span className="font-mono text-xs text-gray-500 break-all">{address}</span>
         <CopyButton text={address} />
       </div>
       <PortfolioDefiPanel address={address} compact />
+      <AddressTxHistory address={address} title="Transaction history" />
     </div>
   );
 }
@@ -539,10 +546,9 @@ function TokenAccountView({ data }: { data: TokenAccountData }) {
           <TokenView data={data.mintMeta} />
         </div>
       )}
+      <AddressTxHistory address={data.address} title="Account transactions" />
       <a
-        href={data.solscanUrl}
-        target="_blank"
-        rel="noopener noreferrer"
+        href={`/address/${data.address}`}
         className="inline-flex items-center gap-1 text-xs text-purple-500 hover:underline"
       >
         sol.new <ExternalLink className="w-3 h-3" />
