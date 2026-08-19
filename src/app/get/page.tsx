@@ -231,8 +231,8 @@ export default function GetPage() {
             {/* Stripe live credits — mainnet only */}
             {network === "mainnet" && <CreditsBuySection />}
 
-            {/* MoneyGram sandbox — test/devnet only */}
-            {network === "devnet" && <MoneyGramRampsCard />}
+            {/* MoneyGram Ramps — live on mainnet when approved; sandbox on devnet */}
+            <MoneyGramRampsCard />
 
             {/* View on explorer */}
             <a

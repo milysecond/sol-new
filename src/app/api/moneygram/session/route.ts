@@ -3,6 +3,7 @@ import {
   createMoneyGramSession,
   moneygramConfigured,
   moneygramEnv,
+  moneygramMainnetEnabled,
 } from "@/lib/moneygram";
 
 export const runtime = "nodejs";
@@ -22,7 +23,6 @@ export async function POST(_req: NextRequest) {
 
   try {
     const session = await createMoneyGramSession();
-    // Never return secret. Session token + widget URL only.
     return NextResponse.json({
       ok: true,
       sessionId: session.sessionId,
@@ -31,6 +31,7 @@ export async function POST(_req: NextRequest) {
       sdkUrl: session.sdkUrl,
       env: session.env,
       publicKeyHint: session.publicKeyPrefix,
+      mainnetEnabled: session.mainnetEnabled,
     });
   } catch (e) {
     console.error("[moneygram session]", e);
@@ -46,5 +47,7 @@ export async function GET() {
     ok: true,
     configured: moneygramConfigured(),
     env: moneygramEnv(),
+    mainnetEnabled: moneygramMainnetEnabled(),
+    live: moneygramEnv() === "production",
   });
 }

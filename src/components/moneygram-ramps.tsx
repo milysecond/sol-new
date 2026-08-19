@@ -22,6 +22,7 @@ import {
   getPasskeyKeypair,
 } from "@/lib/passkey-wallet";
 import { toast } from "@/lib/toast";
+import { broadcastSignedTx } from "@/lib/broadcast-tx";
 
 type Mode = "on-ramp" | "off-ramp";
 
@@ -90,7 +91,8 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
   const { publicKey } = useWallet();
   const { rpc, network } = useNetwork();
   const [configured, setConfigured] = useState<boolean | null>(null);
-  const [envLabel, setEnvLabel] = useState("sandbox");
+  const [envLabel, setEnvLabel] = useState<"sandbox" | "production">("sandbox");
+  const [mainnetEnabled, setMainnetEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -99,10 +101,20 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
 
   useEffect(() => {
     fetch("/api/moneygram/session")
-      .then((r) => r.json() as Promise<{ configured?: boolean; env?: string }>)
+      .then(
+        (r) =>
+          r.json() as Promise<{
+            configured?: boolean;
+            env?: string;
+            mainnetEnabled?: boolean;
+            live?: boolean;
+          }>,
+      )
       .then((j) => {
         setConfigured(Boolean(j.configured));
-        if (j.env) setEnvLabel(j.env);
+        if (j.env === "production" || j.live) setEnvLabel("production");
+        else setEnvLabel("sandbox");
+        setMainnetEnabled(Boolean(j.mainnetEnabled || j.live));
       })
       .catch(() => setConfigured(false));
     return () => {
@@ -113,6 +125,11 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
       }
     };
   }, []);
+
+  const isLive = envLabel === "production";
+  // Hide on mainnet if not enabled yet; always OK on devnet for sandbox testing
+  const allowedHere =
+    network === "devnet" || (network === "mainnet" && mainnetEnabled);
 
   const signAndSendUsdc = useCallback(
     async (tx: OnChainTx): Promise<string> => {
@@ -170,15 +187,25 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
       const { keypair } = await getPasskeyKeypair(publicKey);
       transaction.sign(keypair);
 
-      const signature = await connection.sendRawTransaction(
-        transaction.serialize(),
-        { skipPreflight: false, maxRetries: 3 },
-      );
-      await connection.confirmTransaction(
-        { signature, blockhash, lastValidBlockHeight },
-        "confirmed",
-      );
-      return signature;
+      // Prefer server broadcast pool on mainnet
+      try {
+        const signature = await broadcastSignedTx(transaction);
+        await connection.confirmTransaction(
+          { signature, blockhash, lastValidBlockHeight },
+          "confirmed",
+        );
+        return signature;
+      } catch {
+        const signature = await connection.sendRawTransaction(
+          transaction.serialize(),
+          { skipPreflight: false, maxRetries: 3 },
+        );
+        await connection.confirmTransaction(
+          { signature, blockhash, lastValidBlockHeight },
+          "confirmed",
+        );
+        return signature;
+      }
     },
     [publicKey, rpc],
   );
@@ -205,7 +232,9 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
 
       await loadSdk(
         session.sdkUrl ||
-          "https://playground.xramps.moneygram.com/sdk/index.global.js",
+          (isLive
+            ? "https://api.xramps.moneygram.com/sdk/index.global.js"
+            : "https://playground.xramps.moneygram.com/sdk/index.global.js"),
       );
       if (!window.RampsSDK?.createRamps) {
         throw new Error("MoneyGram SDK not available");
@@ -268,11 +297,15 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
   };
 
   if (configured === false) return null;
+  if (!allowedHere) return null;
+
   if (configured === null) {
     return (
-      <div className={`rounded-2xl border border-black/10 dark:border-white/10 p-4 ${className}`}>
+      <div
+        className={`rounded-2xl border border-black/10 dark:border-white/10 p-4 ${className}`}
+      >
         <div className="flex items-center gap-2 text-sm text-gray-500">
-          <Spinner size={16} /> Checking cash ramp…
+          <Spinner size={16} /> Checking MoneyGram…
         </div>
       </div>
     );
@@ -288,19 +321,22 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-            MoneyGram Ramps · TEST
-            {envLabel && envLabel !== "sandbox" ? ` · ${envLabel}` : " · sandbox"}
+            MoneyGram Ramps
+            {isLive ? " · Live" : " · Sandbox"}
           </p>
           <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-            Cash ↔ USDC (test only)
+            {isLive ? "Cash ↔ USDC" : "Cash ↔ USDC (test)"}
           </h3>
           <p className="text-sm text-gray-500 dark:text-white/50 leading-relaxed">
-            Sandbox MoneyGram on <strong>test network</strong> — no real cash.
-            Switch to mainnet for live Stripe credits.
+            {isLive
+              ? "Buy USDC with cash at MoneyGram, or cash out USDC to cash. Funds go to your connected wallet."
+              : "Sandbox MoneyGram — no real cash. Production keys switch this to live automatically."}
           </p>
-          <p className="text-[11px] text-amber-600 mt-1">
-            You’re on devnet · MoneyGram sandbox only
-          </p>
+          {!isLive && network === "mainnet" && (
+            <p className="text-[11px] text-amber-600 mt-1">
+              Partner approved · still on sandbox keys until live keys are set
+            </p>
+          )}
         </div>
       </div>
 
@@ -310,7 +346,7 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
             type="button"
             disabled={busy || open}
             onClick={() => void openWidget("on-ramp")}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold py-3 cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold py-3 cursor-pointer min-h-[48px]"
           >
             {busy ? <Spinner size={16} /> : <ArrowDownToLine className="w-4 h-4" />}
             Cash in → USDC
@@ -319,7 +355,7 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
             type="button"
             disabled={busy || open}
             onClick={() => void openWidget("off-ramp")}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-50 text-emerald-900 dark:text-emerald-100 font-semibold py-3 cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-50 text-emerald-900 dark:text-emerald-100 font-semibold py-3 cursor-pointer min-h-[48px]"
           >
             {busy ? <Spinner size={16} /> : <ArrowUpFromLine className="w-4 h-4" />}
             USDC → cash out
@@ -336,7 +372,9 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
       <div
         ref={containerRef}
         id="moneygram-ramps-widget"
-        className={open ? "min-h-[480px] w-full rounded-xl overflow-hidden" : "hidden"}
+        className={
+          open ? "min-h-[480px] w-full rounded-xl overflow-hidden" : "hidden"
+        }
       />
     </div>
   );
