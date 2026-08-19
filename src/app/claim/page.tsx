@@ -192,7 +192,8 @@ export default function ClaimPage() {
   } = useWallet();
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+    const run = async () => {
       const params = new URLSearchParams(window.location.search);
       const net: Network = params.get("n") === "d" ? "devnet" : "mainnet";
       setNetwork(net);
@@ -201,7 +202,7 @@ export default function ClaimPage() {
       const secret = parseGiftSecret(window.location.hash);
       const gift = secret ? keypairFromSecret(secret) : null;
       if (!gift) {
-        setState({ kind: "invalid" });
+        if (!cancelled) setState({ kind: "invalid" });
         return;
       }
 
@@ -212,6 +213,7 @@ export default function ClaimPage() {
           gift.publicKey,
           net,
         );
+        if (cancelled) return;
         if (lamports <= CLAIM_FEE_LAMPORTS && tokens.length === 0) {
           let wasClaimed = false;
           try {
@@ -222,23 +224,35 @@ export default function ClaimPage() {
           } catch {
             /* ignore */
           }
-          setState({ kind: "empty", wasClaimed });
+          if (!cancelled) setState({ kind: "empty", wasClaimed });
         } else {
           const enriched = await Promise.all(
             tokens.map((t) => loadTokenMeta(t.mint, t.decimals, t.amount)),
           );
-          setState({
-            kind: "ready",
-            gift,
-            lamports,
-            usdcBase,
-            tokens: enriched,
-          });
+          if (!cancelled) {
+            setState({
+              kind: "ready",
+              gift,
+              lamports,
+              usdcBase,
+              tokens: enriched,
+            });
+          }
         }
       } catch {
-        setState({ kind: "invalid" });
+        if (!cancelled) setState({ kind: "invalid" });
       }
-    })();
+    };
+    void run();
+    // Re-run if hash arrives late (some WebViews strip then restore)
+    const onHash = () => {
+      void run();
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("hashchange", onHash);
+    };
   }, []);
 
   const handleClaim = async () => {

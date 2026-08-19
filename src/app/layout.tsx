@@ -12,6 +12,7 @@ import { PushPrompt } from "@/components/push-prompt";
 import { SiteFooter } from "@/components/site-footer";
 import { WalletBrowserTitle } from "@/components/wallet-browser-title";
 import { RouteTransition } from "@/components/route-transition";
+import { DeepLinkGuard } from "@/components/deep-link-guard";
 import { SolanaConnectorProvider } from "@/components/solana-connector-provider";
 import { ExternalWalletBridge } from "@/components/external-wallet-bridge";
 
@@ -153,9 +154,10 @@ export default function RootLayout({
         </ThemeProvider>
         <InstallPrompt />
         <PushPrompt />
+        <DeepLinkGuard />
         <script
           dangerouslySetInnerHTML={{
-            __html: `if("serviceWorker"in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js"))`,
+            __html: `if("serviceWorker"in navigator)window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js").then(r=>r.update()).catch(()=>{})})`,
           }}
         />
       </body>
