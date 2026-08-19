@@ -83,6 +83,59 @@ export function middleware(request: NextRequest) {
   }
   // /address/<pk> — let the app route handle (metadata + Scan UI). No rewrite.
 
+  // /explorer aliases — Solscan-shaped paths → in-app surfaces
+  if (path === "/explorer" || path === "/explorer/") {
+    const q =
+      url.searchParams.get("q") ||
+      url.searchParams.get("query") ||
+      url.searchParams.get("address") ||
+      url.searchParams.get("tx");
+    if (q && q.trim()) {
+      const dest = request.nextUrl.clone();
+      // leave classification to the page via ?q= — strip other noise
+      dest.pathname = "/explorer";
+      dest.search = `?q=${encodeURIComponent(q.trim())}`;
+      return NextResponse.redirect(dest, 308);
+    }
+    return NextResponse.next();
+  }
+  const explorerTx = path.match(/^\/explorer\/(?:tx|transaction)\/([^/]+)\/?$/i);
+  if (explorerTx?.[1]) {
+    const dest = request.nextUrl.clone();
+    dest.pathname = `/receipt/${explorerTx[1]}`;
+    dest.search = "";
+    return NextResponse.redirect(dest, 308);
+  }
+  const explorerAddr = path.match(
+    /^\/explorer\/(?:address|account|wallet)\/([^/]+)\/?$/i,
+  );
+  if (explorerAddr?.[1]) {
+    const dest = request.nextUrl.clone();
+    dest.pathname = `/address/${explorerAddr[1]}`;
+    dest.search = "";
+    return NextResponse.redirect(dest, 308);
+  }
+  const explorerToken = path.match(/^\/explorer\/token\/([^/]+)\/?$/i);
+  if (explorerToken?.[1]) {
+    const dest = request.nextUrl.clone();
+    dest.pathname = `/token/${explorerToken[1]}`;
+    dest.search = "";
+    return NextResponse.redirect(dest, 308);
+  }
+  // bare /explorer/<value> — pubkey or signature
+  const explorerBare = path.match(/^\/explorer\/([^/]+)\/?$/);
+  if (explorerBare?.[1] && explorerBare[1] !== "address" && explorerBare[1] !== "tx" && explorerBare[1] !== "token") {
+    const v = explorerBare[1];
+    const dest = request.nextUrl.clone();
+    dest.search = "";
+    if (v.length >= 80) {
+      dest.pathname = `/receipt/${v}`;
+    } else {
+      dest.pathname = `/address/${v}`;
+    }
+    return NextResponse.redirect(dest, 308);
+  }
+
   return NextResponse.next();
 }
 
