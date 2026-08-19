@@ -56,6 +56,8 @@ declare global {
   }
 }
 
+const HEADER_H = 52;
+
 function loadSdk(url: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (window.RampsSDK?.createRamps) {
@@ -95,6 +97,47 @@ function parseAmountToRaw(
   const [w, f = ""] = s.split(".");
   const frac = (f + "0".repeat(decimals)).slice(0, decimals);
   return BigInt(w || "0") * BigInt(10 ** decimals) + BigInt(frac || "0");
+}
+
+/**
+ * MoneyGram iframe needs a real box with height:100%.
+ * Their SDK also mutates container.style.height from postMessage —
+ * that breaks flex/absolute hosts so taps miss list rows. We lock size.
+ */
+function lockWidgetBox(el: HTMLElement) {
+  const h = `calc(100dvh - ${HEADER_H}px)`;
+  el.style.cssText = [
+    "position:relative",
+    "display:block",
+    "width:100%",
+    `height:${h}`,
+    `min-height:${h}`,
+    `max-height:${h}`,
+    "flex:none",
+    "overflow:hidden",
+    "pointer-events:auto",
+    "touch-action:auto",
+    "background:#000",
+    "z-index:1",
+  ].join(";");
+
+  const iframe = el.querySelector("iframe");
+  if (iframe instanceof HTMLIFrameElement) {
+    iframe.style.cssText = [
+      "position:absolute",
+      "inset:0",
+      "width:100%",
+      "height:100%",
+      "border:0",
+      "display:block",
+      "pointer-events:auto",
+      "touch-action:auto",
+      "z-index:2",
+    ].join(";");
+    iframe.setAttribute("scrolling", "yes");
+    // ensure interactive APIs
+    iframe.allow = "clipboard-write; camera; geolocation; payment";
+  }
 }
 
 export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
@@ -146,10 +189,13 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
 
   useEffect(() => {
     if (!open) return;
-    const prev = document.body.style.overflow;
+    const prevOverflow = document.body.style.overflow;
+    const prevTouch = document.body.style.touchAction;
     document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = prevOverflow;
+      document.body.style.touchAction = prevTouch;
     };
   }, [open]);
 
@@ -253,10 +299,12 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
     [rpc],
   );
 
-  // Mount SDK once full-screen portal + container exist
+  // Mount SDK once portal is open + pending session ready
   useEffect(() => {
     if (!open || !pending || !publicKey) return;
     let cancelled = false;
+    let mo: MutationObserver | null = null;
+    let poll: ReturnType<typeof setInterval> | null = null;
 
     (async () => {
       try {
@@ -267,7 +315,6 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
           throw new Error("MoneyGram SDK not available");
         }
 
-        // Wait for portal paint
         await new Promise<void>((r) => requestAnimationFrame(() => r()));
         await new Promise<void>((r) => requestAnimationFrame(() => r()));
         if (cancelled) return;
@@ -281,14 +328,19 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
           /* ignore */
         }
         container.innerHTML = "";
-        Object.assign(container.style, {
-          width: "100%",
-          height: "100%",
-          minHeight: "100%",
-          flex: "1",
-          display: "block",
-          position: "relative",
+        lockWidgetBox(container);
+
+        // Re-lock whenever SDK mutates height (breaks hit-testing otherwise)
+        mo = new MutationObserver(() => {
+          lockWidgetBox(container);
         });
+        mo.observe(container, {
+          attributes: true,
+          attributeFilter: ["style", "class"],
+          childList: true,
+          subtree: true,
+        });
+        poll = setInterval(() => lockWidgetBox(container), 500);
 
         const widgetUrl = new URL(pending.widgetUrl);
         widgetUrl.searchParams.set("mode", pending.mode);
@@ -338,6 +390,11 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
 
         rampsRef.current = ramps;
         ramps.open();
+        // After open, force iframe hit targets again
+        requestAnimationFrame(() => lockWidgetBox(container));
+        setTimeout(() => lockWidgetBox(container), 50);
+        setTimeout(() => lockWidgetBox(container), 300);
+        setTimeout(() => lockWidgetBox(container), 1000);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to open MoneyGram");
@@ -350,6 +407,8 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
 
     return () => {
       cancelled = true;
+      mo?.disconnect();
+      if (poll) clearInterval(poll);
     };
   }, [open, pending, publicKey, signAndSendUsdc, destroyWidget]);
 
@@ -413,12 +472,23 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
     mounted && open
       ? createPortal(
           <div
-            className="fixed inset-0 z-[200] flex flex-col bg-zinc-950"
+            className="fixed inset-0 z-[300] flex flex-col bg-black"
             role="dialog"
             aria-modal="true"
             aria-label="MoneyGram Ramps"
+            // Don't capture pointer events on the shell — only header + iframe box
+            style={{ touchAction: "manipulation" }}
           >
-            <div className="flex items-center justify-between gap-3 px-3 sm:px-4 py-2.5 bg-zinc-950 border-b border-white/10 shrink-0 safe-pt">
+            <div
+              className="flex items-center justify-between gap-3 px-3 sm:px-4 bg-zinc-950 border-b border-white/10 shrink-0"
+              style={{
+                height: HEADER_H,
+                minHeight: HEADER_H,
+                paddingTop: "env(safe-area-inset-top)",
+                pointerEvents: "auto",
+                zIndex: 2,
+              }}
+            >
               <div className="min-w-0">
                 <p className="text-[10px] uppercase tracking-wider text-emerald-400 font-semibold">
                   MoneyGram {isLive ? "Live" : "Sandbox"}
@@ -428,7 +498,7 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
                       ? " · Cash out"
                       : ""}
                 </p>
-                <p className="text-sm text-white/80 truncate">
+                <p className="text-xs text-white/70 truncate font-mono">
                   {publicKey
                     ? `${publicKey.slice(0, 6)}…${publicKey.slice(-6)}`
                     : "Wallet"}
@@ -437,26 +507,41 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
               <button
                 type="button"
                 onClick={destroyWidget}
-                className="inline-flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] px-3 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-medium"
+                className="inline-flex items-center justify-center gap-1.5 h-10 px-3 rounded-full bg-white/12 hover:bg-white/18 text-white text-sm font-medium shrink-0"
                 aria-label="Close MoneyGram"
               >
-                <X size={18} /> Close
+                <X size={16} /> Close
               </button>
             </div>
-            <div className="relative flex-1 min-h-0 w-full">
+
+            {/* Explicit viewport box — SDK iframe fills this */}
+            <div
+              ref={containerRef}
+              id="moneygram-ramps-widget"
+              style={{
+                height: `calc(100dvh - ${HEADER_H}px)`,
+                minHeight: `calc(100dvh - ${HEADER_H}px)`,
+                maxHeight: `calc(100dvh - ${HEADER_H}px)`,
+                width: "100%",
+                position: "relative",
+                overflow: "hidden",
+                pointerEvents: "auto",
+                touchAction: "auto",
+                zIndex: 1,
+                background: "#000",
+              }}
+            />
+
+            {busy && (
               <div
-                ref={containerRef}
-                id="moneygram-ramps-widget"
-                className="absolute inset-0 w-full h-full bg-black"
-              />
-              {busy && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 pointer-events-none">
-                  <div className="flex items-center gap-2 text-white text-sm">
-                    <Spinner size={18} /> Opening MoneyGram…
-                  </div>
+                className="absolute inset-0 flex items-center justify-center bg-black/50"
+                style={{ zIndex: 5, pointerEvents: "none" }}
+              >
+                <div className="flex items-center gap-2 text-white text-sm">
+                  <Spinner size={18} /> Opening MoneyGram…
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>,
           document.body,
         )
@@ -480,8 +565,7 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
               {isLive ? "Cash ↔ USDC" : "Cash ↔ USDC (test)"}
             </h3>
             <p className="text-sm text-gray-500 dark:text-white/50 leading-relaxed">
-              Opens full-screen so you can search locations and complete cash in
-              / out.
+              Full-screen MoneyGram — tap a location to continue.
             </p>
           </div>
         </div>
