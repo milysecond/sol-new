@@ -68,10 +68,22 @@ function loadSdk(url: string): Promise<void> {
       `script[data-moneygram-sdk="1"]`,
     );
     if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () =>
-        reject(new Error("SDK load failed")),
+      // Already loading or loaded
+      if (window.RampsSDK?.createRamps) {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error("SDK load failed")),
+        { once: true },
       );
+      // Safety timeout
+      setTimeout(() => {
+        if (window.RampsSDK?.createRamps) resolve();
+        else reject(new Error("SDK load timeout"));
+      }, 15_000);
       return;
     }
     const s = document.createElement("script");
@@ -81,6 +93,11 @@ function loadSdk(url: string): Promise<void> {
     s.onload = () => resolve();
     s.onerror = () => reject(new Error("Failed to load MoneyGram SDK"));
     document.head.appendChild(s);
+    setTimeout(() => {
+      if (!window.RampsSDK?.createRamps) {
+        reject(new Error("SDK load timeout"));
+      }
+    }, 15_000);
   });
 }
 
@@ -99,43 +116,31 @@ function parseAmountToRaw(
   return BigInt(w || "0") * BigInt(10 ** decimals) + BigInt(frac || "0");
 }
 
-/**
- * MoneyGram iframe needs a real box with height:100%.
- * Their SDK also mutates container.style.height from postMessage —
- * that breaks flex/absolute hosts so taps miss list rows. We lock size.
- */
-function lockWidgetBox(el: HTMLElement) {
-  const h = `calc(100dvh - ${HEADER_H}px)`;
-  el.style.cssText = [
-    "position:relative",
-    "display:block",
-    "width:100%",
-    `height:${h}`,
-    `min-height:${h}`,
-    `max-height:${h}`,
-    "flex:none",
-    "overflow:hidden",
-    "pointer-events:auto",
-    "touch-action:auto",
-    "background:#000",
-    "z-index:1",
-  ].join(";");
+/** Full-viewport box with !important so SDK height posts can't shrink hit targets. */
+function sizeContainer(el: HTMLElement) {
+  const h = `calc(100dvh - ${HEADER_H}px - env(safe-area-inset-top, 0px))`;
+  el.style.setProperty("position", "relative", "important");
+  el.style.setProperty("display", "block", "important");
+  el.style.setProperty("width", "100%", "important");
+  el.style.setProperty("height", h, "important");
+  el.style.setProperty("min-height", h, "important");
+  el.style.setProperty("max-height", h, "important");
+  el.style.setProperty("overflow", "hidden", "important");
+  el.style.setProperty("pointer-events", "auto", "important");
+  el.style.setProperty("touch-action", "auto", "important");
+  el.style.setProperty("background", "#000", "important");
 
   const iframe = el.querySelector("iframe");
   if (iframe instanceof HTMLIFrameElement) {
-    iframe.style.cssText = [
-      "position:absolute",
-      "inset:0",
-      "width:100%",
-      "height:100%",
-      "border:0",
-      "display:block",
-      "pointer-events:auto",
-      "touch-action:auto",
-      "z-index:2",
-    ].join(";");
+    iframe.style.setProperty("position", "absolute", "important");
+    iframe.style.setProperty("inset", "0", "important");
+    iframe.style.setProperty("width", "100%", "important");
+    iframe.style.setProperty("height", "100%", "important");
+    iframe.style.setProperty("border", "0", "important");
+    iframe.style.setProperty("display", "block", "important");
+    iframe.style.setProperty("pointer-events", "auto", "important");
+    iframe.style.setProperty("touch-action", "auto", "important");
     iframe.setAttribute("scrolling", "yes");
-    // ensure interactive APIs
     iframe.allow = "clipboard-write; camera; geolocation; payment";
   }
 }
@@ -151,8 +156,10 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<PendingSession | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [status, setStatus] = useState<string>("");
   const rampsRef = useRef<RampsInstance | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const startedKeyRef = useRef<string | null>(null);
   const publicKeyRef = useRef(publicKey);
   publicKeyRef.current = publicKey;
 
@@ -189,13 +196,10 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
 
   useEffect(() => {
     if (!open) return;
-    const prevOverflow = document.body.style.overflow;
-    const prevTouch = document.body.style.touchAction;
+    const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    document.body.style.touchAction = "none";
     return () => {
-      document.body.style.overflow = prevOverflow;
-      document.body.style.touchAction = prevTouch;
+      document.body.style.overflow = prev;
     };
   }, [open]);
 
@@ -205,19 +209,16 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
 
   const destroyWidget = useCallback(() => {
     try {
-      rampsRef.current?.close();
-    } catch {
-      /* ignore */
-    }
-    try {
       rampsRef.current?.destroy();
     } catch {
       /* ignore */
     }
     rampsRef.current = null;
+    startedKeyRef.current = null;
     setPending(null);
     setOpen(false);
     setBusy(false);
+    setStatus("");
   }, []);
 
   const signAndSendUsdc = useCallback(
@@ -299,28 +300,35 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
     [rpc],
   );
 
-  // Mount SDK once portal is open + pending session ready
+  // Mount once when portal open + session ready (no dep churn)
   useEffect(() => {
     if (!open || !pending || !publicKey) return;
+
+    const key = `${pending.sessionToken}:${pending.mode}`;
+    if (startedKeyRef.current === key && rampsRef.current) return;
+    startedKeyRef.current = key;
+
     let cancelled = false;
-    let mo: MutationObserver | null = null;
-    let poll: ReturnType<typeof setInterval> | null = null;
+    const timers: number[] = [];
 
     (async () => {
       try {
         setBusy(true);
+        setStatus("Loading SDK…");
         await loadSdk(pending.sdkUrl);
         if (cancelled) return;
         if (!window.RampsSDK?.createRamps) {
           throw new Error("MoneyGram SDK not available");
         }
 
-        await new Promise<void>((r) => requestAnimationFrame(() => r()));
-        await new Promise<void>((r) => requestAnimationFrame(() => r()));
+        // Wait for portal DOM
+        await new Promise<void>((r) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => r())),
+        );
         if (cancelled) return;
 
         const container = containerRef.current;
-        if (!container) throw new Error("Missing widget container");
+        if (!container) throw new Error("Widget container missing — try again");
 
         try {
           rampsRef.current?.destroy();
@@ -328,32 +336,30 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
           /* ignore */
         }
         container.innerHTML = "";
-        lockWidgetBox(container);
+        sizeContainer(container);
 
-        // Re-lock whenever SDK mutates height (breaks hit-testing otherwise)
-        mo = new MutationObserver(() => {
-          lockWidgetBox(container);
-        });
-        mo.observe(container, {
-          attributes: true,
-          attributeFilter: ["style", "class"],
-          childList: true,
-          subtree: true,
-        });
-        poll = setInterval(() => lockWidgetBox(container), 500);
+        setStatus("Starting widget…");
 
         const widgetUrl = new URL(pending.widgetUrl);
+        // mode on URL + config (SDK reads both)
         widgetUrl.searchParams.set("mode", pending.mode);
 
         const ramps = window.RampsSDK.createRamps({
           container,
           sessionToken: pending.sessionToken,
           widgetUrl: widgetUrl.toString(),
-          address: publicKey,
-          chain: "solana",
-          asset: "USDC",
-          appName: "sol.new",
           theme: "dark",
+          mode: pending.mode,
+          // SDK expects wallet object — not bare address
+          wallet: {
+            address: publicKey,
+            chain: "solana",
+            asset: "USDC",
+            network: "solana",
+          },
+          appName: "sol.new",
+          clientDomain:
+            typeof window !== "undefined" ? window.location.origin : "https://sol.new",
           onSignTransaction: async (tx: OnChainTx) => {
             try {
               const sig = await signAndSendUsdc(tx);
@@ -365,6 +371,12 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
               throw e;
             }
           },
+          onReady: () => {
+            setBusy(false);
+            setStatus("");
+            const c = containerRef.current;
+            if (c) sizeContainer(c);
+          },
           onError: (err: unknown) => {
             const msg =
               typeof err === "string"
@@ -373,6 +385,7 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
                   ? String((err as { message: unknown }).message)
                   : "Widget error";
             setError(msg);
+            setBusy(false);
           },
           onClose: () => {
             destroyWidget();
@@ -390,32 +403,47 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
 
         rampsRef.current = ramps;
         ramps.open();
-        // After open, force iframe hit targets again
-        requestAnimationFrame(() => lockWidgetBox(container));
-        setTimeout(() => lockWidgetBox(container), 50);
-        setTimeout(() => lockWidgetBox(container), 300);
-        setTimeout(() => lockWidgetBox(container), 1000);
+
+        // Size after iframe injects; do NOT use MutationObserver (infinite loop)
+        const reapply = () => {
+          const c = containerRef.current;
+          if (c) sizeContainer(c);
+        };
+        timers.push(window.setTimeout(reapply, 0));
+        timers.push(window.setTimeout(reapply, 100));
+        timers.push(window.setTimeout(reapply, 400));
+        timers.push(window.setTimeout(reapply, 1200));
+        // Failsafe: never hang spinner forever
+        timers.push(
+          window.setTimeout(() => {
+            setBusy(false);
+            setStatus("");
+            reapply();
+          }, 8000),
+        );
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to open MoneyGram");
-          destroyWidget();
+          setBusy(false);
+          setStatus("");
+          startedKeyRef.current = null;
         }
-      } finally {
-        if (!cancelled) setBusy(false);
       }
     })();
 
     return () => {
       cancelled = true;
-      mo?.disconnect();
-      if (poll) clearInterval(poll);
+      for (const t of timers) window.clearTimeout(t);
     };
-  }, [open, pending, publicKey, signAndSendUsdc, destroyWidget]);
+    // intentionally stable deps — pending/open/publicKey only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, pending, publicKey]);
 
   const start = async (mode: Mode) => {
     if (!publicKey) return;
     setBusy(true);
     setError(null);
+    setStatus("Creating session…");
     try {
       try {
         rampsRef.current?.destroy();
@@ -423,6 +451,7 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
         /* ignore */
       }
       rampsRef.current = null;
+      startedKeyRef.current = null;
 
       const res = await fetch("/api/moneygram/session", { method: "POST" });
       const session = (await res.json()) as {
@@ -447,9 +476,11 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
             : "https://playground.xramps.moneygram.com/sdk/index.global.js"),
       });
       setOpen(true);
+      setStatus("Opening…");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to open MoneyGram");
       setBusy(false);
+      setStatus("");
     }
   };
 
@@ -476,8 +507,6 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
             role="dialog"
             aria-modal="true"
             aria-label="MoneyGram Ramps"
-            // Don't capture pointer events on the shell — only header + iframe box
-            style={{ touchAction: "manipulation" }}
           >
             <div
               className="flex items-center justify-between gap-3 px-3 sm:px-4 bg-zinc-950 border-b border-white/10 shrink-0"
@@ -485,7 +514,6 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
                 height: HEADER_H,
                 minHeight: HEADER_H,
                 paddingTop: "env(safe-area-inset-top)",
-                pointerEvents: "auto",
                 zIndex: 2,
               }}
             >
@@ -514,31 +542,27 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
               </button>
             </div>
 
-            {/* Explicit viewport box — SDK iframe fills this */}
             <div
               ref={containerRef}
               id="moneygram-ramps-widget"
               style={{
-                height: `calc(100dvh - ${HEADER_H}px)`,
-                minHeight: `calc(100dvh - ${HEADER_H}px)`,
-                maxHeight: `calc(100dvh - ${HEADER_H}px)`,
+                height: `calc(100dvh - ${HEADER_H}px - env(safe-area-inset-top, 0px))`,
                 width: "100%",
                 position: "relative",
                 overflow: "hidden",
-                pointerEvents: "auto",
-                touchAction: "auto",
-                zIndex: 1,
                 background: "#000",
+                zIndex: 1,
               }}
             />
 
             {busy && (
               <div
-                className="absolute inset-0 flex items-center justify-center bg-black/50"
+                className="absolute inset-0 flex items-center justify-center bg-black/55"
                 style={{ zIndex: 5, pointerEvents: "none" }}
               >
                 <div className="flex items-center gap-2 text-white text-sm">
-                  <Spinner size={18} /> Opening MoneyGram…
+                  <Spinner size={18} />
+                  {status || "Opening MoneyGram…"}
                 </div>
               </div>
             )}
@@ -565,7 +589,7 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
               {isLive ? "Cash ↔ USDC" : "Cash ↔ USDC (test)"}
             </h3>
             <p className="text-sm text-gray-500 dark:text-white/50 leading-relaxed">
-              Full-screen MoneyGram — tap a location to continue.
+              Full-screen MoneyGram — pick a location, then follow the steps.
             </p>
           </div>
         </div>
