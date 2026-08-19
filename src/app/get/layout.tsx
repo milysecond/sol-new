@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata: Metadata = pageMeta({
   title: "Get funds — sol.new",
   description:
-    "Fund sol.new: Stripe live credits (Apple Pay / card) or MoneyGram Ramps sandbox for test cash ↔ USDC. Receive on-chain anytime.",
+    "Fund sol.new: Stripe A$5 credits, MoneyGram cash ↔ USDC, or receive on-chain. Passkey wallet.",
   path: "/get",
 });
 

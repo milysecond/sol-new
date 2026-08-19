@@ -1,6 +1,12 @@
 /**
  * MoneyGram Ramps (sandbox / production) — server-only helpers.
  * Secret key never leaves the server.
+ *
+ * Env:
+ *  MONEYGRAM_RAMPS_PUBLIC_KEY / MONEYGRAM_PK
+ *  MONEYGRAM_RAMPS_SECRET_KEY / MONEYGRAM_SK
+ *  MONEYGRAM_RAMPS_ENV = sandbox | production (auto from key prefix if unset)
+ *  MONEYGRAM_RAMPS_MAINNET = 1 to show ramps on mainnet UI when approved
  */
 
 function env(name: string): string | undefined {
@@ -33,8 +39,30 @@ export function moneygramPublicKey(): string | undefined {
 }
 
 export function moneygramEnv(): MoneyGramEnv {
-  const e = (env("MONEYGRAM_RAMPS_ENV") || "sandbox").toLowerCase();
-  return e === "production" || e === "prod" ? "production" : "sandbox";
+  const forced = (env("MONEYGRAM_RAMPS_ENV") || "").toLowerCase();
+  if (forced === "production" || forced === "prod" || forced === "live") {
+    return "production";
+  }
+  if (forced === "sandbox" || forced === "test" || forced === "sbox") {
+    return "sandbox";
+  }
+  // Auto-detect from key id
+  const sk = env("MONEYGRAM_RAMPS_SECRET_KEY") || env("MONEYGRAM_SK") || "";
+  const pk = moneygramPublicKey() || "";
+  if (/sbox|sandbox|test/i.test(sk) || /sbox|sandbox|test/i.test(pk)) {
+    return "sandbox";
+  }
+  if (/live|prod/i.test(sk) || /live|prod/i.test(pk)) {
+    return "production";
+  }
+  return "sandbox";
+}
+
+/** Show MoneyGram on mainnet Get page (approved partner). */
+export function moneygramMainnetEnabled(): boolean {
+  if (moneygramEnv() === "production") return true;
+  const flag = (env("MONEYGRAM_RAMPS_MAINNET") || "").toLowerCase();
+  return flag === "1" || flag === "true" || flag === "yes";
 }
 
 export function moneygramSessionUrl(): string {
@@ -44,7 +72,10 @@ export function moneygramSessionUrl(): string {
       "https://api.xramps.moneygram.com/api/v1/sessions"
     );
   }
-  return "https://playground.xramps.moneygram.com/api/v1/sessions";
+  return (
+    env("MONEYGRAM_RAMPS_SESSION_URL") ||
+    "https://playground.xramps.moneygram.com/api/v1/sessions"
+  );
 }
 
 export function moneygramSdkUrl(): string {
@@ -54,7 +85,10 @@ export function moneygramSdkUrl(): string {
       "https://api.xramps.moneygram.com/sdk/index.global.js"
     );
   }
-  return "https://playground.xramps.moneygram.com/sdk/index.global.js";
+  return (
+    env("MONEYGRAM_RAMPS_SDK_URL") ||
+    "https://playground.xramps.moneygram.com/sdk/index.global.js"
+  );
 }
 
 export type MoneyGramSession = {
@@ -66,11 +100,11 @@ export type MoneyGramSession = {
   env: MoneyGramEnv;
   sdkUrl: string;
   publicKeyPrefix: string;
+  mainnetEnabled: boolean;
 };
 
 export async function createMoneyGramSession(): Promise<MoneyGramSession> {
-  const secret =
-    env("MONEYGRAM_RAMPS_SECRET_KEY") || env("MONEYGRAM_SK");
+  const secret = env("MONEYGRAM_RAMPS_SECRET_KEY") || env("MONEYGRAM_SK");
   if (!secret) throw new Error("MoneyGram secret not configured");
 
   const res = await fetch(moneygramSessionUrl(), {
@@ -111,5 +145,6 @@ export async function createMoneyGramSession(): Promise<MoneyGramSession> {
     env: moneygramEnv(),
     sdkUrl: moneygramSdkUrl(),
     publicKeyPrefix: pk ? `${pk.slice(0, 18)}…` : moneygramEnv(),
+    mainnetEnabled: moneygramMainnetEnabled(),
   };
 }
