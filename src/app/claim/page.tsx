@@ -402,8 +402,8 @@ export default function ClaimPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
-        <div className="w-full max-w-md space-y-6">
+      <main className="flex-1 w-full min-w-0 flex flex-col justify-center pb-24">
+        <div className="mx-auto w-full max-w-md px-4 sm:px-6 py-5 sm:py-8 space-y-6">
           {state.kind === "loading" && (
             <div className="text-center space-y-3">
               <Spinner size={28} className="mx-auto" />

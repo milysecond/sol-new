@@ -199,10 +199,10 @@ export default function MultisigPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">
       <Navbar />
-      <main className="flex-1 flex flex-col px-4 py-4 sm:px-6 sm:py-8 sm:items-center">
+      <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="create a Multisig">
           <PageTransition>
-          <div className="w-full sm:max-w-lg space-y-6">
+          <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-6">
             <div className="text-center space-y-1">
               <AnimatedIcon icon={ShieldCheck} size={32} className="text-blue-400" />
               <h1 className="text-2xl font-bold tracking-tight">Multisig</h1>

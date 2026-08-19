@@ -11,7 +11,7 @@ export default function ReceiptHomePage() {
     <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-8 pb-safe">
-        <div className="w-full max-w-md space-y-6">
+        <div className="mx-auto w-full max-w-md px-4 sm:px-6 py-5 sm:py-8 space-y-6">
           <header className="text-center space-y-2">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-purple-500/10 text-purple-500 mb-1">
               <Receipt className="w-7 h-7" />

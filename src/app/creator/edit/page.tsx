@@ -181,7 +181,7 @@ function EditInner() {
   };
 
   return (
-    <div className="w-full max-w-md space-y-4">
+    <div className="mx-auto w-full max-w-md px-4 sm:px-6 py-5 sm:py-8 space-y-4">
       <h1 className="text-xl font-bold">Edit profile</h1>
 
       <label className="flex items-center gap-4 cursor-pointer group">
