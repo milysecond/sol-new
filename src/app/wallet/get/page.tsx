@@ -185,13 +185,13 @@ export default function WalletGetPage() {
                 </button>
               )}
 
-              {network === "mainnet" && <MoneyGramRampsCard />}
+              {network === "devnet" && <MoneyGramRampsCard />}
               {network === "mainnet" && (
                 <Link
                   href="/get"
-                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/80 font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-1.5 min-h-[48px]"
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-1.5 min-h-[48px]"
                 >
-                  <DollarSign size={14} /> More ways to get funds
+                  <DollarSign size={14} /> Get funds / credits
                 </Link>
               )}
             </div>

@@ -204,6 +204,7 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
   }, [open]);
 
   const isLive = envLabel === "production";
+  // Test only for now — mainnet stays off unless MONEYGRAM_RAMPS_MAINNET=1
   const allowedHere =
     network === "devnet" || (network === "mainnet" && mainnetEnabled);
 
@@ -589,7 +590,7 @@ export function MoneyGramRampsCard({ className = "" }: { className?: string }) {
               {isLive ? "Cash ↔ USDC" : "Cash ↔ USDC (test)"}
             </h3>
             <p className="text-sm text-gray-500 dark:text-white/50 leading-relaxed">
-              Full-screen MoneyGram — pick a location, then follow the steps.
+              Test / sandbox only — no real cash. Switch network to devnet to try.
             </p>
           </div>
         </div>

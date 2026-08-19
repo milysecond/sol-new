@@ -58,9 +58,11 @@ export function moneygramEnv(): MoneyGramEnv {
   return "sandbox";
 }
 
-/** Show MoneyGram on mainnet Get page (approved partner). */
+/**
+ * MoneyGram on mainnet UI — OFF for now (test/sandbox only).
+ * Flip via MONEYGRAM_RAMPS_MAINNET=1 + production keys when going live.
+ */
 export function moneygramMainnetEnabled(): boolean {
-  if (moneygramEnv() === "production") return true;
   const flag = (env("MONEYGRAM_RAMPS_MAINNET") || "").toLowerCase();
   return flag === "1" || flag === "true" || flag === "yes";
 }
