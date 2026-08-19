@@ -475,7 +475,7 @@ function StylePicker({ onSelect }: { onSelect: (s: Exclude<Style, "pick">) => vo
 
   return (
     <PageTransition>
-      <div className="w-full sm:max-w-lg space-y-4">
+      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
         <div className="text-center space-y-1">
           <AnimatedIcon icon={Coins} size={32} className="text-purple-400" />
           <h1 className="text-2xl font-bold tracking-tight">Launch a token</h1>
@@ -619,7 +619,7 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
 
   return (
     <PageTransition>
-      <div className="w-full sm:max-w-lg space-y-4">
+      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
         <div className="text-center space-y-1 relative">
           <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
@@ -862,7 +862,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
   return (
     <>
       <PageTransition>
-        <div className="w-full sm:max-w-lg space-y-4">
+        <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
           <div className="text-center space-y-1 relative">
             <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
               <ArrowLeft size={15} />
@@ -1138,7 +1138,7 @@ function GenesisForm({ onBack }: { onBack: () => void }) {
 
   return (
     <PageTransition>
-      <div className="w-full sm:max-w-lg space-y-4">
+      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
         <div className="text-center space-y-1 relative">
           <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
@@ -1273,7 +1273,7 @@ function MetadaoForm({ onBack }: { onBack: () => void }) {
 
   return (
     <PageTransition>
-      <div className="w-full sm:max-w-lg space-y-4">
+      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
         <div className="text-center space-y-1 relative">
           <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
@@ -1527,7 +1527,7 @@ function OrynthForm({ onBack }: { onBack: () => void }) {
 
   return (
     <PageTransition>
-      <div className="w-full sm:max-w-lg space-y-4 mx-auto">
+      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4 mx-auto">
         <div className="text-center space-y-1 relative">
           <button
             type="button"

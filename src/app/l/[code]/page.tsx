@@ -141,7 +141,7 @@ export default async function ShortLinkPage({
 
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md space-y-5">
+      <div className="mx-auto w-full max-w-md px-4 sm:px-6 py-5 sm:py-8 space-y-5">
         <div className="text-center space-y-2">
           <p className="text-xs font-medium uppercase tracking-wide text-sky-500">
             sol.new short link

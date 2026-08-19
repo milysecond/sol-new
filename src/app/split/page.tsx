@@ -129,9 +129,9 @@ export default function SplitPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 flex flex-col px-4 py-4 sm:px-6 sm:py-8 sm:items-center pb-24 sm:pb-8">
+      <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="split a bill">
-          <div className="w-full sm:max-w-lg space-y-8">
+          <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-8">
             <div className="text-center space-y-3">
               <AnimatedIcon icon={Users} size={40} className="text-purple-400" />
               <h1 className="text-3xl font-bold tracking-tight">Split a bill</h1>

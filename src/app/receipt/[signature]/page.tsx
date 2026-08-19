@@ -67,7 +67,7 @@ export default function ReceiptSignaturePage() {
       </div>
 
       <main className="flex-1 flex flex-col items-center px-4 py-4 sm:py-8 pb-safe">
-        <div className="w-full max-w-md space-y-3">
+        <div className="mx-auto w-full max-w-md px-4 sm:px-6 py-5 sm:py-8 space-y-3">
           {/* Compact search chrome */}
           <div className="print:hidden rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">

@@ -105,7 +105,7 @@ export default function IdPage() {
       <Navbar />
       <main className="flex-1 flex flex-col items-center px-4 py-8 sm:py-16">
         <PageTransition>
-          <div className="w-full max-w-lg space-y-6">
+          <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-6">
             {/* Header */}
             <div className="text-center space-y-2">
               <AnimatedIcon icon={Search} size={32} className="text-purple-400" />
