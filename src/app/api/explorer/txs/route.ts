@@ -13,11 +13,13 @@ type SigRow = {
   memo: string | null;
   blockTime: number | null;
   confirmationStatus: string | null;
+  /** Network fee paid by fee payer, in lamports */
+  feeLamports: number | null;
 };
 
 /**
  * GET /api/explorer/txs?address=<pubkey>&limit=40&before=<sig>&network=mainnet|devnet
- * Solana Explorer–style signature list for an account.
+ * Solana Explorer–style signature list + fee (lamports) per tx.
  */
 export async function GET(req: NextRequest) {
   const address = req.nextUrl.searchParams.get("address")?.trim() || "";
@@ -50,6 +52,32 @@ export async function GET(req: NextRequest) {
         before: before || undefined,
       });
 
+      const feeBySig = new Map<string, number | null>();
+      // Batch getParsedTransactions for fees (RPC max ~100; keep chunks small)
+      const sigList = sigs.map((s) => s.signature);
+      const CHUNK = 20;
+      for (let i = 0; i < sigList.length; i += CHUNK) {
+        const chunk = sigList.slice(i, i + CHUNK);
+        try {
+          const parsed = await connection.getParsedTransactions(chunk, {
+            maxSupportedTransactionVersion: 0,
+            commitment: "confirmed",
+          });
+          parsed.forEach((tx, idx) => {
+            const sig = chunk[idx];
+            const fee = tx?.meta?.fee;
+            feeBySig.set(
+              sig,
+              typeof fee === "number" && Number.isFinite(fee) ? fee : null,
+            );
+          });
+        } catch {
+          for (const sig of chunk) {
+            if (!feeBySig.has(sig)) feeBySig.set(sig, null);
+          }
+        }
+      }
+
       const transactions: SigRow[] = sigs.map((s) => ({
         signature: s.signature,
         slot: s.slot,
@@ -57,6 +85,7 @@ export async function GET(req: NextRequest) {
         memo: s.memo ?? null,
         blockTime: s.blockTime ?? null,
         confirmationStatus: s.confirmationStatus ?? null,
+        feeLamports: feeBySig.get(s.signature) ?? null,
       }));
 
       return NextResponse.json(

@@ -21,6 +21,7 @@ type TxRow = {
   memo: string | null;
   blockTime: number | null;
   confirmationStatus: string | null;
+  feeLamports?: number | null;
 };
 
 function shortSig(s: string) {
@@ -44,6 +45,21 @@ function fmtWhen(ts: number | null) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/** Fee in lamports (primary) + tiny SOL hint */
+function fmtFee(lamports: number | null | undefined) {
+  if (lamports == null || !Number.isFinite(lamports)) {
+    return { primary: "—", secondary: null as string | null };
+  }
+  const n = Math.round(lamports);
+  const primary = `${n.toLocaleString()} lamports`;
+  const sol = n / 1e9;
+  const secondary =
+    sol >= 0.000001
+      ? `${sol.toLocaleString(undefined, { maximumFractionDigits: 9 })} SOL`
+      : null;
+  return { primary, secondary };
 }
 
 /**
@@ -153,20 +169,22 @@ export function AddressTxHistory({
 
       {rows.length > 0 && (
         <div className="rounded-2xl border border-black/10 dark:border-white/10 overflow-hidden divide-y divide-black/5 dark:divide-white/5">
-          {/* header */}
-          <div className="hidden sm:grid grid-cols-[1fr_100px_88px_72px] gap-2 px-3 py-2 bg-black/[0.03] dark:bg-white/[0.03] text-[10px] uppercase tracking-wide text-gray-400 font-semibold">
+          {/* header — Signature | Time | Fee (lamports) | Slot | Result */}
+          <div className="hidden sm:grid grid-cols-[minmax(0,1.4fr)_88px_minmax(0,1.1fr)_80px_64px] gap-2 px-3 py-2 bg-black/[0.03] dark:bg-white/[0.03] text-[10px] uppercase tracking-wide text-gray-400 font-semibold">
             <span>Signature</span>
             <span>Time</span>
+            <span>Fee (lamports)</span>
             <span>Slot</span>
             <span className="text-right">Result</span>
           </div>
           {rows.map((tx) => {
             const ok = tx.err == null;
+            const fee = fmtFee(tx.feeLamports);
             return (
               <Link
                 key={tx.signature}
                 href={txPath(tx.signature)}
-                className="grid grid-cols-1 sm:grid-cols-[1fr_100px_88px_72px] gap-1 sm:gap-2 px-3 py-2.5 hover:bg-rose-500/[0.06] transition items-center"
+                className="grid grid-cols-1 sm:grid-cols-[minmax(0,1.4fr)_88px_minmax(0,1.1fr)_80px_64px] gap-1 sm:gap-2 px-3 py-2.5 hover:bg-rose-500/[0.06] transition items-center"
               >
                 <div className="min-w-0 flex items-center gap-2">
                   {ok ? (
@@ -183,6 +201,16 @@ export function AddressTxHistory({
                   <Clock className="w-3 h-3 sm:hidden" />
                   {fmtWhen(tx.blockTime)}
                 </div>
+                <div className="pl-5 sm:pl-0 min-w-0">
+                  <p className="text-[11px] font-mono tabular-nums text-gray-700 dark:text-white/75 truncate">
+                    {fee.primary}
+                  </p>
+                  {fee.secondary && (
+                    <p className="text-[10px] text-gray-400 tabular-nums">
+                      {fee.secondary}
+                    </p>
+                  )}
+                </div>
                 <span className="text-[11px] font-mono text-gray-400 tabular-nums pl-5 sm:pl-0">
                   {tx.slot.toLocaleString()}
                 </span>
@@ -194,7 +222,7 @@ export function AddressTxHistory({
                   {ok ? "Success" : "Failed"}
                 </span>
                 {tx.memo && (
-                  <p className="sm:col-span-4 text-[10px] text-gray-400 truncate pl-5">
+                  <p className="sm:col-span-5 text-[10px] text-gray-400 truncate pl-5">
                     memo: {tx.memo}
                   </p>
                 )}
