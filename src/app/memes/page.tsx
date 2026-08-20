@@ -30,6 +30,35 @@ type Template = {
 
 const MEMES_API = "https://memes.sol.new";
 
+/** Same-origin proxy — memes.sol.new blanks have no CORS (breaks crossOrigin img/canvas). */
+function proxiedBlank(url: string): string {
+  if (!url) return url;
+  if (url.startsWith("/api/memes/blank")) return url;
+  try {
+    const u = new URL(url, MEMES_API);
+    if (u.hostname.endsWith("memes.sol.new") || u.pathname.startsWith("/templates/")) {
+      return `/api/memes/blank?url=${encodeURIComponent(u.toString())}`;
+    }
+  } catch {}
+  return url;
+}
+
+function normalizeTemplate(raw: any): Template {
+  const blankRaw = raw.blank || raw.blankRaw || raw.image || "";
+  const blank = proxiedBlank(blankRaw);
+  return {
+    id: String(raw.id || ""),
+    name: String(raw.name || raw.id || "Template"),
+    blank,
+    blankRaw: blankRaw || blank,
+    face: raw.face,
+    tag: raw.tag,
+    lines: raw.lines,
+    boxes: raw.boxes,
+    featured: !!raw.featured,
+  };
+}
+
 export default function MemesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,12 +77,12 @@ export default function MemesPage() {
       try {
         const res = await fetch(`${MEMES_API}/api/templates?limit=80`);
         const data = (await res.json()) as { items?: any[] };
-        let items: Template[] = data.items || [];
+        let items: Template[] = (data.items || []).map(normalizeTemplate);
 
         // Prefer Toly faces + popular originals
         const tolyFaces = items.filter((t) => {
           const id = t.id.toLowerCase();
-          return id.includes("toly");
+          return id.includes("toly") || (t.face || "").toLowerCase() === "toly";
         });
 
         const popular = items.filter((t) => t.featured || ["screaming", "toly-screaming"].includes(t.id));
@@ -80,7 +109,8 @@ export default function MemesPage() {
           {
             id: "toly-screaming",
             name: "Toly Screaming",
-            blank: `${MEMES_API}/templates/toly-screaming.jpg`,
+            blank: proxiedBlank(`${MEMES_API}/templates/toly-screaming.jpg`),
+            blankRaw: `${MEMES_API}/templates/toly-screaming.jpg`,
             face: "toly",
             boxes: [
               { id: "top", x: 0.05, y: 0.03, w: 0.9, h: 0.18, style: "impact", align: "center" },
@@ -90,7 +120,8 @@ export default function MemesPage() {
           {
             id: "toly-chamath",
             name: "Toly Chamath Pompass",
-            blank: `${MEMES_API}/templates/toly-chamath-pompass.jpg`,
+            blank: proxiedBlank(`${MEMES_API}/templates/toly-chamath-pompass.jpg`),
+            blankRaw: `${MEMES_API}/templates/toly-chamath-pompass.jpg`,
             face: "toly",
             boxes: [
               { id: "top", x: 0.05, y: 0.03, w: 0.9, h: 0.16, style: "impact", align: "center" },
@@ -312,6 +343,16 @@ export default function MemesPage() {
                           className="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:opacity-100 transition"
                           loading="lazy"
                           crossOrigin="anonymous"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            const el = e.currentTarget;
+                            // Fallback to direct blank if proxy fails once
+                            if (tpl.blankRaw && !el.dataset.fallback) {
+                              el.dataset.fallback = "1";
+                              el.removeAttribute("crossorigin");
+                              el.src = tpl.blankRaw;
+                            }
+                          }}
                         />
                         <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-black/30 text-sm font-semibold text-white">
                           {tpl.name}
