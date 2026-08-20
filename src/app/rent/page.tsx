@@ -5,7 +5,7 @@ import RentPage from "./rent-client";
 export const metadata: Metadata = pageMeta({
   title: "Minimum Rent — sol.new",
   description:
-    "Live Solana minimum rent-exempt balance in lamports, SOL, and USD. Token account (165 bytes) + system account.",
+    "Live Solana rent costs in lamports, SOL, and USD. Close empty token accounts gasless and reclaim rent.",
   path: "/rent",
 });
 

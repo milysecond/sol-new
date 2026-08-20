@@ -339,7 +339,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/rent",
     label: "Rent",
     title: "Min rent",
-    desc: "Rent-exempt cost · lamports + USD",
+    desc: "Min rent + gasless empty-account close",
     icon: Coins,
     color: "text-violet-600 dark:text-violet-400",
     category: "tools",
