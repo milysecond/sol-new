@@ -251,11 +251,13 @@ export default function NftPage() {
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="mint an NFT">
           <PageTransition>
-          <div className="app-shell-wide py-5 sm:py-8 lg:py-10 space-y-6">
-            <div className="text-center space-y-1">
-              <AnimatedIcon icon={Image} size={32} className="text-green-400" />
-              <h1 className="text-2xl font-bold tracking-tight">Mint an NFT</h1>
-              <p className="text-gray-500 dark:text-white/50 text-sm">Turn any image into a Solana NFT.</p>
+          <div className="app-shell-wide py-6 sm:py-10 lg:py-12 space-y-8">
+            <div className="text-center lg:text-left space-y-2 max-w-3xl lg:max-w-none">
+              <AnimatedIcon icon={Image} size={36} className="text-green-400 mx-auto lg:mx-0" />
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">Mint an NFT</h1>
+              <p className="text-gray-500 dark:text-white/50 text-sm lg:text-base">
+                Turn any image into a Solana NFT — standard or compressed.
+              </p>
             </div>
 
             {status === "done" && result ? (
@@ -350,18 +352,20 @@ export default function NftPage() {
                 </button>
               </div></FadeIn>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 lg:items-start">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 lg:items-start">
                 {/* Desktop sticky preview */}
-                <div className="lg:col-span-5 xl:col-span-4 order-2 lg:order-1">
-                  <div className="lg:sticky lg:top-24 space-y-3">
-                    <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.03] aspect-square flex items-center justify-center overflow-hidden min-h-[220px]">
+                <div className="lg:col-span-5 xl:col-span-5 order-2 lg:order-1">
+                  <div className="lg:sticky lg:top-24 space-y-4">
+                    <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.03] aspect-square flex items-center justify-center overflow-hidden min-h-[280px] lg:min-h-[360px] xl:min-h-[420px] shadow-sm">
                       {imagePreview ? (
                         <img src={imagePreview} alt="preview" className="w-full h-full object-cover" />
                       ) : (
-                        <div className="text-center px-6 text-gray-400 dark:text-white/35 text-sm space-y-2">
-                          <Image className="w-10 h-10 mx-auto opacity-50" />
-                          <p>Image preview</p>
-                          <p className="text-xs opacity-70">Upload on the right · shows full size on desktop</p>
+                        <div className="text-center px-8 text-gray-400 dark:text-white/35 text-sm space-y-3">
+                          <Image className="w-14 h-14 mx-auto opacity-40" />
+                          <p className="font-medium">Image preview</p>
+                          <p className="text-xs opacity-70 max-w-[14rem] mx-auto">
+                            Upload an image — full-size preview stays sticky while you edit
+                          </p>
                         </div>
                       )}
                     </div>
@@ -379,7 +383,7 @@ export default function NftPage() {
                   </div>
                 </div>
 
-                <div className="lg:col-span-7 xl:col-span-8 order-1 lg:order-2 space-y-3 max-w-xl lg:max-w-none">
+                <div className="lg:col-span-7 xl:col-span-7 order-1 lg:order-2 space-y-4 max-w-2xl lg:max-w-none mx-auto lg:mx-0 w-full">
                 <input
                   type="text"
                   placeholder="NFT name"

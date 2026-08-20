@@ -35,13 +35,29 @@ type Template = {
   boxes?: TemplateBox[];
   featured?: boolean;
   keywords?: string[];
+  /** Position in API list — used for "new first" sort */
+  catalogIndex?: number;
 };
 
 type FaceFilter = "all" | "toly" | "original";
+type SortMode = "new" | "random" | "featured";
 
 const MEMES_API = "https://memes.sol.new";
 const WATERMARK = "sol.new";
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 18;
+
+function shuffleInPlace<T>(arr: T[], seed: number): T[] {
+  let s = seed >>> 0;
+  const rand = () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 0xffffffff;
+  };
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 function proxiedBlank(url: string): string {
   if (!url) return url;
@@ -147,6 +163,8 @@ export default function MemesPage() {
   /** Editable text box layout (normalized 0–1) — draggable on canvas */
   const [boxes, setBoxes] = useState<TemplateBox[]>([]);
   const [filter, setFilter] = useState<FaceFilter>("toly");
+  const [sort, setSort] = useState<SortMode>("new");
+  const [shuffleSeed, setShuffleSeed] = useState(() => Date.now());
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [generating, setGenerating] = useState(false);
@@ -175,7 +193,9 @@ export default function MemesPage() {
         const data = (await res.json()) as { items?: any[] };
         const items: Template[] = (data.items || []).map(normalizeTemplate);
 
-        const cleaned = items.filter((t) => {
+        const cleaned = items
+          .map((tpl, idx) => ({ ...tpl, catalogIndex: idx }))
+          .filter((t) => {
           const f = (t.face || "").toLowerCase();
           if (f === "sal" || f === "ansem") return false;
           const id = t.id.toLowerCase();
@@ -183,21 +203,10 @@ export default function MemesPage() {
           return true;
         });
 
-        cleaned.sort((a, b) => {
-          const score = (t: Template) =>
-            (t.featured ? 4 : 0) + (t.face === "toly" ? 2 : 0) + (t.id.includes("screaming") ? 1 : 0);
-          return score(b) - score(a) || a.name.localeCompare(b.name);
-        });
-
         setTemplates(cleaned);
-
-        const def =
-          cleaned.find((t) => t.face === "toly" && t.featured) ||
-          cleaned.find((t) => t.face === "toly") ||
-          cleaned[0];
-        if (def) {
-          applyTemplate(def);
-        }
+        // Desktop: start on full blank grid (don't auto-open editor)
+        setSelected(null);
+        setPicking(true);
       } catch {
         const fallback: Template = {
           id: "toly-screaming",
@@ -243,7 +252,7 @@ export default function MemesPage() {
 
   const filteredTemplates = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return templates.filter((t) => {
+    let list = templates.filter((t) => {
       const id = t.id.toLowerCase();
       const isToly = t.face === "toly" || id.includes("toly");
       if (filter === "toly" && !isToly) return false;
@@ -255,7 +264,20 @@ export default function MemesPage() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [templates, filter, query]);
+
+    if (sort === "new") {
+      list = [...list].sort((a, b) => (b.catalogIndex ?? 0) - (a.catalogIndex ?? 0));
+    } else if (sort === "featured") {
+      list = [...list].sort((a, b) => {
+        const score = (t: Template) =>
+          (t.featured ? 8 : 0) + (t.face === "toly" ? 2 : 0) + (t.id.includes("screaming") ? 1 : 0);
+        return score(b) - score(a) || (b.catalogIndex ?? 0) - (a.catalogIndex ?? 0);
+      });
+    } else {
+      list = shuffleInPlace([...list], shuffleSeed);
+    }
+    return list;
+  }, [templates, filter, query, sort, shuffleSeed]);
 
   const pageCount = Math.max(1, Math.ceil(filteredTemplates.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
@@ -264,7 +286,7 @@ export default function MemesPage() {
   // Reset page when filters change
   useEffect(() => {
     setPage(0);
-  }, [filter, query]);
+  }, [filter, query, sort, shuffleSeed]);
 
   const renderToCanvas = useCallback(
     async (tpl: Template, caps: string[], layout: TemplateBox[], opts?: { guides?: boolean }) => {
@@ -552,30 +574,57 @@ export default function MemesPage() {
             </p>
           </div>
 
-          {/* Filters + search (fixed, not draggable) */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
-            <div className="flex flex-wrap justify-center gap-2 text-sm">
-              {chips.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setFilter(c.id)}
-                  className={`px-4 py-1.5 rounded-xl border transition ${
-                    filter === c.id
-                      ? "bg-pink-500 text-black border-pink-400"
-                      : "border-black/10 dark:border-white/15 hover:bg-black/5 dark:hover:bg-white/5 text-gray-700 dark:text-white/70"
-                  }`}
-                >
-                  {c.label}
-                  <span
-                    className={`ml-1.5 text-[11px] ${filter === c.id ? "text-black/60" : "text-gray-400"}`}
+          {/* Filters + sort + search */}
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+              <div className="flex flex-wrap justify-center lg:justify-start gap-2 text-sm">
+                {chips.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setFilter(c.id)}
+                    className={`px-4 py-1.5 rounded-xl border transition ${
+                      filter === c.id
+                        ? "bg-pink-500 text-black border-pink-400"
+                        : "border-black/10 dark:border-white/15 hover:bg-black/5 dark:hover:bg-white/5 text-gray-700 dark:text-white/70"
+                    }`}
                   >
-                    {c.count}
-                  </span>
-                </button>
-              ))}
+                    {c.label}
+                    <span
+                      className={`ml-1.5 text-[11px] ${filter === c.id ? "text-black/60" : "text-gray-400"}`}
+                    >
+                      {c.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap justify-center lg:justify-end gap-2 text-sm">
+                {(
+                  [
+                    { id: "new" as const, label: "New" },
+                    { id: "random" as const, label: "Random" },
+                    { id: "featured" as const, label: "Featured" },
+                  ] as const
+                ).map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => {
+                      if (s.id === "random") setShuffleSeed(Date.now());
+                      setSort(s.id);
+                    }}
+                    className={`px-4 py-1.5 rounded-xl border transition ${
+                      sort === s.id
+                        ? "bg-violet-500 text-white border-violet-400"
+                        : "border-black/10 dark:border-white/15 hover:bg-black/5 dark:hover:bg-white/5 text-gray-700 dark:text-white/70"
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <label className="relative w-full sm:w-64">
+            <label className="relative w-full max-w-xl mx-auto lg:mx-0 lg:max-w-md lg:ml-auto">
               <Search
                 size={16}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
@@ -584,15 +633,15 @@ export default function MemesPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search templates…"
-                className="w-full rounded-xl border border-black/10 dark:border-white/15 bg-black/[0.03] dark:bg-white/5 pl-9 pr-3 py-2 text-sm outline-none focus:border-pink-500/60"
+                className="w-full rounded-xl border border-black/10 dark:border-white/15 bg-black/[0.03] dark:bg-white/5 pl-9 pr-3 py-2.5 text-sm outline-none focus:border-pink-500/60"
               />
             </label>
           </div>
 
-          <div className={`grid gap-6 ${selected && !picking ? "" : "lg:grid-cols-12"}`}>
-            {/* Templates — hidden once a meme is selected (until Change blank) */}
+          <div className={`grid gap-6 ${selected && !picking ? "" : ""}`}>
+            {/* Templates — full-width grid on desktop until a blank is chosen */}
             {(picking || !selected) && (
-            <div className={`${selected && !picking ? "" : "lg:col-span-5 xl:col-span-6"} flex flex-col min-h-0`}>
+            <div className={`${selected && !picking ? "" : "w-full"} flex flex-col min-h-0`}>
               <div className="flex items-center justify-between mb-3 px-1">
                 <div className="text-xs uppercase tracking-widest text-gray-500 dark:text-white/50">
                   Choose blank
@@ -600,7 +649,7 @@ export default function MemesPage() {
                 <div className="text-[11px] text-gray-400">
                   {loading
                     ? "…"
-                    : `${filteredTemplates.length} · page ${safePage + 1}/${pageCount}`}
+                    : `${filteredTemplates.length} · page ${safePage + 1}/${pageCount} · ${sort}`}
                 </div>
               </div>
 
@@ -610,7 +659,7 @@ export default function MemesPage() {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 lg:gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 lg:gap-4">
                     {pageItems.length === 0 && (
                       <div className="col-span-full text-gray-500 dark:text-white/50 text-sm py-8 text-center">
                         No templates match this filter.
@@ -729,7 +778,7 @@ export default function MemesPage() {
 
             {/* Editor — only when a meme is selected and not browsing blanks */}
             {selected && !picking && (
-            <div className="w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto">
+            <div className="w-full max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-3 px-1">
                     <div className="min-w-0">
