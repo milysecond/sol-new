@@ -152,6 +152,9 @@ export default function MemesPage() {
   const [generating, setGenerating] = useState(false);
   const [activeBox, setActiveBox] = useState<number | null>(null);
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null);
+  /** When a meme is selected, hide the grid until user taps Change blank */
+  const [picking, setPicking] = useState(true);
+  const [draggingText, setDraggingText] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
@@ -225,6 +228,7 @@ export default function MemesPage() {
     );
     setActiveBox(null);
     setImgSize(null);
+    setPicking(false);
   };
 
   const counts = useMemo(() => {
@@ -353,6 +357,27 @@ export default function MemesPage() {
     }
   }, [selected, captions, boxes, activeBox, renderToCanvas]);
 
+  // Prevent page scroll while dragging caption boxes (esp. mobile)
+  useEffect(() => {
+    if (!draggingText) return;
+    const prevOverflow = document.body.style.overflow;
+    const prevTouch = document.body.style.touchAction;
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+    const block = (ev: Event) => {
+      ev.preventDefault();
+    };
+    // non-passive so preventDefault works
+    window.addEventListener("touchmove", block, { passive: false });
+    window.addEventListener("wheel", block, { passive: false });
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.touchAction = prevTouch;
+      window.removeEventListener("touchmove", block);
+      window.removeEventListener("wheel", block);
+    };
+  }, [draggingText]);
+
   /** Map pointer → canvas pixel coords accounting for CSS scaling */
   const canvasPoint = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -391,8 +416,11 @@ export default function MemesPage() {
       setActiveBox(null);
       return;
     }
+    e.preventDefault();
+    e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     setActiveBox(idx);
+    setDraggingText(true);
     dragRef.current = {
       index: idx,
       startX: pt.x,
@@ -406,6 +434,8 @@ export default function MemesPage() {
     const drag = dragRef.current;
     const pt = canvasPoint(e);
     if (!drag || !pt) return;
+    e.preventDefault();
+    e.stopPropagation();
     const dx = (pt.x - drag.startX) / pt.cw;
     const dy = (pt.y - drag.startY) / pt.ch;
     const b = boxes[drag.index];
@@ -420,6 +450,7 @@ export default function MemesPage() {
 
   const onCanvasPointerUp = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     if (dragRef.current) {
+      e.preventDefault();
       try {
         e.currentTarget.releasePointerCapture(e.pointerId);
       } catch {
@@ -427,6 +458,7 @@ export default function MemesPage() {
       }
     }
     dragRef.current = null;
+    setDraggingText(false);
   };
 
   const updateCaption = (index: number, value: string) => {
@@ -556,9 +588,10 @@ export default function MemesPage() {
             </label>
           </div>
 
-          <div className="grid lg:grid-cols-12 gap-6">
-            {/* Templates — paginated, natural aspect thumbs */}
-            <div className="lg:col-span-5 flex flex-col min-h-0">
+          <div className={`grid gap-6 ${selected && !picking ? "" : "lg:grid-cols-12"}`}>
+            {/* Templates — hidden once a meme is selected (until Change blank) */}
+            {(picking || !selected) && (
+            <div className={`${selected && !picking ? "" : "lg:col-span-5"} flex flex-col min-h-0`}>
               <div className="flex items-center justify-between mb-3 px-1">
                 <div className="text-xs uppercase tracking-widest text-gray-500 dark:text-white/50">
                   Choose blank
@@ -691,23 +724,39 @@ export default function MemesPage() {
                 </>
               )}
             </div>
+            )}
 
-            {/* Editor */}
-            <div className="lg:col-span-7">
-              {!selected ? (
-                <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 p-10 text-center text-gray-500 dark:text-white/60">
-                  Select a template to start
-                </div>
-              ) : (
+            {/* Editor — only when a meme is selected and not browsing blanks */}
+            {selected && !picking && (
+            <div className="w-full max-w-3xl mx-auto">
                 <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-3 px-1">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold truncate">{selected.name}</div>
+                      {selected.face && (
+                        <div className="text-[11px] text-gray-400 capitalize">{selected.face}</div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPicking(true)}
+                      className="shrink-0 rounded-xl border border-black/10 dark:border-white/15 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5"
+                    >
+                      Change blank
+                    </button>
+                  </div>
                   <div
                     ref={canvasWrapRef}
-                    className="relative rounded-3xl overflow-hidden border border-black/10 dark:border-white/10 bg-zinc-950 flex items-center justify-center max-h-[min(70vh,640px)]"
-                    style={aspectStyle}
+                    className="relative rounded-3xl overflow-hidden border border-black/10 dark:border-white/10 bg-zinc-950 flex items-center justify-center max-h-[min(70vh,640px)] overscroll-none select-none"
+                    style={{ ...aspectStyle, touchAction: "none" }}
+                    onTouchMove={(e) => {
+                      if (draggingText) e.preventDefault();
+                    }}
                   >
                     <canvas
                       ref={canvasRef}
-                      className="max-h-[min(70vh,640px)] max-w-full w-auto h-auto object-contain cursor-grab active:cursor-grabbing touch-none"
+                      className="max-h-[min(70vh,640px)] max-w-full w-auto h-auto object-contain cursor-grab active:cursor-grabbing touch-none select-none"
+                      style={{ touchAction: "none" }}
                       onPointerDown={onCanvasPointerDown}
                       onPointerMove={onCanvasPointerMove}
                       onPointerUp={onCanvasPointerUp}
@@ -787,8 +836,8 @@ export default function MemesPage() {
                     watermark. Image keeps its real aspect ratio.
                   </p>
                 </div>
-              )}
             </div>
+            )}
           </div>
         </div>
       </main>
