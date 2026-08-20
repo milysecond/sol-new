@@ -89,10 +89,11 @@ async function solUsd(): Promise<number> {
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    const custom = Number(url.searchParams.get("space") || "");
+    const rawSpace = url.searchParams.get("space");
+    const customNum = rawSpace != null && rawSpace !== "" ? Number(rawSpace) : NaN;
     const extraSpace =
-      Number.isFinite(custom) && custom >= 0 && custom <= 10_000_000
-        ? Math.floor(custom)
+      Number.isFinite(customNum) && customNum >= 0 && customNum <= 10_000_000
+        ? Math.floor(customNum)
         : null;
 
     const [tokenLamports, systemLamports, price, customLamports] =
