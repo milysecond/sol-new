@@ -440,9 +440,10 @@ export default function MemesPage() {
     const dy = (pt.y - drag.startY) / pt.ch;
     const b = boxes[drag.index];
     if (!b) return;
-    // Keep box fully inside image
-    const nx = Math.min(Math.max(0, drag.origX + dx), 1 - b.w);
-    const ny = Math.min(Math.max(0, drag.origY + dy), 1 - b.h);
+    // Allow text boxes to hang off / leave the image edges
+    // Soft limit so they stay roughly reachable (~full box width/height off)
+    const nx = Math.min(Math.max(-b.w * 0.95, drag.origX + dx), 0.95);
+    const ny = Math.min(Math.max(-b.h * 0.95, drag.origY + dy), 0.95);
     setBoxes((prev) =>
       prev.map((box, i) => (i === drag.index ? { ...box, x: nx, y: ny } : box)),
     );
