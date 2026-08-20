@@ -298,6 +298,62 @@ export function Navbar() {
             <ThemeToggle />
 
             {/* Menu button on the right (standard) */}
+            {pushPermission !== "unsupported" && (
+              <button
+                type="button"
+                onClick={async () => {
+                  setPushLoading(true);
+                  try {
+                    if (pushPermission === "granted") {
+                      await unsubscribePush();
+                      setPushPermission("default");
+                    } else if (pushPermission !== "denied") {
+                      await subscribePush(publicKey ?? undefined);
+                      setPushPermission(getPushPermission());
+                    }
+                  } finally {
+                    setPushLoading(false);
+                  }
+                }}
+                disabled={pushLoading || pushPermission === "denied"}
+                aria-label={
+                  pushPermission === "granted"
+                    ? "Notifications on — click to turn off"
+                    : pushPermission === "denied"
+                      ? "Notifications blocked in browser"
+                      : "Enable notifications"
+                }
+                title={
+                  pushPermission === "denied"
+                    ? "Blocked in browser settings"
+                    : pushPermission === "granted"
+                      ? "Notifications on"
+                      : "Enable notifications"
+                }
+                className={`inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-sm transition border min-h-[40px] ${
+                  pushPermission === "granted"
+                    ? "text-purple-600 dark:text-purple-400 border-purple-400/30 bg-purple-500/10 hover:bg-purple-500/15"
+                    : pushPermission === "denied"
+                      ? "text-gray-400 border-black/10 dark:border-white/10 opacity-50 cursor-not-allowed"
+                      : "text-gray-700 dark:text-white/70 border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
+                }`}
+              >
+                {pushPermission === "granted" ? (
+                  <Bell size={18} className="shrink-0" />
+                ) : (
+                  <Bell size={18} className="shrink-0 opacity-90" />
+                )}
+                <span className="hidden md:inline font-medium text-xs sm:text-sm">
+                  {pushLoading
+                    ? "…"
+                    : pushPermission === "granted"
+                      ? "Alerts on"
+                      : pushPermission === "denied"
+                        ? "Blocked"
+                        : "Enable noti"}
+                </span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setShowMore((v) => !v)}
