@@ -76,7 +76,7 @@ export default function SubPage() {
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
       <main className="flex-1 px-4 py-6 sm:px-6 sm:py-10 sm:flex sm:justify-center">
-        <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-6">
+        <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-6">
           <header className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-violet-500">
               Subscriptions

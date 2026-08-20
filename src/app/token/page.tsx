@@ -404,7 +404,7 @@ function ExampleFormModal({
       aria-label={`How ${ex.name} was launched`}
     >
       <div
-        className="w-full sm:max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl"
+        className="w-full sm:max-w-lg lg:max-w-xl max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 flex items-center justify-between px-5 py-4 bg-white/90 dark:bg-black/90 backdrop-blur border-b border-black/10 dark:border-white/10">
@@ -475,7 +475,7 @@ function StylePicker({ onSelect }: { onSelect: (s: Exclude<Style, "pick">) => vo
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1">
           <AnimatedIcon icon={Coins} size={32} className="text-purple-400" />
           <h1 className="text-2xl font-bold tracking-tight">Launch a token</h1>
@@ -619,7 +619,7 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1 relative">
           <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
@@ -862,7 +862,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
   return (
     <>
       <PageTransition>
-        <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
+        <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
           <div className="text-center space-y-1 relative">
             <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
               <ArrowLeft size={15} />
@@ -967,7 +967,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
 
       {showInfo && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4" onClick={() => setShowInfo(false)}>
-          <div className="w-full sm:max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full sm:max-w-lg lg:max-w-xl max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 flex items-center justify-between px-5 py-4 bg-white/90 dark:bg-black/90 backdrop-blur border-b border-black/10 dark:border-white/10">
               <h2 className="text-lg font-bold flex items-center gap-2"><Info className="w-5 h-5 text-orange-400" /> How a token launch works</h2>
               <button type="button" onClick={() => setShowInfo(false)} aria-label="Close" className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer"><X className="w-5 h-5" /></button>
@@ -1138,7 +1138,7 @@ function GenesisForm({ onBack }: { onBack: () => void }) {
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1 relative">
           <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
@@ -1273,7 +1273,7 @@ function MetadaoForm({ onBack }: { onBack: () => void }) {
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1 relative">
           <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
@@ -1527,7 +1527,7 @@ function OrynthForm({ onBack }: { onBack: () => void }) {
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4 mx-auto">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1 relative">
           <button
             type="button"
