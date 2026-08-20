@@ -342,14 +342,16 @@ export function Navbar() {
                       : "text-gray-700 dark:text-white/70 border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
                 }`}
               >
-                {pushPermission === "granted" ? (
-                  <Bell size={16} className="shrink-0" />
+                {pushLoading ? (
+                  <Spinner size={14} className="shrink-0 text-current" />
                 ) : (
-                  <Bell size={16} className="shrink-0 opacity-90" />
+                  <Bell size={16} className="shrink-0" />
                 )}
                 <span className="hidden md:inline font-medium text-xs sm:text-sm">
                   {pushLoading
-                    ? "…"
+                    ? pushPermission === "granted"
+                      ? "Turning off"
+                      : "Enabling"
                     : pushPermission === "granted"
                       ? "Alerts on"
                       : pushPermission === "denied"
@@ -547,14 +549,19 @@ export function Navbar() {
                           disabled={pushLoading || pushPermission === "denied"}
                           className="block w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer disabled:opacity-40"
                         >
-                          {pushPermission === "granted" ? (
+                          {pushLoading ? (
+                            <>
+                              <Spinner size={14} className="inline mr-1.5" />
+                              {pushPermission === "granted" ? "Turning off…" : "Enabling…"}
+                            </>
+                          ) : pushPermission === "granted" ? (
                             <>
                               <BellOff size={14} className="inline mr-1.5" /> Turn off notifications
                             </>
                           ) : (
                             <>
                               <Bell size={14} className="inline mr-1.5" />
-                              {pushLoading ? "Enabling…" : "Enable notifications"}
+                              Enable notifications
                             </>
                           )}
                         </button>
@@ -629,7 +636,14 @@ export function Navbar() {
                   disabled={loading}
                   className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg px-3 py-1.5 min-h-[32px] transition cursor-pointer disabled:opacity-50"
                 >
-                  {loading ? "..." : "Connect"}
+                  {loading ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Spinner size={12} className="text-white" />
+                      Connecting
+                    </span>
+                  ) : (
+                    "Connect"
+                  )}
                 </button>
                 <button
                   type="button"

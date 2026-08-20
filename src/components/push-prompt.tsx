@@ -76,7 +76,7 @@ export function PushPrompt({ wallet }: { wallet?: string }) {
           disabled={loading}
           className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-400 text-white text-xs font-semibold transition cursor-pointer shrink-0 disabled:opacity-60"
         >
-          {loading ? "…" : "Enable"}
+          {loading ? "Enabling…" : "Enable"}
         </button>
         <button
           type="button"
