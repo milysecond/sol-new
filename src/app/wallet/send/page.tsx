@@ -33,6 +33,7 @@ import { friendlyError } from "@/lib/friendly-errors";
 import {
   fetchWalletTokens,
   formatTokenUi,
+  formatAmountInput,
   uiToRawAmount,
   type WalletToken,
 } from "@/lib/wallet-tokens";
@@ -334,7 +335,7 @@ export default function SendPage() {
       setAmount(max);
     } else {
       setError(null);
-      setAmount(formatTokenUi(selected.uiAmount, selected.decimals));
+      setAmount(formatAmountInput(selected.uiAmount, selected.decimals));
     }
   };
 
