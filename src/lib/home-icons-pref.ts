@@ -16,7 +16,25 @@ const SECONDARY_KEY = "sol.new.home.secondaryOrder";
 
 function mergeKnown(ids: string[], defaults: readonly string[]): string[] {
   const known = new Set(defaults);
-  const ordered = ids.filter((id) => known.has(id));
+  let ordered = ids.filter((id) => known.has(id));
+
+  // Ensure new items like /memes appear visibly (insert after related item)
+  if (!ordered.includes("/memes")) {
+    const giftIdx = ordered.indexOf("/gift");
+    if (giftIdx !== -1) {
+      ordered.splice(giftIdx + 1, 0, "/memes");
+    } else {
+      // append at end if no gift
+      const insertIdx = ordered.findIndex(h => h === "/poap" || h === "/punt" || h === "/draw");
+      if (insertIdx !== -1) {
+        ordered.splice(insertIdx, 0, "/memes");
+      } else {
+        ordered.push("/memes");
+      }
+    }
+  }
+
+  // still append any other missing defaults
   for (const d of defaults) {
     if (!ordered.includes(d)) ordered.push(d);
   }
