@@ -541,7 +541,7 @@ export default function MemesPage() {
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
-        <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-5 sm:py-8 space-y-6">
+        <div className="app-shell-wide py-5 sm:py-8 lg:py-10 space-y-6 lg:space-y-8">
           <div className="text-center space-y-3">
             <div className="text-xs uppercase tracking-[3px] text-pink-500 dark:text-pink-400 font-semibold">
               sol.new · memes
@@ -592,7 +592,7 @@ export default function MemesPage() {
           <div className={`grid gap-6 ${selected && !picking ? "" : "lg:grid-cols-12"}`}>
             {/* Templates — hidden once a meme is selected (until Change blank) */}
             {(picking || !selected) && (
-            <div className={`${selected && !picking ? "" : "lg:col-span-5"} flex flex-col min-h-0`}>
+            <div className={`${selected && !picking ? "" : "lg:col-span-5 xl:col-span-6"} flex flex-col min-h-0`}>
               <div className="flex items-center justify-between mb-3 px-1">
                 <div className="text-xs uppercase tracking-widest text-gray-500 dark:text-white/50">
                   Choose blank
@@ -610,7 +610,7 @@ export default function MemesPage() {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 lg:gap-4">
                     {pageItems.length === 0 && (
                       <div className="col-span-full text-gray-500 dark:text-white/50 text-sm py-8 text-center">
                         No templates match this filter.
@@ -729,7 +729,7 @@ export default function MemesPage() {
 
             {/* Editor — only when a meme is selected and not browsing blanks */}
             {selected && !picking && (
-            <div className="w-full max-w-3xl mx-auto">
+            <div className="w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-3 px-1">
                     <div className="min-w-0">
@@ -748,7 +748,7 @@ export default function MemesPage() {
                   </div>
                   <div
                     ref={canvasWrapRef}
-                    className="relative rounded-3xl overflow-hidden border border-black/10 dark:border-white/10 bg-zinc-950 flex items-center justify-center max-h-[min(70vh,640px)] overscroll-none select-none"
+                    className="relative rounded-3xl overflow-hidden border border-black/10 dark:border-white/10 bg-zinc-950 flex items-center justify-center max-h-[min(78vh,720px)] lg:max-h-[min(82vh,800px)] overscroll-none select-none"
                     style={{ ...aspectStyle, touchAction: "none" }}
                     onTouchMove={(e) => {
                       if (draggingText) e.preventDefault();
@@ -756,7 +756,7 @@ export default function MemesPage() {
                   >
                     <canvas
                       ref={canvasRef}
-                      className="max-h-[min(70vh,640px)] max-w-full w-auto h-auto object-contain cursor-grab active:cursor-grabbing touch-none select-none"
+                      className="max-h-[min(78vh,720px)] lg:max-h-[min(82vh,800px)] max-w-full w-auto h-auto object-contain cursor-grab active:cursor-grabbing touch-none select-none"
                       style={{ touchAction: "none" }}
                       onPointerDown={onCanvasPointerDown}
                       onPointerMove={onCanvasPointerMove}

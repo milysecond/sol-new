@@ -319,7 +319,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/id",
     label: "Names",
     title: "Names",
-    desc: ".sol and more",
+    desc: ".sol · .sns · .bonk · .skr",
     icon: AtSign,
     color: "text-indigo-600 dark:text-indigo-400",
     category: "tools",

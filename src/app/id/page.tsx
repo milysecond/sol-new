@@ -103,15 +103,15 @@ export default function IdPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">
       <Navbar />
-      <main className="flex-1 flex flex-col items-center px-4 py-8 sm:py-16">
+      <main className="flex-1 flex flex-col items-center px-0 py-8 sm:py-12 lg:py-16 w-full min-w-0">
         <PageTransition>
-          <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-6">
+          <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-6">
             {/* Header */}
             <div className="text-center space-y-2">
               <AnimatedIcon icon={Search} size={32} className="text-purple-400" />
               <h1 className="text-3xl font-bold tracking-tight">Solana names</h1>
               <p className="text-gray-500 dark:text-white/50 text-sm">
-                Register .sol · look up .sol / .sns / .bonk / .skr
+                Register .sol · look up .sol · .sns · .bonk · .skr
               </p>
             </div>
 
@@ -124,7 +124,7 @@ export default function IdPage() {
                 <input
                   type="text"
                   id="id-lookup"
-                  placeholder="metasal.sol · name.skr · name.bonk"
+                  placeholder="metasal.sol · name.sns · name.skr · name.bonk"
                   className="flex-1 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-purple-400/50"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {

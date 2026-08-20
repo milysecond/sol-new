@@ -251,7 +251,7 @@ export default function NftPage() {
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="mint an NFT">
           <PageTransition>
-          <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
+          <div className="app-shell-wide py-5 sm:py-8 lg:py-10 space-y-6">
             <div className="text-center space-y-1">
               <AnimatedIcon icon={Image} size={32} className="text-green-400" />
               <h1 className="text-2xl font-bold tracking-tight">Mint an NFT</h1>
@@ -350,7 +350,36 @@ export default function NftPage() {
                 </button>
               </div></FadeIn>
             ) : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 lg:items-start">
+                {/* Desktop sticky preview */}
+                <div className="lg:col-span-5 xl:col-span-4 order-2 lg:order-1">
+                  <div className="lg:sticky lg:top-24 space-y-3">
+                    <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.03] aspect-square flex items-center justify-center overflow-hidden min-h-[220px]">
+                      {imagePreview ? (
+                        <img src={imagePreview} alt="preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="text-center px-6 text-gray-400 dark:text-white/35 text-sm space-y-2">
+                          <Image className="w-10 h-10 mx-auto opacity-50" />
+                          <p>Image preview</p>
+                          <p className="text-xs opacity-70">Upload on the right · shows full size on desktop</p>
+                        </div>
+                      )}
+                    </div>
+                    {(name || description) && (
+                      <div className="rounded-2xl border border-black/10 dark:border-white/10 p-4 space-y-1">
+                        <p className="font-semibold text-lg truncate">{name || "Untitled NFT"}</p>
+                        {description && (
+                          <p className="text-sm text-gray-500 dark:text-white/45 line-clamp-3">{description}</p>
+                        )}
+                        <p className="text-[11px] text-gray-400 pt-1 capitalize">
+                          {mintType} · ×{quantity}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="lg:col-span-7 xl:col-span-8 order-1 lg:order-2 space-y-3 max-w-xl lg:max-w-none">
                 <input
                   type="text"
                   placeholder="NFT name"
@@ -494,13 +523,14 @@ export default function NftPage() {
                     ? <span className="text-green-400">Free with promo code</span>
                     : `${((mintType === "standard" ? 0.02 : 0.001) * quantity).toFixed(3)} SOL${quantity > 1 ? ` (${(mintType === "standard" ? 0.02 : 0.001).toFixed(3)} × ${quantity})` : ""}`}
                 </p>
+                </div>
               </div>
             )}
           </div>
           </PageTransition>
         </ConnectGate>
 
-        <div className="mx-auto w-full max-w-lg px-4 sm:px-6 pt-6 pb-2 space-y-2">
+        <div className="app-shell pt-6 pb-2 space-y-2">
           <p className="text-center text-xs text-gray-400 dark:text-white/30">Looking to buy NFTs instead?</p>
           <div className="grid grid-cols-2 gap-3">
             <a
