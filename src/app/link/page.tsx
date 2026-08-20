@@ -72,7 +72,7 @@ function LinkShell({ children }: { children?: React.ReactNode }) {
       <Navbar />
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         {children ?? (
-          <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 text-center text-gray-400 py-16">Loading…</div>
+          <div className="app-shell py-5 sm:py-8 lg:py-10 text-center text-gray-400 py-16">Loading…</div>
         )}
       </main>
     </div>
@@ -359,7 +359,7 @@ function LinkPageInner() {
 
   return (
     <LinkShell>
-      <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-8">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-8">
         <div className="text-center space-y-3">
           <AnimatedIcon icon={Link2} size={40} className="text-sky-400" />
           <h1 className="text-3xl font-bold tracking-tight">Short links</h1>

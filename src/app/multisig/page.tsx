@@ -202,7 +202,7 @@ export default function MultisigPage() {
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="create a Multisig">
           <PageTransition>
-          <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-6">
+          <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-6">
             <div className="text-center space-y-1">
               <AnimatedIcon icon={ShieldCheck} size={32} className="text-blue-400" />
               <h1 className="text-2xl font-bold tracking-tight">Multisig</h1>

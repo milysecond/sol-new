@@ -307,7 +307,7 @@ export default function PayPage() {
       <Navbar />
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="use payments">
-          <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-6">
+          <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-6">
             <div className="text-center space-y-2">
               <AnimatedIcon icon={CreditCard} size={40} className="text-purple-400" />
               <h1 className="text-3xl font-bold tracking-tight">Pay</h1>
