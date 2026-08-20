@@ -12,7 +12,7 @@ import { RPC, type Network } from "@/lib/network";
 import {
   CLAIM_FEE_LAMPORTS,
   keypairFromSecret,
-  parseGiftSecret,
+  parseGiftSecretFromLocation,
   inspectGift,
   sweepGift,
 } from "@/lib/gift-link";
@@ -199,7 +199,11 @@ export default function ClaimPage() {
       setNetwork(net);
       setMessage(params.get("m"));
 
-      const secret = parseGiftSecret(window.location.hash);
+      const secret = parseGiftSecretFromLocation({
+        search: window.location.search,
+        hash: window.location.hash,
+        pathname: window.location.pathname,
+      });
       const gift = secret ? keypairFromSecret(secret) : null;
       if (!gift) {
         if (!cancelled) setState({ kind: "invalid" });

@@ -82,6 +82,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var p=location.pathname+location.search+location.hash;if(p&&p!=="/"&&p.indexOf("/onboard")!==0){sessionStorage.setItem("solnew.deeplink.entry",p);sessionStorage.setItem("solnew.deeplink.entry.t",String(Date.now()))}}catch(e){}})();`,
+          }}
+        />
         {/* viewport also exported above; keep cover for PWA / notched devices */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.classList.add('dark')}catch(e){}})()` }} />
 
