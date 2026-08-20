@@ -190,6 +190,10 @@ export function Navbar() {
   }, [showMenu]);
 
   const shortKey = publicKey ? `${publicKey.slice(0, 4)}...${publicKey.slice(-4)}` : null;
+  const displayName =
+    walletLabel && publicKey && walletLabel !== publicKey
+      ? walletLabel
+      : shortKey;
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -390,8 +394,12 @@ export function Navbar() {
                       <Spinner size={12} className="text-purple-500" />
                     </span>
                   )}
-                  <span className="text-gray-700 dark:text-white/60 max-w-[90px] truncate font-mono">
-                    {shortKey}
+                  <span
+                    className={`text-gray-700 dark:text-white/60 max-w-[90px] truncate ${
+                      walletLabel && publicKey && walletLabel !== publicKey ? "" : "font-mono"
+                    }`}
+                  >
+                    {displayName}
                   </span>
                 </button>
 
@@ -419,7 +427,14 @@ export function Navbar() {
                             {publicKey}
                           </p>
                         )}
-                        <p className="text-[10px] text-gray-400 mt-1">Wallet name = address</p>
+                        {walletLabel && walletLabel !== publicKey && (
+                          <p className="text-sm font-semibold text-purple-600 dark:text-purple-400 mt-1 truncate">
+                            {walletLabel}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-gray-400 mt-1">
+                          Label wallets in Settings · address stays the same
+                        </p>
                         {balance !== null ? (
                           <p className="text-sm font-mono text-purple-600 dark:text-purple-400 mt-2">
                             {formatSol(hideBalances, balance, 4)}
@@ -439,6 +454,13 @@ export function Navbar() {
                         className="block px-4 py-2.5 text-sm text-gray-700 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5"
                       >
                         <Wallet size={14} className="inline mr-1.5" /> Wallet
+                      </Link>
+                      <Link
+                        href="/wallet/settings"
+                        onClick={() => setShowMenu(false)}
+                        className="block px-4 py-2.5 text-sm text-gray-700 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5"
+                      >
+                        Label wallets…
                       </Link>
                       <Link
                         href="/portfolio"
@@ -556,7 +578,11 @@ export function Navbar() {
                                   : "text-gray-600 dark:text-white/60"
                               }`}
                             >
-                              <span className="truncate max-w-[130px]">{w.label}</span>
+                              <span className="truncate max-w-[130px]">
+                                {w.label && w.label !== w.pubkey
+                                  ? w.label
+                                  : `${w.pubkey.slice(0, 4)}…${w.pubkey.slice(-4)}`}
+                              </span>
                               <span className="text-[10px] font-mono text-gray-400 ml-2 shrink-0">
                                 {w.pubkey.slice(0, 4)}…{w.pubkey.slice(-4)}
                               </span>

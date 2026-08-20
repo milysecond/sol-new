@@ -107,6 +107,17 @@ function saveWallets(wallets: WalletEntry[]) {
   localStorage.setItem("sol.new.wallets", JSON.stringify(wallets));
 }
 
+/** Friendly label: keep custom names; empty falls back to pubkey. */
+function normalizeLabel(pubkey: string, label?: string | null): string {
+  const cleaned = (label || "").trim().replace(/\s+/g, " ").slice(0, 32);
+  return cleaned || pubkey;
+}
+
+function isCustomLabel(pubkey: string, label?: string | null): boolean {
+  const l = (label || "").trim();
+  return Boolean(l) && l !== pubkey;
+}
+
 function upsertWallet(entry: WalletEntry): WalletEntry[] {
   const wallets = loadWallets();
   const idx = wallets.findIndex((w) => w.pubkey === entry.pubkey);
@@ -137,12 +148,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const saved = localStorage.getItem("sol.new.wallet");
-    const savedWallets = loadWallets().map((w) => ({ ...w, label: w.pubkey }));
+    const savedWallets = loadWallets().map((w) => ({
+      ...w,
+      label: normalizeLabel(w.pubkey, w.label),
+    }));
     if (savedWallets.length) saveWallets(savedWallets);
     if (saved) {
       setPublicKey(saved);
-      setWalletLabel(saved);
-      localStorage.setItem("sol.new.walletLabel", saved);
+      const entry = savedWallets.find((w) => w.pubkey === saved);
+      const lbl = entry ? normalizeLabel(saved, entry.label) : saved;
+      setWalletLabel(lbl);
+      localStorage.setItem("sol.new.walletLabel", lbl);
     }
     setWallets(savedWallets);
   }, []);
@@ -213,16 +229,22 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, [wallets.length, network]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const activateWallet = (entry: WalletEntry) => {
-    // Wallet name === address (product rule)
-    const labeled: WalletEntry = { ...entry, label: entry.pubkey };
+    const existing = loadWallets().find((w) => w.pubkey === entry.pubkey);
+    // Prefer explicit custom label on entry, else keep saved custom label, else pubkey
+    const label = isCustomLabel(entry.pubkey, entry.label)
+      ? normalizeLabel(entry.pubkey, entry.label)
+      : isCustomLabel(entry.pubkey, existing?.label)
+        ? normalizeLabel(entry.pubkey, existing?.label)
+        : entry.pubkey;
+    const labeled: WalletEntry = { ...entry, label };
     const updated = upsertWallet(labeled);
     setWallets(updated);
     setPublicKey(labeled.pubkey);
-    setWalletLabel(labeled.pubkey);
+    setWalletLabel(labeled.label);
     setBalance(null);
     setUsdcBalance(null);
     localStorage.setItem("sol.new.wallet", labeled.pubkey);
-    localStorage.setItem("sol.new.walletLabel", labeled.pubkey);
+    localStorage.setItem("sol.new.walletLabel", labeled.label);
     // Never leave a stale credentialId from a previous wallet
     if (labeled.credentialId) {
       localStorage.setItem("sol.new.credentialId", labeled.credentialId);
@@ -399,24 +421,24 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const renameWallet = (pubkey: string, _label: string) => {
-    // Name is always the address
+  const renameWallet = (pubkey: string, label: string) => {
     const list = loadWallets();
     const idx = list.findIndex((w) => w.pubkey === pubkey);
     if (idx < 0) return;
-    list[idx] = { ...list[idx], label: pubkey };
+    const nextLabel = normalizeLabel(pubkey, label);
+    list[idx] = { ...list[idx], label: nextLabel };
     saveWallets(list);
     setWallets([...list]);
     if (publicKey === pubkey) {
-      setWalletLabel(pubkey);
-      localStorage.setItem("sol.new.walletLabel", pubkey);
+      setWalletLabel(nextLabel);
+      localStorage.setItem("sol.new.walletLabel", nextLabel);
     }
     const entry = list[idx];
     if (entry.userId) {
       void signalPasskeyUserDetails({
         userId: entry.userId,
-        name: pubkey,
-        displayName: pubkey,
+        name: nextLabel,
+        displayName: nextLabel,
       });
     }
   };
@@ -447,7 +469,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     try {
       const { toast } = await import("@/lib/toast");
       toast.info(
-        `Authenticate to switch to ${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`,
+        `Authenticate to switch to ${
+          isCustomLabel(pubkey, entry.label)
+            ? entry.label
+            : `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`
+        }`,
       );
 
       const result = await provePasskeyWallet(pubkey);
@@ -458,7 +484,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       activateWallet({
         pubkey: result.publicKey,
         credentialId: result.credentialId,
-        label: result.publicKey,
+        label: entry.label || result.publicKey,
         userId: entry.userId,
       });
 
@@ -471,7 +497,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }),
       }).catch(() => {});
 
-      toast.success(`Switched to ${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`);
+      toast.success(
+        `Switched to ${
+          isCustomLabel(pubkey, entry.label)
+            ? entry.label
+            : `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`
+        }`,
+      );
     } catch (e) {
       const { friendlyError } = await import("./friendly-errors");
       setError(

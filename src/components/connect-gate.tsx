@@ -24,7 +24,7 @@ function short(pk: string) {
 /**
  * Gate actions behind the shared wallet-context session.
  * Prefers existing passkeys / saved wallets over "create new".
- * Wallet name is always the address.
+ * Wallets can have a custom label; address stays the same.
  */
 export function ConnectGate({
   children,
