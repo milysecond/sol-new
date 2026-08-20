@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Navbar } from "@/components/navbar";
 import { Spinner } from "@/components/spinner";
-import { Download, Share2, RefreshCw, Search } from "lucide-react";
+import { Download, Share2, RefreshCw, Search, GripVertical, X } from "lucide-react";
 
 type TemplateBox = {
   id: string;
@@ -104,6 +104,11 @@ export default function MemesPage() {
   const [filter, setFilter] = useState<FaceFilter>("toly");
   const [query, setQuery] = useState("");
   const [generating, setGenerating] = useState(false);
+  // Floating search — user can drag it around (persisted)
+  const [searchPos, setSearchPos] = useState<{ x: number; y: number } | null>(null);
+  const [draggingSearch, setDraggingSearch] = useState(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const searchBoxRef = useRef<HTMLDivElement>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgCache = useRef<Map<string, HTMLImageElement>>(new Map());
@@ -172,6 +177,73 @@ export default function MemesPage() {
     }
     load();
   }, []);
+
+  // Restore floating search position
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("sol.new.memes.searchPos");
+      if (raw) {
+        const p = JSON.parse(raw) as { x: number; y: number };
+        if (typeof p.x === "number" && typeof p.y === "number") setSearchPos(p);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const onSearchPointerDown = useCallback((e: ReactPointerEvent) => {
+    // Only drag from grip / chrome, not the text input itself
+    const target = e.target as HTMLElement;
+    if (target.closest("input")) return;
+    const box = searchBoxRef.current;
+    if (!box) return;
+    const rect = box.getBoundingClientRect();
+    dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    setDraggingSearch(true);
+    box.setPointerCapture(e.pointerId);
+  }, []);
+
+  const onSearchPointerMove = useCallback(
+    (e: ReactPointerEvent) => {
+      if (!draggingSearch) return;
+      const x = Math.max(8, Math.min(window.innerWidth - 280, e.clientX - dragOffset.current.x));
+      const y = Math.max(8, Math.min(window.innerHeight - 56, e.clientY - dragOffset.current.y));
+      setSearchPos({ x, y });
+    },
+    [draggingSearch],
+  );
+
+  const onSearchPointerUp = useCallback(
+    (e: ReactPointerEvent) => {
+      if (!draggingSearch) return;
+      setDraggingSearch(false);
+      try {
+        searchBoxRef.current?.releasePointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      setSearchPos((prev) => {
+        if (prev) {
+          try {
+            localStorage.setItem("sol.new.memes.searchPos", JSON.stringify(prev));
+          } catch {
+            /* ignore */
+          }
+        }
+        return prev;
+      });
+    },
+    [draggingSearch],
+  );
+
+  const resetSearchPos = () => {
+    setSearchPos(null);
+    try {
+      localStorage.removeItem("sol.new.memes.searchPos");
+    } catch {
+      /* ignore */
+    }
+  };
 
   const counts = useMemo(() => {
     let toly = 0;
@@ -363,39 +435,81 @@ export default function MemesPage() {
             </p>
           </div>
 
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
-            <div className="flex flex-wrap justify-center gap-2 text-sm">
-              {chips.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setFilter(c.id)}
-                  className={`px-4 py-1.5 rounded-xl border transition ${
-                    filter === c.id
-                      ? "bg-pink-500 text-black border-pink-400"
-                      : "border-black/10 dark:border-white/15 hover:bg-black/5 dark:hover:bg-white/5 text-gray-700 dark:text-white/70"
-                  }`}
-                >
-                  {c.label}
-                  <span className={`ml-1.5 text-[11px] ${filter === c.id ? "text-black/60" : "text-gray-400"}`}>
-                    {c.count}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <label className="relative w-full sm:w-64">
+          {/* Face filters */}
+          <div className="flex flex-wrap justify-center gap-2 text-sm">
+            {chips.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setFilter(c.id)}
+                className={`px-4 py-1.5 rounded-xl border transition ${
+                  filter === c.id
+                    ? "bg-pink-500 text-black border-pink-400"
+                    : "border-black/10 dark:border-white/15 hover:bg-black/5 dark:hover:bg-white/5 text-gray-700 dark:text-white/70"
+                }`}
+              >
+                {c.label}
+                <span className={`ml-1.5 text-[11px] ${filter === c.id ? "text-black/60" : "text-gray-400"}`}>
+                  {c.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Draggable floating search — drag the grip to move; position saved */}
+          <div
+            ref={searchBoxRef}
+            onPointerDown={onSearchPointerDown}
+            onPointerMove={onSearchPointerMove}
+            onPointerUp={onSearchPointerUp}
+            onPointerCancel={onSearchPointerUp}
+            style={
+              searchPos
+                ? { position: "fixed", left: searchPos.x, top: searchPos.y, zIndex: 60 }
+                : undefined
+            }
+            className={`${
+              searchPos
+                ? "w-[min(20rem,calc(100vw-1rem))]"
+                : "relative mx-auto w-full max-w-md"
+            } flex items-center gap-1 rounded-2xl border border-black/10 dark:border-white/15 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md shadow-lg shadow-black/10 px-1.5 py-1.5 ${
+              draggingSearch ? "cursor-grabbing ring-2 ring-pink-500/40" : ""
+            }`}
+          >
+            <button
+              type="button"
+              aria-label="Drag search"
+              title="Drag to move search"
+              className="shrink-0 p-2 rounded-xl text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 cursor-grab active:cursor-grabbing touch-none"
+            >
+              <GripVertical size={16} />
+            </button>
+            <div className="relative flex-1 min-w-0">
               <Search
                 size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
               />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search templates…"
-                className="w-full rounded-xl border border-black/10 dark:border-white/15 bg-black/[0.03] dark:bg-white/5 pl-9 pr-3 py-2 text-sm outline-none focus:border-pink-500/60"
+                className="w-full rounded-xl bg-black/[0.03] dark:bg-white/5 pl-9 pr-3 py-2 text-sm outline-none focus:ring-1 focus:ring-pink-500/50 border-0"
               />
-            </label>
+            </div>
+            {(query || searchPos) && (
+              <button
+                type="button"
+                aria-label={query ? "Clear search" : "Reset search position"}
+                title={query ? "Clear" : "Reset position"}
+                onClick={() => {
+                  if (query) setQuery("");
+                  else resetSearchPos();
+                }}
+                className="shrink-0 p-2 rounded-xl text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
 
           <div className="grid lg:grid-cols-12 gap-6">
