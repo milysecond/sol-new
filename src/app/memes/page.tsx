@@ -583,7 +583,7 @@ export default function MemesPage() {
                     key={c.id}
                     type="button"
                     onClick={() => setFilter(c.id)}
-                    className={`px-4 py-1.5 rounded-xl border transition ${
+                    className={`px-3 py-1 rounded-lg border transition ${
                       filter === c.id
                         ? "bg-pink-500 text-black border-pink-400"
                         : "border-black/10 dark:border-white/15 hover:bg-black/5 dark:hover:bg-white/5 text-gray-700 dark:text-white/70"
@@ -613,7 +613,7 @@ export default function MemesPage() {
                       if (s.id === "random") setShuffleSeed(Date.now());
                       setSort(s.id);
                     }}
-                    className={`px-4 py-1.5 rounded-xl border transition ${
+                    className={`px-3 py-1 rounded-lg border transition ${
                       sort === s.id
                         ? "bg-violet-500 text-white border-violet-400"
                         : "border-black/10 dark:border-white/15 hover:bg-black/5 dark:hover:bg-white/5 text-gray-700 dark:text-white/70"

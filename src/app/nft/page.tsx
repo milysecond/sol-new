@@ -308,7 +308,7 @@ export default function NftPage() {
                   <a
                     href={mintHref(result.mint)}
                     target="_blank"
-                    className="flex items-center justify-center gap-1.5 w-full bg-green-500 hover:bg-green-400 text-white font-semibold rounded-xl px-4 py-3.5 transition text-center"
+                    className="flex items-center justify-center gap-1.5 w-full bg-green-500 hover:bg-green-400 text-white font-semibold rounded-lg px-3.5 py-2.5 transition text-center"
                   >
                     View your NFT on sol.new <ExternalLink className="w-3.5 h-3.5 inline ml-1" />
                   </a>
@@ -324,7 +324,7 @@ export default function NftPage() {
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                   }}
-                  className={`flex items-center justify-center gap-1.5 w-full border rounded-xl px-4 py-3 transition cursor-pointer ${
+                  className={`flex items-center justify-center gap-1.5 w-full border rounded-lg px-3.5 py-2.5 transition cursor-pointer ${
                     copied
                       ? "bg-green-500/15 border-green-400/40 text-green-500 dark:text-green-400"
                       : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white"
@@ -346,7 +346,7 @@ export default function NftPage() {
                     setImageFile(null);
                     setImagePreview(null);
                   }}
-                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition cursor-pointer"
+                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-lg px-3.5 py-2.5 hover:text-gray-900 dark:hover:text-white transition cursor-pointer"
                 >
                   Mint another
                 </button>
@@ -422,7 +422,7 @@ export default function NftPage() {
                     <button
                       key={t}
                       onClick={() => setMintType(t)}
-                      className={`flex-1 border rounded-xl px-4 py-2.5 text-sm transition cursor-pointer ${
+                      className={`flex-1 border rounded-lg px-3 py-2 text-sm transition cursor-pointer ${
                         mintType === t
                           ? "bg-green-500/20 border-green-400/50 text-green-300"
                           : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:text-white hover:border-black/20 dark:hover:border-white/20"
@@ -510,7 +510,7 @@ export default function NftPage() {
                 <button
                   onClick={handleMint}
                   disabled={!name || !imageFile || status === "uploading" || status === "minting"}
-                  className="w-full bg-green-500 hover:bg-green-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
+                  className="w-full bg-green-500 hover:bg-green-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed"
                 >
                   {status === "uploading"
                     ? <><Spinner size={16} className="inline mr-2" />Uploading...</>
@@ -541,7 +541,7 @@ export default function NftPage() {
               href="https://magiceden.io/solana"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-medium text-gray-600 dark:text-white/60 hover:text-pink-500 dark:hover:text-pink-400 hover:border-pink-400/40 transition"
+              className="flex items-center justify-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3.5 py-2.5 text-sm font-medium text-gray-600 dark:text-white/60 hover:text-pink-500 dark:hover:text-pink-400 hover:border-pink-400/40 transition"
             >
               Magic Eden <ExternalLink className="w-3.5 h-3.5" />
             </a>
@@ -549,7 +549,7 @@ export default function NftPage() {
               href="https://www.tensor.trade"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-medium text-gray-600 dark:text-white/60 hover:text-sky-500 dark:hover:text-sky-400 hover:border-sky-400/40 transition"
+              className="flex items-center justify-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3.5 py-2.5 text-sm font-medium text-gray-600 dark:text-white/60 hover:text-sky-500 dark:hover:text-sky-400 hover:border-sky-400/40 transition"
             >
               Tensor <ExternalLink className="w-3.5 h-3.5" />
             </a>

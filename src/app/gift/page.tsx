@@ -743,7 +743,7 @@ export default function GiftPage() {
                     <button
                       onClick={handleCancelGift}
                       disabled={cancelling}
-                      className="w-full flex items-center justify-center gap-2 bg-red-500 hover:bg-red-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer"
+                      className="w-full flex items-center justify-center gap-2 bg-red-500 hover:bg-red-400 disabled:opacity-50 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer"
                     >
                       {cancelling ? (
                         <>
@@ -781,7 +781,7 @@ export default function GiftPage() {
                   <div className="w-full flex gap-2">
                     <button
                       onClick={copyLink}
-                      className="flex-1 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-1.5"
+                      className="flex-1 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       {copied ? (
                         <>
@@ -793,7 +793,7 @@ export default function GiftPage() {
                     </button>
                     <button
                       onClick={shareLink}
-                      className="bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 transition cursor-pointer"
+                      className="bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 border border-black/10 dark:border-white/10 rounded-lg px-3.5 py-2.5 transition cursor-pointer"
                       title="Share"
                     >
                       <Share2 className="w-4 h-4" />
@@ -811,7 +811,7 @@ export default function GiftPage() {
                 </div>
                 <button
                   onClick={reset}
-                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition cursor-pointer"
+                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-lg px-3.5 py-2.5 hover:text-gray-900 dark:hover:text-white transition cursor-pointer"
                 >
                   Send another gift
                 </button>

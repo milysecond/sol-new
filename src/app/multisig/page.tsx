@@ -252,7 +252,7 @@ export default function MultisigPage() {
 
                 <button
                   onClick={() => { setStatus("idle"); setResult(null); setName(""); setMembers([""]); setThreshold(2); }}
-                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition cursor-pointer"
+                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-lg px-3.5 py-2.5 hover:text-gray-900 dark:hover:text-white transition cursor-pointer"
                 >
                   Create another
                 </button>
@@ -392,7 +392,7 @@ export default function MultisigPage() {
                   <button
                     onClick={handleCreate}
                     disabled={!canCreate}
-                    className="w-full bg-blue-500 hover:bg-blue-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
+                    className="w-full bg-blue-500 hover:bg-blue-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed"
                   >
                     Create Multisig
                   </button>

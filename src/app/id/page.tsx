@@ -240,7 +240,7 @@ export default function IdPage() {
                       <button
                         onClick={handleRegister}
                         disabled={busy || !publicKey}
-                        className="w-full bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="w-full bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       >
                         {busy ? (
                           <><Spinner size={20} /> {statusLabel}</>

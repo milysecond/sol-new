@@ -45,7 +45,7 @@ function QrModal({
       <button
         type="button"
         onClick={onCopy}
-        className="w-full flex items-center justify-center gap-1.5 bg-fuchsia-500 hover:bg-fuchsia-400 text-white font-semibold rounded-xl px-4 py-3.5 transition min-h-[48px]"
+        className="w-full flex items-center justify-center gap-1.5 bg-fuchsia-500 hover:bg-fuchsia-400 text-white font-semibold rounded-lg px-3.5 py-2.5 transition min-h-[48px]"
       >
         {copied ? (
           <>
@@ -170,7 +170,7 @@ export default function WalletGetPage() {
                   type="button"
                   onClick={() => void handleAirdrop()}
                   disabled={airdropping}
-                  className="w-full bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 text-yellow-700 dark:text-yellow-300 font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 min-h-[48px]"
+                  className="w-full bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 text-yellow-700 dark:text-yellow-300 font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 min-h-[48px]"
                 >
                   <Droplets size={14} />
                   {airdropping ? (
@@ -189,7 +189,7 @@ export default function WalletGetPage() {
               {network === "mainnet" && (
                 <Link
                   href="/get"
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-1.5 min-h-[48px]"
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 min-h-[48px]"
                 >
                   <DollarSign size={14} /> Get funds / credits
                 </Link>

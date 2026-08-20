@@ -262,7 +262,7 @@ export default function EarnPage() {
                     type="button"
                     disabled={busy || !amount || Number(amount) <= 0}
                     onClick={() => void submit()}
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2 capitalize"
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2 capitalize"
                   >
                     {busy ? <Spinner size={16} /> : null}
                     {action} USDC

@@ -222,7 +222,7 @@ export function Navbar() {
             <Link
               href="/home"
               onDoubleClick={() => router.push("/dir")}
-              className="flex items-center gap-2 shrink-0 min-h-[40px] pl-0.5 pr-1 justify-center rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition"
+              className="flex items-center gap-2 shrink-0 min-h-[34px] pl-0.5 pr-1 justify-center rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition"
               aria-label="sol.new home"
             >
               <img src="/icon-192.png" alt="sol.new" className="w-8 h-8 rounded-lg" />
@@ -259,7 +259,7 @@ export function Navbar() {
                     key={item.href}
                     href={item.href}
                     title={item.label}
-                    className={`min-h-[44px] min-w-[48px] inline-flex flex-col items-center justify-center gap-0.5 px-2 rounded-xl text-[10px] transition ${
+                    className={`min-h-[36px] min-w-[40px] inline-flex flex-col items-center justify-center gap-0.5 px-2 rounded-xl text-[10px] transition ${
                       active
                         ? "bg-purple-500/15 text-purple-700 dark:text-purple-300"
                         : "text-gray-500 dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5"
@@ -330,7 +330,7 @@ export function Navbar() {
                       ? "Notifications on"
                       : "Enable notifications"
                 }
-                className={`inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-sm transition border min-h-[40px] ${
+                className={`inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm transition border min-h-[32px] ${
                   pushPermission === "granted"
                     ? "text-purple-600 dark:text-purple-400 border-purple-400/30 bg-purple-500/10 hover:bg-purple-500/15"
                     : pushPermission === "denied"
@@ -339,9 +339,9 @@ export function Navbar() {
                 }`}
               >
                 {pushPermission === "granted" ? (
-                  <Bell size={18} className="shrink-0" />
+                  <Bell size={16} className="shrink-0" />
                 ) : (
-                  <Bell size={18} className="shrink-0 opacity-90" />
+                  <Bell size={16} className="shrink-0 opacity-90" />
                 )}
                 <span className="hidden md:inline font-medium text-xs sm:text-sm">
                   {pushLoading
@@ -350,7 +350,7 @@ export function Navbar() {
                       ? "Alerts on"
                       : pushPermission === "denied"
                         ? "Blocked"
-                        : "Enable noti"}
+                        : "Notify"}
                 </span>
               </button>
             )}
@@ -358,9 +358,9 @@ export function Navbar() {
               type="button"
               onClick={() => setShowMore((v) => !v)}
               aria-label="Open menu"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-gray-700 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/10 transition border border-black/10 dark:border-white/10 ml-1"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-gray-700 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/10 transition border border-black/10 dark:border-white/10 ml-0.5"
             >
-              <Menu size={18} />
+              <Menu size={16} />
               <span className="hidden lg:inline font-medium">Menu</span>
             </button>
             {publicKey ? (
@@ -371,7 +371,7 @@ export function Navbar() {
                   onClick={() => setShowMenu(!showMenu)}
                   aria-expanded={showMenu}
                   aria-haspopup="menu"
-                  className="flex items-center gap-1.5 sm:gap-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-2.5 sm:px-3 py-2 min-h-[40px] text-xs sm:text-sm hover:border-purple-400/30 transition cursor-pointer"
+                  className="flex items-center gap-1.5 sm:gap-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-2 sm:px-2.5 py-1.5 min-h-[32px] text-xs sm:text-sm hover:border-purple-400/30 transition cursor-pointer"
                 >
                   <Wallet size={14} className="text-purple-500 dark:text-purple-400 sm:hidden" />
                   {balance !== null ? (
@@ -601,7 +601,7 @@ export function Navbar() {
                   type="button"
                   onClick={() => void connect()}
                   disabled={loading}
-                  className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-xl px-3.5 py-2 min-h-[40px] transition cursor-pointer disabled:opacity-50"
+                  className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg px-3 py-1.5 min-h-[32px] transition cursor-pointer disabled:opacity-50"
                 >
                   {loading ? "..." : "Connect"}
                 </button>
@@ -609,14 +609,14 @@ export function Navbar() {
                   type="button"
                   onClick={() => void connect({ createNew: true })}
                   disabled={loading}
-                  className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 text-sm rounded-xl px-3 py-2 min-h-[40px] transition cursor-pointer disabled:opacity-50 hidden sm:block"
+                  className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 text-sm rounded-lg px-2.5 py-1.5 min-h-[32px] transition cursor-pointer disabled:opacity-50 hidden sm:block"
                   title="Only if you need a brand-new wallet"
                 >
                   New
                 </button>
                 <Link
                   href="/wallet/find"
-                  className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 text-sm rounded-xl px-3 py-2 min-h-[40px] transition hidden sm:flex items-center"
+                  className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 text-sm rounded-lg px-2.5 py-1.5 min-h-[32px] transition hidden sm:flex items-center"
                 >
                   Find
                 </Link>
@@ -632,7 +632,7 @@ export function Navbar() {
           <Link
             key={item.href}
             href={item.href}
-            className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-xl flex-1 max-w-[72px] min-h-[52px] transition active:scale-95 touch-manipulation ${
+            className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-xl flex-1 max-w-[72px] min-h-[44px] transition active:scale-95 touch-manipulation ${
               isActive(item.href)
                 ? "text-purple-600 dark:text-purple-400"
                 : "text-gray-500 dark:text-white/40"
@@ -645,7 +645,7 @@ export function Navbar() {
         <button
           type="button"
           onClick={() => setShowMore(true)}
-          className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-xl flex-1 max-w-[72px] min-h-[52px] transition active:scale-95 touch-manipulation cursor-pointer ${
+          className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-xl flex-1 max-w-[72px] min-h-[44px] transition active:scale-95 touch-manipulation cursor-pointer ${
             moreActive ? "text-purple-600 dark:text-purple-400" : "text-gray-500 dark:text-white/40"
           }`}
         >

@@ -247,7 +247,7 @@ export default function BurnPage() {
                 type="button"
                 disabled={busy || selectedEmpty.length === 0}
                 onClick={() => void closeSelected()}
-                className="w-full bg-orange-600 hover:bg-orange-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2"
+                className="w-full bg-orange-600 hover:bg-orange-500 disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2"
               >
                 {busy ? <Spinner size={16} /> : <Flame size={16} />}
                 Close {selectedEmpty.length} account

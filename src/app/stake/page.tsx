@@ -427,7 +427,7 @@ export default function StakePage() {
                   type="button"
                   disabled={busy || !amount}
                   onClick={() => void handleStake()}
-                  className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2"
                 >
                   {busy ? <Spinner size={16} /> : null}
                   Stake SOL

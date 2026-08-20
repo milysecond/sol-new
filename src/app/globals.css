@@ -372,3 +372,25 @@ textarea:not(:disabled) {
     transition-duration: revert !important;
   }
 }
+
+
+/* Compact buttons — slightly tighter on tablet+, keep phone touch-friendly */
+@media (min-width: 640px) {
+  button.btn-compact,
+  .btn-compact {
+    min-height: 2.25rem;
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* Default: full-width primary-looking buttons aren't huge slabs on desktop */
+@media (min-width: 768px) {
+  main button.w-full.rounded-xl.py-3\.5,
+  main button.w-full.rounded-xl[class*="py-3.5"],
+  main a.w-full.rounded-xl[class*="py-3.5"] {
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+  }
+}

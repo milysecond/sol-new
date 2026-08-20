@@ -684,7 +684,7 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
               <button
                 onClick={handleLaunch}
                 disabled={!name || !ticker || !imageFile}
-                className={`w-full ${ac.btn} disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed`}
+                className={`w-full ${ac.btn} disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed`}
               >
                 {isBags ? "Launch my token" : "Launch on pump.fun"}
               </button>
@@ -953,7 +953,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
             ) : (
               <>
                 <PromoInput onValidCode={setPromoCode} onClear={() => setPromoCode(null)} />
-                <button onClick={handleLaunch} disabled={!name || !ticker || !imageFile} className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed">
+                <button onClick={handleLaunch} disabled={!name || !ticker || !imageFile} className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed">
                   Launch token
                 </button>
               </>
@@ -1198,7 +1198,7 @@ function GenesisForm({ onBack }: { onBack: () => void }) {
         <button
           onClick={handleLaunch}
           disabled={busy || !name || !ticker || !imageFile}
-          className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {busy ? (status === "auth" ? "Authenticating…" : status === "uploading" ? "Uploading…" : "Creating…") : "Launch Genesis TGE"}
         </button>
@@ -1335,7 +1335,7 @@ function MetadaoForm({ onBack }: { onBack: () => void }) {
         <button
           onClick={handleCreate}
           disabled={busy || !valid}
-          className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {busy ? (status === "auth" ? "Authenticating…" : "Creating DAO…") : "Create Futarchy DAO"}
         </button>
@@ -1647,7 +1647,7 @@ function OrynthForm({ onBack }: { onBack: () => void }) {
                 type="button"
                 onClick={() => void handleLaunch()}
                 disabled={!name || !ticker || !imageFile || !publicKey}
-                className={`w-full ${ac.btn} disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3.5`}
+                className={`w-full ${ac.btn} disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5`}
               >
                 Launch with Orynth
               </button>
