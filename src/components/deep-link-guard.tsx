@@ -42,6 +42,7 @@ const DEEP_PREFIXES = [
   "/dir",
   "/docs",
   "/get",
+  "/rent",
   "/wallet/",
 ];
 

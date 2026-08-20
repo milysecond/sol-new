@@ -61,6 +61,7 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
     section: "explore",
     links: [
       { label: "explorer", href: "/explorer" },
+      { label: "min rent", href: "/rent" },
       { label: "address lookup", href: "/address" },
       { label: "watchlists", href: "/lists" },
       { label: "token gallery", href: "/gallery" },
