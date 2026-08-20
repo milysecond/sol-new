@@ -160,7 +160,7 @@ export default function BurnPage() {
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="reclaim rent">
           <PageTransition>
-            <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-6">
+            <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-6">
               <div className="text-center space-y-2">
                 <Flame className="mx-auto text-orange-400" size={36} />
                 <h1 className="text-3xl font-bold tracking-tight">Burn / reclaim</h1>

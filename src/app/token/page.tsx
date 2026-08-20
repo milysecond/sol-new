@@ -1672,7 +1672,7 @@ export default function TokenPage() {
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">
       <Navbar />
       <main className="flex-1 w-full pb-24">
-        <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8">
+        <div className="app-shell py-5 sm:py-8 lg:py-10">
           {style === "pick" && <StylePicker onSelect={setStyle} />}
           {style === "meteora" && <MeteorForm onBack={() => setStyle("pick")} />}
           {style === "orynth" && <OrynthForm onBack={() => setStyle("pick")} />}
