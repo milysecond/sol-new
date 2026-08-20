@@ -274,18 +274,6 @@ export default function RentPage() {
             </div>
           )}
         </details>
-
-        <p className="text-center text-[11px] text-gray-400">
-          Inspired by{" "}
-          <a
-            href="https://minrent.sal.fun"
-            className="text-violet-500 hover:underline"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            minrent.sal.fun
-          </a>
-        </p>
       </PageShell>
     </div>
   );
