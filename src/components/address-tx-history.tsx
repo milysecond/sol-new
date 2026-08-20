@@ -106,7 +106,12 @@ export function AddressTxHistory({
           nextBefore?: string | null;
         };
         if (!r.ok || j.ok === false) {
-          throw new Error(j.error || "Failed to load transactions");
+          const msg = j.error || "Failed to load transactions";
+          // Never show raw RPC/provider dumps (403 JSON bodies, etc.)
+          if (/403|401|402|blocked|forbidden|jsonrpc|Your IP/i.test(msg)) {
+            throw new Error("RPC temporarily unavailable — try Refresh");
+          }
+          throw new Error(msg);
         }
         const list = j.transactions || [];
         setRows((prev) => (append ? [...prev, ...list] : list));
