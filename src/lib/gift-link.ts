@@ -63,11 +63,39 @@ export function buildGiftUrl(
   origin = "https://sol.new"
 ): string {
   const params = new URLSearchParams();
+  // App Links / TWA / many WebViews STRIP the hash — secret must live in the query too.
+  params.set("g", secret);
   if (network === "devnet") params.set("n", "d");
   if (message?.trim()) params.set("m", message.trim().slice(0, 80));
   const qs = params.toString();
   const base = origin.replace(/\/$/, "");
-  return `${base}/claim${qs ? `?${qs}` : ""}#${secret}`;
+  // Keep # for browser-only privacy when hash is preserved; query is the durable path.
+  return `${base}/claim?${qs}#${secret}`;
+}
+
+/**
+ * Resolve gift secret from location.
+ * Order: query `g`/`s` → path `/claim/<secret>` → hash (legacy).
+ * Hash alone fails on Seeker / Android App Links.
+ */
+export function parseGiftSecretFromLocation(loc: {
+  search?: string;
+  hash?: string;
+  pathname?: string;
+}): string | null {
+  try {
+    const sp = new URLSearchParams(loc.search || "");
+    const q = (sp.get("g") || sp.get("s") || "").trim();
+    if (q.length > 20) return q;
+
+    const path = (loc.pathname || "").replace(/\/+$/, "");
+    const m = path.match(/^\/claim\/([A-Za-z0-9_-]{20,})$/);
+    if (m?.[1]) return m[1];
+
+    return parseGiftSecret(loc.hash || "");
+  } catch {
+    return parseGiftSecret(loc.hash || "");
+  }
 }
 
 export function parseGiftSecret(hash: string): string | null {
