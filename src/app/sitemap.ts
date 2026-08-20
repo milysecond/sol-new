@@ -57,6 +57,7 @@ const STATIC_ROUTES: {
   { path: "/clip", priority: 0.85, freq: "weekly" },
   { path: "/stake", priority: 0.7, freq: "weekly" },
   { path: "/lst", priority: 0.7, freq: "weekly" },
+  { path: "/rent", priority: 0.7, freq: "hourly" },
   { path: "/burn", priority: 0.6, freq: "weekly" },
   { path: "/dir", priority: 0.5, freq: "weekly" },
   { path: "/privacy", priority: 0.3, freq: "yearly" },
