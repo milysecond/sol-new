@@ -36,6 +36,7 @@ import QRCode from "qrcode";
 import {
   fetchWalletTokens,
   formatTokenUi,
+  formatAmountInput,
   type WalletToken,
 } from "@/lib/wallet-tokens";
 import { AmountUsdHint, TokenMetaRow } from "@/components/token-meta";
@@ -658,15 +659,45 @@ export default function GiftPage() {
     if (sym === "SOL") return `${l.amount} SOL`;
     return `${l.amount} ${sym}`;
   };
-  const setMax = () => {
-    if (!selected) return;
+  /** Max gift amount as input-safe string (no commas). Leaves SOL fee reserve for native. */
+  const maxGiftUi = (): { ui: number; str: string; dec: number } | null => {
+    if (!selected) return null;
+    const dec = selected.isNativeSol ? 9 : selected.decimals;
     if (selected.isNativeSol) {
-      const max = Math.max(0, (balance ?? 0) - 0.0001);
-      setAmount(max > 0 ? String(Math.floor(max * 10000) / 10000) : "");
-    } else {
-      setAmount(formatTokenUi(selected.uiAmount, selected.decimals));
+      // Match create() reserve: claim fee×2 + buffer + small tx fee
+      const reserve =
+        (CLAIM_FEE_LAMPORTS * 2 + 5_000 + 50_000) / LAMPORTS_PER_SOL;
+      const ui = Math.max(0, (balance ?? selected.uiAmount ?? 0) - reserve);
+      return { ui, str: formatAmountInput(ui, 9), dec: 9 };
     }
+    const ui = Math.max(0, selected.uiAmount || 0);
+    return { ui, str: formatAmountInput(ui, dec), dec };
   };
+
+  const setMax = () => {
+    const m = maxGiftUi();
+    if (!m || !m.str) {
+      setError(
+        selected?.isNativeSol
+          ? "Not enough SOL left after gift fees"
+          : "No balance",
+      );
+      return;
+    }
+    setError(null);
+    setAmount(m.str);
+  };
+
+  const setPct = (pct: number) => {
+    const m = maxGiftUi();
+    if (!m || m.ui <= 0) {
+      setError("No balance");
+      return;
+    }
+    setError(null);
+    setAmount(formatAmountInput(m.ui * pct, m.dec));
+  };
+
   const presets =
     token === "SOL" ? PRESETS_SOL : token === "USDC" ? PRESETS_USDC : [];
   const displayAmountLabel = () => {
@@ -815,7 +846,7 @@ export default function GiftPage() {
                     type="text"
                     placeholder="0.00"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+                    onChange={(e) => setAmount(e.target.value.replace(/,/g, "").replace(/[^0-9.]/g, ""))}
                     disabled={busy}
                     className={`w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl ${
                       token === "SOL" || token === "USDC" ? "pl-8" : "pl-4"
@@ -823,33 +854,73 @@ export default function GiftPage() {
                   />
                 </div>
                 <AmountUsdHint amount={amount} priceUsd={selected?.priceUsd} />
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex gap-1.5 flex-wrap">
-                    {presets.map((preset) => (
+                <div className="space-y-2">
+                  {/* 25 / 50 / 75 / Max — large touch targets */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {(
+                      [
+                        [0.25, "25%"],
+                        [0.5, "50%"],
+                        [0.75, "75%"],
+                        [1, "Max"],
+                      ] as const
+                    ).map(([pct, label]) => (
                       <button
-                        key={preset}
+                        key={label}
                         type="button"
-                        onClick={() => setAmount(preset)}
-                        disabled={busy}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-mono transition cursor-pointer border ${
-                          amount === preset
-                            ? "bg-amber-500/20 border-amber-400/50 text-amber-600 dark:text-amber-300"
-                            : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:border-amber-400/40"
-                        }`}
+                        disabled={busy || !selected}
+                        onClick={() => (pct === 1 ? setMax() : setPct(pct))}
+                        className={`min-h-[44px] rounded-xl text-sm font-semibold transition border ${
+                          label === "Max"
+                            ? "bg-amber-500 hover:bg-amber-400 border-amber-400 text-black"
+                            : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-800 dark:text-white/80 hover:border-amber-400/50"
+                        } disabled:opacity-40`}
                       >
-                        {token === "SOL" ? `◎${preset}` : token === "USDC" ? `$${preset}` : preset}
+                        {label}
                       </button>
                     ))}
                   </div>
-                  <button
-                    type="button"
-                    onClick={setMax}
-                    disabled={busy || !selected}
-                    className="text-xs text-gray-400 dark:text-white/40 hover:text-amber-500 dark:hover:text-amber-400 transition cursor-pointer font-mono whitespace-nowrap"
-                    title="Use full balance"
-                  >
-                    max
-                  </button>
+                  {/* Fixed presets for SOL / USDC */}
+                  {presets.length > 0 && (
+                    <div className="flex gap-1.5 flex-wrap">
+                      {presets.map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setAmount(preset)}
+                          disabled={busy}
+                          className={`min-h-[36px] px-3 rounded-lg text-xs font-mono transition cursor-pointer border ${
+                            amount === preset
+                              ? "bg-amber-500/20 border-amber-400/50 text-amber-600 dark:text-amber-300"
+                              : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:border-amber-400/40"
+                          }`}
+                        >
+                          {token === "SOL"
+                            ? `◎${preset}`
+                            : token === "USDC"
+                              ? `$${preset}`
+                              : preset}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {selected && (
+                    <p className="text-[11px] text-gray-400 dark:text-white/35">
+                      Available{" "}
+                      <span className="font-mono text-gray-600 dark:text-white/60">
+                        {formatTokenUi(
+                          selected.isNativeSol
+                            ? (balance ?? selected.uiAmount)
+                            : selected.uiAmount,
+                          selected.decimals,
+                        )}{" "}
+                        {selected.symbol}
+                      </span>
+                      {selected.isNativeSol
+                        ? " · Max keeps a small fee reserve"
+                        : ""}
+                    </p>
+                  )}
                 </div>
                 <input
                   type="text"

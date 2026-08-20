@@ -49,11 +49,34 @@ function shortMint(m: string) {
   return `${m.slice(0, 4)}…${m.slice(-4)}`;
 }
 
+/** Display balance in lists (may use grouping commas). */
 export function formatTokenUi(n: number, decimals = 6): string {
   if (!Number.isFinite(n)) return "0";
-  if (n >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (n >= 1000) {
+    return n.toLocaleString(undefined, {
+      maximumFractionDigits: Math.min(2, decimals),
+    });
+  }
   const d = n >= 1 ? Math.min(4, decimals) : Math.min(6, decimals);
   return n.toFixed(d).replace(/\.?0+$/, "") || "0";
+}
+
+/**
+ * Amount for <input> — never locale commas (parseFloat("29,970") === 29).
+ * Floors to token decimals via integer math.
+ */
+export function formatAmountInput(n: number, decimals = 9): string {
+  if (!Number.isFinite(n) || n <= 0) return "";
+  const d = Math.max(0, Math.min(9, Math.floor(decimals)));
+  const f = 10 ** d;
+  // Avoid float dust: work in base units
+  const raw = Math.floor(n * f + 1e-10);
+  if (raw <= 0) return "";
+  if (d === 0) return String(raw);
+  const whole = Math.floor(raw / f);
+  let frac = String(raw % f).padStart(d, "0");
+  frac = frac.replace(/0+$/, "");
+  return frac ? `${whole}.${frac}` : String(whole);
 }
 
 export function formatUsd(n: number | null | undefined, opts?: { compact?: boolean }): string {
