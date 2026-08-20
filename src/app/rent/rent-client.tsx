@@ -191,7 +191,7 @@ export default function RentPage() {
             <div className="space-y-3">
               <Row
                 label="Token account"
-                sub={`${token.space} bytes · SPL ATA (same as minrent)`}
+                sub={`${token.space} bytes · SPL ATA`}
                 lamports={token.lamports}
                 sol={token.sol}
                 usd={token.usd}
