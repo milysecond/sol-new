@@ -26,6 +26,10 @@ const cmd = [
   "--alias:events=events",
   "--alias:buffer=buffer",
   "--define:global=globalThis",
+  // Allow pointing the browser bundle at a self-hosted / devnet relayer
+  `--define:process.env.NEXT_PUBLIC_RELAYER_API_URL=${JSON.stringify(
+    process.env.NEXT_PUBLIC_RELAYER_API_URL || "https://api3.privacycash.org"
+  )}`,
   "--loader:.wasm=file",
   "--asset-names=[name]",
   "--public-path=/zk/",

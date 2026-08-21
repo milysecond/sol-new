@@ -38,7 +38,7 @@ export function PrivateSendSheet({
   initialRecipient = "",
   initialAmount = "",
 }: Props = {}) {
-  const { network, rpc } = useNetwork();
+  const { network, rpc, toggle } = useNetwork();
   const [internalOpen, setInternalOpen] = useState(false);
   const open = openProp ?? internalOpen;
   const setOpen = (v: boolean) => {
@@ -305,25 +305,47 @@ export function PrivateSendSheet({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => void openSheet()}
-        disabled={!available || connecting}
-        className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-black text-left transition hover:border-fuchsia-400/50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-      >
-        <div className="flex items-center gap-2">
-          {connecting ? <Spinner size={14} /> : <EyeOff size={14} className="text-purple-500" />}
-          <div>
-            <p className="text-xs font-medium text-gray-900 dark:text-white">ZK private send</p>
-            <p className="text-[11px] text-gray-500 dark:text-white/40">
-              {available
-                ? "Shielded transfers — no public link to recipient"
-                : "Available on mainnet only"}
-            </p>
+      {available ? (
+        <button
+          type="button"
+          onClick={() => void openSheet()}
+          disabled={connecting}
+          className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-black text-left transition hover:border-fuchsia-400/50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        >
+          <div className="flex items-center gap-2">
+            {connecting ? <Spinner size={14} /> : <EyeOff size={14} className="text-purple-500" />}
+            <div>
+              <p className="text-xs font-medium text-gray-900 dark:text-white">ZK private send</p>
+              <p className="text-[11px] text-gray-500 dark:text-white/40">
+                Shielded transfers — no public link to recipient
+              </p>
+            </div>
           </div>
+          <span className="text-[11px] text-purple-500 font-medium">Open</span>
+        </button>
+      ) : (
+        <div className="w-full rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2.5 space-y-2">
+          <div className="flex items-center gap-2">
+            <EyeOff size={14} className="text-amber-600 shrink-0" />
+            <div>
+              <p className="text-xs font-medium text-gray-900 dark:text-white">
+                Hosted ZK pool is mainnet-only
+              </p>
+              <p className="text-[11px] text-gray-600 dark:text-white/50 leading-snug">
+                Privacy Cash program can run on devnet if you self-host a relayer. Public API is
+                mainnet.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => toggle()}
+            className="w-full rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold py-2 transition"
+          >
+            Switch to mainnet
+          </button>
         </div>
-        <span className="text-[11px] text-purple-500 font-medium">Open</span>
-      </button>
+      )}
       {error && !open && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{error}</p>}
       {sheet}
     </>

@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { EyeOff, Shield, ArrowRight, Gift } from "lucide-react";
+import { EyeOff, Shield, ArrowRight, Gift, FlaskConical } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { PageTransition } from "@/components/page-transition";
@@ -14,7 +14,7 @@ const PrivateSendSheet = dynamic(
 );
 
 export default function PrivatePage() {
-  const { network } = useNetwork();
+  const { network, toggle } = useNetwork();
   const mainnet = network === "mainnet";
 
   return (
@@ -38,8 +38,26 @@ export default function PrivatePage() {
               </div>
 
               {!mainnet && (
-                <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
-                  Switch to <strong>mainnet</strong> (live) — the Privacy Cash pool is mainnet-only.
+                <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 space-y-3 text-sm text-amber-900 dark:text-amber-100">
+                  <p className="font-semibold flex items-center gap-2">
+                    <FlaskConical className="w-4 h-4 shrink-0" />
+                    You&apos;re on devnet
+                  </p>
+                  <p className="text-xs leading-relaxed text-amber-800/90 dark:text-amber-100/80">
+                    Privacy Cash <strong>can</strong> be deployed on Solana devnet (self-hosted
+                    program + your own relayer). The <strong>public</strong> pool + relayer that
+                    sol.new uses (
+                    <code className="text-[10px]">api3.privacycash.org</code>) is{" "}
+                    <strong>mainnet-only</strong> — there is no public hosted devnet API right now.
+                    SDK e2e tests also run on mainnet.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => toggle()}
+                    className="inline-flex items-center justify-center rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-semibold px-3.5 py-2 transition"
+                  >
+                    Switch to mainnet (live)
+                  </button>
                 </div>
               )}
 
@@ -84,16 +102,42 @@ export default function PrivatePage() {
                   <Gift className="w-4 h-4 text-amber-500" /> ZK gifts
                 </p>
                 <p className="text-xs text-gray-500 dark:text-white/45 leading-relaxed">
-                  On <Link href="/gift" className="text-purple-500 underline">/gift</Link>, choose{" "}
-                  <strong>ZK private</strong> to fund a claim link from your shielded balance — the
-                  gift is not paid directly from your public address.
+                  On{" "}
+                  <Link href="/gift" className="text-purple-500 underline">
+                    /gift
+                  </Link>
+                  , choose <strong>ZK private</strong> to fund a claim link from your shielded
+                  balance — the gift is not paid directly from your public address. Mainnet SOL
+                  only.
                 </p>
               </div>
 
+              <div className="rounded-2xl border border-black/10 dark:border-white/10 p-4 space-y-2 text-xs text-gray-500 dark:text-white/45 leading-relaxed">
+                <p className="font-semibold text-sm text-gray-800 dark:text-white/80">
+                  Devnet vs mainnet
+                </p>
+                <ul className="list-disc pl-4 space-y-1">
+                  <li>
+                    <strong>Hosted product</strong> (what sol.new uses): mainnet pool +{" "}
+                    <code className="text-[10px]">api3.privacycash.org</code>
+                  </li>
+                  <li>
+                    <strong>Self-host / test program</strong>: Privacy Cash docs cover{" "}
+                    <code className="text-[10px]">anchor deploy --provider.cluster devnet</code> —
+                    you must run your own relayer (
+                    <code className="text-[10px]">NEXT_PUBLIC_RELAYER_API_URL</code> at build time)
+                  </li>
+                  <li>
+                    No public free-for-all Privacy Cash <em>devnet API</em> was found — unlike some
+                    other privacy stacks (e.g. Umbra has a documented devnet indexer)
+                  </li>
+                </ul>
+              </div>
+
               <p className="text-[11px] text-gray-400 text-center leading-relaxed">
-                Relayer fees apply on send/unshield. Not financial advice. Protocol:{" "}
+                Relayer fees on send/unshield. Not financial advice. Protocol:{" "}
                 <a
-                  href="https://privacycash.org"
+                  href="https://www.privacycash.org"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline"
