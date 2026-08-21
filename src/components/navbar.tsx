@@ -220,16 +220,16 @@ export function Navbar() {
   return (
     <nav className="relative z-[80]">
       <div ref={headerRef} className="sticky top-0 z-[80] border-b border-black/10 dark:border-white/10 bg-white/90 dark:bg-black/90 backdrop-blur-md safe-top">
-        <div className="flex items-center justify-between gap-2 px-2 sm:px-5 lg:px-6 py-2 sm:py-3 max-w-[1400px] mx-auto w-full">
-          <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+        <div className="flex items-center justify-between gap-1.5 sm:gap-3 px-2.5 sm:px-5 lg:px-6 py-2 sm:py-2.5 max-w-[1400px] mx-auto w-full">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             {/* Logo — standard left position, always links home */}
             <Link
               href="/home"
               onDoubleClick={() => router.push("/dir")}
-              className="flex items-center gap-2 shrink-0 min-h-[34px] pl-0.5 pr-1 justify-center rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition"
+              className="flex items-center gap-2 shrink-0 h-8 pl-0.5 pr-1 justify-center rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition"
               aria-label="sol.new home"
             >
-              <img src="/icon-192.png" alt="sol.new" className="w-8 h-8 rounded-lg" />
+              <img src="/icon-192.png" alt="sol.new" className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg" />
               <span className="text-lg sm:text-xl font-bold tracking-tight hidden md:inline">
                 sol<span className="text-purple-500 dark:text-purple-400">.new</span>
               </span>
@@ -241,11 +241,11 @@ export function Navbar() {
             <button
               type="button"
               onClick={toggle}
-              className="cursor-pointer shrink-0 min-h-[36px] inline-flex items-center justify-center"
+              className="cursor-pointer shrink-0 h-8 inline-flex items-center justify-center"
               title={`Switch to ${network === "mainnet" ? "devnet" : "mainnet"}`}
             >
               <span
-                className={`inline-flex items-center justify-center min-w-[2.5rem] text-[10px] font-medium border rounded-md px-1.5 py-1 transition-colors ${
+                className={`inline-flex items-center justify-center h-7 min-w-[2.25rem] text-[10px] font-semibold border rounded-md px-2 leading-none transition-colors ${
                   network === "devnet"
                     ? "text-yellow-700 dark:text-yellow-400 bg-yellow-500/10 border-yellow-500/20"
                     : "text-green-700 dark:text-green-400 bg-green-500/10 border-green-500/20"
@@ -255,7 +255,7 @@ export function Navbar() {
               </span>
             </button>
 
-            <div className="hidden md:flex lg:hidden items-center gap-0.5 ml-1">
+            <div className="hidden md:flex lg:hidden items-center gap-0.5 ml-0.5">
               {TABLET_NAV.map((item) => {
                 const active = isActive(item.href);
                 return (
@@ -263,27 +263,27 @@ export function Navbar() {
                     key={item.href}
                     href={item.href}
                     title={item.label}
-                    className={`min-h-[36px] min-w-[40px] inline-flex flex-col items-center justify-center gap-0.5 px-2 rounded-xl text-[10px] transition ${
+                    className={`h-8 min-w-[40px] inline-flex flex-col items-center justify-center gap-0.5 px-2 rounded-lg text-[10px] transition ${
                       active
                         ? "bg-purple-500/15 text-purple-700 dark:text-purple-300"
                         : "text-gray-500 dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5"
                     }`}
                   >
-                    <item.icon size={18} />
+                    <item.icon size={16} />
                     <span className="leading-none">{item.label}</span>
                   </Link>
                 );
               })}
             </div>
 
-            <div className="hidden lg:flex items-center gap-0.5 ml-1">
+            <div className="hidden lg:flex items-center gap-0.5 ml-0.5">
               {NAV_ITEMS.map((item) => {
                 const active = isActive(item.href);
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`px-2.5 py-1.5 rounded-lg text-sm transition whitespace-nowrap ${
+                    className={`h-8 px-2.5 inline-flex items-center rounded-lg text-sm transition whitespace-nowrap ${
                       active
                         ? "bg-purple-500/15 text-purple-800 dark:text-purple-200"
                         : "text-gray-500 dark:text-white/40 hover:text-gray-800 dark:hover:text-white/70 hover:bg-black/5 dark:hover:bg-white/5"
@@ -297,8 +297,8 @@ export function Navbar() {
             </div>
           </div>
 
-          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-            <SocialLinks />
+          <div className="flex items-center gap-1 shrink-0">
+            <SocialLinks className="hidden sm:flex" />
             <ThemeToggle />
 
             {/* Menu button on the right (standard) */}
@@ -334,7 +334,7 @@ export function Navbar() {
                       ? "Notifications on"
                       : "Enable notifications"
                 }
-                className={`inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm transition border min-h-[32px] ${
+                className={`inline-flex items-center justify-center gap-1 h-8 px-2 rounded-lg text-sm transition border ${
                   pushPermission === "granted"
                     ? "text-purple-600 dark:text-purple-400 border-purple-400/30 bg-purple-500/10 hover:bg-purple-500/15"
                     : pushPermission === "denied"
@@ -345,9 +345,9 @@ export function Navbar() {
                 {pushLoading ? (
                   <Spinner size={14} className="shrink-0 text-current" />
                 ) : (
-                  <Bell size={16} className="shrink-0" />
+                  <Bell size={15} className="shrink-0" />
                 )}
-                <span className="hidden md:inline font-medium text-xs sm:text-sm">
+                <span className="hidden md:inline font-medium text-xs">
                   {pushLoading
                     ? pushPermission === "granted"
                       ? "Turning off"
@@ -364,10 +364,10 @@ export function Navbar() {
               type="button"
               onClick={() => setShowMore((v) => !v)}
               aria-label="Open menu"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-gray-700 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/10 transition border border-black/10 dark:border-white/10 ml-0.5"
+              className="inline-flex items-center justify-center gap-1 h-8 px-2 rounded-lg text-sm text-gray-700 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/10 transition border border-black/10 dark:border-white/10"
             >
-              <Menu size={16} />
-              <span className="hidden lg:inline font-medium">Menu</span>
+              <Menu size={15} />
+              <span className="hidden lg:inline font-medium text-xs">Menu</span>
             </button>
             {publicKey ? (
               <div className="relative">
@@ -377,11 +377,11 @@ export function Navbar() {
                   onClick={() => setShowMenu(!showMenu)}
                   aria-expanded={showMenu}
                   aria-haspopup="menu"
-                  className="flex items-center gap-1.5 sm:gap-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-2 sm:px-2.5 py-1.5 min-h-[32px] text-xs sm:text-sm hover:border-purple-400/30 transition cursor-pointer"
+                  className="flex items-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg h-8 px-2 sm:px-2.5 text-xs sm:text-sm hover:border-purple-400/30 transition cursor-pointer"
                 >
-                  <Wallet size={14} className="text-purple-500 dark:text-purple-400 sm:hidden" />
+                  <Wallet size={14} className="text-purple-500 dark:text-purple-400 sm:hidden shrink-0" />
                   {balance !== null ? (
-                    <span className="text-purple-600 dark:text-purple-400 font-mono">
+                    <span className="text-purple-600 dark:text-purple-400 font-mono tabular-nums">
                       {hideBalances ? (
                         "••••"
                       ) : (
@@ -397,7 +397,7 @@ export function Navbar() {
                     </span>
                   )}
                   <span
-                    className={`text-gray-700 dark:text-white/60 max-w-[90px] truncate ${
+                    className={`text-gray-700 dark:text-white/60 max-w-[72px] sm:max-w-[90px] truncate ${
                       walletLabel && publicKey && walletLabel !== publicKey ? "" : "font-mono"
                     }`}
                   >
