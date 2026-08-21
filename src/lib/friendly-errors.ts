@@ -58,8 +58,26 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
   if (m.includes("blockhash not found") || m.includes("transaction was not confirmed")) {
     return "The network is congested. Try again in a moment.";
   }
-  if (m.includes("failed to fetch") || m.includes("networkerror")) {
+  // Privacy Cash / snarkjs
+  if (
+    m.includes("failed to fetch") ||
+    m.includes("networkerror") ||
+    m.includes("load of media") ||
+    m.includes("fetching the") && m.includes("wasm")
+  ) {
+    if (m.includes("circuit") || m.includes("zkey") || m.includes("wasm") || m.includes("snark") || m.includes("groth") || m.includes("prove")) {
+      return "Couldn't load the ZK circuit (large file). Stay on Wi‑Fi, hard-refresh, and try Shield again.";
+    }
+    if (m.includes("relayer") || m.includes("privacycash") || m.includes("/deposit") || m.includes("/withdraw") || m.includes("/utxos")) {
+      return "Privacy Cash relayer unreachable. Check you're on the right network (live = mainnet) and try again.";
+    }
     return "Lost your connection. Check your network and try again.";
+  }
+  if (m.includes("don't deposit more") || m.includes("deposit more than")) {
+    return msg;
+  }
+  if (m.includes("insufficient balance") && m.includes("sol")) {
+    return "Not enough SOL in your public wallet to shield that amount + fees.";
   }
   if (m.includes("429") || m.includes("rate limit")) {
     return "Too many requests too fast — wait a few seconds and retry.";

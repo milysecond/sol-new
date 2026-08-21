@@ -404,7 +404,7 @@ function ExampleFormModal({
       aria-label={`How ${ex.name} was launched`}
     >
       <div
-        className="w-full sm:max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl"
+        className="w-full sm:max-w-lg lg:max-w-xl max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 flex items-center justify-between px-5 py-4 bg-white/90 dark:bg-black/90 backdrop-blur border-b border-black/10 dark:border-white/10">
@@ -475,7 +475,7 @@ function StylePicker({ onSelect }: { onSelect: (s: Exclude<Style, "pick">) => vo
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1">
           <AnimatedIcon icon={Coins} size={32} className="text-purple-400" />
           <h1 className="text-2xl font-bold tracking-tight">Launch a token</h1>
@@ -619,7 +619,7 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1 relative">
           <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
@@ -684,7 +684,7 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
               <button
                 onClick={handleLaunch}
                 disabled={!name || !ticker || !imageFile}
-                className={`w-full ${ac.btn} disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed`}
+                className={`w-full ${ac.btn} disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed`}
               >
                 {isBags ? "Launch my token" : "Launch on pump.fun"}
               </button>
@@ -862,7 +862,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
   return (
     <>
       <PageTransition>
-        <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
+        <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
           <div className="text-center space-y-1 relative">
             <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
               <ArrowLeft size={15} />
@@ -953,7 +953,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
             ) : (
               <>
                 <PromoInput onValidCode={setPromoCode} onClear={() => setPromoCode(null)} />
-                <button onClick={handleLaunch} disabled={!name || !ticker || !imageFile} className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed">
+                <button onClick={handleLaunch} disabled={!name || !ticker || !imageFile} className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed">
                   Launch token
                 </button>
               </>
@@ -967,7 +967,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
 
       {showInfo && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4" onClick={() => setShowInfo(false)}>
-          <div className="w-full sm:max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full sm:max-w-lg lg:max-w-xl max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 flex items-center justify-between px-5 py-4 bg-white/90 dark:bg-black/90 backdrop-blur border-b border-black/10 dark:border-white/10">
               <h2 className="text-lg font-bold flex items-center gap-2"><Info className="w-5 h-5 text-orange-400" /> How a token launch works</h2>
               <button type="button" onClick={() => setShowInfo(false)} aria-label="Close" className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer"><X className="w-5 h-5" /></button>
@@ -1138,7 +1138,7 @@ function GenesisForm({ onBack }: { onBack: () => void }) {
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1 relative">
           <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
@@ -1198,7 +1198,7 @@ function GenesisForm({ onBack }: { onBack: () => void }) {
         <button
           onClick={handleLaunch}
           disabled={busy || !name || !ticker || !imageFile}
-          className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {busy ? (status === "auth" ? "Authenticating…" : status === "uploading" ? "Uploading…" : "Creating…") : "Launch Genesis TGE"}
         </button>
@@ -1273,7 +1273,7 @@ function MetadaoForm({ onBack }: { onBack: () => void }) {
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1 relative">
           <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
@@ -1335,7 +1335,7 @@ function MetadaoForm({ onBack }: { onBack: () => void }) {
         <button
           onClick={handleCreate}
           disabled={busy || !valid}
-          className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {busy ? (status === "auth" ? "Authenticating…" : "Creating DAO…") : "Create Futarchy DAO"}
         </button>
@@ -1527,7 +1527,7 @@ function OrynthForm({ onBack }: { onBack: () => void }) {
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4 mx-auto">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1 relative">
           <button
             type="button"
@@ -1647,7 +1647,7 @@ function OrynthForm({ onBack }: { onBack: () => void }) {
                 type="button"
                 onClick={() => void handleLaunch()}
                 disabled={!name || !ticker || !imageFile || !publicKey}
-                className={`w-full ${ac.btn} disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3.5`}
+                className={`w-full ${ac.btn} disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5`}
               >
                 Launch with Orynth
               </button>
@@ -1672,7 +1672,7 @@ export default function TokenPage() {
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">
       <Navbar />
       <main className="flex-1 w-full pb-24">
-        <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8">
+        <div className="app-shell py-5 sm:py-8 lg:py-10">
           {style === "pick" && <StylePicker onSelect={setStyle} />}
           {style === "meteora" && <MeteorForm onBack={() => setStyle("pick")} />}
           {style === "orynth" && <OrynthForm onBack={() => setStyle("pick")} />}

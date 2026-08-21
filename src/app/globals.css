@@ -2,6 +2,49 @@
 
 @variant dark (&:where(.dark, .dark *));
 
+/* Visual viewport — kept live by <VisualViewportSync />
+   Fallbacks for SSR / first paint before JS. */
+:root {
+  --vvh: 100dvh;
+  --vvw: 100vw;
+  --vv-offset-top: 0px;
+  --vv-offset-left: 0px;
+  --app-height: 100dvh;
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
+/* Prefer dynamic viewport height over classic 100vh (iOS URL bar). */
+.min-h-app {
+  min-height: 100vh; /* fallback */
+  min-height: 100dvh;
+  min-height: var(--app-height);
+}
+.h-app {
+  height: 100vh;
+  height: 100dvh;
+  height: var(--app-height);
+}
+
+/* Sheets / drawers that must fit above home indicator + keyboard */
+.max-h-sheet {
+  max-height: min(85dvh, calc(var(--vvh) - 0.75rem));
+}
+.max-h-sheet-tall {
+  max-height: min(92dvh, calc(var(--vvh) - 0.5rem));
+}
+
+/* Fixed overlay pinned to visual viewport (keyboard-safe) */
+.fixed-vv {
+  position: fixed;
+  left: var(--vv-offset-left, 0px);
+  top: var(--vv-offset-top, 0px);
+  width: var(--vvw, 100vw);
+  height: var(--vvh, 100dvh);
+}
+
 body {
   background: #fff;
   color: #111;
@@ -10,6 +53,10 @@ body {
   /* Notch / Dynamic Island / home indicator */
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+  /* Avoid rubber-band horizontal bleed on iOS */
+  overflow-x: clip;
+  min-height: 100dvh;
+  min-height: var(--app-height);
 }
 
 html.dark body {
@@ -53,6 +100,80 @@ html.dark body {
   main {
     padding-left: max(1.25rem, env(safe-area-inset-left));
     padding-right: max(1.25rem, env(safe-area-inset-right));
+  }
+}
+
+/* Desktop-friendly content shells — not phone-narrow on large screens */
+.app-shell {
+  width: 100%;
+  max-width: 42rem; /* 2xl */
+  margin-left: auto;
+  margin-right: auto;
+  min-width: 0;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+@media (min-width: 640px) {
+  .app-shell {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .app-shell {
+    max-width: 56rem; /* 4xl */
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+@media (min-width: 1280px) {
+  .app-shell {
+    max-width: 64rem; /* 5xl */
+  }
+}
+@media (min-width: 1536px) {
+  .app-shell {
+    max-width: 72rem; /* 6xl */
+  }
+}
+.app-shell-wide {
+  width: 100%;
+  max-width: 48rem; /* 3xl */
+  margin-left: auto;
+  margin-right: auto;
+  min-width: 0;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+@media (min-width: 640px) {
+  .app-shell-wide {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .app-shell-wide {
+    max-width: 64rem; /* 5xl */
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+@media (min-width: 1280px) {
+  .app-shell-wide {
+    max-width: 72rem; /* 6xl */
+  }
+}
+@media (min-width: 1536px) {
+  .app-shell-wide {
+    max-width: 80rem; /* 7xl */
+  }
+}
+
+/* Desktop: slightly airier vertical rhythm for app mains */
+@media (min-width: 1024px) {
+  main {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
   }
 }
 
@@ -124,6 +245,48 @@ html.dark .img-skeleton {
 a, button {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+
+/* Soft page enter (PageTransition / FadeIn) */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+.animate-page-enter {
+  animation: page-enter 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-page-enter {
+    animation: none;
+  }
+}
+
+/* Clear press response on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  a[href]:not(.no-press),
+  button:not(:disabled):not([aria-disabled="true"]):not(.no-press),
+  [role="button"]:not([aria-disabled="true"]):not(.no-press) {
+    transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.14s ease;
+  }
+  a[href]:not(.no-press):active,
+  button:not(:disabled):not([aria-disabled="true"]):not(.no-press):active,
+  [role="button"]:not([aria-disabled="true"]):not(.no-press):active {
+    transform: scale(0.97);
+    opacity: 0.9;
+  }
+}
+
+/* Desktop / fine pointer — light active feedback without big scale on links */
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled):not([aria-disabled="true"]):not(.no-press):active {
+    transform: scale(0.98);
+  }
 }
 
 /* Pointers always relevant:
@@ -296,5 +459,27 @@ textarea:not(:disabled) {
     animation-duration: revert !important;
     animation-iteration-count: revert !important;
     transition-duration: revert !important;
+  }
+}
+
+
+/* Compact buttons — slightly tighter on tablet+, keep phone touch-friendly */
+@media (min-width: 640px) {
+  button.btn-compact,
+  .btn-compact {
+    min-height: 2.25rem;
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* Default: full-width primary-looking buttons aren't huge slabs on desktop */
+@media (min-width: 768px) {
+  main button.w-full.rounded-xl.py-3\.5,
+  main button.w-full.rounded-xl[class*="py-3.5"],
+  main a.w-full.rounded-xl[class*="py-3.5"] {
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
   }
 }

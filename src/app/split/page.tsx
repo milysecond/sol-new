@@ -131,7 +131,7 @@ export default function SplitPage() {
       <Navbar />
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="split a bill">
-          <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-8">
+          <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-8">
             <div className="text-center space-y-3">
               <AnimatedIcon icon={Users} size={40} className="text-purple-400" />
               <h1 className="text-3xl font-bold tracking-tight">Split a bill</h1>
@@ -177,7 +177,7 @@ export default function SplitPage() {
                     <button
                       key={t}
                       onClick={() => setToken(t)}
-                      className={`flex-1 border rounded-xl px-4 py-2.5 text-sm transition cursor-pointer ${
+                      className={`flex-1 border rounded-lg px-3 py-2 text-sm transition cursor-pointer ${
                         token === t
                           ? "bg-purple-500/20 border-purple-400/50 text-purple-500 dark:text-purple-300"
                           : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:border-black/20 dark:hover:border-white/20"
@@ -250,7 +250,7 @@ export default function SplitPage() {
                 <button
                   onClick={handleGenerate}
                   disabled={!grandTotal || generating}
-                  className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
+                  className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed"
                 >
                   {generating ? "Building links…" : `Create ${people} payment link${people === 1 ? "" : "s"}`}
                 </button>

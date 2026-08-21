@@ -468,7 +468,7 @@ export default function EditTokenMetadataPage() {
                       type="button"
                       onClick={submit}
                       disabled={submitting}
-                      className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {submitting ? (
                         <>
@@ -482,7 +482,7 @@ export default function EditTokenMetadataPage() {
                       type="button"
                       onClick={() => router.push(`/token/${params.mint}`)}
                       disabled={submitting}
-                      className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition cursor-pointer disabled:opacity-50"
+                      className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-lg px-3.5 py-2.5 hover:text-gray-900 dark:hover:text-white transition cursor-pointer disabled:opacity-50"
                     >
                       Cancel
                     </button>

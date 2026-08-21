@@ -73,7 +73,7 @@ export function BottomSheet({
   return (
     <>
       <div
-        className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-sm transition-opacity duration-200 ease-out ${
+        className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-sm transition-opacity duration-350 ease-out ${
           shown ? "opacity-100" : "opacity-0"
         }`}
         onClick={onClose}
@@ -86,7 +86,7 @@ export function BottomSheet({
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onTransitionEnd={onTransitionEnd}
-          className={`bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-sm shadow-2xl transition-[transform,opacity] duration-300 sm:duration-200 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] ${
+          className={`bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-sm shadow-2xl transition-[transform,opacity] duration-[420ms] sm:duration-300 [transition-timing-function:cubic-bezier(0.22,1,0.36,1)] ${
             shown
               ? "translate-y-0 sm:scale-100 opacity-100"
               : "translate-y-full sm:translate-y-0 sm:scale-[0.97] sm:opacity-0"

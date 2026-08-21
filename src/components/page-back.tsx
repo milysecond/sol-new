@@ -49,10 +49,10 @@ export function PageBack({ className = "" }: { className?: string }) {
       type="button"
       onClick={go}
       aria-label="Go back"
-      className={`inline-flex items-center justify-center shrink-0 h-9 w-9 sm:h-10 sm:w-auto sm:min-w-[40px] sm:px-2.5 rounded-full sm:rounded-xl text-sm text-gray-600 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer border border-transparent hover:border-black/10 dark:hover:border-white/10 ${className}`}
+      className={`inline-flex items-center justify-center shrink-0 h-8 w-8 sm:w-auto sm:min-w-[36px] sm:px-2 rounded-lg text-sm text-gray-600 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer border border-transparent hover:border-black/10 dark:hover:border-white/10 ${className}`}
     >
-      <ArrowLeft size={18} strokeWidth={2.25} />
-      <span className="hidden sm:inline font-medium ml-1">Back</span>
+      <ArrowLeft size={16} strokeWidth={2.25} />
+      <span className="hidden sm:inline font-medium text-xs ml-1">Back</span>
     </button>
   );
 }

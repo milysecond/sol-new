@@ -30,10 +30,14 @@ export async function POST(req: NextRequest) {
 
   try {
     await initDb();
-    const { publicKey, sender, amountLamports, network, token } = (await req.json()) as {
-      publicKey?: string; sender?: string; amountLamports?: number; network?: string; token?: string;
+    const { publicKey, sender, amountLamports, network, token, private: isPrivate } = (await req.json()) as {
+      publicKey?: string; sender?: string; amountLamports?: number; network?: string; token?: string; private?: boolean;
     };
-    if (!isPubkeyish(publicKey) || !isPubkeyish(sender)) {
+    if (!isPubkeyish(publicKey)) {
+      return NextResponse.json({ error: "Invalid publicKey" }, { status: 400 });
+    }
+    const privateGift = isPrivate === true || sender === "private";
+    if (!privateGift && !isPubkeyish(sender)) {
       return NextResponse.json({ error: "Invalid publicKey" }, { status: 400 });
     }
     const lamports = Number(amountLamports);
@@ -42,15 +46,16 @@ export async function POST(req: NextRequest) {
     }
     const net = network === "devnet" ? "devnet" : "mainnet";
     const tok = token === "USDC" || (typeof token === "string" && token.length > 10) ? token : "SOL";
-    await saveClaimLink({ publicKey, sender, amountLamports: lamports, network: net, token: tok });
+    const senderStored = privateGift ? "private" : (sender as string);
+    await saveClaimLink({ publicKey, sender: senderStored, amountLamports: lamports, network: net, token: tok });
 
     after(async () => {
       await notifyEvent({
         kind: "gift_created",
         emoji: "🎁",
-        title: "Gift link created",
+        title: privateGift ? "Private gift link created" : "Gift link created",
         fields: {
-          sender,
+          ...(privateGift ? { mode: "private" } : { sender: senderStored }),
           gift: publicKey,
           amount: String(lamports),
           token: tok,

@@ -79,7 +79,7 @@ function ExplorerInner() {
       <Navbar />
       <main className="flex-1 w-full pb-24">
         <PageTransition>
-          <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-8 sm:py-12 space-y-8">
+          <div className="app-shell py-8 sm:py-12 space-y-8">
             <div className="text-center space-y-2">
               <p className="text-[11px] uppercase tracking-wider text-rose-500 font-semibold">
                 Explorer

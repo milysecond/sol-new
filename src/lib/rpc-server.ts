@@ -68,6 +68,8 @@ export function devnetRpcEndpoints(): string[] {
   const list: string[] = [];
   const override = process.env.DEVNET_RPC?.trim();
   if (override) list.push(override);
+  // Working public first — api.devnet often 429; many HELIUS keys lack devnet
+  list.push("https://solana-devnet.api.onfinality.io/public");
   const helius = process.env.HELIUS_API_KEY?.trim();
   if (helius) list.push(`https://devnet.helius-rpc.com/?api-key=${helius}`);
   list.push("https://api.devnet.solana.com");
@@ -93,6 +95,7 @@ export function isRateLimitedMessage(msg: string): boolean {
   return (
     m.includes("429") ||
     m.includes("402") ||
+    m.includes("403") ||
     m.includes("rate limit") ||
     m.includes("too many requests") ||
     m.includes("payment required") ||
@@ -102,7 +105,10 @@ export function isRateLimitedMessage(msg: string): boolean {
     m.includes("quota") ||
     m.includes("capacity") ||
     m.includes("max usage") ||
-    m.includes("forbidden")
+    m.includes("forbidden") ||
+    m.includes("blocked") ||
+    m.includes("unauthorized") ||
+    m.includes("access forbidden")
   );
 }
 
