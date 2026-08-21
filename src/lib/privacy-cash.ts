@@ -1,6 +1,7 @@
 /**
- * Privacy Cash (Groth16 ZK pool) helpers for sol.new.
- * Mainnet only — pool/indexer/relayer are not on devnet.
+ * Privacy Cash (Groth16 ZK pool) — browser only.
+ * Uses Function('return import(m)') so Next/OpenNext cannot statically
+ * bundle privacycash / @lightprotocol/hasher.rs into the CF Worker.
  */
 "use client";
 
@@ -15,7 +16,6 @@ import {
 } from "@solana/web3.js";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 
-// Node globals for snarkjs / hasher wasm (Turbopack skips ProvidePlugin)
 if (typeof window !== "undefined") {
   const w = window as unknown as Record<string, unknown>;
   if (!w.Buffer) w.Buffer = Buffer;
@@ -23,13 +23,16 @@ if (typeof window !== "undefined") {
   if (!w.global) w.global = window;
 }
 
+/** Escape static analysis — packages load only in the browser at runtime. */
+// eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+const dynamicImport = new Function("m", "return import(m)") as (m: string) => Promise<any>;
+
 export const PRIVACY_CASH_KEY_BASE = "/circuit2/transaction2";
 export const PRIVACY_CASH_SIGN_MSG = "Privacy Money account sign in";
 const FIRST_FETCH_NOTES = 60_000;
 
 export type PrivacyCashSession = {
   keypair: Keypair;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   encryptionService: any;
   hasher: unknown;
   connection: Connection;
@@ -49,15 +52,16 @@ export async function getUtxoOffset(): Promise<number> {
 }
 
 export async function openPrivacyCashSession(rpc: string): Promise<PrivacyCashSession> {
+  if (typeof window === "undefined") {
+    throw new Error("ZK privacy runs in the browser only");
+  }
   const { keypair } = await getPasskeyKeypair();
   const [{ EncryptionService, setLogger }, { WasmFactory }, nacl] = await Promise.all([
-    import("privacycash/utils"),
-    import("@lightprotocol/hasher.rs"),
-    import("tweetnacl"),
+    dynamicImport("privacycash/utils"),
+    dynamicImport("@lightprotocol/hasher.rs"),
+    dynamicImport("tweetnacl"),
   ]);
-  setLogger(() => {
-    /* quiet by default; UI can set its own logger */
-  });
+  setLogger(() => {});
   const signature = nacl.default.sign.detached(
     new TextEncoder().encode(PRIVACY_CASH_SIGN_MSG),
     keypair.secretKey,
@@ -70,7 +74,7 @@ export async function openPrivacyCashSession(rpc: string): Promise<PrivacyCashSe
 }
 
 export async function getPrivateSolBalance(session: PrivacyCashSession): Promise<number> {
-  const { getUtxos, getBalanceFromUtxos } = await import("privacycash/utils");
+  const { getUtxos, getBalanceFromUtxos } = await dynamicImport("privacycash/utils");
   const offset = await getUtxoOffset();
   const utxos = await getUtxos({
     connection: session.connection,
@@ -87,11 +91,10 @@ export async function shieldSol(
   lamports: number,
   onStatus?: (msg: string) => void,
 ): Promise<string> {
-  const utils = await import("privacycash/utils");
-  const { setLogger } = utils;
-  if (onStatus) setLogger((_level: string, message: string) => onStatus(message));
+  const utils = await dynamicImport("privacycash/utils");
+  if (onStatus) utils.setLogger((_l: string, message: string) => onStatus(message));
   const res = await utils.deposit({
-    lightWasm: session.hasher as never,
+    lightWasm: session.hasher,
     connection: session.connection,
     publicKey: session.keypair.publicKey,
     storage: localStorage,
@@ -106,19 +109,17 @@ export async function shieldSol(
   return res.tx;
 }
 
-/** ZK private withdraw — breaks on-chain link from your public wallet history. */
 export async function privateSendSol(
   session: PrivacyCashSession,
   lamports: number,
   recipient: PublicKey | string,
   onStatus?: (msg: string) => void,
 ): Promise<string> {
-  const utils = await import("privacycash/utils");
-  const { setLogger } = utils;
-  if (onStatus) setLogger((_level: string, message: string) => onStatus(message));
+  const utils = await dynamicImport("privacycash/utils");
+  if (onStatus) utils.setLogger((_l: string, message: string) => onStatus(message));
   const to = typeof recipient === "string" ? new PublicKey(recipient) : recipient;
   const res = await utils.withdraw({
-    lightWasm: session.hasher as never,
+    lightWasm: session.hasher,
     connection: session.connection,
     publicKey: session.keypair.publicKey,
     storage: localStorage,
