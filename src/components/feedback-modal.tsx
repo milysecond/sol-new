@@ -46,8 +46,7 @@ const toneUi: Record<
 };
 
 /**
- * Family-style feedback drawer — success/error after an action.
- * Bottom sheet on mobile feel via fixed panel + opacity.
+ * Mobile-first feedback sheet — bottom drawer on phone, centered card on sm+.
  */
 export function FeedbackModal({
   open,
@@ -63,11 +62,16 @@ export function FeedbackModal({
 }: Props) {
   useEffect(() => {
     if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -77,7 +81,7 @@ export function FeedbackModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[90] bg-black/50 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-[2px] touch-none"
         onClick={onClose}
         aria-hidden
       />
@@ -85,9 +89,14 @@ export function FeedbackModal({
         role="dialog"
         aria-modal
         aria-label={title}
-        className="fixed z-[91] left-1/2 -translate-x-1/2 bottom-0 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 w-full sm:max-w-md px-3 sm:px-0 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0"
+        className="fixed z-[210] inset-x-0 bottom-0 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-md"
       >
-        <div className="rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl p-5 space-y-4 animate-[fadeIn_0.18s_ease-out]">
+        <div className="rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5 space-y-4">
+          {/* grabber — mobile */}
+          <div className="sm:hidden flex justify-center pb-1" aria-hidden>
+            <span className="w-10 h-1 rounded-full bg-black/15 dark:bg-white/20" />
+          </div>
+
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3 min-w-0">
               <div
@@ -109,10 +118,10 @@ export function FeedbackModal({
             <button
               type="button"
               onClick={onClose}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 touch-manipulation"
+              className="h-10 w-10 -mr-1 inline-flex items-center justify-center rounded-xl text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 touch-manipulation active:scale-95"
               aria-label="Close"
             >
-              <X size={16} />
+              <X size={18} />
             </button>
           </div>
 
@@ -121,18 +130,18 @@ export function FeedbackModal({
               state={buttonState}
               idleLabel={primaryLabel}
               onClick={() => {
-                onPrimary?.();
-                if (!onPrimary) onClose();
+                if (onPrimary) onPrimary();
+                else onClose();
               }}
             />
             {secondaryLabel && (
               <button
                 type="button"
                 onClick={() => {
-                  onSecondary?.();
-                  if (!onSecondary) onClose();
+                  if (onSecondary) onSecondary();
+                  else onClose();
                 }}
-                className="min-h-[44px] rounded-xl text-sm font-medium text-gray-600 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 transition touch-manipulation"
+                className="min-h-[48px] rounded-xl text-sm font-medium text-gray-600 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 transition touch-manipulation active:scale-[0.99]"
               >
                 {secondaryLabel}
               </button>

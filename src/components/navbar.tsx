@@ -40,6 +40,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { SocialLinks } from "@/components/social-links";
 import { Spinner } from "@/components/spinner";
 import { PageBack } from "@/components/page-back";
+import { WalletInfoModal } from "@/components/wallet-info-modal";
+import { CommandPaletteButton, AppCommandPalette } from "@/components/app-command-palette";
 import { useDefaultToken } from "@/lib/currency-pref";
 import { formatSol, useHideBalances } from "@/lib/privacy";
 import type { LucideIcon } from "lucide-react";
@@ -86,11 +88,15 @@ export function Navbar() {
     airdropping,
     airdropDone,
     handleAirdrop,
+    refreshBalance,
   } = useWallet();
   const [hideBalances] = useHideBalances();
   const { network, toggle } = useNetwork();
   const [defaultToken, setDefaultToken] = useDefaultToken();
   const [showMenu, setShowMenu] = useState(false);
+  const [walletSheet, setWalletSheet] = useState(false);
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [copiedAddr, setCopiedAddr] = useState(false);
   const [pushPermission, setPushPermission] = useState<PushPermission>("default");
   const [pushLoading, setPushLoading] = useState(false);
   const pathname = usePathname();
@@ -218,6 +224,7 @@ export function Navbar() {
   );
 
   return (
+    <>
     <nav className="relative z-[80]">
       <div ref={headerRef} className="sticky top-0 z-[80] border-b border-black/10 dark:border-white/10 bg-white/90 dark:bg-black/90 backdrop-blur-md safe-top">
         <div className="flex items-center justify-between gap-1.5 sm:gap-3 px-2.5 sm:px-5 lg:px-6 py-2 sm:py-2.5 max-w-[1400px] mx-auto w-full">
@@ -299,6 +306,7 @@ export function Navbar() {
 
           <div className="flex items-center gap-1 shrink-0">
             <SocialLinks className="hidden sm:flex" />
+            <CommandPaletteButton onClick={() => setCmdOpen(true)} />
             <ThemeToggle />
 
             {/* Menu button on the right (standard) */}
@@ -374,10 +382,13 @@ export function Navbar() {
                 <button
                   ref={menuBtnRef}
                   type="button"
-                  onClick={() => setShowMenu(!showMenu)}
-                  aria-expanded={showMenu}
-                  aria-haspopup="menu"
-                  className="flex items-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg h-8 px-2 sm:px-2.5 text-xs sm:text-sm hover:border-purple-400/30 transition cursor-pointer"
+                  onClick={() => {
+                    setWalletSheet(true);
+                    setShowMenu(false);
+                  }}
+                  aria-expanded={walletSheet}
+                  aria-haspopup="dialog"
+                  className="flex items-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg h-8 px-2 sm:px-2.5 text-xs sm:text-sm hover:border-purple-400/30 transition cursor-pointer touch-manipulation active:scale-[0.98]"
                 >
                   <Wallet size={14} className="text-purple-500 dark:text-purple-400 sm:hidden shrink-0" />
                   {balance !== null ? (
@@ -720,5 +731,53 @@ export function Navbar() {
         </div>
       )}
     </nav>
+
+      {publicKey && (
+        <WalletInfoModal
+          open={walletSheet}
+          onClose={() => setWalletSheet(false)}
+          address={publicKey}
+          label={walletLabel || undefined}
+          balanceSol={hideBalances ? null : balance}
+          networkLabel={network === "devnet" ? "devnet" : "mainnet"}
+          copied={copiedAddr}
+          onCopy={async () => {
+            try {
+              await navigator.clipboard.writeText(publicKey);
+              setCopiedAddr(true);
+              setTimeout(() => setCopiedAddr(false), 1500);
+            } catch { /* ignore */ }
+          }}
+          onSend={() => {
+            setWalletSheet(false);
+            router.push("/wallet/send");
+          }}
+          onReceive={() => {
+            setWalletSheet(false);
+            router.push(`/address/${publicKey}`);
+          }}
+          onPrivate={() => {
+            setWalletSheet(false);
+            router.push("/private");
+          }}
+          onWallet={() => {
+            setWalletSheet(false);
+            router.push("/wallet");
+          }}
+          onPortfolio={() => {
+            setWalletSheet(false);
+            router.push("/portfolio");
+          }}
+          onSettings={() => {
+            setWalletSheet(false);
+            router.push("/wallet/settings");
+          }}
+          onRefresh={() => {
+            void refreshBalance();
+          }}
+        />
+      )}
+      <AppCommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
+    </>
   );
 }

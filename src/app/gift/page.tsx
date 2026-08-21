@@ -6,6 +6,8 @@ import { ConnectGate } from "@/components/connect-gate";
 import { Gift, Check, Share2, Undo2, Copy, X, ChevronDown, Link2, Globe, ExternalLink } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { Spinner } from "@/components/spinner";
+import { FeedbackModal } from "@/components/feedback-modal";
+import { TxConfirm } from "@/components/tx-confirm";
 import { SlideToSend } from "@/components/slide-to-send";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
@@ -59,6 +61,8 @@ export default function GiftPage() {
   const [message, setMessage] = useState("");
   /** public = direct fund · hop = unlink hop · zk = Privacy Cash withdraw to gift */
   const [privacyMode, setPrivacyMode] = useState<"public" | "hop" | "zk">("zk");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [showFb, setShowFb] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [giftUrl, setGiftUrl] = useState<string | null>(null);
@@ -407,6 +411,7 @@ export default function GiftPage() {
         await refreshBalance();
         const { toast } = await import("@/lib/toast");
         toast.success("ZK private gift created!");
+        setShowFb(true);
         try {
           new Audio("/chaching.mp3").play();
         } catch {
@@ -594,6 +599,7 @@ export default function GiftPage() {
       await refreshBalance();
       const { toast } = await import("@/lib/toast");
       toast.success(privacyMode === "hop" ? "Private hop gift created!" : "Gift link created!");
+      setShowFb(true);
       try {
         new Audio("/chaching.mp3").play();
       } catch {
@@ -1190,7 +1196,11 @@ export default function GiftPage() {
                 )}
 
                 <SlideToSend
-                  onConfirm={handleCreate}
+                  onConfirm={() => {
+                    setError(null);
+                    if (!amount || !selected) return;
+                    setConfirmOpen(true);
+                  }}
                   disabled={!amount || busy || !selected}
                   loading={busy}
                   label={`Slide to create ${tokenSymbol} gift`}
@@ -1327,6 +1337,55 @@ export default function GiftPage() {
               </div>
             )}
           </div>
+
+            {confirmOpen && selected && (
+              <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
+                <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => !busy && setConfirmOpen(false)} />
+                <div className="relative z-10 w-full sm:max-w-md px-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0">
+                  <div className="rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-950 p-4 sm:p-5 shadow-2xl">
+                    <TxConfirm
+                      title="Confirm gift"
+                      subtitle={`${privacyMode === "zk" ? "ZK private" : privacyMode === "hop" ? "Private hop" : "Public"} gift on ${network}`}
+                      kind="send"
+                      rows={[
+                        { label: "Amount", value: displayAmountLabel(), mono: true },
+                        { label: "Token", value: tokenSymbol },
+                        { label: "Network", value: network === "devnet" ? "Devnet" : "Mainnet" },
+                        { label: "Privacy", value: privacyMode.toUpperCase() },
+                      ]}
+                      notice={
+                        privacyMode === "zk"
+                          ? "ZK proof can take 10–30s. Keep the screen on."
+                          : "You’ll approve with Face ID / passkey next."
+                      }
+                      confirmLabel="Create gift"
+                      cancelLabel="Back"
+                      busy={busy}
+                      onCancel={() => setConfirmOpen(false)}
+                      onConfirm={() => {
+                        setConfirmOpen(false);
+                        void handleCreate();
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <FeedbackModal
+              open={showFb && Boolean(giftUrl)}
+              onClose={() => setShowFb(false)}
+              tone="success"
+              title="Gift ready!"
+              body="Share the claim link. Anyone with it can claim with Face ID."
+              primaryLabel="Copy link"
+              secondaryLabel="Dismiss"
+              onPrimary={() => {
+                if (giftUrl) void navigator.clipboard.writeText(giftUrl);
+                setShowFb(false);
+              }}
+            />
+
         </ConnectGate>
       </main>
 

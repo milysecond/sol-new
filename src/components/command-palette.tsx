@@ -20,7 +20,7 @@ type Props = {
 };
 
 /**
- * Lightweight CMD+K / command palette.
+ * Mobile-first command palette — full-width bottom sheet on phone.
  */
 export function CommandPalette({
   open,
@@ -47,7 +47,12 @@ export function CommandPalette({
       setActive(0);
       return;
     }
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     requestAnimationFrame(() => inputRef.current?.focus());
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [open]);
 
   useEffect(() => {
@@ -83,25 +88,38 @@ export function CommandPalette({
 
   return (
     <>
-      <div className="fixed inset-0 z-[95] bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed z-[96] left-1/2 -translate-x-1/2 top-[12%] w-[min(100%-1.25rem,28rem)]">
-        <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl overflow-hidden animate-[fadeIn_0.14s_ease-out]">
-          <div className="flex items-center gap-2 px-3 border-b border-black/5 dark:border-white/5">
+      <div className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="fixed z-[210] inset-x-0 bottom-0 sm:inset-auto sm:left-1/2 sm:top-[10%] sm:-translate-x-1/2 sm:w-[min(100%-1.25rem,28rem)]">
+        <div className="rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl overflow-hidden pb-[env(safe-area-inset-bottom)] max-h-[min(85dvh,40rem)] flex flex-col">
+          <div className="sm:hidden flex justify-center pt-2.5" aria-hidden>
+            <span className="w-10 h-1 rounded-full bg-black/15 dark:bg-white/20" />
+          </div>
+          <div className="flex items-center gap-2 px-3 border-b border-black/5 dark:border-white/5 shrink-0">
             <Search size={16} className="text-gray-400 shrink-0" />
             <input
               ref={inputRef}
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder={placeholder}
-              className="flex-1 min-w-0 bg-transparent py-3.5 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 outline-none"
+              enterKeyHint="go"
+              autoCapitalize="off"
+              autoCorrect="off"
+              className="flex-1 min-w-0 bg-transparent py-3.5 text-base sm:text-sm text-gray-900 dark:text-white placeholder:text-gray-400 outline-none"
             />
+            <button
+              type="button"
+              onClick={onClose}
+              className="sm:hidden text-xs font-semibold text-purple-500 px-2 py-2 touch-manipulation"
+            >
+              Close
+            </button>
             <kbd className="hidden sm:inline text-[10px] font-mono text-gray-400 border border-black/10 dark:border-white/10 rounded px-1.5 py-0.5">
               esc
             </kbd>
           </div>
-          <ul className="max-h-[min(50vh,20rem)] overflow-y-auto py-1">
+          <ul className="overflow-y-auto overscroll-contain py-1 flex-1">
             {filtered.length === 0 && (
-              <li className="px-4 py-6 text-center text-sm text-gray-400">No matches</li>
+              <li className="px-4 py-8 text-center text-sm text-gray-400">No matches</li>
             )}
             {filtered.map((it, i) => (
               <li key={it.id}>
@@ -112,10 +130,10 @@ export function CommandPalette({
                     it.onSelect();
                     onClose();
                   }}
-                  className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-left transition ${
+                  className={`w-full flex items-center justify-between gap-3 px-3.5 min-h-[52px] sm:min-h-[44px] py-2.5 text-left transition touch-manipulation active:bg-purple-500/10 ${
                     i === active
                       ? "bg-purple-500/15 text-purple-800 dark:text-purple-200"
-                      : "text-gray-800 dark:text-white/80 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+                      : "text-gray-800 dark:text-white/80"
                   }`}
                 >
                   <div className="min-w-0">
@@ -132,7 +150,7 @@ export function CommandPalette({
                     )}
                   </div>
                   {i === active && (
-                    <CornerDownLeft size={14} className="shrink-0 opacity-60" />
+                    <CornerDownLeft size={14} className="shrink-0 opacity-60 hidden sm:block" />
                   )}
                 </button>
               </li>

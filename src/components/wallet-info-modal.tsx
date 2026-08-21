@@ -11,6 +11,7 @@ import {
   EyeOff,
   X,
   RefreshCw,
+  FolderOpen,
 } from "lucide-react";
 
 type Props = {
@@ -26,11 +27,13 @@ type Props = {
   onPrivate?: () => void;
   onSettings?: () => void;
   onRefresh?: () => void;
+  onWallet?: () => void;
+  onPortfolio?: () => void;
   copied?: boolean;
 };
 
 /**
- * Wallet info modal — chip expansion pattern.
+ * Mobile-first wallet sheet (bottom on phone, floating card on desktop).
  */
 export function WalletInfoModal({
   open,
@@ -45,15 +48,22 @@ export function WalletInfoModal({
   onPrivate,
   onSettings,
   onRefresh,
+  onWallet,
+  onPortfolio,
   copied,
 }: Props) {
   useEffect(() => {
     if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -64,15 +74,19 @@ export function WalletInfoModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm"
+        className="fixed inset-0 z-[200] bg-black/45 backdrop-blur-[2px] touch-none"
         onClick={onClose}
         aria-hidden
       />
-      <div className="fixed z-[91] left-1/2 -translate-x-1/2 top-[12%] sm:top-[18%] w-[min(100%-1.5rem,22rem)]">
-        <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl overflow-hidden animate-[fadeIn_0.16s_ease-out]">
-          <div className="px-4 pt-4 pb-3 flex items-start justify-between gap-2 border-b border-black/5 dark:border-white/5">
+      <div className="fixed z-[210] inset-x-0 bottom-0 sm:inset-auto sm:left-1/2 sm:top-[12%] sm:-translate-x-1/2 sm:w-[min(100%-1.5rem,22rem)]">
+        <div className="rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl overflow-hidden pb-[env(safe-area-inset-bottom)]">
+          <div className="sm:hidden flex justify-center pt-2.5" aria-hidden>
+            <span className="w-10 h-1 rounded-full bg-black/15 dark:bg-white/20" />
+          </div>
+
+          <div className="px-4 pt-3 pb-3 flex items-start justify-between gap-2 border-b border-black/5 dark:border-white/5">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-purple-500/15 text-purple-500 inline-flex items-center justify-center shrink-0">
+              <div className="w-11 h-11 rounded-xl bg-purple-500/15 text-purple-500 inline-flex items-center justify-center shrink-0">
                 <Wallet size={18} />
               </div>
               <div className="min-w-0">
@@ -91,10 +105,10 @@ export function WalletInfoModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-gray-400 hover:bg-black/5 dark:hover:bg-white/5"
+                className="h-10 w-10 inline-flex items-center justify-center rounded-xl text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 touch-manipulation active:scale-95"
                 aria-label="Close"
               >
-                <X size={15} />
+                <X size={16} />
               </button>
             </div>
           </div>
@@ -109,7 +123,7 @@ export function WalletInfoModal({
             </p>
           </div>
 
-          <div className="grid grid-cols-4 gap-1.5 px-3 pb-3">
+          <div className="grid grid-cols-4 gap-2 px-3 pb-3">
             {(
               [
                 { icon: ArrowUpRight, label: "Send", fn: onSend },
@@ -122,35 +136,38 @@ export function WalletInfoModal({
                 key={a.label}
                 type="button"
                 onClick={a.fn}
-                className="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] hover:bg-purple-500/10 border border-transparent hover:border-purple-400/30 transition touch-manipulation active:scale-95"
+                className="flex flex-col items-center justify-center gap-1 min-h-[64px] rounded-xl bg-black/[0.03] dark:bg-white/[0.04] hover:bg-purple-500/10 border border-transparent hover:border-purple-400/30 transition touch-manipulation active:scale-95"
               >
                 {a.label === "Copied" ? (
-                  <Check size={16} className="text-emerald-500" />
+                  <Check size={18} className="text-emerald-500" />
                 ) : (
-                  <a.icon size={16} className="text-purple-500" />
+                  <a.icon size={18} className="text-purple-500" />
                 )}
-                <span className="text-[10px] font-medium text-gray-600 dark:text-white/60">
+                <span className="text-[11px] font-medium text-gray-600 dark:text-white/60">
                   {a.label}
                 </span>
               </button>
             ))}
           </div>
 
-          <div className="border-t border-black/5 dark:border-white/5 px-2 py-1.5 flex">
-            <button
-              type="button"
-              onClick={onRefresh}
-              className="flex-1 flex items-center justify-center gap-1.5 min-h-[40px] text-xs font-medium text-gray-500 hover:text-gray-800 dark:hover:text-white/80 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"
-            >
-              <RefreshCw size={13} /> Refresh
-            </button>
-            <button
-              type="button"
-              onClick={onSettings}
-              className="flex-1 flex items-center justify-center gap-1.5 min-h-[40px] text-xs font-medium text-gray-500 hover:text-gray-800 dark:hover:text-white/80 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"
-            >
-              <Settings size={13} /> Settings
-            </button>
+          <div className="border-t border-black/5 dark:border-white/5 px-2 py-1.5 grid grid-cols-2 sm:grid-cols-4 gap-0.5">
+            {(
+              [
+                { icon: Wallet, label: "Wallet", fn: onWallet },
+                { icon: FolderOpen, label: "Portfolio", fn: onPortfolio },
+                { icon: RefreshCw, label: "Refresh", fn: onRefresh },
+                { icon: Settings, label: "Settings", fn: onSettings },
+              ] as const
+            ).map((a) => (
+              <button
+                key={a.label}
+                type="button"
+                onClick={a.fn}
+                className="flex items-center justify-center gap-1.5 min-h-[48px] text-xs font-medium text-gray-500 hover:text-gray-800 dark:hover:text-white/80 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 touch-manipulation active:scale-95"
+              >
+                <a.icon size={14} /> {a.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
