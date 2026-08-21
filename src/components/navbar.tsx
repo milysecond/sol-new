@@ -739,20 +739,61 @@ export function Navbar() {
           address={publicKey}
           label={walletLabel || undefined}
           balanceSol={hideBalances ? null : balance}
+          balanceLoading={!hideBalances && balance === null}
+          balanceDisplay={
+            hideBalances ? (
+              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">••••</p>
+            ) : undefined
+          }
           networkLabel={network === "devnet" ? "devnet" : "mainnet"}
+          isDevnet={network === "devnet"}
           copied={copiedAddr}
+          defaultToken={defaultToken}
+          onDefaultToken={setDefaultToken}
+          wallets={wallets}
+          onSwitchWallet={(pk) => {
+            void switchWallet(pk);
+            setWalletSheet(false);
+          }}
+          pushPermission={pushPermission}
+          pushLoading={pushLoading}
+          onTogglePush={async () => {
+            setPushLoading(true);
+            try {
+              if (pushPermission === "granted") {
+                await unsubscribePush();
+                setPushPermission("default");
+              } else {
+                await subscribePush(publicKey ?? undefined);
+                setPushPermission(getPushPermission());
+              }
+            } finally {
+              setPushLoading(false);
+            }
+          }}
+          airdropping={airdropping}
+          airdropDone={airdropDone}
+          onAirdrop={() => {
+            handleAirdrop();
+          }}
           onCopy={async () => {
             try {
               await navigator.clipboard.writeText(publicKey);
               setCopiedAddr(true);
               setTimeout(() => setCopiedAddr(false), 1500);
-            } catch { /* ignore */ }
+            } catch {
+              /* ignore */
+            }
           }}
           onSend={() => {
             setWalletSheet(false);
             router.push("/wallet/send");
           }}
           onReceive={() => {
+            setWalletSheet(false);
+            router.push(`/address/${publicKey}`);
+          }}
+          onViewAddress={() => {
             setWalletSheet(false);
             router.push(`/address/${publicKey}`);
           }}
@@ -772,8 +813,20 @@ export function Navbar() {
             setWalletSheet(false);
             router.push("/wallet/settings");
           }}
+          onLabelWallets={() => {
+            setWalletSheet(false);
+            router.push("/wallet/settings");
+          }}
+          onFindWallet={() => {
+            setWalletSheet(false);
+            router.push("/wallet/find");
+          }}
           onRefresh={() => {
             void refreshBalance();
+          }}
+          onDisconnect={() => {
+            disconnect();
+            setWalletSheet(false);
           }}
         />
       )}
