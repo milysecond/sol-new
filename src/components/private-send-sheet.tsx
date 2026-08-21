@@ -156,6 +156,8 @@ export function PrivateSendSheet({
       }
       await refreshBalance(s);
     } catch (e) {
+      const raw = e instanceof Error ? e.message : String(e);
+      console.error("[zk-private]", raw, e);
       setError(friendlyError(e, "Something went wrong. Try again."));
     } finally {
       setBusy(false);

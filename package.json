@@ -11,8 +11,8 @@
     "deploy": "npm run build:zk && opennextjs-cloudflare build && node scripts/strip-zk-from-worker.cjs && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "predeploy": "node -e \"const b=require('child_process').execSync('git branch --show-current').toString().trim(); if(b!=='main'){console.error('REFUSING to deploy from branch: '+b);process.exit(1)}\"",
-    "postinstall": "cp node_modules/@lightprotocol/hasher.rs/dist/hasher_wasm_simd_bg.wasm node_modules/@lightprotocol/hasher.rs/dist/browser-fat/es/ 2>/dev/null; cp node_modules/@lightprotocol/hasher.rs/dist/light_wasm_hasher_bg.wasm node_modules/@lightprotocol/hasher.rs/dist/browser-fat/es/ 2>/dev/null; npm run build:zk",
-    "build:zk": "node scripts/build-zk-bundle.cjs",
+    "postinstall": "node scripts/patch-privacycash-prover.cjs; cp node_modules/@lightprotocol/hasher.rs/dist/hasher_wasm_simd_bg.wasm node_modules/@lightprotocol/hasher.rs/dist/browser-fat/es/ 2>/dev/null; cp node_modules/@lightprotocol/hasher.rs/dist/light_wasm_hasher_bg.wasm node_modules/@lightprotocol/hasher.rs/dist/browser-fat/es/ 2>/dev/null; npm run build:zk",
+    "build:zk": "node scripts/patch-privacycash-prover.cjs && node scripts/build-zk-bundle.cjs",
     "strip-zk": "node scripts/strip-zk-from-worker.cjs"
   },
   "dependencies": {

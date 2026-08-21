@@ -22,7 +22,10 @@ if (typeof window !== "undefined") {
   if (!w.global) w.global = window;
 }
 
-export const PRIVACY_CASH_KEY_BASE = "/circuit2/transaction2";
+export const PRIVACY_CASH_KEY_BASE =
+  typeof window !== "undefined"
+    ? `${window.location.origin}/circuit2/transaction2`
+    : "/circuit2/transaction2";
 export const PRIVACY_CASH_SIGN_MSG = "Privacy Money account sign in";
 const FIRST_FETCH_NOTES = 60_000;
 
