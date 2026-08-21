@@ -23,7 +23,7 @@ function tap(haptic: boolean) {
   if (!haptic) return;
   try {
     if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate(12);
+      navigator.vibrate(14);
     }
   } catch {
     /* ignore */
@@ -32,7 +32,7 @@ function tap(haptic: boolean) {
 
 /**
  * Compact stateful CTA — idle → loading → success/error.
- * Touch-friendly: 48px min height, scale press, no layout jump.
+ * Clear press scale + haptic.
  */
 export function ActionButton({
   state = "idle",
@@ -63,16 +63,19 @@ export function ActionButton({
     <button
       type={type}
       disabled={disabled || busy || isSuccess}
-      onClick={() => {
+      onPointerDown={() => {
         if (disabled || busy || isSuccess) return;
         tap(haptic);
+      }}
+      onClick={() => {
+        if (disabled || busy || isSuccess) return;
         onClick?.();
       }}
       className={[
         "w-full inline-flex items-center justify-center gap-2 px-4 min-h-[48px]",
         "rounded-xl font-semibold text-sm select-none touch-manipulation",
-        "transition-[transform,background-color,opacity,box-shadow] duration-150",
-        "active:scale-[0.98] disabled:cursor-not-allowed",
+        "transition-[transform,background-color,opacity,box-shadow] duration-200 ease-out",
+        "active:scale-[0.96] active:brightness-95 disabled:cursor-not-allowed",
         isSuccess
           ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/25"
           : isError

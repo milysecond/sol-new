@@ -8,7 +8,6 @@ import { QrCode } from "@/components/qr-code";
 import { WalletShell } from "@/components/wallet-shell";
 import { PageTransition } from "@/components/page-transition";
 import { ConvertToSolCard } from "@/components/convert-to-sol-card";
-import { MoneyGramRampsCard } from "@/components/moneygram-ramps";
 import { RequestFundsShare } from "@/components/request-funds-share";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
@@ -170,7 +169,7 @@ export default function WalletGetPage() {
                   type="button"
                   onClick={() => void handleAirdrop()}
                   disabled={airdropping}
-                  className="w-full bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 text-yellow-700 dark:text-yellow-300 font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 min-h-[48px]"
+                  className="w-full bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 text-yellow-700 dark:text-yellow-300 font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 min-h-[48px] touch-manipulation active:scale-[0.98]"
                 >
                   <Droplets size={14} />
                   {airdropping ? (
@@ -185,15 +184,13 @@ export default function WalletGetPage() {
                 </button>
               )}
 
-              {network === "devnet" && <MoneyGramRampsCard />}
-              {network === "mainnet" && (
-                <Link
-                  href="/get"
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 min-h-[48px]"
-                >
-                  <DollarSign size={14} /> Get funds / credits
-                </Link>
-              )}
+              {/* Cash ramps live on /get — not inside wallet receive */}
+              <Link
+                href="/get"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 min-h-[48px] touch-manipulation active:scale-[0.98]"
+              >
+                <DollarSign size={14} /> Get funds / credits
+              </Link>
             </div>
           )}
       </PageTransition>
