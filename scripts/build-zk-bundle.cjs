@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Build Privacy Cash + Light hasher browser bundle → public/zk/ */
+/** Build Privacy Cash + Light hasher browser bundle → public/zk/ (fully self-contained) */
 const { execSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
@@ -12,6 +12,7 @@ const entry = path.join(root, "scripts/zk-privacy-entry.js");
 const shim = path.join(root, "scripts/zk-shim.js");
 const outfile = path.join(outDir, "privacycash.js");
 
+// Bundle EVERYTHING including @solana/web3.js so the browser has no bare imports.
 const cmd = [
   "npx esbuild",
   JSON.stringify(entry),
@@ -20,7 +21,6 @@ const cmd = [
   "--platform=browser",
   "--target=es2022",
   `--outfile=${JSON.stringify(outfile)}`,
-  "--external:@solana/web3.js",
   "--alias:crypto=crypto-browserify",
   "--alias:stream=stream-browserify",
   "--alias:events=events",
@@ -33,10 +33,9 @@ const cmd = [
   `--inject:${JSON.stringify(shim)}`,
 ].join(" ");
 
-console.log("build:zk → public/zk/privacycash.js");
+console.log("build:zk → public/zk/privacycash.js (self-contained)");
 execSync(cmd, { stdio: "inherit", cwd: root });
 
-// Ensure wasm siblings exist next to the JS (import.meta.url relative)
 const wasmSrc = path.join(
   root,
   "node_modules/@lightprotocol/hasher.rs/dist/browser-fat/es",
@@ -48,6 +47,23 @@ for (const f of ["hasher_wasm_simd_bg.wasm", "light_wasm_hasher_bg.wasm"]) {
   if (fs.existsSync(src)) {
     fs.copyFileSync(src, path.join(outDir, f));
   }
+}
+
+// Sanity: no bare bare-module imports left (except maybe node builtins we polyfilled)
+const js = fs.readFileSync(outfile, "utf8");
+const bare = [...js.matchAll(/(?:from|import)\s*\(?\s*["'](@[^"']+|[^"'./][^"']*)["']/g)]
+  .map((m) => m[1])
+  .filter((s) => !s.endsWith(".wasm") && !s.startsWith("data:"));
+const unique = [...new Set(bare)].filter(
+  (s) =>
+    !s.includes("\n") &&
+    s.length < 80 &&
+    (s.startsWith("@") || /^[a-zA-Z]/.test(s)),
+);
+if (unique.length) {
+  console.warn("build:zk warning — possible bare imports still present:", unique.slice(0, 20));
+} else {
+  console.log("build:zk: no bare module imports detected");
 }
 
 const st = fs.statSync(outfile);
