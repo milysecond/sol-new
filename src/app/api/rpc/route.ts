@@ -47,9 +47,16 @@ async function tryEndpoint(
       return { ok: false, status: res.status, text: text.slice(0, 300) };
     }
     try {
-      const j = JSON.parse(text) as { error?: { message?: string } };
+      const j = JSON.parse(text) as { error?: { message?: string; code?: number }; result?: unknown };
       if (j.error?.message && isRateLimitedMessage(j.error.message)) {
         return { ok: false, status: 429, text: j.error.message };
+      }
+      // Provider JSON error that's not a normal RPC app error — try next
+      if (j.error && j.result === undefined) {
+        const msg = j.error.message || "";
+        if (isRateLimitedMessage(msg) || /blocked|unauthorized|forbidden|429|402|403/i.test(msg)) {
+          return { ok: false, status: 502, text: msg };
+        }
       }
     } catch {
       /* pass through */

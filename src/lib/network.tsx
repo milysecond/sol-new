@@ -29,12 +29,16 @@ export const MAINNET_RPC_POOL = [
  * Devnet: same-origin proxy first (uses server HELIUS_API_KEY),
  * then public fallback (often 429).
  */
+/**
+ * Devnet: browser-direct public first (CF worker IPs often blocked),
+ * then same-origin proxy, then official public.
+ */
 export const DEVNET_RPC_POOL = [
+  "https://solana-devnet.api.onfinality.io/public",
   "/api/rpc?network=devnet",
   ...(typeof process !== "undefined" && process.env.NEXT_PUBLIC_RPC_DEVNET
     ? [process.env.NEXT_PUBLIC_RPC_DEVNET]
     : []),
-  "https://solana-devnet.api.onfinality.io/public",
   "https://api.devnet.solana.com",
 ] as const;
 

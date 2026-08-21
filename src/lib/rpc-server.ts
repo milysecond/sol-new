@@ -95,6 +95,7 @@ export function isRateLimitedMessage(msg: string): boolean {
   return (
     m.includes("429") ||
     m.includes("402") ||
+    m.includes("403") ||
     m.includes("rate limit") ||
     m.includes("too many requests") ||
     m.includes("payment required") ||
@@ -104,7 +105,10 @@ export function isRateLimitedMessage(msg: string): boolean {
     m.includes("quota") ||
     m.includes("capacity") ||
     m.includes("max usage") ||
-    m.includes("forbidden")
+    m.includes("forbidden") ||
+    m.includes("blocked") ||
+    m.includes("unauthorized") ||
+    m.includes("access forbidden")
   );
 }
 
