@@ -352,6 +352,7 @@ export default function GiftPage() {
       const isPrivateGift = Boolean(created.private && created.transaction2 && created.hopSecret);
 
       async function signSendUserTx(txIn: Transaction): Promise<string> {
+        if (!publicKey) throw new Error("Wallet not connected");
         let tx = txIn;
         tx.feePayer = new PublicKey(publicKey);
         if (created.blockhash) tx.recentBlockhash = created.blockhash;
