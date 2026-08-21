@@ -31,7 +31,7 @@ import {
 import { addressPath } from "@/lib/explorer";
 import { TokenIcon } from "@/components/token-meta";
 import { analytics } from "@/lib/analytics";
-import { Connection, PublicKey, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import QRCode from "qrcode";
 import {
   fetchWalletTokens,
@@ -57,6 +57,8 @@ export default function GiftPage() {
   const [selected, setSelected] = useState<WalletToken | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [message, setMessage] = useState("");
+  /** Private: fund via one-time hop — gift not funded directly from main wallet */
+  const [privateMode, setPrivateMode] = useState(true);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [giftUrl, setGiftUrl] = useState<string | null>(null);
@@ -325,12 +327,16 @@ export default function GiftPage() {
           symbol: selected.symbol,
           network,
           message: message || undefined,
+          private: privateMode,
         }),
       });
       const created = (await createRes.json()) as {
         ok?: boolean;
         error?: string;
+        private?: boolean;
         transaction?: string;
+        transaction2?: string;
+        hopSecret?: string;
         giftPubkey?: string;
         claimUrl?: string;
         amountLamports?: number;
@@ -343,31 +349,26 @@ export default function GiftPage() {
       }
 
       const connection = new Connection(rpc, "confirmed");
-      let tx = Transaction.from(Buffer.from(created.transaction, "base64"));
-      // Ensure fee payer + blockhash are set for wallet simulators
-      tx.feePayer = new PublicKey(publicKey);
-      if (created.blockhash) tx.recentBlockhash = created.blockhash;
+      const isPrivateGift = Boolean(created.private && created.transaction2 && created.hopSecret);
 
-      let signature: string;
+      async function signSendUserTx(txIn: Transaction): Promise<string> {
+        let tx = txIn;
+        tx.feePayer = new PublicKey(publicKey);
+        if (created.blockhash) tx.recentBlockhash = created.blockhash;
 
-      if (walletKind === "external") {
-        setStatus("auth");
-        const {
-          signAndSendWithExternal,
-          signTransactionWithInjected,
-        } = await import("@/lib/external-wallet");
-
-        // Prefer wallet-native sign+send (mobile Phantom etc.)
-        const sent = await signAndSendWithExternal(tx, {
-          skipPreflight: false,
-          maxRetries: 3,
-        });
-        if (sent) {
-          signature = sent;
-        } else {
+        if (walletKind === "external") {
+          setStatus("auth");
+          const {
+            signAndSendWithExternal,
+            signTransactionWithInjected,
+          } = await import("@/lib/external-wallet");
+          const sent = await signAndSendWithExternal(tx, {
+            skipPreflight: false,
+            maxRetries: 3,
+          });
+          if (sent) return sent;
           const signed = await signTransactionWithInjected(tx);
           setStatus("sending");
-          // signed may be Transaction or opaque — normalize serialize
           const raw =
             typeof (signed as Transaction).serialize === "function"
               ? (signed as Transaction).serialize({
@@ -375,36 +376,34 @@ export default function GiftPage() {
                   verifySignatures: false,
                 })
               : Buffer.from(signed as unknown as ArrayBuffer);
-          signature = await broadcastSignedTx(raw, {
+          return broadcastSignedTx(raw, {
             rpc,
             rotateMainnetRpc,
             skipPreflight: false,
           });
         }
-      } else {
         if (!sender) throw new Error("Passkey authentication required. Gift was not sent.");
-        // Fresh blockhash after Face ID so the tx doesn't expire mid-prompt
-        let confirmBh = created.blockhash;
-        let confirmLv = created.lastValidBlockHeight;
         try {
           const latest = await connection.getLatestBlockhash("confirmed");
           tx.recentBlockhash = latest.blockhash;
-          tx.feePayer = sender.publicKey;
-          confirmBh = latest.blockhash;
-          confirmLv = latest.lastValidBlockHeight;
+          created.blockhash = latest.blockhash;
+          created.lastValidBlockHeight = latest.lastValidBlockHeight;
         } catch {
-          tx.feePayer = sender.publicKey;
           if (created.blockhash) tx.recentBlockhash = created.blockhash;
         }
+        tx.feePayer = sender.publicKey;
         tx.partialSign(sender);
-        signature = await broadcastSignedTx(tx, {
+        return broadcastSignedTx(tx, {
           rpc,
           rotateMainnetRpc,
           skipPreflight: false,
         });
-        created.blockhash = confirmBh;
-        created.lastValidBlockHeight = confirmLv;
       }
+
+      // Tx1: fund hop (private) or fund gift (standard)
+      setStatus("sending");
+      let tx1 = Transaction.from(Buffer.from(created.transaction, "base64"));
+      const signature = await signSendUserTx(tx1);
 
       setStatus("confirming");
       const bh = created.blockhash;
@@ -416,6 +415,39 @@ export default function GiftPage() {
         );
       } else {
         await connection.confirmTransaction(signature, "confirmed");
+      }
+
+      // Tx2 private: hop → gift (signed only by ephemeral hop — not main wallet)
+      if (isPrivateGift) {
+        setStatus("sending");
+        const hop = Keypair.fromSecretKey(Buffer.from(created.hopSecret!, "base64"));
+        let tx2 = Transaction.from(Buffer.from(created.transaction2!, "base64"));
+        try {
+          const latest2 = await connection.getLatestBlockhash("confirmed");
+          tx2.recentBlockhash = latest2.blockhash;
+          created.blockhash = latest2.blockhash;
+          created.lastValidBlockHeight = latest2.lastValidBlockHeight;
+        } catch {
+          /* keep */
+        }
+        tx2.feePayer = hop.publicKey;
+        tx2.partialSign(hop);
+        const sig2 = await broadcastSignedTx(tx2, {
+          rpc,
+          rotateMainnetRpc,
+          skipPreflight: false,
+        });
+        setStatus("confirming");
+        const bh2 = created.blockhash;
+        const lv2 = created.lastValidBlockHeight;
+        if (bh2 && lv2 != null) {
+          await connection.confirmTransaction(
+            { signature: sig2, blockhash: bh2, lastValidBlockHeight: lv2 },
+            "confirmed",
+          );
+        } else {
+          await connection.confirmTransaction(sig2, "confirmed");
+        }
       }
 
       const url = created.claimUrl;
@@ -453,7 +485,7 @@ export default function GiftPage() {
       startCancelWindow();
       await refreshBalance();
       const { toast } = await import("@/lib/toast");
-      toast.success("Gift link created!");
+      toast.success(privateMode ? "Private gift link created!" : "Gift link created!");
       try {
         new Audio("/chaching.mp3").play();
       } catch {
@@ -565,7 +597,7 @@ export default function GiftPage() {
         tokenSymbol,
       giftUrl,
       message,
-      senderLabel: walletLabel || null,
+      senderLabel: privateMode ? null : walletLabel || null,
     });
     try {
       const how = await shareOrCopy(payload);
@@ -922,6 +954,24 @@ export default function GiftPage() {
                     </p>
                   )}
                 </div>
+                <label className="flex items-start gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] px-3 py-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="mt-1 accent-amber-500"
+                    checked={privateMode}
+                    onChange={(e) => setPrivateMode(e.target.checked)}
+                    disabled={busy}
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-gray-900 dark:text-white">
+                      Private send
+                    </span>
+                    <span className="block text-[11px] text-gray-500 dark:text-white/45 leading-snug mt-0.5">
+                      Funds a one-time hop wallet first, then the gift. Your main address is not the gift&apos;s
+                      direct funder. Share text hides your name. Advanced chain analysis can still correlate timing.
+                    </span>
+                  </span>
+                </label>
                 <input
                   type="text"
                   placeholder="Add a message (optional)"
