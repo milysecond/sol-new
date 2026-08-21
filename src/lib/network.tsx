@@ -34,6 +34,7 @@ export const DEVNET_RPC_POOL = [
   ...(typeof process !== "undefined" && process.env.NEXT_PUBLIC_RPC_DEVNET
     ? [process.env.NEXT_PUBLIC_RPC_DEVNET]
     : []),
+  "https://solana-devnet.api.onfinality.io/public",
   "https://api.devnet.solana.com",
 ] as const;
 
@@ -75,9 +76,16 @@ const NetworkContext = createContext<NetworkState>({
 
 export const useNetwork = () => useContext(NetworkContext);
 
+function resolveRpcUrl(url: string): string {
+  if (typeof window !== "undefined" && url.startsWith("/")) {
+    return `${window.location.origin}${url}`;
+  }
+  return url;
+}
+
 async function probeRpc(url: string): Promise<boolean> {
   try {
-    const res = await fetch(url, {
+    const res = await fetch(resolveRpcUrl(url), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -227,7 +235,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
 
   const explorerUrl = (address: string) => addressPath(address);
 
-  const rpc = network === "mainnet" ? mainnetRpc : devnetRpc;
+  const rpc = resolveRpcUrl(network === "mainnet" ? mainnetRpc : devnetRpc);
 
   return (
     <NetworkContext.Provider
