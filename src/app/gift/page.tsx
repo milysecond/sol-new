@@ -57,8 +57,8 @@ export default function GiftPage() {
   const [selected, setSelected] = useState<WalletToken | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [message, setMessage] = useState("");
-  /** Private: fund via one-time hop — gift not funded directly from main wallet */
-  const [privateMode, setPrivateMode] = useState(true);
+  /** public = direct fund · hop = unlink hop · zk = Privacy Cash withdraw to gift */
+  const [privacyMode, setPrivacyMode] = useState<"public" | "hop" | "zk">("zk");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [giftUrl, setGiftUrl] = useState<string | null>(null);
@@ -308,6 +308,92 @@ export default function GiftPage() {
         sender = keypair;
       }
 
+      // ── ZK private gift (Privacy Cash) ─────────────────────────────
+      if (privacyMode === "zk") {
+        if (network !== "mainnet") {
+          throw new Error("ZK private gifts are mainnet-only. Switch to live.");
+        }
+        if (!selected.isNativeSol && selected.symbol !== "SOL") {
+          throw new Error("ZK gifts support SOL only right now. Use hop mode for tokens.");
+        }
+        setStatus("auth");
+        const {
+          openPrivacyCashSession,
+          getPrivateSolBalance,
+          shieldSol,
+          privateSendSol,
+          solToLamports,
+        } = await import("@/lib/privacy-cash");
+        const {
+          createGiftKeypair,
+          buildGiftUrl,
+          CLAIM_FEE_LAMPORTS: claimFee,
+        } = await import("@/lib/gift-link");
+        const session = await openPrivacyCashSession(rpc);
+        let privBal = await getPrivateSolBalance(session);
+        const needSol = parsed + claimFee / 1e9 + 0.002; // amount + claim buffer + slack
+        if (privBal + 1e-9 < needSol) {
+          // Auto-shield shortfall from public wallet
+          const shortfall = needSol - privBal;
+          const publicSol = balance ?? 0;
+          if (publicSol < shortfall + 0.003) {
+            throw new Error(
+              `Need ~${needSol.toFixed(4)} SOL private (have ${privBal.toFixed(4)}). Public also short — top up or shield first on /private.`,
+            );
+          }
+          setStatus("sending");
+          await shieldSol(session, solToLamports(shortfall), () => setStatus("sending"));
+          privBal = await getPrivateSolBalance(session);
+        }
+        const { keypair: giftKp, secret } = createGiftKeypair();
+        const fundLamports = solToLamports(parsed) + claimFee;
+        setStatus("sending");
+        await privateSendSol(session, fundLamports, giftKp.publicKey, () =>
+          setStatus("confirming"),
+        );
+        const origin = typeof window !== "undefined" ? window.location.origin : "https://sol.new";
+        const url = buildGiftUrl(secret, network, message || undefined, origin);
+        const entry: GiftLinkEntry = {
+          pubkey: giftKp.publicKey.toBase58(),
+          url,
+          amount: parsed,
+          token: "SOL",
+          symbol: "SOL",
+          icon: selected.icon,
+          decimals: 9,
+          network,
+          createdAt: new Date().toISOString(),
+        };
+        saveGiftLink(entry);
+        refreshLinks();
+        fetch("/api/gift", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            publicKey: entry.pubkey,
+            sender: "private",
+            amountLamports: solToLamports(parsed),
+            network,
+            token: "SOL",
+            private: true,
+          }),
+        }).catch(() => {});
+        analytics.giftLinkCreated(parsed);
+        setGiftUrl(url);
+        setGiftEntry(entry);
+        setStatus("done");
+        startCancelWindow();
+        await refreshBalance();
+        const { toast } = await import("@/lib/toast");
+        toast.success("ZK private gift created!");
+        try {
+          new Audio("/chaching.mp3").play();
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+
       setStatus("sending");
       const createRes = await fetch("/api/gift/create", {
         method: "POST",
@@ -327,7 +413,7 @@ export default function GiftPage() {
           symbol: selected.symbol,
           network,
           message: message || undefined,
-          private: privateMode,
+          private: privacyMode === "hop",
         }),
       });
       const created = (await createRes.json()) as {
@@ -486,7 +572,7 @@ export default function GiftPage() {
       startCancelWindow();
       await refreshBalance();
       const { toast } = await import("@/lib/toast");
-      toast.success(privateMode ? "Private gift link created!" : "Gift link created!");
+      toast.success(privacyMode === "hop" ? "Private hop gift created!" : "Gift link created!");
       try {
         new Audio("/chaching.mp3").play();
       } catch {
@@ -598,7 +684,7 @@ export default function GiftPage() {
         tokenSymbol,
       giftUrl,
       message,
-      senderLabel: privateMode ? null : walletLabel || null,
+      senderLabel: privacyMode === "public" ? walletLabel || null : null,
     });
     try {
       const how = await shareOrCopy(payload);
@@ -955,24 +1041,67 @@ export default function GiftPage() {
                     </p>
                   )}
                 </div>
-                <label className="flex items-start gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] px-3 py-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mt-1 accent-amber-500"
-                    checked={privateMode}
-                    onChange={(e) => setPrivateMode(e.target.checked)}
-                    disabled={busy}
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold text-gray-900 dark:text-white">
-                      Private send
-                    </span>
-                    <span className="block text-[11px] text-gray-500 dark:text-white/45 leading-snug mt-0.5">
-                      Funds a one-time hop wallet first, then the gift. Your main address is not the gift&apos;s
-                      direct funder. Share text hides your name. Advanced chain analysis can still correlate timing.
-                    </span>
-                  </span>
-                </label>
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Privacy
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(
+                      [
+                        {
+                          id: "zk" as const,
+                          label: "ZK",
+                          desc: "Privacy Cash · true unlink",
+                        },
+                        {
+                          id: "hop" as const,
+                          label: "Hop",
+                          desc: "One-time wallet hop",
+                        },
+                        {
+                          id: "public" as const,
+                          label: "Public",
+                          desc: "Direct from wallet",
+                        },
+                      ] as const
+                    ).map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setPrivacyMode(m.id)}
+                        className={`rounded-xl border px-2 py-2 text-left transition ${
+                          privacyMode === m.id
+                            ? m.id === "zk"
+                              ? "border-purple-400/60 bg-purple-500/15"
+                              : m.id === "hop"
+                                ? "border-amber-400/60 bg-amber-500/10"
+                                : "border-black/20 dark:border-white/20 bg-black/5 dark:bg-white/5"
+                            : "border-black/10 dark:border-white/10 hover:bg-black/[0.03]"
+                        }`}
+                      >
+                        <span className="block text-xs font-bold">{m.label}</span>
+                        <span className="block text-[10px] text-gray-500 leading-snug mt-0.5">
+                          {m.desc}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  {privacyMode === "zk" && (
+                    <p className="text-[11px] text-purple-600 dark:text-purple-300 leading-snug">
+                      Groth16 ZK via Privacy Cash (mainnet SOL). Shields if needed, then privately funds the
+                      gift.{" "}
+                      <a href="/private" className="underline">
+                        Manage private balance
+                      </a>
+                    </p>
+                  )}
+                  {privacyMode === "hop" && (
+                    <p className="text-[11px] text-amber-700 dark:text-amber-300/90 leading-snug">
+                      Two-tx hop: main → ephemeral → gift. Weaker than ZK; timing can still correlate.
+                    </p>
+                  )}
+                </div>
                 <input
                   type="text"
                   placeholder="Add a message (optional)"
