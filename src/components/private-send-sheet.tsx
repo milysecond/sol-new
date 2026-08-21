@@ -13,7 +13,11 @@ import {
   privateSendSol,
   shieldSol,
   solToLamports,
+  isPrivacyCashAvailable,
+  setDevnetRelayerUrl,
+  getDevnetRelayerUrl,
   type PrivacyCashSession,
+  type PrivacyNetwork,
 } from "@/lib/privacy-cash";
 import { resolveRecipient } from "@/lib/resolve-name";
 
@@ -39,6 +43,7 @@ export function PrivateSendSheet({
   initialAmount = "",
 }: Props = {}) {
   const { network, rpc, toggle } = useNetwork();
+  const privacyNet = (network === "devnet" ? "devnet" : "mainnet") as PrivacyNetwork;
   const [internalOpen, setInternalOpen] = useState(false);
   const open = openProp ?? internalOpen;
   const setOpen = (v: boolean) => {
@@ -56,19 +61,20 @@ export function PrivateSendSheet({
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [doneTx, setDoneTx] = useState<string | null>(null);
+  const [devRelayerInput, setDevRelayerInput] = useState("");
 
-  const available = network === "mainnet";
+  const available = isPrivacyCashAvailable(privacyNet);
 
   const refreshBalance = useCallback(async (s: PrivacyCashSession) => {
     setBalance(await getPrivateSolBalance(s));
   }, []);
 
   const ensureSession = useCallback(async () => {
-    if (session) return session;
-    const s = await openPrivacyCashSession(rpc);
+    if (session && session.network === privacyNet) return session;
+    const s = await openPrivacyCashSession(rpc, privacyNet);
     setSession(s);
     return s;
-  }, [session, rpc]);
+  }, [session, rpc, privacyNet]);
 
   const openSheet = async () => {
     if (!available || connecting) return;
@@ -329,21 +335,49 @@ export function PrivateSendSheet({
             <EyeOff size={14} className="text-amber-600 shrink-0" />
             <div>
               <p className="text-xs font-medium text-gray-900 dark:text-white">
-                Hosted ZK pool is mainnet-only
+                {privacyNet === "devnet"
+                  ? "Devnet ZK needs a relayer URL"
+                  : "Hosted ZK pool is mainnet-only"}
               </p>
               <p className="text-[11px] text-gray-600 dark:text-white/50 leading-snug">
-                Privacy Cash program can run on devnet if you self-host a relayer. Public API is
-                mainnet.
+                {privacyNet === "devnet"
+                  ? "Paste the sol.new devnet Privacy Cash relayer (tunnel or deployed URL)."
+                  : "Privacy Cash public API is mainnet. Switch network or use self-host."}
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => toggle()}
-            className="w-full rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold py-2 transition"
-          >
-            Switch to mainnet
-          </button>
+          {privacyNet === "devnet" ? (
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={devRelayerInput || getDevnetRelayerUrl()}
+                onChange={(e) => setDevRelayerInput(e.target.value)}
+                placeholder="https://….trycloudflare.com"
+                className="flex-1 min-w-0 rounded-lg border border-black/10 dark:border-white/15 bg-white dark:bg-black px-2 py-1.5 text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const u = (devRelayerInput || getDevnetRelayerUrl()).trim();
+                  if (!u) return;
+                  setDevnetRelayerUrl(u);
+                  setError(null);
+                  void openSheet();
+                }}
+                className="shrink-0 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold px-3 py-1.5"
+              >
+                Save & open
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => toggle()}
+              className="w-full rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold py-2 transition"
+            >
+              Switch to mainnet
+            </button>
+          )}
         </div>
       )}
       {error && !open && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{error}</p>}

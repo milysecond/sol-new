@@ -1,5 +1,5 @@
 /**
- * Privacy Cash (Groth16 ZK) — loads prebundled browser build from /zk/privacycash.js
+ * Privacy Cash (Groth16 ZK) — loads prebundled browser build from /zk/
  * so Next never packs WASM into the Cloudflare Worker.
  */
 "use client";
@@ -25,8 +25,22 @@ if (typeof window !== "undefined") {
 export const PRIVACY_CASH_KEY_BASE = "/circuit2/transaction2";
 export const PRIVACY_CASH_SIGN_MSG = "Privacy Money account sign in";
 const FIRST_FETCH_NOTES = 60_000;
-/** Pre-built ESM bundle (esbuild) served as a static asset */
-const PRIVACY_CASH_BUNDLE = "/zk/privacycash.js";
+
+export type PrivacyNetwork = "mainnet" | "devnet";
+
+const BUNDLES: Record<PrivacyNetwork, string> = {
+  mainnet: "/zk/privacycash.js",
+  devnet: "/zk/privacycash-devnet.js",
+};
+
+const RELAYER_ROOT: Record<PrivacyNetwork, string> = {
+  mainnet: "https://api3.privacycash.org",
+  // Overridable at runtime for local/tunnel relayers
+  devnet:
+    (typeof process !== "undefined" &&
+      process.env.NEXT_PUBLIC_RELAYER_API_URL_DEVNET) ||
+    "",
+};
 
 export type PrivacyCashSession = {
   keypair: Keypair;
@@ -34,33 +48,67 @@ export type PrivacyCashSession = {
   encryptionService: any;
   hasher: unknown;
   connection: Connection;
+  network: PrivacyNetwork;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PrivacyCashUtils = any;
 
-let utilsPromise: Promise<PrivacyCashUtils> | null = null;
+const utilsCache = new Map<PrivacyNetwork, Promise<PrivacyCashUtils>>();
 
-async function loadPrivacyUtils(): Promise<PrivacyCashUtils> {
+function resolveDevnetRelayer(): string {
+  if (typeof window !== "undefined") {
+    const fromLs = window.localStorage.getItem("solnew.pc.devnetRelayer");
+    if (fromLs) return fromLs.replace(/\/$/, "");
+  }
+  return (RELAYER_ROOT.devnet || "").replace(/\/$/, "");
+}
+
+export function setDevnetRelayerUrl(url: string) {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem("solnew.pc.devnetRelayer", url.replace(/\/$/, ""));
+  }
+}
+
+export function getDevnetRelayerUrl(): string {
+  return resolveDevnetRelayer();
+}
+
+export function isPrivacyCashAvailable(network: PrivacyNetwork): boolean {
+  if (network === "mainnet") return true;
+  return Boolean(resolveDevnetRelayer());
+}
+
+async function loadPrivacyUtils(network: PrivacyNetwork): Promise<PrivacyCashUtils> {
   if (typeof window === "undefined") {
     throw new Error("ZK privacy runs in the browser only");
   }
-  if (!utilsPromise) {
-    // Absolute URL → browser module graph; never seen by the Worker bundler.
-    const href = new URL(PRIVACY_CASH_BUNDLE, window.location.origin).href;
+  if (network === "devnet" && !resolveDevnetRelayer()) {
+    throw new Error(
+      "Devnet Privacy Cash relayer not configured. Set localStorage solnew.pc.devnetRelayer",
+    );
+  }
+  let p = utilsCache.get(network);
+  if (!p) {
+    const path = BUNDLES[network];
+    const href = new URL(path, window.location.origin).href;
     // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
     const dyn = new Function("u", "return import(u)") as (u: string) => Promise<PrivacyCashUtils>;
-    utilsPromise = dyn(href).catch((e) => {
-      utilsPromise = null;
+    p = dyn(href).catch((e) => {
+      utilsCache.delete(network);
       throw e;
     });
+    utilsCache.set(network, p);
   }
-  return utilsPromise;
+  return p;
 }
 
-export async function getUtxoOffset(): Promise<number> {
+export async function getUtxoOffset(network: PrivacyNetwork = "mainnet"): Promise<number> {
   try {
-    const res = await fetch("https://api3.privacycash.org/merkle/root?token=sol");
+    const base =
+      network === "devnet" ? resolveDevnetRelayer() : RELAYER_ROOT.mainnet;
+    if (!base) return 0;
+    const res = await fetch(`${base}/merkle/root?token=sol`);
     const j = (await res.json()) as { nextIndex?: number };
     if (typeof j.nextIndex === "number" && j.nextIndex > FIRST_FETCH_NOTES) {
       return j.nextIndex - FIRST_FETCH_NOTES;
@@ -71,12 +119,18 @@ export async function getUtxoOffset(): Promise<number> {
   return 0;
 }
 
-export async function openPrivacyCashSession(rpc: string): Promise<PrivacyCashSession> {
+export async function openPrivacyCashSession(
+  rpc: string,
+  network: PrivacyNetwork = "mainnet",
+): Promise<PrivacyCashSession> {
   if (typeof window === "undefined") {
     throw new Error("ZK privacy runs in the browser only");
   }
   const { keypair } = await getPasskeyKeypair();
-  const [utils, nacl] = await Promise.all([loadPrivacyUtils(), import("tweetnacl")]);
+  const [utils, nacl] = await Promise.all([
+    loadPrivacyUtils(network),
+    import("tweetnacl"),
+  ]);
   const { EncryptionService, setLogger, WasmFactory } = utils;
   if (!EncryptionService || !WasmFactory) {
     throw new Error("Privacy Cash bundle incomplete — hard refresh and try again.");
@@ -90,12 +144,12 @@ export async function openPrivacyCashSession(rpc: string): Promise<PrivacyCashSe
   encryptionService.deriveEncryptionKeyFromSignature(signature);
   const hasher = await WasmFactory.getInstance();
   const connection = new Connection(rpc, "confirmed");
-  return { keypair, encryptionService, hasher, connection };
+  return { keypair, encryptionService, hasher, connection, network };
 }
 
 export async function getPrivateSolBalance(session: PrivacyCashSession): Promise<number> {
-  const { getUtxos, getBalanceFromUtxos } = await loadPrivacyUtils();
-  const offset = await getUtxoOffset();
+  const { getUtxos, getBalanceFromUtxos } = await loadPrivacyUtils(session.network);
+  const offset = await getUtxoOffset(session.network);
   const utxos = await getUtxos({
     connection: session.connection,
     publicKey: session.keypair.publicKey,
@@ -111,7 +165,7 @@ export async function shieldSol(
   lamports: number,
   onStatus?: (msg: string) => void,
 ): Promise<string> {
-  const utils = await loadPrivacyUtils();
+  const utils = await loadPrivacyUtils(session.network);
   if (onStatus) utils.setLogger?.((_l: string, message: string) => onStatus(message));
   const res = await utils.deposit({
     lightWasm: session.hasher as never,
@@ -135,7 +189,7 @@ export async function privateSendSol(
   recipient: PublicKey | string,
   onStatus?: (msg: string) => void,
 ): Promise<string> {
-  const utils = await loadPrivacyUtils();
+  const utils = await loadPrivacyUtils(session.network);
   if (onStatus) utils.setLogger?.((_l: string, message: string) => onStatus(message));
   const to = typeof recipient === "string" ? new PublicKey(recipient) : recipient;
   const res = await utils.withdraw({
