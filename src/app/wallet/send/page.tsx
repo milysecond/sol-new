@@ -593,7 +593,7 @@ export default function SendPage() {
       )}
 
       {confirmOpen && selected && (
-        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
+        <div className="fixed-vv z-[200] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/50" onClick={() => !busy && setConfirmOpen(false)} />
           <div className="relative z-10 w-full sm:max-w-md px-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0">
             <div className="rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-950 p-4 sm:p-5 shadow-2xl">

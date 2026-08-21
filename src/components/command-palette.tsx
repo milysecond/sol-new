@@ -20,7 +20,7 @@ type Props = {
 };
 
 /**
- * Mobile-first command palette — full-width bottom sheet on phone.
+ * Mobile-first command palette — visual-viewport pinned, keyboard-safe.
  */
 export function CommandPalette({
   open,
@@ -87,11 +87,11 @@ export function CommandPalette({
   if (!open) return null;
 
   return (
-    <>
-      <div className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="fixed z-[210] inset-x-0 bottom-0 sm:inset-auto sm:left-1/2 sm:top-[10%] sm:-translate-x-1/2 sm:w-[min(100%-1.25rem,28rem)]">
-        <div className="rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl overflow-hidden pb-[env(safe-area-inset-bottom)] max-h-[min(85dvh,40rem)] flex flex-col">
-          <div className="sm:hidden flex justify-center pt-2.5" aria-hidden>
+    <div className="fixed-vv z-[200] flex flex-col justify-end sm:justify-start sm:items-center sm:pt-[max(8%,calc(var(--sat)+1rem))]">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="relative z-10 w-full sm:w-[min(100%-1.25rem,28rem)] max-h-sheet-tall flex flex-col">
+        <div className="rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl overflow-hidden pb-[env(safe-area-inset-bottom)] flex flex-col min-h-0 max-h-full">
+          <div className="sm:hidden flex justify-center pt-2.5 shrink-0" aria-hidden>
             <span className="w-10 h-1 rounded-full bg-black/15 dark:bg-white/20" />
           </div>
           <div className="flex items-center gap-2 px-3 border-b border-black/5 dark:border-white/5 shrink-0">
@@ -117,7 +117,7 @@ export function CommandPalette({
               esc
             </kbd>
           </div>
-          <ul className="overflow-y-auto overscroll-contain py-1 flex-1">
+          <ul className="overflow-y-auto overscroll-contain py-1 flex-1 min-h-0">
             {filtered.length === 0 && (
               <li className="px-4 py-8 text-center text-sm text-gray-400">No matches</li>
             )}
@@ -158,6 +158,6 @@ export function CommandPalette({
           </ul>
         </div>
       </div>
-    </>
+    </div>
   );
 }

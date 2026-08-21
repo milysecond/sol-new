@@ -19,6 +19,7 @@ import { FeedbackModal } from "@/components/feedback-modal";
 import { WalletInfoModal } from "@/components/wallet-info-modal";
 import { CommandPalette, type CommandItem } from "@/components/command-palette";
 import { WalletCreateDemo } from "@/components/wallet-create-demo";
+import { ViewportMeasurePanel } from "@/components/viewport-measure-panel";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 
@@ -162,7 +163,7 @@ export default function LabPage() {
   }, [demoAddress]);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-24 sm:pb-10">
+    <div className="min-h-app bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-24 sm:pb-10">
       <Navbar />
       <main className="flex-1 w-full min-w-0">
         <div className="app-shell py-6 sm:py-10 space-y-6">
@@ -184,6 +185,7 @@ export default function LabPage() {
               </a>
               . Touch them. Not production-critical — safe to break.
             </p>
+            <ViewportMeasurePanel />
             <div className="flex flex-wrap gap-2 pt-1">
               {[
                 ["#action", "Action button"],

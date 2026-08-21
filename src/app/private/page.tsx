@@ -18,7 +18,7 @@ export default function PrivatePage() {
   const mainnet = network === "mainnet";
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">
+    <div className="min-h-app bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">
       <Navbar />
       <main className="flex-1 w-full min-w-0">
         <ConnectGate action="use ZK private wallet">

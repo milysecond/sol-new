@@ -853,7 +853,7 @@ export default function GiftPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
+    <div className="min-h-app bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="send a gift">
@@ -1339,7 +1339,7 @@ export default function GiftPage() {
           </div>
 
             {confirmOpen && selected && (
-              <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
+              <div className="fixed-vv z-[200] flex items-end sm:items-center justify-center">
                 <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => !busy && setConfirmOpen(false)} />
                 <div className="relative z-10 w-full sm:max-w-md px-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0">
                   <div className="rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-950 p-4 sm:p-5 shadow-2xl">

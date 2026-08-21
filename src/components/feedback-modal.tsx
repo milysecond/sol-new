@@ -46,7 +46,7 @@ const toneUi: Record<
 };
 
 /**
- * Mobile-first feedback sheet — bottom drawer on phone, centered card on sm+.
+ * Mobile-first feedback sheet — pinned to visual viewport (keyboard-safe).
  */
 export function FeedbackModal({
   open,
@@ -79,20 +79,15 @@ export function FeedbackModal({
   const Icon = t.icon;
 
   return (
-    <>
-      <div
-        className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-[2px] touch-none"
-        onClick={onClose}
-        aria-hidden
-      />
+    <div className="fixed-vv z-[200] flex flex-col justify-end sm:justify-center sm:items-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} aria-hidden />
       <div
         role="dialog"
         aria-modal
         aria-label={title}
-        className="fixed z-[210] inset-x-0 bottom-0 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-md"
+        className="relative z-10 w-full sm:max-w-md sm:px-3 max-h-sheet flex flex-col"
       >
-        <div className="rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5 space-y-4">
-          {/* grabber — mobile */}
+        <div className="rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl px-4 pt-3 pb-[max(1rem,var(--sab,env(safe-area-inset-bottom)))] sm:p-5 space-y-4 overflow-y-auto overscroll-contain">
           <div className="sm:hidden flex justify-center pb-1" aria-hidden>
             <span className="w-10 h-1 rounded-full bg-black/15 dark:bg-white/20" />
           </div>
@@ -118,7 +113,7 @@ export function FeedbackModal({
             <button
               type="button"
               onClick={onClose}
-              className="h-10 w-10 -mr-1 inline-flex items-center justify-center rounded-xl text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 touch-manipulation active:scale-95"
+              className="h-10 w-10 -mr-1 inline-flex items-center justify-center rounded-xl text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 touch-manipulation active:scale-95 shrink-0"
               aria-label="Close"
             >
               <X size={18} />
@@ -149,6 +144,6 @@ export function FeedbackModal({
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
