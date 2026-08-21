@@ -122,26 +122,72 @@ export function PrivateSendSheet({
     validRecipient = true; // resolve at send time (.sol / .sns ok)
   }
 
+  const tap = () => {
+    try {
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate(12);
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  /** Map Privacy Cash logger spam → short mobile-friendly phases */
+  const friendlyStatus = (raw: string): string => {
+    const m = raw.toLowerCase();
+    if (!raw || raw.length < 2) return "Working…";
+    if (m.includes("utxo") || m.includes("fetching") || m.includes("/range")) {
+      return "Loading private notes…";
+    }
+    if (m.includes("merkle") || m.includes("root") || m.includes("proofv2")) {
+      return "Syncing tree…";
+    }
+    if (m.includes("proof") || m.includes("snark") || m.includes("groth") || m.includes("witness")) {
+      return "Generating ZK proof…";
+    }
+    if (m.includes("sign")) return "Approve passkey…";
+    if (m.includes("relay") || m.includes("submit") || m.includes("/deposit") || m.includes("/withdraw")) {
+      return "Submitting…";
+    }
+    if (m.includes("confirm") || m.includes("wait") || m.includes("check")) {
+      return "Confirming on-chain…";
+    }
+    if (m.includes("encrypt") || m.includes("deposit") || m.includes("utxo key")) {
+      return "Preparing…";
+    }
+    if (/https?:\/\//.test(raw) || raw.length > 42) return "Working…";
+    return raw;
+  };
+
   const run = async () => {
     if (busy || !validAmount || !validRecipient) return;
+    tap();
     setBusy(true);
     setError(null);
     setDoneTx(null);
+    setStatusMsg(
+      mode === "shield" ? "Starting shield…" : mode === "send" ? "Starting private send…" : "Starting unshield…",
+    );
     try {
       const s = await ensureSession();
-      const onStatus = (m: string) => setStatusMsg(m);
+      const onStatus = (m: string) => setStatusMsg(friendlyStatus(m));
       let tx: string;
       if (mode === "shield") {
+        setStatusMsg("Building shield…");
         tx = await shieldSol(s, lamports, onStatus);
       } else {
         let toPk = s.keypair.publicKey;
         if (mode === "send") {
+          setStatusMsg("Resolving recipient…");
           const r = await resolveRecipient(recipient.trim());
           if (!r.ok) throw new Error(r.error || "Could not resolve recipient");
           toPk = new PublicKey(r.owner);
         }
+        setStatusMsg("Building private transfer…");
         tx = await privateSendSol(s, lamports, toPk, onStatus);
       }
+      setStatusMsg("Done");
+      tap();
       setDoneTx(tx);
       setAmount("");
       if (mode === "send") setRecipient("");
@@ -159,6 +205,13 @@ export function PrivateSendSheet({
       const raw = e instanceof Error ? e.message : String(e);
       console.error("[zk-private]", raw, e);
       setError(friendlyError(e, "Something went wrong. Try again."));
+      try {
+        if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+          navigator.vibrate([30, 40, 30]);
+        }
+      } catch {
+        /* ignore */
+      }
     } finally {
       setBusy(false);
       setStatusMsg(null);
@@ -168,8 +221,11 @@ export function PrivateSendSheet({
   const inputCls =
     "w-full px-3 py-2.5 bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400/50 disabled:opacity-50";
 
+  const ctaLabel =
+    mode === "send" ? "Send privately (ZK)" : mode === "shield" ? "Shield SOL" : "Unshield SOL";
+
   const sheet = (
-    <BottomSheet open={open} onClose={() => setOpen(false)} className="p-6 flex flex-col gap-4">
+    <BottomSheet open={open} onClose={() => !busy && setOpen(false)} className="p-6 flex flex-col gap-4">
       <div>
         <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
           <EyeOff size={18} className="text-purple-500" /> ZK private wallet
@@ -182,6 +238,9 @@ export function PrivateSendSheet({
             ) : (
               `${balance.toFixed(4)} SOL`
             )}
+          </span>
+          <span className="ml-2 text-[10px] uppercase tracking-wide text-gray-400">
+            · {privacyNet === "devnet" ? "devnet" : "mainnet"}
           </span>
         </p>
       </div>
@@ -198,12 +257,13 @@ export function PrivateSendSheet({
             key={id}
             type="button"
             onClick={() => {
+              tap();
               setMode(id);
               setError(null);
               setDoneTx(null);
             }}
             disabled={busy}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer active:scale-95 disabled:opacity-50 ${
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 min-h-[40px] rounded-xl text-xs font-medium transition cursor-pointer touch-manipulation active:scale-[0.97] disabled:opacity-50 ${
               mode === id
                 ? "bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-300 border border-fuchsia-400/50"
                 : "bg-black/5 dark:bg-white/5 text-gray-500 dark:text-white/50 border border-black/10 dark:border-white/10"
@@ -218,7 +278,7 @@ export function PrivateSendSheet({
       <p className="text-[11px] text-gray-500 dark:text-white/40 leading-snug">
         {mode === "send" &&
           "ZK send from your shielded balance. No on-chain link between your public wallet and the recipient."}
-        {mode === "shield" && "Deposit SOL into the Privacy Cash pool (Groth16)."}
+        {mode === "shield" && "Deposit SOL into the Privacy Cash pool (Groth16). Proof can take 10–30s."}
         {mode === "unshield" && "Withdraw SOL from the pool back to your public passkey wallet."}
       </p>
 
@@ -236,6 +296,7 @@ export function PrivateSendSheet({
       <div className="relative">
         <input
           type="number"
+          inputMode="decimal"
           step="0.001"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
@@ -246,9 +307,12 @@ export function PrivateSendSheet({
         {mode !== "shield" && balance !== null && balance > 0 && (
           <button
             type="button"
-            onClick={() => setAmount(String(balance))}
+            onClick={() => {
+              tap();
+              setAmount(String(balance));
+            }}
             disabled={busy}
-            className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-purple-500 hover:bg-purple-400 text-white text-xs font-medium rounded transition disabled:opacity-50 cursor-pointer"
+            className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1.5 min-h-[32px] bg-purple-500 hover:bg-purple-400 active:scale-95 text-white text-xs font-medium rounded-lg transition disabled:opacity-50 cursor-pointer touch-manipulation"
           >
             Max
           </button>
@@ -278,31 +342,37 @@ export function PrivateSendSheet({
         </div>
       )}
 
+      {busy && statusMsg && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-400/25">
+          <Spinner size={14} className="text-purple-500 shrink-0" />
+          <p className="text-xs text-purple-700 dark:text-purple-200 font-medium leading-snug">
+            {statusMsg}
+          </p>
+        </div>
+      )}
+
       <button
         type="button"
         onClick={() => void run()}
         disabled={busy || !validAmount || !validRecipient}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        className="w-full flex items-center justify-center gap-2 px-4 min-h-[48px] bg-purple-500 hover:bg-purple-400 active:bg-purple-600 active:scale-[0.98] text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer touch-manipulation select-none"
       >
         {busy ? (
           <>
-            <Spinner size={16} />
-            {statusMsg || "Proving…"}
+            <Spinner size={18} />
+            <span>Working…</span>
           </>
         ) : (
           <>
-            <ArrowRight size={16} />
-            {mode === "send"
-              ? "Send privately (ZK)"
-              : mode === "shield"
-                ? "Shield SOL"
-                : "Unshield SOL"}
+            <ArrowRight size={18} />
+            {ctaLabel}
           </>
         )}
       </button>
 
       <p className="text-[10px] text-gray-400 dark:text-white/30 text-center leading-snug">
-        Privacy Cash · Groth16 proofs · Light Protocol hasher · mainnet. Relayer fee on send/unshield.
+        Privacy Cash · Groth16 · {privacyNet === "devnet" ? "devnet pool" : "mainnet pool"}. Keep
+        screen on while proving.
       </p>
     </BottomSheet>
   );
@@ -316,9 +386,12 @@ export function PrivateSendSheet({
       {available ? (
         <button
           type="button"
-          onClick={() => void openSheet()}
+          onClick={() => {
+            tap();
+            void openSheet();
+          }}
           disabled={connecting}
-          className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-black text-left transition hover:border-fuchsia-400/50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          className="w-full flex items-center justify-between px-3 py-2.5 min-h-[44px] rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-black text-left transition hover:border-fuchsia-400/50 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer touch-manipulation"
         >
           <div className="flex items-center gap-2">
             {connecting ? <Spinner size={14} /> : <EyeOff size={14} className="text-purple-500" />}
