@@ -7,13 +7,15 @@ const nextConfig: NextConfig = {
     "192.168.1.164",
     "*.trycloudflare.com",
   ],
-  // Keep fat browser/WASM stacks out of the Cloudflare Worker bundle
+  // Keep fat browser/WASM stacks out of the Cloudflare Worker server graph
   serverExternalPackages: [
     "privacycash",
     "@lightprotocol/hasher.rs",
     "three",
     "gsap",
     "canvas-confetti",
+    "snarkjs",
+    "ffjavascript",
   ],
   async redirects() {
     return [

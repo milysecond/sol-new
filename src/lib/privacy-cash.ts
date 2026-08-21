@@ -1,7 +1,6 @@
 /**
- * Privacy Cash (Groth16 ZK pool) — browser only.
- * Uses Function('return import(m)') so Next/OpenNext cannot statically
- * bundle privacycash / @lightprotocol/hasher.rs into the CF Worker.
+ * Privacy Cash (Groth16 ZK) — loads prebundled browser build from /zk/privacycash.js
+ * so Next never packs WASM into the Cloudflare Worker.
  */
 "use client";
 
@@ -23,20 +22,41 @@ if (typeof window !== "undefined") {
   if (!w.global) w.global = window;
 }
 
-/** Escape static analysis — packages load only in the browser at runtime. */
-// eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-const dynamicImport = new Function("m", "return import(m)") as (m: string) => Promise<any>;
-
 export const PRIVACY_CASH_KEY_BASE = "/circuit2/transaction2";
 export const PRIVACY_CASH_SIGN_MSG = "Privacy Money account sign in";
 const FIRST_FETCH_NOTES = 60_000;
+/** Pre-built ESM bundle (esbuild) served as a static asset */
+const PRIVACY_CASH_BUNDLE = "/zk/privacycash.js";
 
 export type PrivacyCashSession = {
   keypair: Keypair;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   encryptionService: any;
   hasher: unknown;
   connection: Connection;
 };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PrivacyCashUtils = any;
+
+let utilsPromise: Promise<PrivacyCashUtils> | null = null;
+
+async function loadPrivacyUtils(): Promise<PrivacyCashUtils> {
+  if (typeof window === "undefined") {
+    throw new Error("ZK privacy runs in the browser only");
+  }
+  if (!utilsPromise) {
+    // Absolute URL → browser module graph; never seen by the Worker bundler.
+    const href = new URL(PRIVACY_CASH_BUNDLE, window.location.origin).href;
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+    const dyn = new Function("u", "return import(u)") as (u: string) => Promise<PrivacyCashUtils>;
+    utilsPromise = dyn(href).catch((e) => {
+      utilsPromise = null;
+      throw e;
+    });
+  }
+  return utilsPromise;
+}
 
 export async function getUtxoOffset(): Promise<number> {
   try {
@@ -56,12 +76,12 @@ export async function openPrivacyCashSession(rpc: string): Promise<PrivacyCashSe
     throw new Error("ZK privacy runs in the browser only");
   }
   const { keypair } = await getPasskeyKeypair();
-  const [{ EncryptionService, setLogger }, { WasmFactory }, nacl] = await Promise.all([
-    dynamicImport("privacycash/utils"),
-    dynamicImport("@lightprotocol/hasher.rs"),
-    dynamicImport("tweetnacl"),
-  ]);
-  setLogger(() => {});
+  const [utils, nacl] = await Promise.all([loadPrivacyUtils(), import("tweetnacl")]);
+  const { EncryptionService, setLogger, WasmFactory } = utils;
+  if (!EncryptionService || !WasmFactory) {
+    throw new Error("Privacy Cash bundle incomplete — hard refresh and try again.");
+  }
+  setLogger?.(() => {});
   const signature = nacl.default.sign.detached(
     new TextEncoder().encode(PRIVACY_CASH_SIGN_MSG),
     keypair.secretKey,
@@ -74,7 +94,7 @@ export async function openPrivacyCashSession(rpc: string): Promise<PrivacyCashSe
 }
 
 export async function getPrivateSolBalance(session: PrivacyCashSession): Promise<number> {
-  const { getUtxos, getBalanceFromUtxos } = await dynamicImport("privacycash/utils");
+  const { getUtxos, getBalanceFromUtxos } = await loadPrivacyUtils();
   const offset = await getUtxoOffset();
   const utxos = await getUtxos({
     connection: session.connection,
@@ -91,10 +111,10 @@ export async function shieldSol(
   lamports: number,
   onStatus?: (msg: string) => void,
 ): Promise<string> {
-  const utils = await dynamicImport("privacycash/utils");
-  if (onStatus) utils.setLogger((_l: string, message: string) => onStatus(message));
+  const utils = await loadPrivacyUtils();
+  if (onStatus) utils.setLogger?.((_l: string, message: string) => onStatus(message));
   const res = await utils.deposit({
-    lightWasm: session.hasher,
+    lightWasm: session.hasher as never,
     connection: session.connection,
     publicKey: session.keypair.publicKey,
     storage: localStorage,
@@ -115,11 +135,11 @@ export async function privateSendSol(
   recipient: PublicKey | string,
   onStatus?: (msg: string) => void,
 ): Promise<string> {
-  const utils = await dynamicImport("privacycash/utils");
-  if (onStatus) utils.setLogger((_l: string, message: string) => onStatus(message));
+  const utils = await loadPrivacyUtils();
+  if (onStatus) utils.setLogger?.((_l: string, message: string) => onStatus(message));
   const to = typeof recipient === "string" ? new PublicKey(recipient) : recipient;
   const res = await utils.withdraw({
-    lightWasm: session.hasher,
+    lightWasm: session.hasher as never,
     connection: session.connection,
     publicKey: session.keypair.publicKey,
     storage: localStorage,
