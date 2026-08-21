@@ -68,10 +68,10 @@ export function devnetRpcEndpoints(): string[] {
   const list: string[] = [];
   const override = process.env.DEVNET_RPC?.trim();
   if (override) list.push(override);
+  // Working public first — api.devnet often 429; many HELIUS keys lack devnet
+  list.push("https://solana-devnet.api.onfinality.io/public");
   const helius = process.env.HELIUS_API_KEY?.trim();
   if (helius) list.push(`https://devnet.helius-rpc.com/?api-key=${helius}`);
-  // Public free endpoints (api.devnet often 429s)
-  list.push("https://solana-devnet.api.onfinality.io/public");
   list.push("https://api.devnet.solana.com");
   const seen = new Set<string>();
   return list.filter((u) => {
