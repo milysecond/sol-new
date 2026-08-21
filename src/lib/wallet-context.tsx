@@ -217,8 +217,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!publicKey) return;
+    // Clear stale chain balances immediately on network/RPC change
     setBalance(null);
     setUsdcBalance(null);
+    setWalletBalances({});
     refreshBalance();
     const interval = setInterval(refreshBalance, 15000);
     return () => clearInterval(interval);

@@ -232,6 +232,27 @@ export default function GiftPage() {
     });
   }, [giftUrl]);
 
+  // Network switch → reset form state that is network-specific
+  useEffect(() => {
+    setError(null);
+    setStatus("idle");
+    setGiftUrl(null);
+    setGiftEntry(null);
+    setCancelLeft(0);
+    setCopied(false);
+    if (cancelTimer.current) {
+      clearInterval(cancelTimer.current);
+      cancelTimer.current = null;
+    }
+    // ZK Privacy Cash hosted pool is mainnet-only
+    if (network !== "mainnet" && privacyMode === "zk") {
+      setPrivacyMode("hop");
+    }
+    // Clear amount so presets don't look "funded" on empty chain
+    setAmount("");
+    void refreshBalance();
+  }, [network]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     return () => {
       if (cancelTimer.current) clearInterval(cancelTimer.current);
@@ -1002,42 +1023,70 @@ export default function GiftPage() {
                   {/* Fixed presets for SOL / USDC */}
                   {presets.length > 0 && (
                     <div className="flex gap-1.5 flex-wrap">
-                      {presets.map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => setAmount(preset)}
-                          disabled={busy}
-                          className={`min-h-[36px] px-3 rounded-lg text-xs font-mono transition cursor-pointer border ${
-                            amount === preset
-                              ? "bg-amber-500/20 border-amber-400/50 text-amber-600 dark:text-amber-300"
-                              : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:border-amber-400/40"
-                          }`}
-                        >
-                          {token === "SOL"
-                            ? `◎${preset}`
-                            : token === "USDC"
-                              ? `$${preset}`
-                              : preset}
-                        </button>
-                      ))}
+                      {presets.map((preset) => {
+                        const n = parseFloat(preset);
+                        const m = maxGiftUi();
+                        const over = m != null && Number.isFinite(n) && n > m.ui + 1e-12;
+                        return (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => {
+                              if (over) {
+                                setError(
+                                  m && m.ui <= 0
+                                    ? "No balance on this network"
+                                    : `Only ${m?.str ?? 0} available on ${network}`,
+                                );
+                                return;
+                              }
+                              setError(null);
+                              setAmount(preset);
+                            }}
+                            disabled={busy || over || balance === null}
+                            className={`min-h-[36px] px-3 rounded-lg text-xs font-mono transition cursor-pointer border touch-manipulation active:scale-95 ${
+                              amount === preset
+                                ? "bg-amber-500/20 border-amber-400/50 text-amber-600 dark:text-amber-300"
+                                : over
+                                  ? "opacity-35 border-black/10 dark:border-white/10 text-gray-400"
+                                  : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:border-amber-400/40"
+                            }`}
+                          >
+                            {token === "SOL"
+                              ? `◎${preset}`
+                              : token === "USDC"
+                                ? `$${preset}`
+                                : preset}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                   {selected && (
                     <p className="text-[11px] text-gray-400 dark:text-white/35">
                       Available{" "}
                       <span className="font-mono text-gray-600 dark:text-white/60">
-                        {formatTokenUi(
-                          selected.isNativeSol
-                            ? (balance ?? selected.uiAmount)
-                            : selected.uiAmount,
-                          selected.decimals,
-                        )}{" "}
-                        {selected.symbol}
+                        {balance === null && selected.isNativeSol ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Spinner size={10} className="inline" /> loading
+                          </span>
+                        ) : (
+                          <>
+                            {formatTokenUi(
+                              selected.isNativeSol
+                                ? (balance ?? selected.uiAmount)
+                                : selected.uiAmount,
+                              selected.decimals,
+                            )}{" "}
+                            {selected.symbol}
+                          </>
+                        )}
                       </span>
-                      {selected.isNativeSol
-                        ? " · Max keeps a small fee reserve"
-                        : ""}
+                      <span className="text-gray-400 dark:text-white/30">
+                        {" "}
+                        · {network === "devnet" ? "devnet" : "mainnet"}
+                      </span>
+                      {selected.isNativeSol ? " · Max keeps a small fee reserve" : ""}
                     </p>
                   )}
                 </div>
@@ -1051,33 +1100,48 @@ export default function GiftPage() {
                         {
                           id: "zk" as const,
                           label: "ZK",
-                          desc: "Privacy Cash · true unlink",
+                          desc:
+                            network === "mainnet"
+                              ? "Privacy Cash · true unlink"
+                              : "Mainnet only",
+                          disabled: network !== "mainnet",
                         },
                         {
                           id: "hop" as const,
                           label: "Hop",
                           desc: "One-time wallet hop",
+                          disabled: false,
                         },
                         {
                           id: "public" as const,
                           label: "Public",
                           desc: "Direct from wallet",
+                          disabled: false,
                         },
                       ] as const
                     ).map((m) => (
                       <button
                         key={m.id}
                         type="button"
-                        disabled={busy}
-                        onClick={() => setPrivacyMode(m.id)}
-                        className={`rounded-xl border px-2 py-2 text-left transition ${
-                          privacyMode === m.id
-                            ? m.id === "zk"
-                              ? "border-purple-400/60 bg-purple-500/15"
-                              : m.id === "hop"
-                                ? "border-amber-400/60 bg-amber-500/10"
-                                : "border-black/20 dark:border-white/20 bg-black/5 dark:bg-white/5"
-                            : "border-black/10 dark:border-white/10 hover:bg-black/[0.03]"
+                        disabled={busy || m.disabled}
+                        onClick={() => {
+                          if (m.disabled) return;
+                          setPrivacyMode(m.id);
+                          setError(null);
+                        }}
+                        title={
+                          m.disabled ? "Switch to live (mainnet) for ZK gifts" : undefined
+                        }
+                        className={`rounded-xl border px-2 py-2 text-left transition touch-manipulation active:scale-[0.98] ${
+                          m.disabled
+                            ? "opacity-40 cursor-not-allowed border-black/10 dark:border-white/10"
+                            : privacyMode === m.id
+                              ? m.id === "zk"
+                                ? "border-purple-400/60 bg-purple-500/15"
+                                : m.id === "hop"
+                                  ? "border-amber-400/60 bg-amber-500/10"
+                                  : "border-black/20 dark:border-white/20 bg-black/5 dark:bg-white/5"
+                              : "border-black/10 dark:border-white/10 hover:bg-black/[0.03]"
                         }`}
                       >
                         <span className="block text-xs font-bold">{m.label}</span>
@@ -1087,10 +1151,16 @@ export default function GiftPage() {
                       </button>
                     ))}
                   </div>
-                  {privacyMode === "zk" && (
+                  {network === "devnet" && (
+                    <p className="text-[11px] text-amber-700 dark:text-amber-300/90 leading-snug">
+                      You&apos;re on <strong>devnet</strong>. ZK gifts need{" "}
+                      <strong>live/mainnet</strong>. Hop &amp; Public work here.
+                    </p>
+                  )}
+                  {privacyMode === "zk" && network === "mainnet" && (
                     <p className="text-[11px] text-purple-600 dark:text-purple-300 leading-snug">
-                      Groth16 ZK via Privacy Cash (mainnet SOL). Shields if needed, then privately funds the
-                      gift.{" "}
+                      Groth16 ZK via Privacy Cash (mainnet SOL). Shields if needed, then privately
+                      funds the gift.{" "}
                       <a href="/private" className="underline">
                         Manage private balance
                       </a>
@@ -1098,7 +1168,8 @@ export default function GiftPage() {
                   )}
                   {privacyMode === "hop" && (
                     <p className="text-[11px] text-amber-700 dark:text-amber-300/90 leading-snug">
-                      Two-tx hop: main → ephemeral → gift. Weaker than ZK; timing can still correlate.
+                      Two-tx hop: main → ephemeral → gift. Weaker than ZK; timing can still
+                      correlate.
                     </p>
                   )}
                 </div>
