@@ -24,10 +24,11 @@ export async function GET() {
       base: configured ? await crossmintBaseUrl() : null,
       assets: staging ? ["USDC", "XMEME"] : ["USDC"],
       amountsUsd: [5, 10, 25, 50, 100],
+      hasClientKey: Boolean(
+        process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY ||
+          process.env.NEXT_PUBLIC_CROSSMINT_API_KEY,
+      ),
       label: "Buy crypto with card / Apple Pay → wallet",
-      note: staging
-        ? "Staging: USDC → Crossmint smart wallet (your passkey is admin). XMEME can go direct."
-        : "Production onramp may require Crossmint enablement.",
     },
     { headers: noStore },
   );
@@ -82,6 +83,11 @@ export async function POST(req: NextRequest) {
       deliveryWallet: order.deliveryWallet,
       adminWallet: order.adminWallet,
       usedSmartWallet: order.usedSmartWallet,
+      embedBaseUrl: order.embedBaseUrl,
+      // Hosted fallback (opens Crossmint UI outside iframe)
+      hostedCheckoutUrl: order.clientSecret
+        ? `${order.embedBaseUrl}/sdk/2024-03-05/embedded-checkout?orderId=${encodeURIComponent(order.orderId)}&clientSecret=${encodeURIComponent(order.clientSecret)}`
+        : null,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Crossmint failed";
@@ -92,7 +98,7 @@ export async function POST(req: NextRequest) {
         "Production onramp not enabled. Use staging keys or contact Crossmint sales.";
     } else if (/malformed api key/i.test(msg)) {
       out =
-        "Crossmint rejected the server key from this network. Prefer embedded client checkout (ck_…) or staging.";
+        "Crossmint rejected the server key from this network. Prefer staging or contact Crossmint.";
     }
     return NextResponse.json({ error: out }, { status: 502 });
   }

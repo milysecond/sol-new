@@ -1,6 +1,6 @@
 /**
- * Crossmint headless checkout — fiat → Solana tokens.
- * USDC to external wallets: create smart wallet (user pubkey = admin), fund that.
+ * Crossmint headless checkout — fiat → Solana tokens (FOMO-style).
+ * USDC: fund a Crossmint smart wallet administered by the user's passkey.
  */
 async function envVarAsync(name: string): Promise<string | undefined> {
   try {
@@ -37,6 +37,11 @@ export const XMEME_STAGING_LOCATOR =
 
 export type CrossmintAsset = "USDC" | "SOL" | "XMEME";
 
+function ownerLocator(userWallet: string): string {
+  // Stable Crossmint user id (max-ish length; keep deterministic)
+  return `userId:solnew-${userWallet.slice(0, 20)}`;
+}
+
 export async function crossmintConfigured(): Promise<boolean> {
   return Boolean(await envVarAsync("CROSSMINT_API_KEY"));
 }
@@ -63,23 +68,44 @@ export async function tokenLocatorFor(asset: CrossmintAsset): Promise<string> {
   return staging ? USDC_DEVNET_LOCATOR : USDC_MAINNET_LOCATOR;
 }
 
+/** Reuse existing smart wallet, or create one (passkey = adminSigner). */
 export async function ensureSmartWalletForExternal(
   userWallet: string,
-): Promise<{ address: string }> {
+): Promise<{ address: string; created: boolean }> {
   const key = await envVarAsync("CROSSMINT_API_KEY");
   if (!key) throw new Error("CROSSMINT_API_KEY not configured");
   const base = await crossmintBaseUrl();
+  const owner = ownerLocator(userWallet);
+  const headers = {
+    "content-type": "application/json",
+    "x-api-key": key.trim(),
+  };
+
+  // Prefer GET existing
+  for (const loc of [`${owner}:solana`, `${owner}:solana:smart`]) {
+    try {
+      const getRes = await fetch(
+        `${base}/api/2025-06-09/wallets/${encodeURIComponent(loc)}`,
+        { headers: { "x-api-key": key.trim() } },
+      );
+      if (getRes.ok) {
+        const existing = (await getRes.json()) as { address?: string };
+        if (existing.address) {
+          return { address: existing.address, created: false };
+        }
+      }
+    } catch {
+      /* continue */
+    }
+  }
 
   const res = await fetch(`${base}/api/2025-06-09/wallets`, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": key.trim(),
-    },
+    headers,
     body: JSON.stringify({
       chainType: "solana",
       type: "smart",
-      owner: `userId:solnew-${userWallet.slice(0, 20)}`,
+      owner,
       config: {
         adminSigner: {
           type: "external-wallet",
@@ -89,15 +115,20 @@ export async function ensureSmartWalletForExternal(
     }),
   });
 
-  const data = (await res.json()) as {
-    address?: string;
-    message?: string;
-  };
-
+  const data = (await res.json()) as { address?: string; message?: string };
   if (!res.ok || !data.address) {
+    // Race: created between GET and POST — GET again
+    const retry = await fetch(
+      `${base}/api/2025-06-09/wallets/${encodeURIComponent(`${owner}:solana`)}`,
+      { headers: { "x-api-key": key.trim() } },
+    );
+    if (retry.ok) {
+      const existing = (await retry.json()) as { address?: string };
+      if (existing.address) return { address: existing.address, created: false };
+    }
     throw new Error(data.message || `Create smart wallet failed (${res.status})`);
   }
-  return { address: data.address };
+  return { address: data.address, created: true };
 }
 
 export type CreateFundOrderOpts = {
@@ -116,6 +147,7 @@ export type CrossmintOrderResult = {
   deliveryWallet: string;
   adminWallet: string;
   usedSmartWallet: boolean;
+  embedBaseUrl: string;
   raw: Record<string, unknown>;
 };
 
@@ -137,13 +169,13 @@ export async function createCrossmintFundOrder(
   let deliveryWallet = opts.wallet;
   let usedSmartWallet = false;
 
-  // USDC needs smart wallet for external (passkey) recipients
   if (opts.asset === "USDC") {
     const sw = await ensureSmartWalletForExternal(opts.wallet);
     deliveryWallet = sw.address;
     usedSmartWallet = true;
   }
 
+  const email = opts.receiptEmail?.trim().slice(0, 256);
   const body = {
     lineItems: [
       {
@@ -157,9 +189,7 @@ export async function createCrossmintFundOrder(
     ],
     payment: {
       method: "card" as const,
-      ...(opts.receiptEmail
-        ? { receiptEmail: opts.receiptEmail.slice(0, 256) }
-        : {}),
+      ...(email ? { receiptEmail: email } : {}),
     },
     recipient: {
       walletAddress: deliveryWallet,
@@ -197,18 +227,21 @@ export async function createCrossmintFundOrder(
   const payment = (order.payment || {}) as Record<string, unknown>;
   const prep = (payment.preparation || {}) as Record<string, unknown>;
 
+  const clientSecret =
+    (typeof data.clientSecret === "string" && data.clientSecret) ||
+    (typeof order.clientSecret === "string" && order.clientSecret) ||
+    (typeof prep.stripeClientSecret === "string" && prep.stripeClientSecret) ||
+    undefined;
+
   return {
     orderId,
-    clientSecret:
-      (typeof data.clientSecret === "string" && data.clientSecret) ||
-      (typeof order.clientSecret === "string" && order.clientSecret) ||
-      (typeof prep.stripeClientSecret === "string" && prep.stripeClientSecret) ||
-      undefined,
+    clientSecret,
     phase: typeof order.phase === "string" ? order.phase : undefined,
     paymentStatus: typeof payment.status === "string" ? payment.status : undefined,
     deliveryWallet,
     adminWallet: opts.wallet,
     usedSmartWallet,
+    embedBaseUrl: base,
     raw: data as Record<string, unknown>,
   };
 }
