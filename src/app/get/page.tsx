@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { PageTransition } from "@/components/page-transition";
 import { Navbar } from "@/components/navbar";
 import { MoneyGramRampsCard } from "@/components/moneygram-ramps";
+import { CrossmintFundCard } from "@/components/crossmint-fund-card";
 import { ConnectGate } from "@/components/connect-gate";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
@@ -316,8 +317,19 @@ export default function GetPage() {
               </div>
             )}
 
-            {/* Stripe credits — always mounted so return-from-Checkout confirm runs */}
-            <CreditsBuySection />
+            {/* Crossmint: fiat → USDC/SOL in wallet (FOMO-style) */}
+            <CrossmintFundCard />
+
+            {/* Optional sol.new app credits (Stripe) — secondary */}
+            <details className="rounded-xl border border-black/10 dark:border-white/10 open:pb-0">
+              <summary className="cursor-pointer list-none px-4 py-3 text-xs font-semibold text-gray-500 dark:text-white/50 flex items-center justify-between">
+                <span>App credits (optional)</span>
+                <span className="text-[10px] font-medium text-gray-400">A$5 Stripe</span>
+              </summary>
+              <div className="px-2 pb-2">
+                <CreditsBuySection />
+              </div>
+            </details>
 
             {/* MoneyGram — sandbox/test only (devnet) */}
             {network === "devnet" && <MoneyGramRampsCard />}
