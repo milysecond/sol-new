@@ -317,7 +317,7 @@ export default function GetPage() {
               </div>
             )}
 
-            {/* Crossmint: fiat → USDC/SOL in wallet (FOMO-style) */}
+            {/* Crossmint Token Checkout (Apple Pay) — no USDC onramp */}
             <CrossmintFundCard />
 
             {/* Optional sol.new app credits (Stripe) — secondary */}

@@ -1,6 +1,12 @@
 /**
- * Crossmint headless checkout — fiat → Solana tokens (FOMO-style).
- * USDC: fund a Crossmint smart wallet administered by the user's passkey.
+ * Crossmint Token Checkout only (FOMO-style).
+ * Buy a specific Solana token with Apple Pay / card → lands in user's wallet.
+ *
+ * NO stablecoin onramp (USDC fund-wallet). That product is geo-gated and separate.
+ *
+ * Network routing:
+ *   devnet  → staging.crossmint.com  (sk_staging_ / ck_staging_)
+ *   mainnet → www.crossmint.com      (sk_production_ / ck_production_)
  */
 async function envVarAsync(name: string): Promise<string | undefined> {
   try {
@@ -28,114 +34,64 @@ async function envVarAsync(name: string): Promise<string | undefined> {
   return undefined;
 }
 
-export const USDC_MAINNET_LOCATOR =
-  "solana:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-export const USDC_DEVNET_LOCATOR =
-  "solana:4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
-export const XMEME_STAGING_LOCATOR =
-  "solana:7EivYFyNfgGj8xbUymR7J4LuxUHLKRzpLaERHLvi7Dgu";
+/** Official Crossmint staging memecoin for token-checkout tests */
+export const XMEME_STAGING_MINT = "7EivYFyNfgGj8xbUymR7J4LuxUHLKRzpLaERHLvi7Dgu";
 
-export type CrossmintAsset = "USDC" | "SOL" | "XMEME";
+export type CrossmintNetwork = "mainnet" | "devnet";
 
-function ownerLocator(userWallet: string): string {
-  // Stable Crossmint user id (max-ish length; keep deterministic)
-  return `userId:solnew-${userWallet.slice(0, 20)}`;
-}
-
-export async function crossmintConfigured(): Promise<boolean> {
-  return Boolean(await envVarAsync("CROSSMINT_API_KEY"));
-}
-
-export async function crossmintBaseUrl(): Promise<string> {
-  const forced = (await envVarAsync("CROSSMINT_ENV"))?.toLowerCase();
-  const key = (await envVarAsync("CROSSMINT_API_KEY")) || "";
-  if (forced === "staging" || key.includes("staging") || key.startsWith("sk_staging")) {
-    return "https://staging.crossmint.com";
-  }
-  return "https://www.crossmint.com";
-}
-
-export async function isCrossmintStaging(): Promise<boolean> {
-  return (await crossmintBaseUrl()).includes("staging");
-}
-
-export async function tokenLocatorFor(asset: CrossmintAsset): Promise<string> {
-  const staging = await isCrossmintStaging();
-  if (asset === "XMEME") return XMEME_STAGING_LOCATOR;
-  if (asset === "SOL") {
-    throw new Error("Native SOL buy is not supported by Crossmint yet — use USDC");
-  }
-  return staging ? USDC_DEVNET_LOCATOR : USDC_MAINNET_LOCATOR;
-}
-
-/** Reuse existing smart wallet, or create one (passkey = adminSigner). */
-export async function ensureSmartWalletForExternal(
-  userWallet: string,
-): Promise<{ address: string; created: boolean }> {
-  const key = await envVarAsync("CROSSMINT_API_KEY");
-  if (!key) throw new Error("CROSSMINT_API_KEY not configured");
-  const base = await crossmintBaseUrl();
-  const owner = ownerLocator(userWallet);
-  const headers = {
-    "content-type": "application/json",
-    "x-api-key": key.trim(),
-  };
-
-  // Prefer GET existing
-  for (const loc of [`${owner}:solana`, `${owner}:solana:smart`]) {
-    try {
-      const getRes = await fetch(
-        `${base}/api/2025-06-09/wallets/${encodeURIComponent(loc)}`,
-        { headers: { "x-api-key": key.trim() } },
-      );
-      if (getRes.ok) {
-        const existing = (await getRes.json()) as { address?: string };
-        if (existing.address) {
-          return { address: existing.address, created: false };
-        }
-      }
-    } catch {
-      /* continue */
-    }
-  }
-
-  const res = await fetch(`${base}/api/2025-06-09/wallets`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      chainType: "solana",
-      type: "smart",
-      owner,
-      config: {
-        adminSigner: {
-          type: "external-wallet",
-          address: userWallet,
-        },
-      },
-    }),
-  });
-
-  const data = (await res.json()) as { address?: string; message?: string };
-  if (!res.ok || !data.address) {
-    // Race: created between GET and POST — GET again
-    const retry = await fetch(
-      `${base}/api/2025-06-09/wallets/${encodeURIComponent(`${owner}:solana`)}`,
-      { headers: { "x-api-key": key.trim() } },
+export async function crossmintApiKey(network: CrossmintNetwork): Promise<string | undefined> {
+  if (network === "devnet") {
+    return (
+      (await envVarAsync("CROSSMINT_API_KEY_STAGING")) ||
+      (await envVarAsync("CROSSMINT_API_KEY"))
     );
-    if (retry.ok) {
-      const existing = (await retry.json()) as { address?: string };
-      if (existing.address) return { address: existing.address, created: false };
-    }
-    throw new Error(data.message || `Create smart wallet failed (${res.status})`);
   }
-  return { address: data.address, created: true };
+  return (
+    (await envVarAsync("CROSSMINT_API_KEY_PRODUCTION")) ||
+    (await envVarAsync("CROSSMINT_API_KEY_MAINNET")) ||
+    // Only use generic key for mainnet if it looks like production
+    (async () => {
+      const k = await envVarAsync("CROSSMINT_API_KEY");
+      if (k && (k.includes("production") || k.startsWith("sk_production"))) return k;
+      // staging key must not hit production API
+      if (k && (k.includes("staging") || k.startsWith("sk_staging"))) return undefined;
+      return k;
+    })()
+  );
 }
 
-export type CreateFundOrderOpts = {
+export async function crossmintConfigured(network?: CrossmintNetwork): Promise<boolean> {
+  if (network) return Boolean(await crossmintApiKey(network));
+  const [d, m] = await Promise.all([
+    crossmintApiKey("devnet"),
+    crossmintApiKey("mainnet"),
+  ]);
+  return Boolean(d || m);
+}
+
+export function crossmintBaseUrl(network: CrossmintNetwork): string {
+  return network === "devnet"
+    ? "https://staging.crossmint.com"
+    : "https://www.crossmint.com";
+}
+
+export function tokenLocator(mintOrLocator: string): string {
+  const s = mintOrLocator.trim();
+  if (s.includes(":")) return s;
+  return `solana:${s}`;
+}
+
+export function defaultTokenMint(network: CrossmintNetwork): string | null {
+  // Devnet/staging has a known test memecoin. Mainnet requires an explicit mint.
+  return network === "devnet" ? XMEME_STAGING_MINT : null;
+}
+
+export type CreateTokenCheckoutOpts = {
   wallet: string;
   amountUsd: string;
-  asset: CrossmintAsset;
-  network: "mainnet" | "devnet";
+  /** Mint address or full tokenLocator (solana:Mint...) */
+  tokenMint: string;
+  network: CrossmintNetwork;
   receiptEmail?: string;
 };
 
@@ -145,17 +101,27 @@ export type CrossmintOrderResult = {
   phase?: string;
   paymentStatus?: string;
   deliveryWallet: string;
-  adminWallet: string;
-  usedSmartWallet: boolean;
+  tokenLocator: string;
+  network: CrossmintNetwork;
   embedBaseUrl: string;
   raw: Record<string, unknown>;
 };
 
-export async function createCrossmintFundOrder(
-  opts: CreateFundOrderOpts,
+/**
+ * Token Checkout order — Apple Pay / card → fungible token to external wallet.
+ * Same rails FOMO uses (not Onramp).
+ */
+export async function createTokenCheckoutOrder(
+  opts: CreateTokenCheckoutOpts,
 ): Promise<CrossmintOrderResult> {
-  const key = await envVarAsync("CROSSMINT_API_KEY");
-  if (!key) throw new Error("CROSSMINT_API_KEY not configured");
+  const key = await crossmintApiKey(opts.network);
+  if (!key) {
+    throw new Error(
+      opts.network === "devnet"
+        ? "Crossmint staging key missing (CROSSMINT_API_KEY_STAGING or CROSSMINT_API_KEY)"
+        : "Crossmint production key missing (CROSSMINT_API_KEY_PRODUCTION)",
+    );
+  }
 
   const amount = String(opts.amountUsd).replace(/[^0-9.]/g, "");
   const n = parseFloat(amount);
@@ -163,19 +129,28 @@ export async function createCrossmintFundOrder(
     throw new Error("Amount must be between $1 and $5000");
   }
 
-  const locator = await tokenLocatorFor(opts.asset);
-  const base = await crossmintBaseUrl();
-
-  let deliveryWallet = opts.wallet;
-  let usedSmartWallet = false;
-
-  if (opts.asset === "USDC") {
-    const sw = await ensureSmartWalletForExternal(opts.wallet);
-    deliveryWallet = sw.address;
-    usedSmartWallet = true;
+  const locator = tokenLocator(opts.tokenMint);
+  if (!locator.startsWith("solana:") || locator.length < 40) {
+    throw new Error("Invalid Solana token mint / locator");
   }
 
+  // Reject known stablecoin locators — those are Onramp, not Token Checkout
+  const mint = locator.slice("solana:".length);
+  const STABLES = new Set([
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC mainnet
+    "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", // USDC devnet
+    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
+    "So11111111111111111111111111111111111111112", // wSOL — not token-checkout
+  ]);
+  if (STABLES.has(mint)) {
+    throw new Error(
+      "Stablecoins/SOL use Crossmint Onramp (removed). Use Token Checkout with a memecoin or app token mint.",
+    );
+  }
+
+  const base = crossmintBaseUrl(opts.network);
   const email = opts.receiptEmail?.trim().slice(0, 256);
+
   const body = {
     lineItems: [
       {
@@ -192,7 +167,7 @@ export async function createCrossmintFundOrder(
       ...(email ? { receiptEmail: email } : {}),
     },
     recipient: {
-      walletAddress: deliveryWallet,
+      walletAddress: opts.wallet,
     },
   };
 
@@ -238,10 +213,13 @@ export async function createCrossmintFundOrder(
     clientSecret,
     phase: typeof order.phase === "string" ? order.phase : undefined,
     paymentStatus: typeof payment.status === "string" ? payment.status : undefined,
-    deliveryWallet,
-    adminWallet: opts.wallet,
-    usedSmartWallet,
+    deliveryWallet: opts.wallet,
+    tokenLocator: locator,
+    network: opts.network,
     embedBaseUrl: base,
     raw: data as Record<string, unknown>,
   };
 }
+
+/** @deprecated use createTokenCheckoutOrder */
+export const createCrossmintFundOrder = createTokenCheckoutOrder;

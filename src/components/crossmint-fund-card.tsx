@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { CreditCard, Copy, Check, ExternalLink } from "lucide-react";
+import { CreditCard, ExternalLink } from "lucide-react";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { Spinner } from "@/components/spinner";
@@ -11,11 +11,29 @@ import { friendlyError } from "@/lib/friendly-errors";
 
 const AMOUNTS = [5, 10, 25, 50, 100] as const;
 
-const CLIENT_KEY =
-  (typeof process !== "undefined" &&
-    (process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY ||
-      process.env.NEXT_PUBLIC_CROSSMINT_API_KEY)) ||
-  "";
+/** Staging test memecoin (devnet / Crossmint staging) */
+const XMEME_STAGING = "7EivYFyNfgGj8xbUymR7J4LuxUHLKRzpLaERHLvi7Dgu";
+
+function clientKeyForNetwork(network: "mainnet" | "devnet"): string {
+  if (typeof process === "undefined") return "";
+  if (network === "devnet") {
+    return (
+      process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY_STAGING ||
+      process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY ||
+      process.env.NEXT_PUBLIC_CROSSMINT_API_KEY ||
+      ""
+    );
+  }
+  return (
+    process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY_PRODUCTION ||
+    process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY_MAINNET ||
+    // only use generic if not clearly staging
+    (process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY?.includes("staging")
+      ? ""
+      : process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY) ||
+    ""
+  );
+}
 
 type CheckoutProps = {
   apiKey: string;
@@ -42,7 +60,7 @@ const EmbeddedCheckout = dynamic(
                     allowedMethods: {
                       card: true,
                       applePay: true,
-                      googlePay: true,
+                      googlePay: false,
                     },
                   },
                   defaultMethod: "fiat",
@@ -64,7 +82,7 @@ const EmbeddedCheckout = dynamic(
     ssr: false,
     loading: () => (
       <div className="min-h-[240px] flex items-center justify-center gap-2 text-xs text-gray-500">
-        <Spinner size={14} /> Loading checkout…
+        <Spinner size={14} /> Loading Apple Pay checkout…
       </div>
     ),
   },
@@ -87,36 +105,56 @@ class EmbedBoundary extends React.Component<
   }
 }
 
+/**
+ * FOMO-style Crossmint Token Checkout (Apple Pay).
+ * No USDC onramp — buy a specific token mint into the connected wallet.
+ */
 export function CrossmintFundCard() {
   const { publicKey } = useWallet();
   const { network } = useNetwork();
   const [configured, setConfigured] = useState<boolean | null>(null);
-  const [envLabel, setEnvLabel] = useState("staging");
-  // Staging default = token checkout (FOMO path) — works in AU.
-  // USDC uses Onramp product, which is geo-gated (AU often blocked on staging).
-  const [asset, setAsset] = useState<"USDC" | "XMEME">("XMEME");
+  const [envLabel, setEnvLabel] = useState(network === "devnet" ? "staging" : "production");
   const [amount, setAmount] = useState(25);
   const [email, setEmail] = useState("");
+  const [tokenMint, setTokenMint] = useState(
+    network === "devnet" ? XMEME_STAGING : "",
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | undefined>();
   const [hostedUrl, setHostedUrl] = useState<string | null>(null);
-  const [deliveryWallet, setDeliveryWallet] = useState<string | null>(null);
-  const [usedSmart, setUsedSmart] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [tokenLocator, setTokenLocator] = useState<string | null>(null);
   const [embedCrash, setEmbedCrash] = useState(false);
+
+  const clientKey = useMemo(() => clientKeyForNetwork(network), [network]);
+
+  useEffect(() => {
+    // Reset mint default when switching network
+    setTokenMint(network === "devnet" ? XMEME_STAGING : "");
+    setOrderId(null);
+    setClientSecret(undefined);
+    setHostedUrl(null);
+    setError(null);
+  }, [network]);
 
   useEffect(() => {
     let c = false;
     (async () => {
       try {
-        const r = await fetch("/api/crossmint/order", { cache: "no-store" });
-        const d = (await r.json()) as { configured?: boolean; env?: string };
+        const r = await fetch(`/api/crossmint/order?network=${network}`, {
+          cache: "no-store",
+        });
+        const d = (await r.json()) as {
+          networkConfigured?: boolean;
+          configured?: boolean;
+          env?: string;
+          defaultMint?: string | null;
+        };
         if (!c) {
-          setConfigured(d.configured === true);
+          setConfigured(d.networkConfigured === true || d.configured === true);
           if (d.env) setEnvLabel(d.env);
+          if (d.defaultMint && network === "devnet") setTokenMint(d.defaultMint);
         }
       } catch {
         if (!c) setConfigured(false);
@@ -125,15 +163,13 @@ export function CrossmintFundCard() {
     return () => {
       c = true;
     };
-  }, []);
+  }, [network]);
 
   const reset = useCallback(() => {
     setOrderId(null);
     setClientSecret(undefined);
     setHostedUrl(null);
-    setDeliveryWallet(null);
-    setUsedSmart(false);
-    setPaymentStatus(null);
+    setTokenLocator(null);
     setError(null);
     setEmbedCrash(false);
   }, []);
@@ -141,15 +177,18 @@ export function CrossmintFundCard() {
   const start = useCallback(async () => {
     if (!publicKey) return;
     if (!email.trim() || !email.includes("@")) {
-      setError("Add a receipt email — required for Apple Pay / card.");
+      setError("Receipt email required for Apple Pay.");
+      return;
+    }
+    const mint = tokenMint.trim();
+    if (!mint) {
+      setError("Enter a Solana token mint for checkout.");
       return;
     }
     setBusy(true);
     setError(null);
-    setOrderId(null);
-    setClientSecret(undefined);
-    setHostedUrl(null);
-    setEmbedCrash(false);
+    reset();
+    setBusy(true);
     try {
       const res = await fetch("/api/crossmint/order", {
         method: "POST",
@@ -157,7 +196,7 @@ export function CrossmintFundCard() {
         body: JSON.stringify({
           wallet: publicKey,
           amountUsd: amount,
-          asset,
+          tokenMint: mint,
           network,
           email: email.trim(),
         }),
@@ -167,38 +206,25 @@ export function CrossmintFundCard() {
         error?: string;
         orderId?: string;
         clientSecret?: string;
-        deliveryWallet?: string;
-        usedSmartWallet?: boolean;
-        paymentStatus?: string;
         hostedCheckoutUrl?: string | null;
+        tokenLocator?: string;
       };
       if (!res.ok || !data.ok || !data.orderId) {
-        throw new Error(data.error || "Could not start Crossmint checkout");
+        throw new Error(data.error || "Could not start token checkout");
       }
       if (!data.clientSecret) {
-        throw new Error("Order missing clientSecret — cannot open checkout");
+        throw new Error("Order missing clientSecret — cannot open Apple Pay");
       }
       setOrderId(data.orderId);
       setClientSecret(data.clientSecret);
-      setDeliveryWallet(data.deliveryWallet || null);
-      setUsedSmart(Boolean(data.usedSmartWallet));
-      setPaymentStatus(data.paymentStatus || null);
       setHostedUrl(data.hostedCheckoutUrl || null);
+      setTokenLocator(data.tokenLocator || null);
     } catch (e) {
-      setError(friendlyError(e, "Crossmint checkout failed."));
+      setError(friendlyError(e, "Token checkout failed."));
     } finally {
       setBusy(false);
     }
-  }, [publicKey, amount, asset, network, email]);
-
-  const kycHint = useMemo(() => {
-    if (!paymentStatus) return null;
-    if (paymentStatus === "requires-kyc" || paymentStatus.includes("kyc")) {
-      return "Staging often needs a quick identity check in the checkout before paying.";
-    }
-    if (paymentStatus === "awaiting-payment") return "Complete payment in the form below.";
-    return `Status: ${paymentStatus}`;
-  }, [paymentStatus]);
+  }, [publicKey, email, tokenMint, amount, network, reset]);
 
   if (configured === null) {
     return (
@@ -210,8 +236,13 @@ export function CrossmintFundCard() {
 
   if (!configured) {
     return (
-      <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 text-xs text-amber-800 dark:text-amber-200/90">
-        Crossmint not configured (missing server key).
+      <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 text-xs text-amber-800 dark:text-amber-200/90 space-y-1">
+        <p className="font-semibold">Crossmint Token Checkout not configured</p>
+        <p>
+          {network === "devnet"
+            ? "Set staging server key sk_staging_… (CROSSMINT_API_KEY / _STAGING)."
+            : "Set production server key sk_production_… (CROSSMINT_API_KEY_PRODUCTION)."}
+        </p>
       </div>
     );
   }
@@ -220,65 +251,38 @@ export function CrossmintFundCard() {
     <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-5 space-y-4 ring-1 ring-sky-500/10">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
-          <CreditCard size={16} className="text-sky-500" /> Buy crypto
+          <CreditCard size={16} className="text-sky-500" /> Buy token
         </p>
         <span className="text-[10px] uppercase tracking-wide font-semibold text-sky-700 dark:text-sky-300 bg-sky-500/10 px-2 py-0.5 rounded-full">
-          Crossmint · {envLabel}
+          Crossmint · Apple Pay · {envLabel}
         </span>
       </div>
       <p className="text-xs text-gray-500 dark:text-white/45 leading-relaxed">
-        Card / Apple Pay →{" "}
-        <strong className="text-gray-800 dark:text-white/80">
-          {asset === "XMEME" ? "test token" : asset}
-        </strong>
-        {envLabel === "staging" ? " (staging / devnet)." : "."}
+        FOMO-style <strong className="text-gray-800 dark:text-white/80">Token Checkout</strong> —
+        Apple Pay / card buys a specific mint into your wallet. No USDC onramp.
       </p>
-      {envLabel === "staging" && (
-        <div className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-[11px] text-sky-900 dark:text-sky-100/90 leading-relaxed space-y-1">
-          <p className="font-semibold">Why FOMO works in Aus · we didn’t (until now)</p>
-          <p>
-            <strong>FOMO</strong> uses Crossmint <em>Token Checkout</em> (buy a specific coin with
-            Apple Pay) — available in almost all countries.
-          </p>
-          <p>
-            <strong>USDC “fund wallet”</strong> uses Crossmint <em>Onramp</em> — separate product,
-            IP-gated. Staging often shows “Not available in your country” from Australia.
-          </p>
-          <p>
-            Use <strong>Test token</strong> here to verify Apple Pay (FOMO-style). For real AU
-            funding until production onramp is enabled: deposit crypto, or Stripe credits below.
-          </p>
-        </div>
-      )}
-      {asset === "USDC" && (
-        <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-900 dark:text-amber-100/90 leading-relaxed">
-          USDC = Onramp. If you see “Not available in your country”, that’s Crossmint geo — switch
-          to <strong>Test token</strong> or fund via crypto transfer.
-        </div>
-      )}
 
       {!orderId && (
         <>
-          <div className="flex gap-1.5">
-            {(
-              envLabel === "staging"
-                ? (["USDC", "XMEME"] as const)
-                : (["USDC"] as const)
-            ).map((a) => (
-              <button
-                key={a}
-                type="button"
-                onClick={() => setAsset(a)}
-                className={`flex-1 min-h-[44px] rounded-xl text-xs font-semibold border transition touch-manipulation active:scale-[0.98] ${
-                  asset === a
-                    ? "bg-sky-500/15 border-sky-400/50 text-sky-800 dark:text-sky-200"
-                    : "border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60"
-                }`}
-              >
-                {a === "XMEME" ? "Test token" : a}
-              </button>
-            ))}
-          </div>
+          <label className="block space-y-1">
+            <span className="text-[11px] font-medium text-gray-500 dark:text-white/50">
+              Token mint {network === "devnet" ? "(devnet — XMEME default)" : "(mainnet)"}
+            </span>
+            <input
+              type="text"
+              spellCheck={false}
+              autoComplete="off"
+              placeholder={
+                network === "devnet"
+                  ? XMEME_STAGING
+                  : "Solana mint address"
+              }
+              value={tokenMint}
+              onChange={(e) => setTokenMint(e.target.value.trim())}
+              className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-2.5 font-mono text-xs sm:text-sm text-gray-900 dark:text-white placeholder:text-gray-400"
+            />
+          </label>
+
           <div className="flex flex-wrap gap-1.5">
             {AMOUNTS.map((a) => (
               <button
@@ -295,19 +299,21 @@ export function CrossmintFundCard() {
               </button>
             ))}
           </div>
+
           <input
             type="email"
             inputMode="email"
             autoComplete="email"
-            placeholder="Receipt email (required)"
+            placeholder="Receipt email (required for Apple Pay)"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-2.5 text-base sm:text-sm text-gray-900 dark:text-white placeholder:text-gray-400"
           />
+
           <ActionButton
             state={busy ? "loading" : "idle"}
-            idleLabel={`Buy $${amount} ${asset === "XMEME" ? "test token" : asset}`}
-            loadingLabel="Creating order…"
+            idleLabel={`Buy $${amount} with Apple Pay`}
+            loadingLabel="Creating checkout…"
             disabled={!publicKey || busy}
             onClick={() => void start()}
           />
@@ -316,39 +322,17 @@ export function CrossmintFundCard() {
 
       {orderId && clientSecret && (
         <div className="space-y-3">
-          {kycHint && (
-            <p className="text-[11px] text-amber-700 dark:text-amber-300/90 leading-snug">
-              {kycHint}
+          {tokenLocator && (
+            <p className="text-[11px] text-gray-500 dark:text-white/45 font-mono break-all">
+              {tokenLocator} →{" "}
+              {publicKey ? `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}` : "wallet"}
             </p>
           )}
 
-          {usedSmart && deliveryWallet && (
-            <div className="rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 px-3 py-2 text-[11px] text-gray-600 dark:text-white/60 space-y-1">
-              <p>
-                USDC lands in your <strong>Crossmint smart wallet</strong> (passkey is admin):
-              </p>
-              <button
-                type="button"
-                className="font-mono text-sky-600 dark:text-sky-300 break-all text-left inline-flex items-start gap-1 touch-manipulation"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(deliveryWallet);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1500);
-                  } catch {
-                    /* ignore */
-                  }
-                }}
-              >
-                {deliveryWallet} {copied ? <Check size={12} /> : <Copy size={12} />}
-              </button>
-            </div>
-          )}
-
-          {CLIENT_KEY && !embedCrash && (
+          {clientKey && !embedCrash && (
             <EmbedBoundary onError={() => setEmbedCrash(true)}>
               <EmbeddedCheckout
-                apiKey={CLIENT_KEY}
+                apiKey={clientKey}
                 orderId={orderId}
                 clientSecret={clientSecret}
                 receiptEmail={email.trim() || undefined}
@@ -363,7 +347,7 @@ export function CrossmintFundCard() {
               rel="noopener noreferrer"
               className="min-h-[48px] w-full inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500 text-white text-sm font-semibold px-4 touch-manipulation active:scale-[0.98]"
             >
-              {embedCrash || !CLIENT_KEY ? "Open checkout" : "Open checkout in new tab"}{" "}
+              {embedCrash || !clientKey ? "Open Apple Pay checkout" : "Open checkout in new tab"}{" "}
               <ExternalLink size={14} />
             </a>
           )}
@@ -385,6 +369,8 @@ export function CrossmintFundCard() {
       )}
 
       <p className="text-[11px] text-gray-400 dark:text-white/30 leading-snug">
+        Network: <span className="font-semibold">{network}</span>
+        {" · "}
         Connected:{" "}
         <span className="font-mono">
           {publicKey ? `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}` : "—"}

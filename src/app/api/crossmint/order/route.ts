@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
 import {
-  createCrossmintFundOrder,
+  createTokenCheckoutOrder,
   crossmintConfigured,
   crossmintBaseUrl,
-  isCrossmintStaging,
-  type CrossmintAsset,
+  defaultTokenMint,
+  type CrossmintNetwork,
 } from "@/lib/crossmint";
 
 export const runtime = "nodejs";
@@ -13,42 +13,79 @@ export const dynamic = "force-dynamic";
 
 const noStore = { "Cache-Control": "no-store" };
 
-export async function GET() {
-  const configured = await crossmintConfigured();
-  const staging = configured ? await isCrossmintStaging() : false;
+export async function GET(req: NextRequest) {
+  const networkParam = req.nextUrl.searchParams.get("network");
+  const network: CrossmintNetwork =
+    networkParam === "devnet" ? "devnet" : "mainnet";
+  const configured = await crossmintConfigured(network);
+  const anyConfigured = await crossmintConfigured();
   return NextResponse.json(
     {
-      ok: configured,
-      configured,
-      env: staging ? "staging" : "production",
-      base: configured ? await crossmintBaseUrl() : null,
-      assets: staging ? ["USDC", "XMEME"] : ["USDC"],
+      ok: anyConfigured,
+      configured: anyConfigured,
+      networkConfigured: configured,
+      mode: "token-checkout",
+      onramp: false,
+      env: network === "devnet" ? "staging" : "production",
+      base: crossmintBaseUrl(network),
+      defaultMint: defaultTokenMint(network),
       amountsUsd: [5, 10, 25, 50, 100],
+      applePay: true,
       hasClientKey: Boolean(
         process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY ||
+          process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY_STAGING ||
+          process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY_PRODUCTION ||
           process.env.NEXT_PUBLIC_CROSSMINT_API_KEY,
       ),
-      label: "Buy crypto with card / Apple Pay → wallet",
+      label: "Token checkout · Apple Pay",
+      note: "FOMO-style token checkout only. No USDC onramp.",
     },
     { headers: noStore },
   );
 }
 
+/**
+ * POST Token Checkout
+ * { wallet, amountUsd, tokenMint?, network?, email? }
+ * tokenMint required on mainnet; devnet defaults to XMEME test token.
+ */
 export async function POST(req: NextRequest) {
-  if (!(await crossmintConfigured())) {
+  const body = (await req.json().catch(() => ({}))) as {
+    wallet?: string;
+    amountUsd?: string | number;
+    tokenMint?: string;
+    mint?: string;
+    asset?: string; // legacy — ignored except reject USDC
+    network?: string;
+    email?: string;
+  };
+
+  const network: CrossmintNetwork =
+    body.network === "devnet" ? "devnet" : "mainnet";
+
+  if (!(await crossmintConfigured(network))) {
     return NextResponse.json(
-      { error: "Crossmint not configured. Set CROSSMINT_API_KEY." },
+      {
+        error:
+          network === "devnet"
+            ? "Crossmint staging not configured (sk_staging_…)."
+            : "Crossmint production not configured (sk_production_…).",
+      },
       { status: 503 },
     );
   }
 
-  const body = (await req.json().catch(() => ({}))) as {
-    wallet?: string;
-    amountUsd?: string | number;
-    asset?: string;
-    network?: string;
-    email?: string;
-  };
+  // Explicitly reject onramp assets
+  const asset = (body.asset || "").toUpperCase();
+  if (asset === "USDC" || asset === "SOL" || asset === "USDT") {
+    return NextResponse.json(
+      {
+        error:
+          "Onramp removed. Use Token Checkout with a token mint (memecoin / app token), not USDC/SOL.",
+      },
+      { status: 400 },
+    );
+  }
 
   const wallet = body.wallet?.trim() || "";
   try {
@@ -57,34 +94,43 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid Solana wallet" }, { status: 400 });
   }
 
-  const assetRaw = (body.asset || "USDC").toUpperCase();
-  const asset = (
-    assetRaw === "XMEME" ? "XMEME" : assetRaw === "SOL" ? "SOL" : "USDC"
-  ) as CrossmintAsset;
-  const network = body.network === "devnet" ? "devnet" : "mainnet";
+  const mint =
+    body.tokenMint?.trim() ||
+    body.mint?.trim() ||
+    defaultTokenMint(network) ||
+    "";
+  if (!mint) {
+    return NextResponse.json(
+      {
+        error:
+          "tokenMint required on mainnet (Solana mint address for Token Checkout).",
+      },
+      { status: 400 },
+    );
+  }
+
   const amountUsd = String(body.amountUsd ?? "10");
 
   try {
-    const order = await createCrossmintFundOrder({
+    const order = await createTokenCheckoutOrder({
       wallet,
       amountUsd,
-      asset,
+      tokenMint: mint,
       network,
       receiptEmail: body.email?.trim(),
     });
     return NextResponse.json({
       ok: true,
+      mode: "token-checkout",
       orderId: order.orderId,
       clientSecret: order.clientSecret,
       phase: order.phase,
       paymentStatus: order.paymentStatus,
-      asset,
       amountUsd: parseFloat(amountUsd),
       deliveryWallet: order.deliveryWallet,
-      adminWallet: order.adminWallet,
-      usedSmartWallet: order.usedSmartWallet,
+      tokenLocator: order.tokenLocator,
+      network: order.network,
       embedBaseUrl: order.embedBaseUrl,
-      // Hosted fallback (opens Crossmint UI outside iframe)
       hostedCheckoutUrl: order.clientSecret
         ? `${order.embedBaseUrl}/sdk/2024-03-05/embedded-checkout?orderId=${encodeURIComponent(order.orderId)}&clientSecret=${encodeURIComponent(order.clientSecret)}`
         : null,
@@ -93,12 +139,9 @@ export async function POST(req: NextRequest) {
     const msg = e instanceof Error ? e.message : "Crossmint failed";
     console.error("[crossmint/order]", msg);
     let out = msg;
-    if (/onramp is not yet enabled/i.test(msg)) {
+    if (/onramp/i.test(msg)) {
       out =
-        "Production onramp not enabled. Use staging keys or contact Crossmint sales.";
-    } else if (/malformed api key/i.test(msg)) {
-      out =
-        "Crossmint rejected the server key from this network. Prefer staging or contact Crossmint.";
+        "This mint routes to Onramp (disabled). Pick a Token Checkout–supported mint.";
     }
     return NextResponse.json({ error: out }, { status: 502 });
   }
