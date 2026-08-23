@@ -12,7 +12,7 @@ async function envVarAsync(name: string): Promise<string | undefined> {
   try {
     const { getCloudflareContext } = await import("@opennextjs/cloudflare");
     const ctx = await getCloudflareContext({ async: true });
-    const v = (ctx as { env?: Record<string, unknown> })?.env?.[name];
+    const v = (ctx as unknown as { env?: Record<string, unknown> })?.env?.[name];
     if (typeof v === "string" && v.trim()) return v.trim();
   } catch {
     /* ignore */
@@ -139,9 +139,8 @@ export async function createCrossmintFundOrder(
   const res = await fetch(`${base}/api/2022-06-09/orders`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      "x-api-key": key,
-      "X-API-KEY": key,
+      "content-type": "application/json",
+      "x-api-key": key.trim(),
     },
     body: JSON.stringify(body),
   });

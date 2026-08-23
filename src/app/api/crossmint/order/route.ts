@@ -30,16 +30,10 @@ export async function GET() {
   );
 }
 
-/**
- * POST { wallet, amountUsd, asset?, network?, email? }
- */
 export async function POST(req: NextRequest) {
   if (!(await crossmintConfigured())) {
     return NextResponse.json(
-      {
-        error:
-          "Crossmint not configured. Set CROSSMINT_API_KEY (server sk_…) in Worker secrets.",
-      },
+      { error: "Crossmint not configured. Set CROSSMINT_API_KEY Worker secret." },
       { status: 503 },
     );
   }
@@ -89,6 +83,15 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Crossmint failed";
     console.error("[crossmint/order]", msg);
-    return NextResponse.json({ error: msg }, { status: 502 });
+    // Friendlier copy for the two known blockers
+    let out = msg;
+    if (/onramp is not yet enabled/i.test(msg)) {
+      out =
+        "Crossmint production onramp isn’t enabled on this project yet. Test with a staging key (sk_staging_…) or ask Crossmint to enable production onramp (crossmint.com/contact/sales). Meanwhile add NEXT_PUBLIC_CROSSMINT_CLIENT_KEY (ck_…) for in-browser checkout.";
+    } else if (/malformed api key/i.test(msg)) {
+      out =
+        "Crossmint rejected the server request (often Worker IP). Use a client key (ck_production_…) via NEXT_PUBLIC_CROSSMINT_CLIENT_KEY for embedded checkout, or contact Crossmint.";
+    }
+    return NextResponse.json({ error: out }, { status: 502 });
   }
 }
