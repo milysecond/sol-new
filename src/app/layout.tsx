@@ -73,6 +73,7 @@ export const metadata: Metadata = {
   },
   other: {
     "mobile-web-app-capable": "yes",
+    "ory-verify": "orynth-b0fb015f7ffc4fe18c93ee68a5be88e5",
   },
 };
 
