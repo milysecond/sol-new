@@ -3,26 +3,35 @@
  * FOMO-style: Apple Pay / card → USDC or SOL lands on-chain.
  *
  * Env:
- *   CROSSMINT_API_KEY (server sk_…) — required
- *   CROSSMINT_CLIENT_KEY (optional ck_… for embedded UI later)
- *   CROSSMINT_ENV = staging | production (default: inferred from key)
+ *   CROSSMINT_API_KEY (server sk_…) — required (Worker secret)
+ *   CROSSMINT_CLIENT_KEY / NEXT_PUBLIC_CROSSMINT_CLIENT_KEY (optional ck_…)
+ *   CROSSMINT_ENV = staging | production
  */
-function envVar(name: string): string | undefined {
-  const fromProcess = process.env[name]?.trim();
-  if (fromProcess) return fromProcess;
+
+async function envVarAsync(name: string): Promise<string | undefined> {
   try {
+    const { getCloudflareContext } = await import("@opennextjs/cloudflare");
+    const ctx = await getCloudflareContext({ async: true });
+    const v = (ctx as { env?: Record<string, unknown> })?.env?.[name];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  } catch {
+    /* ignore */
+  }
+  try {
+    // sync fallback
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getCloudflareContext } = require("@opennextjs/cloudflare") as {
       getCloudflareContext: (opts?: { async?: boolean }) => {
         env?: Record<string, unknown>;
       };
     };
-    const ctx = getCloudflareContext();
-    const v = ctx?.env?.[name];
+    const v = getCloudflareContext()?.env?.[name];
     if (typeof v === "string" && v.trim()) return v.trim();
   } catch {
     /* ignore */
   }
+  const fromProcess = process.env[name]?.trim();
+  if (fromProcess) return fromProcess;
   return undefined;
 }
 
@@ -30,7 +39,6 @@ export const USDC_MAINNET_LOCATOR =
   "solana:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 export const USDC_DEVNET_LOCATOR =
   "solana:4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
-/** Native SOL via wrapped SOL mint (Crossmint fungible locator) */
 export const SOL_MAINNET_LOCATOR =
   "solana:So11111111111111111111111111111111111111112";
 export const SOL_DEVNET_LOCATOR =
@@ -38,44 +46,44 @@ export const SOL_DEVNET_LOCATOR =
 
 export type CrossmintAsset = "USDC" | "SOL";
 
-export function crossmintConfigured(): boolean {
-  return Boolean(envVar("CROSSMINT_API_KEY"));
+export async function crossmintConfigured(): Promise<boolean> {
+  return Boolean(await envVarAsync("CROSSMINT_API_KEY"));
 }
 
-export function crossmintBaseUrl(): string {
-  const forced = envVar("CROSSMINT_ENV")?.toLowerCase();
-  const key = envVar("CROSSMINT_API_KEY") || "";
+export async function crossmintBaseUrl(): Promise<string> {
+  const forced = (await envVarAsync("CROSSMINT_ENV"))?.toLowerCase();
+  const key = (await envVarAsync("CROSSMINT_API_KEY")) || "";
   if (forced === "staging" || key.includes("staging") || key.startsWith("sk_staging")) {
     return "https://staging.crossmint.com";
   }
-  if (forced === "production" || key.includes("production") || key.startsWith("sk_production")) {
+  if (
+    forced === "production" ||
+    key.includes("production") ||
+    key.startsWith("sk_production")
+  ) {
     return "https://www.crossmint.com";
   }
-  // Default production for live keys; staging if unknown
-  return key.startsWith("sk_") && !key.includes("staging")
-    ? "https://www.crossmint.com"
-    : "https://staging.crossmint.com";
+  return "https://www.crossmint.com";
 }
 
-export function isCrossmintStaging(): boolean {
-  return crossmintBaseUrl().includes("staging");
+export async function isCrossmintStaging(): Promise<boolean> {
+  return (await crossmintBaseUrl()).includes("staging");
 }
 
-export function tokenLocatorFor(
+export async function tokenLocatorFor(
   asset: CrossmintAsset,
   network: "mainnet" | "devnet",
-): string {
+): Promise<string> {
   if (asset === "SOL") {
     return network === "devnet" ? SOL_DEVNET_LOCATOR : SOL_MAINNET_LOCATOR;
   }
-  // Staging always uses devnet USDC mint even if app is on "mainnet" UI
-  if (isCrossmintStaging()) return USDC_DEVNET_LOCATOR;
+  if (await isCrossmintStaging()) return USDC_DEVNET_LOCATOR;
   return network === "devnet" ? USDC_DEVNET_LOCATOR : USDC_MAINNET_LOCATOR;
 }
 
 export type CreateFundOrderOpts = {
   wallet: string;
-  amountUsd: string; // exact-in fiat USD, e.g. "10"
+  amountUsd: string;
   asset: CrossmintAsset;
   network: "mainnet" | "devnet";
   receiptEmail?: string;
@@ -94,7 +102,7 @@ export type CrossmintOrderResult = {
 export async function createCrossmintFundOrder(
   opts: CreateFundOrderOpts,
 ): Promise<CrossmintOrderResult> {
-  const key = envVar("CROSSMINT_API_KEY");
+  const key = await envVarAsync("CROSSMINT_API_KEY");
   if (!key) throw new Error("CROSSMINT_API_KEY not configured");
 
   const amount = String(opts.amountUsd).replace(/[^0-9.]/g, "");
@@ -103,8 +111,8 @@ export async function createCrossmintFundOrder(
     throw new Error("Amount must be between $1 and $5000");
   }
 
-  const locator = tokenLocatorFor(opts.asset, opts.network);
-  const base = crossmintBaseUrl();
+  const locator = await tokenLocatorFor(opts.asset, opts.network);
+  const base = await crossmintBaseUrl();
 
   const body = {
     lineItems: [
@@ -118,7 +126,7 @@ export async function createCrossmintFundOrder(
       },
     ],
     payment: {
-      method: "card",
+      method: "card" as const,
       ...(opts.receiptEmail
         ? { receiptEmail: opts.receiptEmail.slice(0, 256) }
         : {}),
@@ -137,9 +145,6 @@ export async function createCrossmintFundOrder(
     },
     body: JSON.stringify(body),
   });
-
-  // timeout via AbortController for wider runtime support
-  // (replaced AbortSignal.timeout above)
 
   const data = (await res.json()) as Record<string, unknown> & {
     error?: boolean | string;
@@ -165,7 +170,6 @@ export async function createCrossmintFundOrder(
   const payment = (order.payment || {}) as Record<string, unknown>;
   const prep = (payment.preparation || {}) as Record<string, unknown>;
 
-  // Hosted checkout deep link (if Crossmint returns one)
   const checkoutUrl =
     (typeof prep.checkoutUrl === "string" && prep.checkoutUrl) ||
     (typeof payment.checkoutUrl === "string" && payment.checkoutUrl) ||
@@ -180,8 +184,7 @@ export async function createCrossmintFundOrder(
       (typeof prep.stripeClientSecret === "string" && prep.stripeClientSecret) ||
       undefined,
     phase: typeof order.phase === "string" ? order.phase : undefined,
-    paymentStatus:
-      typeof payment.status === "string" ? payment.status : undefined,
+    paymentStatus: typeof payment.status === "string" ? payment.status : undefined,
     stripePublishableKey:
       (typeof prep.stripePublishableKey === "string" && prep.stripePublishableKey) ||
       undefined,
@@ -191,12 +194,11 @@ export async function createCrossmintFundOrder(
 }
 
 export async function getCrossmintOrder(orderId: string): Promise<Record<string, unknown>> {
-  const key = envVar("CROSSMINT_API_KEY");
+  const key = await envVarAsync("CROSSMINT_API_KEY");
   if (!key) throw new Error("CROSSMINT_API_KEY not configured");
-  const base = crossmintBaseUrl();
+  const base = await crossmintBaseUrl();
   const res = await fetch(`${base}/api/2022-06-09/orders/${encodeURIComponent(orderId)}`, {
     headers: { "x-api-key": key, "X-API-KEY": key },
-    signal: AbortSignal.timeout(20_000),
   });
   const data = (await res.json()) as Record<string, unknown> & { message?: string };
   if (!res.ok) throw new Error(data.message || `Get order failed (${res.status})`);

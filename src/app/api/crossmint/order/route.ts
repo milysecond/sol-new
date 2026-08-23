@@ -14,12 +14,14 @@ export const dynamic = "force-dynamic";
 const noStore = { "Cache-Control": "no-store" };
 
 export async function GET() {
+  const configured = await crossmintConfigured();
+  const staging = configured ? await isCrossmintStaging() : false;
   return NextResponse.json(
     {
-      ok: crossmintConfigured(),
-      configured: crossmintConfigured(),
-      env: isCrossmintStaging() ? "staging" : "production",
-      base: crossmintConfigured() ? crossmintBaseUrl() : null,
+      ok: configured,
+      configured,
+      env: staging ? "staging" : "production",
+      base: configured ? await crossmintBaseUrl() : null,
       assets: ["USDC", "SOL"],
       amountsUsd: [5, 10, 25, 50, 100],
       label: "Buy crypto with card / Apple Pay → wallet",
@@ -29,15 +31,14 @@ export async function GET() {
 }
 
 /**
- * POST { wallet, amountUsd, asset?: "USDC"|"SOL", network?: "mainnet"|"devnet", email? }
- * Creates Crossmint order — fiat in, token out to wallet (FOMO-style).
+ * POST { wallet, amountUsd, asset?, network?, email? }
  */
 export async function POST(req: NextRequest) {
-  if (!crossmintConfigured()) {
+  if (!(await crossmintConfigured())) {
     return NextResponse.json(
       {
         error:
-          "Crossmint not configured. Set CROSSMINT_API_KEY (server) in Worker secrets.",
+          "Crossmint not configured. Set CROSSMINT_API_KEY (server sk_…) in Worker secrets.",
       },
       { status: 503 },
     );
@@ -70,6 +71,7 @@ export async function POST(req: NextRequest) {
       network,
       receiptEmail: body.email?.trim(),
     });
+    const base = await crossmintBaseUrl();
     return NextResponse.json({
       ok: true,
       orderId: order.orderId,
@@ -80,10 +82,9 @@ export async function POST(req: NextRequest) {
       paymentStatus: order.paymentStatus,
       asset,
       amountUsd: parseFloat(amountUsd),
-      // Client can open Crossmint console payment page as fallback
       payUrl:
         order.checkoutUrl ||
-        `${crossmintBaseUrl().replace("staging.crossmint.com", "staging.crossmint.com").replace("www.crossmint.com", "www.crossmint.com")}/checkout/pay?orderId=${encodeURIComponent(order.orderId)}`,
+        `${base}/checkout?orderId=${encodeURIComponent(order.orderId)}`,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Crossmint failed";
