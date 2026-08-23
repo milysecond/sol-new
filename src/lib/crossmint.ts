@@ -1,13 +1,7 @@
 /**
- * Crossmint headless checkout — fiat → Solana tokens into user's wallet.
- * FOMO-style: Apple Pay / card → USDC or SOL lands on-chain.
- *
- * Env:
- *   CROSSMINT_API_KEY (server sk_…) — required (Worker secret)
- *   CROSSMINT_CLIENT_KEY / NEXT_PUBLIC_CROSSMINT_CLIENT_KEY (optional ck_…)
- *   CROSSMINT_ENV = staging | production
+ * Crossmint headless checkout — fiat → Solana tokens.
+ * USDC to external wallets: create smart wallet (user pubkey = admin), fund that.
  */
-
 async function envVarAsync(name: string): Promise<string | undefined> {
   try {
     const { getCloudflareContext } = await import("@opennextjs/cloudflare");
@@ -18,7 +12,6 @@ async function envVarAsync(name: string): Promise<string | undefined> {
     /* ignore */
   }
   try {
-    // sync fallback
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getCloudflareContext } = require("@opennextjs/cloudflare") as {
       getCloudflareContext: (opts?: { async?: boolean }) => {
@@ -39,12 +32,10 @@ export const USDC_MAINNET_LOCATOR =
   "solana:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 export const USDC_DEVNET_LOCATOR =
   "solana:4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
-export const SOL_MAINNET_LOCATOR =
-  "solana:So11111111111111111111111111111111111111112";
-export const SOL_DEVNET_LOCATOR =
-  "solana:So11111111111111111111111111111111111111112";
+export const XMEME_STAGING_LOCATOR =
+  "solana:7EivYFyNfgGj8xbUymR7J4LuxUHLKRzpLaERHLvi7Dgu";
 
-export type CrossmintAsset = "USDC" | "SOL";
+export type CrossmintAsset = "USDC" | "SOL" | "XMEME";
 
 export async function crossmintConfigured(): Promise<boolean> {
   return Boolean(await envVarAsync("CROSSMINT_API_KEY"));
@@ -56,13 +47,6 @@ export async function crossmintBaseUrl(): Promise<string> {
   if (forced === "staging" || key.includes("staging") || key.startsWith("sk_staging")) {
     return "https://staging.crossmint.com";
   }
-  if (
-    forced === "production" ||
-    key.includes("production") ||
-    key.startsWith("sk_production")
-  ) {
-    return "https://www.crossmint.com";
-  }
   return "https://www.crossmint.com";
 }
 
@@ -70,15 +54,50 @@ export async function isCrossmintStaging(): Promise<boolean> {
   return (await crossmintBaseUrl()).includes("staging");
 }
 
-export async function tokenLocatorFor(
-  asset: CrossmintAsset,
-  network: "mainnet" | "devnet",
-): Promise<string> {
+export async function tokenLocatorFor(asset: CrossmintAsset): Promise<string> {
+  const staging = await isCrossmintStaging();
+  if (asset === "XMEME") return XMEME_STAGING_LOCATOR;
   if (asset === "SOL") {
-    return network === "devnet" ? SOL_DEVNET_LOCATOR : SOL_MAINNET_LOCATOR;
+    throw new Error("Native SOL buy is not supported by Crossmint yet — use USDC");
   }
-  if (await isCrossmintStaging()) return USDC_DEVNET_LOCATOR;
-  return network === "devnet" ? USDC_DEVNET_LOCATOR : USDC_MAINNET_LOCATOR;
+  return staging ? USDC_DEVNET_LOCATOR : USDC_MAINNET_LOCATOR;
+}
+
+export async function ensureSmartWalletForExternal(
+  userWallet: string,
+): Promise<{ address: string }> {
+  const key = await envVarAsync("CROSSMINT_API_KEY");
+  if (!key) throw new Error("CROSSMINT_API_KEY not configured");
+  const base = await crossmintBaseUrl();
+
+  const res = await fetch(`${base}/api/2025-06-09/wallets`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": key.trim(),
+    },
+    body: JSON.stringify({
+      chainType: "solana",
+      type: "smart",
+      owner: `userId:solnew-${userWallet.slice(0, 20)}`,
+      config: {
+        adminSigner: {
+          type: "external-wallet",
+          address: userWallet,
+        },
+      },
+    }),
+  });
+
+  const data = (await res.json()) as {
+    address?: string;
+    message?: string;
+  };
+
+  if (!res.ok || !data.address) {
+    throw new Error(data.message || `Create smart wallet failed (${res.status})`);
+  }
+  return { address: data.address };
 }
 
 export type CreateFundOrderOpts = {
@@ -94,8 +113,9 @@ export type CrossmintOrderResult = {
   clientSecret?: string;
   phase?: string;
   paymentStatus?: string;
-  stripePublishableKey?: string;
-  checkoutUrl?: string;
+  deliveryWallet: string;
+  adminWallet: string;
+  usedSmartWallet: boolean;
   raw: Record<string, unknown>;
 };
 
@@ -111,8 +131,18 @@ export async function createCrossmintFundOrder(
     throw new Error("Amount must be between $1 and $5000");
   }
 
-  const locator = await tokenLocatorFor(opts.asset, opts.network);
+  const locator = await tokenLocatorFor(opts.asset);
   const base = await crossmintBaseUrl();
+
+  let deliveryWallet = opts.wallet;
+  let usedSmartWallet = false;
+
+  // USDC needs smart wallet for external (passkey) recipients
+  if (opts.asset === "USDC") {
+    const sw = await ensureSmartWalletForExternal(opts.wallet);
+    deliveryWallet = sw.address;
+    usedSmartWallet = true;
+  }
 
   const body = {
     lineItems: [
@@ -132,7 +162,7 @@ export async function createCrossmintFundOrder(
         : {}),
     },
     recipient: {
-      walletAddress: opts.wallet,
+      walletAddress: deliveryWallet,
     },
   };
 
@@ -162,18 +192,10 @@ export async function createCrossmintFundOrder(
 
   const order = (data.order || data) as Record<string, unknown>;
   const orderId = String(order.orderId || order.id || "");
-  if (!orderId) {
-    throw new Error("Crossmint did not return an order id");
-  }
+  if (!orderId) throw new Error("Crossmint did not return an order id");
 
   const payment = (order.payment || {}) as Record<string, unknown>;
   const prep = (payment.preparation || {}) as Record<string, unknown>;
-
-  const checkoutUrl =
-    (typeof prep.checkoutUrl === "string" && prep.checkoutUrl) ||
-    (typeof payment.checkoutUrl === "string" && payment.checkoutUrl) ||
-    (typeof order.checkoutUrl === "string" && order.checkoutUrl) ||
-    undefined;
 
   return {
     orderId,
@@ -184,22 +206,9 @@ export async function createCrossmintFundOrder(
       undefined,
     phase: typeof order.phase === "string" ? order.phase : undefined,
     paymentStatus: typeof payment.status === "string" ? payment.status : undefined,
-    stripePublishableKey:
-      (typeof prep.stripePublishableKey === "string" && prep.stripePublishableKey) ||
-      undefined,
-    checkoutUrl,
+    deliveryWallet,
+    adminWallet: opts.wallet,
+    usedSmartWallet,
     raw: data as Record<string, unknown>,
   };
-}
-
-export async function getCrossmintOrder(orderId: string): Promise<Record<string, unknown>> {
-  const key = await envVarAsync("CROSSMINT_API_KEY");
-  if (!key) throw new Error("CROSSMINT_API_KEY not configured");
-  const base = await crossmintBaseUrl();
-  const res = await fetch(`${base}/api/2022-06-09/orders/${encodeURIComponent(orderId)}`, {
-    headers: { "x-api-key": key, "X-API-KEY": key },
-  });
-  const data = (await res.json()) as Record<string, unknown> & { message?: string };
-  if (!res.ok) throw new Error(data.message || `Get order failed (${res.status})`);
-  return data;
 }

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { CreditCard } from "lucide-react";
+import { CreditCard, Copy, Check } from "lucide-react";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { Spinner } from "@/components/spinner";
 import { ActionButton } from "@/components/action-button";
+import { friendlyError } from "@/lib/friendly-errors";
 
 const AMOUNTS = [5, 10, 25, 50, 100] as const;
 
@@ -16,45 +17,23 @@ const CLIENT_KEY =
       process.env.NEXT_PUBLIC_CROSSMINT_API_KEY)) ||
   "";
 
-const USDC_MAINNET = "solana:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-const USDC_DEVNET = "solana:4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
-const SOL_MINT = "solana:So11111111111111111111111111111111111111112";
-
-function locator(asset: "USDC" | "SOL", network: string, staging: boolean) {
-  if (asset === "SOL") return SOL_MINT;
-  if (staging || network === "devnet") return USDC_DEVNET;
-  return USDC_MAINNET;
-}
-
 const EmbeddedCheckout = dynamic(
   () =>
     import("@crossmint/client-sdk-react-ui").then((m) => {
       function Inner(props: {
         apiKey: string;
-        tokenLocator: string;
-        amount: string;
-        wallet: string;
-        email?: string;
+        orderId: string;
+        clientSecret?: string;
       }) {
         return (
           <m.CrossmintProvider apiKey={props.apiKey}>
             <div className="min-h-[360px] w-full rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-950">
               <m.CrossmintEmbeddedCheckout
-                lineItems={{
-                  tokenLocator: props.tokenLocator,
-                  executionParameters: {
-                    mode: "exact-in",
-                    amount: props.amount,
-                    maxSlippageBps: "500",
-                  },
-                }}
-                recipient={{ walletAddress: props.wallet }}
+                orderId={props.orderId}
+                clientSecret={props.clientSecret}
                 payment={{
                   crypto: { enabled: false },
-                  fiat: {
-                    enabled: true,
-                    ...(props.email ? { defaultReceiptEmail: props.email } : {}),
-                  },
+                  fiat: { enabled: true },
                 }}
               />
             </div>
@@ -67,27 +46,27 @@ const EmbeddedCheckout = dynamic(
     ssr: false,
     loading: () => (
       <div className="min-h-[200px] flex items-center justify-center gap-2 text-xs text-gray-500">
-        <Spinner size={14} /> Loading Apple Pay checkout…
+        <Spinner size={14} /> Loading checkout…
       </div>
     ),
   },
 );
 
-/**
- * FOMO-style fund: card/Apple Pay → USDC/SOL to passkey wallet.
- * Prefers client-side embedded checkout (browser IP) — works when Worker
- * egress is blocked by Crossmint.
- */
 export function CrossmintFundCard() {
   const { publicKey } = useWallet();
   const { network } = useNetwork();
-  const [serverOk, setServerOk] = useState<boolean | null>(null);
-  const [envLabel, setEnvLabel] = useState("production");
-  const [asset, setAsset] = useState<"USDC" | "SOL">("USDC");
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const [envLabel, setEnvLabel] = useState("staging");
+  const [asset, setAsset] = useState<"USDC" | "XMEME">("USDC");
   const [amount, setAmount] = useState(25);
   const [email, setEmail] = useState("");
-  const [open, setOpen] = useState(false);
-  const [serverError, setServerError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | undefined>();
+  const [deliveryWallet, setDeliveryWallet] = useState<string | null>(null);
+  const [usedSmart, setUsedSmart] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let c = false;
@@ -96,11 +75,11 @@ export function CrossmintFundCard() {
         const r = await fetch("/api/crossmint/order", { cache: "no-store" });
         const d = (await r.json()) as { configured?: boolean; env?: string };
         if (!c) {
-          setServerOk(d.configured === true);
+          setConfigured(d.configured === true);
           if (d.env) setEnvLabel(d.env);
         }
       } catch {
-        if (!c) setServerOk(false);
+        if (!c) setConfigured(false);
       }
     })();
     return () => {
@@ -108,16 +87,47 @@ export function CrossmintFundCard() {
     };
   }, []);
 
-  const staging = envLabel === "staging" || (CLIENT_KEY && CLIENT_KEY.includes("staging"));
-  const tokenLocator = useMemo(
-    () => locator(asset, network, Boolean(staging)),
-    [asset, network, staging],
-  );
+  const start = useCallback(async () => {
+    if (!publicKey) return;
+    setBusy(true);
+    setError(null);
+    setOrderId(null);
+    setClientSecret(undefined);
+    try {
+      const res = await fetch("/api/crossmint/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet: publicKey,
+          amountUsd: amount,
+          asset,
+          network,
+          email: email.trim() || undefined,
+        }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        orderId?: string;
+        clientSecret?: string;
+        deliveryWallet?: string;
+        usedSmartWallet?: boolean;
+      };
+      if (!res.ok || !data.ok || !data.orderId) {
+        throw new Error(data.error || "Could not start Crossmint checkout");
+      }
+      setOrderId(data.orderId);
+      setClientSecret(data.clientSecret);
+      setDeliveryWallet(data.deliveryWallet || null);
+      setUsedSmart(Boolean(data.usedSmartWallet));
+    } catch (e) {
+      setError(friendlyError(e, "Crossmint checkout failed."));
+    } finally {
+      setBusy(false);
+    }
+  }, [publicKey, amount, asset, network, email]);
 
-  const hasClient = Boolean(CLIENT_KEY);
-  const ready = hasClient || serverOk;
-
-  if (serverOk === null && !CLIENT_KEY) {
+  if (configured === null) {
     return (
       <div className="rounded-xl border border-black/10 dark:border-white/10 p-4 text-xs text-gray-500 flex items-center gap-2">
         <Spinner size={14} /> Checking Crossmint…
@@ -125,35 +135,10 @@ export function CrossmintFundCard() {
     );
   }
 
-  if (!ready) {
+  if (!configured) {
     return (
-      <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 text-xs text-amber-800 dark:text-amber-200/90 space-y-2">
-        <p className="font-semibold">Crossmint needs a client key for checkout</p>
-        <p className="leading-relaxed opacity-90">
-          Production server key is saved, but <strong>onramp isn’t enabled</strong> on this
-          Crossmint project yet (and Worker IPs may be blocked).
-        </p>
-        <ol className="list-decimal pl-4 space-y-1 opacity-90">
-          <li>
-            Console → API Keys → create <code className="font-mono">ck_production_…</code>{" "}
-            (client) with orders scope
-          </li>
-          <li>
-            Set <code className="font-mono">NEXT_PUBLIC_CROSSMINT_CLIENT_KEY</code> and redeploy
-          </li>
-          <li>
-            Or enable production onramp:{" "}
-            <a
-              className="underline"
-              href="https://www.crossmint.com/contact/sales"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              crossmint.com/contact/sales
-            </a>
-          </li>
-          <li>Or test with a <code className="font-mono">sk_staging_…</code> key first</li>
-        </ol>
+      <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 text-xs text-amber-800 dark:text-amber-200/90">
+        Crossmint not configured (missing server key).
       </div>
     );
   }
@@ -165,19 +150,23 @@ export function CrossmintFundCard() {
           <CreditCard size={16} className="text-sky-500" /> Buy crypto
         </p>
         <span className="text-[10px] uppercase tracking-wide font-semibold text-sky-700 dark:text-sky-300 bg-sky-500/10 px-2 py-0.5 rounded-full">
-          Crossmint · {staging ? "staging" : "production"}
+          Crossmint · {envLabel}
         </span>
       </div>
       <p className="text-xs text-gray-500 dark:text-white/45 leading-relaxed">
         FOMO-style: Apple Pay / card →{" "}
-        <strong className="text-gray-800 dark:text-white/80">{asset}</strong> lands in your
-        connected wallet. Real on-chain funds.
+        <strong className="text-gray-800 dark:text-white/80">{asset}</strong> on Solana.
+        {envLabel === "staging" ? " Staging uses devnet tokens." : ""}
       </p>
 
-      {!open && (
+      {!orderId && (
         <>
           <div className="flex gap-1.5">
-            {(["USDC", "SOL"] as const).map((a) => (
+            {(
+              envLabel === "staging"
+                ? (["USDC", "XMEME"] as const)
+                : (["USDC"] as const)
+            ).map((a) => (
               <button
                 key={a}
                 type="button"
@@ -188,7 +177,7 @@ export function CrossmintFundCard() {
                     : "border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60"
                 }`}
               >
-                {a}
+                {a === "XMEME" ? "Test token" : a}
               </button>
             ))}
           </div>
@@ -218,86 +207,80 @@ export function CrossmintFundCard() {
             className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-2.5 text-base sm:text-sm text-gray-900 dark:text-white placeholder:text-gray-400"
           />
           <ActionButton
-            idleLabel={
-              hasClient ? `Buy $${amount} ${asset}` : `Try buy $${amount} ${asset}`
-            }
+            state={busy ? "loading" : "idle"}
+            idleLabel={`Buy $${amount} ${asset === "XMEME" ? "test token" : asset}`}
+            loadingLabel="Creating order…"
             disabled={!publicKey}
-            onClick={() => {
-              setServerError(null);
-              if (hasClient) {
-                setOpen(true);
-                return;
-              }
-              // Server-side fallback
-              void (async () => {
-                try {
-                  const res = await fetch("/api/crossmint/order", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      wallet: publicKey,
-                      amountUsd: amount,
-                      asset,
-                      network,
-                      email: email.trim() || undefined,
-                    }),
-                  });
-                  const data = (await res.json()) as {
-                    ok?: boolean;
-                    error?: string;
-                    payUrl?: string;
-                    checkoutUrl?: string;
-                  };
-                  if (!res.ok || !data.ok) {
-                    setServerError(
-                      data.error ||
-                        "Crossmint production onramp not enabled. Add a client key (ck_…) or enable onramp with Crossmint sales.",
-                    );
-                    return;
-                  }
-                  const url = data.checkoutUrl || data.payUrl;
-                  if (url) window.location.assign(url);
-                  else setServerError("Order created but no checkout URL returned.");
-                } catch (e) {
-                  setServerError(e instanceof Error ? e.message : "Checkout failed");
-                }
-              })();
-            }}
+            onClick={() => void start()}
           />
         </>
       )}
 
-      {open && hasClient && publicKey && (
-        <div className="space-y-2">
-          <EmbeddedCheckout
-            apiKey={CLIENT_KEY}
-            tokenLocator={tokenLocator}
-            amount={String(amount)}
-            wallet={publicKey}
-            email={email.trim() || undefined}
-          />
+      {orderId && (
+        <div className="space-y-3">
+          {usedSmart && deliveryWallet && (
+            <div className="rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 px-3 py-2 text-[11px] text-gray-600 dark:text-white/60 space-y-1">
+              <p>
+                Funds land in your <strong>Crossmint smart wallet</strong> (you are admin via
+                passkey):
+              </p>
+              <button
+                type="button"
+                className="font-mono text-sky-600 dark:text-sky-300 break-all text-left inline-flex items-start gap-1"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(deliveryWallet);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+              >
+                {deliveryWallet} {copied ? <Check size={12} /> : <Copy size={12} />}
+              </button>
+            </div>
+          )}
+
+          {CLIENT_KEY ? (
+            <EmbeddedCheckout
+              apiKey={CLIENT_KEY}
+              orderId={orderId}
+              clientSecret={clientSecret}
+            />
+          ) : (
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              Order <span className="font-mono">{orderId}</span> created. Add{" "}
+              <code className="font-mono">NEXT_PUBLIC_CROSSMINT_CLIENT_KEY</code> for embedded
+              Apple Pay UI.
+            </p>
+          )}
+
           <button
             type="button"
             className="text-xs text-gray-500 underline w-full text-center py-2"
-            onClick={() => setOpen(false)}
+            onClick={() => {
+              setOrderId(null);
+              setClientSecret(undefined);
+              setDeliveryWallet(null);
+            }}
           >
-            Cancel / change amount
+            Cancel / new amount
           </button>
         </div>
       )}
 
-      {serverError && (
+      {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-500 dark:text-red-400 text-xs leading-relaxed">
-          {serverError}
+          {error}
         </div>
       )}
 
       <p className="text-[11px] text-gray-400 dark:text-white/30 leading-snug">
-        To:{" "}
+        Connected:{" "}
         <span className="font-mono">
-          {publicKey ? `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}` : "connect wallet"}
+          {publicKey ? `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}` : "—"}
         </span>
-        {staging ? " · staging/devnet tokens" : " · mainnet"}
       </p>
     </div>
   );

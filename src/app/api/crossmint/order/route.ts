@@ -22,9 +22,12 @@ export async function GET() {
       configured,
       env: staging ? "staging" : "production",
       base: configured ? await crossmintBaseUrl() : null,
-      assets: ["USDC", "SOL"],
+      assets: staging ? ["USDC", "XMEME"] : ["USDC"],
       amountsUsd: [5, 10, 25, 50, 100],
       label: "Buy crypto with card / Apple Pay → wallet",
+      note: staging
+        ? "Staging: USDC → Crossmint smart wallet (your passkey is admin). XMEME can go direct."
+        : "Production onramp may require Crossmint enablement.",
     },
     { headers: noStore },
   );
@@ -33,7 +36,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   if (!(await crossmintConfigured())) {
     return NextResponse.json(
-      { error: "Crossmint not configured. Set CROSSMINT_API_KEY Worker secret." },
+      { error: "Crossmint not configured. Set CROSSMINT_API_KEY." },
       { status: 503 },
     );
   }
@@ -53,7 +56,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid Solana wallet" }, { status: 400 });
   }
 
-  const asset = (body.asset === "SOL" ? "SOL" : "USDC") as CrossmintAsset;
+  const assetRaw = (body.asset || "USDC").toUpperCase();
+  const asset = (
+    assetRaw === "XMEME" ? "XMEME" : assetRaw === "SOL" ? "SOL" : "USDC"
+  ) as CrossmintAsset;
   const network = body.network === "devnet" ? "devnet" : "mainnet";
   const amountUsd = String(body.amountUsd ?? "10");
 
@@ -65,32 +71,28 @@ export async function POST(req: NextRequest) {
       network,
       receiptEmail: body.email?.trim(),
     });
-    const base = await crossmintBaseUrl();
     return NextResponse.json({
       ok: true,
       orderId: order.orderId,
       clientSecret: order.clientSecret,
-      stripePublishableKey: order.stripePublishableKey,
-      checkoutUrl: order.checkoutUrl,
       phase: order.phase,
       paymentStatus: order.paymentStatus,
       asset,
       amountUsd: parseFloat(amountUsd),
-      payUrl:
-        order.checkoutUrl ||
-        `${base}/checkout?orderId=${encodeURIComponent(order.orderId)}`,
+      deliveryWallet: order.deliveryWallet,
+      adminWallet: order.adminWallet,
+      usedSmartWallet: order.usedSmartWallet,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Crossmint failed";
     console.error("[crossmint/order]", msg);
-    // Friendlier copy for the two known blockers
     let out = msg;
     if (/onramp is not yet enabled/i.test(msg)) {
       out =
-        "Crossmint production onramp isn’t enabled on this project yet. Test with a staging key (sk_staging_…) or ask Crossmint to enable production onramp (crossmint.com/contact/sales). Meanwhile add NEXT_PUBLIC_CROSSMINT_CLIENT_KEY (ck_…) for in-browser checkout.";
+        "Production onramp not enabled. Use staging keys or contact Crossmint sales.";
     } else if (/malformed api key/i.test(msg)) {
       out =
-        "Crossmint rejected the server request (often Worker IP). Use a client key (ck_production_…) via NEXT_PUBLIC_CROSSMINT_CLIENT_KEY for embedded checkout, or contact Crossmint.";
+        "Crossmint rejected the server key from this network. Prefer embedded client checkout (ck_…) or staging.";
     }
     return NextResponse.json({ error: out }, { status: 502 });
   }
