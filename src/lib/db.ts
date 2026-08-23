@@ -1911,9 +1911,11 @@ export async function creditWalletFromStripe(opts: {
   stripeSessionId: string;
   note?: string;
 }): Promise<{ balanceCents: number; applied: boolean }> {
-  const wallet = opts.wallet;
+  const wallet = opts.wallet.trim();
   const delta = Math.floor(opts.deltaCents);
+  if (!wallet) throw new Error("wallet required");
   if (delta <= 0) throw new Error("delta must be positive");
+  if (!opts.stripeSessionId) throw new Error("stripeSessionId required");
 
   // Already applied?
   const existing = await db.execute({
@@ -1933,6 +1935,32 @@ export async function creditWalletFromStripe(opts: {
   const cur = await getCreditBalanceCents(wallet);
   const next = cur + delta;
 
+  try {
+    await db.execute({
+      sql: `INSERT INTO credit_ledger (wallet, delta_cents, balance_after, kind, stripe_session_id, note)
+            VALUES (?, ?, ?, 'purchase', ?, ?)`,
+      args: [wallet, delta, next, opts.stripeSessionId, opts.note || "credits pack"],
+    });
+  } catch (e) {
+    // Unique race: another writer applied the same session
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/unique|constraint/i.test(msg)) {
+      const again = await db.execute({
+        sql: "SELECT balance_after FROM credit_ledger WHERE stripe_session_id = ? LIMIT 1",
+        args: [opts.stripeSessionId],
+      });
+      if (again.rows[0]) {
+        return {
+          balanceCents: Number(
+            (again.rows[0] as unknown as { balance_after?: number }).balance_after ?? 0,
+          ),
+          applied: false,
+        };
+      }
+    }
+    throw e;
+  }
+
   await db.execute({
     sql: `INSERT INTO credit_balances (wallet, balance_cents, updated_at)
           VALUES (?, ?, datetime('now'))
@@ -1940,11 +1968,6 @@ export async function creditWalletFromStripe(opts: {
             balance_cents = excluded.balance_cents,
             updated_at = datetime('now')`,
     args: [wallet, next],
-  });
-  await db.execute({
-    sql: `INSERT INTO credit_ledger (wallet, delta_cents, balance_after, kind, stripe_session_id, note)
-          VALUES (?, ?, ?, 'purchase', ?, ?)`,
-    args: [wallet, delta, next, opts.stripeSessionId, opts.note || "credits pack"],
   });
   return { balanceCents: next, applied: true };
 }

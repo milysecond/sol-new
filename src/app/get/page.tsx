@@ -19,6 +19,7 @@ function CreditsBuySection() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!publicKey) {
@@ -44,26 +45,87 @@ function CreditsBuySection() {
     void refresh();
   }, [refresh]);
 
+  // Apply credit after Stripe return — retry until paid + ledger write
   useEffect(() => {
-    try {
-      const q = new URLSearchParams(window.location.search);
-      if (q.get("credits") === "success") {
+    if (!publicKey) return;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const q = new URLSearchParams(window.location.search);
+        const successQ = q.get("credits") === "success";
+        const sid =
+          q.get("session_id") ||
+          sessionStorage.getItem("sol.new.credits.session") ||
+          "";
+        if (successQ && sid) {
+          try {
+            sessionStorage.setItem("sol.new.credits.session", sid);
+          } catch {
+            /* ignore */
+          }
+        }
+        if (!sid || !sid.startsWith("cs_")) return;
+        if (!successQ && !sessionStorage.getItem("sol.new.credits.session")) return;
+
         setSuccess(true);
-        const sid = q.get("session_id");
-        if (sid && publicKey) {
-          void fetch("/api/credits/confirm", {
+        setConfirming(true);
+        setError(null);
+
+        for (let i = 0; i < 8 && !cancelled; i++) {
+          const res = await fetch("/api/credits/confirm", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ sessionId: sid, wallet: publicKey }),
-          }).then(() => refresh());
-        } else {
-          void refresh();
+          });
+          const data = (await res.json()) as {
+            ok?: boolean;
+            paid?: boolean;
+            applied?: boolean;
+            balanceCredits?: number;
+            balanceCents?: number;
+            retry?: boolean;
+            error?: string;
+            status?: string;
+          };
+          if (res.ok && data.ok && data.paid) {
+            setBalance(Number(data.balanceCredits ?? data.balanceCents ?? 0));
+            try {
+              sessionStorage.removeItem("sol.new.credits.session");
+              const url = new URL(window.location.href);
+              url.searchParams.delete("credits");
+              url.searchParams.delete("session_id");
+              window.history.replaceState({}, "", url.pathname + url.search);
+            } catch {
+              /* ignore */
+            }
+            setConfirming(false);
+            void refresh();
+            return;
+          }
+          if (data.retry || data.status === "unpaid" || data.status === "processing") {
+            await new Promise((r) => setTimeout(r, 1500 + i * 500));
+            continue;
+          }
+          if (data.error) {
+            setError(data.error);
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 1200));
+        }
+        setConfirming(false);
+        void refresh();
+      } catch (e) {
+        if (!cancelled) {
+          setConfirming(false);
+          setError(e instanceof Error ? e.message : "Could not confirm payment");
         }
       }
-    } catch {
-      /* ignore */
-    }
-  }, [refresh, publicKey]);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [publicKey, refresh]);
 
   const buy = async () => {
     if (!publicKey) return;
@@ -75,11 +137,22 @@ function CreditsBuySection() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ wallet: publicKey }),
       });
-      const data = (await res.json()) as { ok?: boolean; url?: string; error?: string };
+      const data = (await res.json()) as {
+        ok?: boolean;
+        url?: string;
+        sessionId?: string;
+        error?: string;
+      };
       if (!res.ok || !data.ok || !data.url) {
         throw new Error(data.error || "Could not start checkout");
       }
-      // Same-tab for Apple Pay on iOS Safari
+      if (data.sessionId) {
+        try {
+          sessionStorage.setItem("sol.new.credits.session", data.sessionId);
+        } catch {
+          /* ignore */
+        }
+      }
       window.location.assign(data.url);
     } catch (e) {
       setError(friendlyError(e, "Checkout failed."));
@@ -108,8 +181,8 @@ function CreditsBuySection() {
       </div>
       <p className="text-xs text-gray-500 dark:text-white/45 leading-relaxed">
         <strong className="font-semibold text-gray-800 dark:text-white/80">Live:</strong> buy{" "}
-        <strong className="font-semibold">A$5</strong> sol.new credits with Apple Pay or card (Stripe).
-        Digital credit for fees, links, and drops — not a crypto purchase.
+        <strong className="font-semibold">A$5</strong> sol.new credits with Apple Pay or card
+        (Stripe). Digital credit for fees, links, and drops — not a crypto purchase.
       </p>
 
       <div className="flex items-center justify-between rounded-xl bg-black/5 dark:bg-white/5 px-4 py-3">
@@ -121,23 +194,38 @@ function CreditsBuySection() {
       </div>
 
       {success && (
-        <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-lg px-3 py-2 text-emerald-700 dark:text-emerald-300 text-xs">
-          Payment received — credits will appear within a few seconds. Pull to refresh if needed.
+        <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-lg px-3 py-2 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2">
+          {confirming ? <Spinner size={12} /> : <Check size={14} className="shrink-0" />}
+          {confirming
+            ? "Payment received — applying credits…"
+            : balance > 0
+              ? `Credits updated — balance ${balance.toLocaleString()}.`
+              : "Payment received — refreshing balance…"}
         </div>
       )}
 
       <button
         type="button"
         onClick={() => void buy()}
-        disabled={busy || !publicKey}
-        className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2"
+        disabled={busy || !publicKey || confirming}
+        className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2 min-h-[48px] touch-manipulation active:scale-[0.98]"
       >
         {busy ? <Spinner size={16} /> : null}
         Buy A$5 credits — Apple Pay
       </button>
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs">
-          {error}
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs space-y-1">
+          <p>{error}</p>
+          <button
+            type="button"
+            className="underline font-medium"
+            onClick={() => {
+              setError(null);
+              void refresh();
+            }}
+          >
+            Refresh balance
+          </button>
         </div>
       )}
       <p className="text-[11px] text-gray-400 dark:text-white/30">
@@ -228,8 +316,8 @@ export default function GetPage() {
               </div>
             )}
 
-            {/* Stripe live credits — mainnet only */}
-            {network === "mainnet" && <CreditsBuySection />}
+            {/* Stripe credits — always mounted so return-from-Checkout confirm runs */}
+            <CreditsBuySection />
 
             {/* MoneyGram — sandbox/test only (devnet) */}
             {network === "devnet" && <MoneyGramRampsCard />}
