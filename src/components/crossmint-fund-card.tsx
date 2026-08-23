@@ -92,7 +92,9 @@ export function CrossmintFundCard() {
   const { network } = useNetwork();
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [envLabel, setEnvLabel] = useState("staging");
-  const [asset, setAsset] = useState<"USDC" | "XMEME">("USDC");
+  // Staging default = token checkout (FOMO path) — works in AU.
+  // USDC uses Onramp product, which is geo-gated (AU often blocked on staging).
+  const [asset, setAsset] = useState<"USDC" | "XMEME">("XMEME");
   const [amount, setAmount] = useState(25);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -231,6 +233,29 @@ export function CrossmintFundCard() {
         </strong>
         {envLabel === "staging" ? " (staging / devnet)." : "."}
       </p>
+      {envLabel === "staging" && (
+        <div className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-[11px] text-sky-900 dark:text-sky-100/90 leading-relaxed space-y-1">
+          <p className="font-semibold">Why FOMO works in Aus · we didn’t (until now)</p>
+          <p>
+            <strong>FOMO</strong> uses Crossmint <em>Token Checkout</em> (buy a specific coin with
+            Apple Pay) — available in almost all countries.
+          </p>
+          <p>
+            <strong>USDC “fund wallet”</strong> uses Crossmint <em>Onramp</em> — separate product,
+            IP-gated. Staging often shows “Not available in your country” from Australia.
+          </p>
+          <p>
+            Use <strong>Test token</strong> here to verify Apple Pay (FOMO-style). For real AU
+            funding until production onramp is enabled: deposit crypto, or Stripe credits below.
+          </p>
+        </div>
+      )}
+      {asset === "USDC" && (
+        <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-900 dark:text-amber-100/90 leading-relaxed">
+          USDC = Onramp. If you see “Not available in your country”, that’s Crossmint geo — switch
+          to <strong>Test token</strong> or fund via crypto transfer.
+        </div>
+      )}
 
       {!orderId && (
         <>
