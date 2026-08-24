@@ -11,7 +11,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Move,
+  Sparkles,
 } from "lucide-react";
+import { useWallet } from "@/lib/wallet-context";
+import { useNetwork } from "@/lib/network";
+import { ConnectGate } from "@/components/connect-gate";
+import { friendlyError } from "@/lib/friendly-errors";
 
 type TemplateBox = {
   id: string;
@@ -45,6 +50,11 @@ type SortMode = "new" | "random" | "featured";
 const MEMES_API = "https://memes.sol.new";
 const WATERMARK = "sol.new";
 const PAGE_SIZE = 18;
+/** Same vault as custom short links */
+const MEME_WM_FEE_VAULT = "Deqi6CBfo2FR2XVZXxSwmcjELy1JdbAXWDNFPzDAbtxW";
+const MEME_WM_FEE_SOL = 0.01;
+const MEME_WM_FEE_LAMPORTS = 10_000_000;
+const MEME_WM_UNLOCK_KEY = "solnew.memes.wmUnlock";
 
 function shuffleInPlace<T>(arr: T[], seed: number): T[] {
   let s = seed >>> 0;
@@ -155,7 +165,25 @@ function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.restore();
 }
 
+function loadWmUnlock(): boolean {
+  try {
+    return sessionStorage.getItem(MEME_WM_UNLOCK_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveWmUnlock() {
+  try {
+    sessionStorage.setItem(MEME_WM_UNLOCK_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function MemesPage() {
+  const { publicKey, balance, refreshBalance } = useWallet();
+  const { network, rpc } = useNetwork();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Template | null>(null);
@@ -173,6 +201,11 @@ export default function MemesPage() {
   /** When a meme is selected, hide the grid until user taps Change blank */
   const [picking, setPicking] = useState(true);
   const [draggingText, setDraggingText] = useState(false);
+  /** Paid unlock — no watermark on export for this browser session */
+  const [wmUnlocked, setWmUnlocked] = useState(false);
+  const [payBusy, setPayBusy] = useState(false);
+  const [payErr, setPayErr] = useState<string | null>(null);
+  const [payStatus, setPayStatus] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
@@ -184,6 +217,10 @@ export default function MemesPage() {
     origX: number;
     origY: number;
   } | null>(null);
+
+  useEffect(() => {
+    setWmUnlocked(loadWmUnlock());
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -368,16 +405,19 @@ export default function MemesPage() {
         });
       });
 
-      drawWatermark(ctx, w, h);
+      // Watermark on preview + free export; paid unlock skips it
+      if (!wmUnlocked) {
+        drawWatermark(ctx, w, h);
+      }
     },
-    [activeBox],
+    [activeBox, wmUnlocked],
   );
 
   useEffect(() => {
     if (selected) {
       renderToCanvas(selected, captions, boxes, { guides: activeBox != null }).catch(() => {});
     }
-  }, [selected, captions, boxes, activeBox, renderToCanvas]);
+  }, [selected, captions, boxes, activeBox, renderToCanvas, wmUnlocked]);
 
   // Prevent page scroll while dragging caption boxes (esp. mobile)
   useEffect(() => {
@@ -521,6 +561,68 @@ export default function MemesPage() {
     }
   };
 
+  const unlockWatermark = useCallback(async () => {
+    setPayErr(null);
+    setPayStatus(null);
+    if (wmUnlocked) return;
+    if (network === "devnet") {
+      setPayErr("Watermark unlock is paid on mainnet. Switch to live network.");
+      return;
+    }
+    if (!publicKey) {
+      setPayErr("Connect your wallet to pay 0.01 SOL.");
+      return;
+    }
+    if ((balance ?? 0) < MEME_WM_FEE_SOL + 0.00001) {
+      setPayErr(`Need ${MEME_WM_FEE_SOL} SOL plus a tiny network fee.`);
+      return;
+    }
+    setPayBusy(true);
+    try {
+      setPayStatus("Paying 0.01 SOL…");
+      const { getPasskeyKeypair } = await import("@/lib/passkey-wallet");
+      const { Connection, PublicKey, SystemProgram, Transaction } = await import(
+        "@solana/web3.js"
+      );
+      const { keypair } = await getPasskeyKeypair(publicKey);
+      if (keypair.publicKey.toBase58() !== publicKey) {
+        throw new Error("Passkey does not match the connected wallet.");
+      }
+      const connection = new Connection(rpc, "confirmed");
+      const tx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: keypair.publicKey,
+          toPubkey: new PublicKey(MEME_WM_FEE_VAULT),
+          lamports: MEME_WM_FEE_LAMPORTS,
+        }),
+      );
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash(
+        "confirmed",
+      );
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = keypair.publicKey;
+      tx.sign(keypair);
+      const sig = await connection.sendRawTransaction(tx.serialize(), {
+        skipPreflight: false,
+        maxRetries: 3,
+      });
+      setPayStatus("Confirming…");
+      await connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        "confirmed",
+      );
+      await refreshBalance();
+      saveWmUnlock();
+      setWmUnlocked(true);
+      setPayStatus("Unlocked — downloads are clean");
+    } catch (e) {
+      setPayErr(friendlyError(e, "Payment failed."));
+    } finally {
+      setPayBusy(false);
+      setTimeout(() => setPayStatus(null), 2500);
+    }
+  }, [wmUnlocked, network, publicKey, balance, rpc, refreshBalance]);
+
   const share = async () => {
     if (!selected || !canvasRef.current) return;
     await renderToCanvas(selected, captions, boxes, { guides: false });
@@ -570,7 +672,8 @@ export default function MemesPage() {
             </div>
             <h1 className="text-3xl font-bold tracking-tight">Memes</h1>
             <p className="text-gray-500 dark:text-white/50 max-w-md mx-auto">
-              Drag captions on the image. Filter, paginate, download with sol.new watermark.
+              Drag captions on the image. Download free with a sol.new watermark, or pay{" "}
+              <strong className="text-gray-700 dark:text-white/70">0.01 SOL</strong> to remove it.
             </p>
           </div>
 
@@ -871,6 +974,48 @@ export default function MemesPage() {
                     </button>
                   </div>
 
+                  {/* Watermark unlock — 0.01 SOL */}
+                  <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-4 space-y-3">
+                    {wmUnlocked ? (
+                      <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-2">
+                        <Sparkles size={16} /> Clean exports unlocked this session
+                      </p>
+                    ) : (
+                      <>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                          <div className="flex-1 text-sm text-gray-600 dark:text-white/60">
+                            Remove <span className="font-semibold text-gray-800 dark:text-white/80">sol.new</span>{" "}
+                            watermark — <span className="font-mono font-semibold">0.01 SOL</span>
+                          </div>
+                          <ConnectGate action="unlock clean meme exports">
+                            <button
+                              type="button"
+                              onClick={() => void unlockWatermark()}
+                              disabled={payBusy}
+                              className="min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-semibold px-5 py-2.5 transition active:scale-[0.98] disabled:opacity-60 touch-manipulation"
+                            >
+                              {payBusy ? (
+                                <>
+                                  <Spinner size={16} /> {payStatus || "Paying…"}
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles size={16} /> Unlock clean PNG
+                                </>
+                              )}
+                            </button>
+                          </ConnectGate>
+                        </div>
+                        {payErr && (
+                          <p className="text-xs text-red-500 dark:text-red-400">{payErr}</p>
+                        )}
+                        {payStatus && !payErr && (
+                          <p className="text-xs text-gray-500">{payStatus}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+
                   <p className="text-[11px] text-gray-400 dark:text-white/35 px-1">
                     Templates from{" "}
                     <a
@@ -881,9 +1026,9 @@ export default function MemesPage() {
                     >
                       memes.sol.new
                     </a>
-                    . Exports include a{" "}
+                    . Free downloads include a{" "}
                     <span className="font-medium text-gray-500 dark:text-white/50">sol.new</span>{" "}
-                    watermark. Image keeps its real aspect ratio.
+                    mark. Pay 0.01 SOL once per session for clean exports.
                   </p>
                 </div>
             </div>
