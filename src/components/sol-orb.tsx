@@ -8,7 +8,21 @@ export type SolOrbState =
   | "searching"
   | "listening"
   | "breathing"
-  | "idle";
+  | "idle"
+  | "composing"
+  | "solving"
+  | "connecting"
+  | "weaving"
+  | "shaping";
+
+function normalizeState(state: SolOrbState): Exclude<
+  SolOrbState,
+  "composing" | "solving" | "connecting" | "weaving" | "shaping"
+> {
+  if (state === "composing" || state === "solving" || state === "shaping") return "working";
+  if (state === "connecting" || state === "weaving") return "searching";
+  return state;
+}
 
 type SolOrbProps = {
   size?: number;
@@ -45,10 +59,11 @@ export function SolOrb({
   const dotsRef = useRef<Dot[]>([]);
   const rafRef = useRef(0);
   const t0 = useRef(performance.now());
+  const motion = normalizeState(state);
 
   useEffect(() => {
-    const orbitN = state === "breathing" || state === "idle" ? 6 : state === "searching" ? 14 : 10;
-    const ghostN = state === "working" ? 28 : 16;
+    const orbitN = motion === "breathing" || motion === "idle" ? 6 : motion === "searching" ? 14 : 10;
+    const ghostN = motion === "working" ? 28 : 16;
     const dots: Dot[] = [];
     for (let i = 0; i < orbitN; i++) {
       const orbit = 0.28 + (i / Math.max(1, orbitN - 1)) * 0.55;
@@ -72,7 +87,7 @@ export function SolOrb({
       });
     }
     dotsRef.current = dots;
-  }, [state, size]);
+  }, [motion, size]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -94,11 +109,11 @@ export function SolOrb({
 
     let alive = true;
     const speedMul =
-      state === "working"
+      motion === "working"
         ? 1.15
-        : state === "searching"
+        : motion === "searching"
           ? 1.6
-          : state === "listening"
+          : motion === "listening"
             ? 0.55
             : 0.35;
 
@@ -122,7 +137,7 @@ export function SolOrb({
 
       // core pulse
       const pulse =
-        state === "breathing" || state === "idle"
+        motion === "breathing" || motion === "idle"
           ? 0.85 + 0.15 * Math.sin(t * 2.2)
           : 0.92 + 0.08 * Math.sin(t * 4.5);
       const coreR = R * 0.22 * pulse;
@@ -154,7 +169,7 @@ export function SolOrb({
       // dots
       for (const d of dotsRef.current) {
         d.angle += d.speed * speedMul * 0.018;
-        const wobble = state === "listening" ? Math.sin(t * 3 + d.phase) * 0.04 : 0;
+        const wobble = motion === "listening" ? Math.sin(t * 3 + d.phase) * 0.04 : 0;
         const tilt = 0.55 + 0.2 * Math.sin(d.phase);
         const ox = Math.cos(d.angle) * d.orbit * R;
         const oy = Math.sin(d.angle) * d.orbit * R * tilt + wobble * R;
@@ -178,7 +193,7 @@ export function SolOrb({
       alive = false;
       cancelAnimationFrame(rafRef.current);
     };
-  }, [size, state, isDark]);
+  }, [size, motion, isDark]);
 
   return (
     <canvas
