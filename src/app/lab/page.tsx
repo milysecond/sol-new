@@ -20,6 +20,8 @@ import { WalletInfoModal } from "@/components/wallet-info-modal";
 import { CommandPalette, type CommandItem } from "@/components/command-palette";
 import { WalletCreateDemo } from "@/components/wallet-create-demo";
 import { ViewportMeasurePanel } from "@/components/viewport-measure-panel";
+import { SolOrb, SolOrbMark, type SolOrbState } from "@/components/sol-orb";
+import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 
@@ -57,6 +59,7 @@ export default function LabPage() {
   const router = useRouter();
   const { publicKey, walletLabel, balance, refreshBalance } = useWallet();
   const { network } = useNetwork();
+  const [orbState, setOrbState] = useState<SolOrbState>("working");
 
   // Action button demo
   const [abState, setAbState] = useState<ActionButtonState>("idle");
@@ -207,6 +210,56 @@ export default function LabPage() {
           </header>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
+            <Section
+              id="brand-orb"
+              icon={Sparkles}
+              title="sol.new Brand Orb"
+              source="first-party · not thinking-logos"
+            >
+              <div className="space-y-4">
+                <p className="text-xs text-gray-500 dark:text-white/45 leading-relaxed">
+                  Own particle-orbit mark (inspired by thinking-logos orb, purple brand colors). Used
+                  by Spinner site-wide + navbar mark.
+                </p>
+                <div className="flex flex-wrap items-end gap-6">
+                  <div className="flex flex-col items-center gap-1">
+                    <SolOrb size={64} state={orbState} />
+                    <span className="text-[10px] text-gray-400">64 · {orbState}</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <SolOrb size={32} state={orbState} />
+                    <span className="text-[10px] text-gray-400">32</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <Spinner size={20} state={orbState} />
+                    <span className="text-[10px] text-gray-400">Spinner</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <SolOrbMark size={40} />
+                    <span className="text-[10px] text-gray-400">SVG mark</span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(
+                    ["working", "searching", "listening", "breathing", "idle"] as SolOrbState[]
+                  ).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setOrbState(s)}
+                      className={`min-h-[32px] px-2.5 rounded-lg text-[11px] font-medium border transition ${
+                        orbState === s
+                          ? "bg-purple-500/15 border-purple-400/40 text-purple-700 dark:text-purple-300"
+                          : "border-black/10 dark:border-white/10 text-gray-500"
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </Section>
+
             <Section
               id="action"
               icon={MousePointerClick}

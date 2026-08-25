@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { AppNavMenu } from "@/components/app-nav-menu";
 import { AppSideNav } from "@/components/app-side-nav";
+import { SolOrbMark } from "@/components/sol-orb";
 import {
   readNavMenuStyle,
   NAV_MENU_STYLE_EVENT,
@@ -236,7 +237,7 @@ export function Navbar() {
               className="flex items-center gap-2 shrink-0 h-8 pl-0.5 pr-1 justify-center rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition"
               aria-label="sol.new home"
             >
-              <img src="/icon-192.png" alt="sol.new" className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg" />
+              <SolOrbMark size={32} className="w-7 h-7 sm:w-8 sm:h-8" />
               <span className="text-lg sm:text-xl font-bold tracking-tight hidden md:inline">
                 sol<span className="text-purple-500 dark:text-purple-400">.new</span>
               </span>
