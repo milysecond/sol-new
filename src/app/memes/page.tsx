@@ -39,11 +39,43 @@ type Template = {
   catalogIndex?: number;
 };
 
-type FaceFilter = "all" | "toly" | "original";
+type FaceDef = { id: string; label: string; enabled?: boolean; order?: number; color?: string };
+
+const FALLBACK_FACES: FaceDef[] = [
+  { id: "all", label: "All", order: 0 },
+  { id: "original", label: "Original", order: 1 },
+  { id: "toly", label: "Toly", order: 2 },
+  { id: "elon", label: "Elon", order: 3 },
+  { id: "bezos", label: "Bezos", order: 4 },
+  { id: "jensen", label: "Jensen", order: 5 },
+  { id: "zuck", label: "Zuck", order: 6 },
+  { id: "sal", label: "Sal", order: 7 },
+  { id: "ansem", label: "Ansem", order: 8 },
+  { id: "mert", label: "Mert", order: 9 },
+  { id: "jackma", label: "Jack Ma", order: 10 },
+  { id: "frank", label: "Frank", order: 11 },
+  { id: "trump", label: "Trump", order: 12 },
+];
+
+function detectFace(t: { id?: string; face?: string; tag?: string }): string {
+  const face = (t.face || "").toLowerCase();
+  if (face && face !== "original") return face;
+  const id = (t.id || "").toLowerCase();
+  for (const f of FALLBACK_FACES) {
+    if (f.id === "all" || f.id === "original") continue;
+    if (id.startsWith(f.id + "-")) return f.id;
+  }
+  const tag = (t.tag || "").toLowerCase();
+  for (const f of FALLBACK_FACES) {
+    if (f.id === "all" || f.id === "original") continue;
+    if (tag === f.id || tag === (f.label || "").toLowerCase()) return f.id;
+  }
+  return "original";
+}
 type SortMode = "new" | "random" | "featured";
 
 const MEMES_API = "https://memes.sol.new";
-const WATERMARK = "sol.new";
+const WATERMARK = "sol.new/memes";
 const PAGE_SIZE = 18;
 
 function shuffleInPlace<T>(arr: T[], seed: number): T[] {
@@ -126,32 +158,40 @@ function cloneBoxes(tpl: Template): TemplateBox[] {
   return defaultBoxes(n);
 }
 
+function loggedInUser(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const ls = localStorage.getItem("sol.new.username") || "";
+    const m = (document.cookie || "").match(/(?:^|;\s*)solnew_user=([^;]*)/);
+    const ck = m ? decodeURIComponent(m[1]) : "";
+    const name = (ck || ls).trim();
+    if (!name || name.startsWith("sol.new user")) return "";
+    return name.replace(/^@/, "");
+  } catch {
+    return "";
+  }
+}
+
 function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number) {
   const pad = Math.max(10, Math.floor(w * 0.02));
-  const fontSize = Math.max(14, Math.floor(w * 0.035));
+  const fontSize = Math.max(13, Math.floor(w * 0.028));
   ctx.save();
   ctx.font = `700 ${fontSize}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
-  ctx.textAlign = "right";
+  ctx.lineWidth = Math.max(1, fontSize * 0.08);
+  ctx.strokeStyle = "rgba(0,0,0,0.45)";
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.textAlign = "left";
   ctx.textBaseline = "bottom";
-  const x = w - pad;
-  const y = h - pad;
-  const metrics = ctx.measureText(WATERMARK);
-  const tw = metrics.width + pad * 0.9;
-  const th = fontSize + pad * 0.55;
-  const rx = x - tw;
-  const ry = y - th;
-  ctx.fillStyle = "rgba(0,0,0,0.45)";
-  const r = Math.min(10, th / 2);
-  ctx.beginPath();
-  ctx.moveTo(rx + r, ry);
-  ctx.arcTo(rx + tw, ry, rx + tw, ry + th, r);
-  ctx.arcTo(rx + tw, ry + th, rx, ry + th, r);
-  ctx.arcTo(rx, ry + th, rx, ry, r);
-  ctx.arcTo(rx, ry, rx + tw, ry, r);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
-  ctx.fillText(WATERMARK, x - pad * 0.35, y - pad * 0.2);
+  ctx.strokeText(WATERMARK, pad, h - pad);
+  ctx.fillText(WATERMARK, pad, h - pad);
+  const user = loggedInUser();
+  if (user) {
+    const label = user.startsWith("@") ? user : `@${user}`;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "top";
+    ctx.strokeText(label, w - pad, pad);
+    ctx.fillText(label, w - pad, pad);
+  }
   ctx.restore();
 }
 
@@ -162,7 +202,8 @@ export default function MemesPage() {
   const [captions, setCaptions] = useState<string[]>(["", ""]);
   /** Editable text box layout (normalized 0–1) — draggable on canvas */
   const [boxes, setBoxes] = useState<TemplateBox[]>([]);
-  const [filter, setFilter] = useState<FaceFilter>("toly");
+  const [filter, setFilter] = useState<string>("all");
+  const [faceDefs, setFaceDefs] = useState<FaceDef[]>(FALLBACK_FACES);
   const [sort, setSort] = useState<SortMode>("new");
   const [shuffleSeed, setShuffleSeed] = useState(() => Date.now());
   const [query, setQuery] = useState("");
@@ -189,20 +230,23 @@ export default function MemesPage() {
     async function load() {
       setLoading(true);
       try {
-        const res = await fetch(`${MEMES_API}/api/templates?limit=300`);
-        const data = (await res.json()) as { items?: any[] };
+        const [tplRes, faceRes] = await Promise.all([
+          fetch(`${MEMES_API}/api/templates?source=local&limit=500`),
+          fetch(`${MEMES_API}/api/faces`),
+        ]);
+        const data = (await tplRes.json()) as { items?: any[] };
+        try {
+          const fd = (await faceRes.json()) as { faces?: FaceDef[] };
+          if (Array.isArray(fd.faces) && fd.faces.length) {
+            setFaceDefs(fd.faces.filter((f) => f.enabled !== false));
+          }
+        } catch { /* keep fallback */ }
         const items: Template[] = (data.items || []).map(normalizeTemplate);
-
-        const cleaned = items
-          .map((tpl, idx) => ({ ...tpl, catalogIndex: idx }))
-          .filter((t) => {
-          const f = (t.face || "").toLowerCase();
-          if (f === "sal" || f === "ansem") return false;
-          const id = t.id.toLowerCase();
-          if (id.includes("ansem") || id.startsWith("sal-") || id.includes("-sal-")) return false;
-          return true;
-        });
-
+        const cleaned = items.map((tpl, idx) => ({
+          ...tpl,
+          catalogIndex: idx,
+          face: detectFace(tpl),
+        }));
         setTemplates(cleaned);
         // Desktop: start on full blank grid (don't auto-open editor)
         setSelected(null);
@@ -241,22 +285,20 @@ export default function MemesPage() {
   };
 
   const counts = useMemo(() => {
-    let toly = 0;
-    let original = 0;
+    const c: Record<string, number> = { all: templates.length };
     for (const t of templates) {
-      if (t.face === "toly" || t.id.toLowerCase().includes("toly")) toly += 1;
-      else original += 1;
+      const f = detectFace(t);
+      c[f] = (c[f] || 0) + 1;
     }
-    return { all: templates.length, toly, original };
+    return c;
   }, [templates]);
 
   const filteredTemplates = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = templates.filter((t) => {
       const id = t.id.toLowerCase();
-      const isToly = t.face === "toly" || id.includes("toly");
-      if (filter === "toly" && !isToly) return false;
-      if (filter === "original" && isToly) return false;
+      const face = detectFace(t);
+      if (filter && filter !== "all" && face !== filter) return false;
       if (!q) return true;
       const hay = [t.id, t.name, t.face, t.tag, ...(t.keywords || [])]
         .filter(Boolean)
@@ -548,11 +590,14 @@ export default function MemesPage() {
     await renderToCanvas(selected, captions, boxes, { guides: activeBox != null });
   };
 
-  const chips: { id: FaceFilter; label: string; count: number }[] = [
-    { id: "toly", label: "Toly", count: counts.toly },
-    { id: "original", label: "Original", count: counts.original },
-    { id: "all", label: "All", count: counts.all },
-  ];
+  const chips = [...faceDefs]
+    .filter((f) => f.enabled !== false)
+    .sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
+    .map((f) => ({
+      id: f.id,
+      label: f.label,
+      count: f.id === "all" ? (counts.all || 0) : (counts[f.id] || 0),
+    }));
 
   const aspectStyle =
     imgSize && imgSize.w > 0 && imgSize.h > 0
