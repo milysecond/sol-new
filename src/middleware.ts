@@ -12,6 +12,17 @@ export function middleware(request: NextRequest) {
   const host = request.headers.get("host")?.toLowerCase() || "";
   const path = url.pathname;
 
+  // iOS Universal Links / Android Asset Links — Apple requires JSON content-type
+  if (
+    path === "/.well-known/apple-app-site-association" ||
+    path === "/apple-app-site-association" ||
+    path === "/.well-known/assetlinks.json"
+  ) {
+    const res = NextResponse.next();
+    res.headers.set("Content-Type", "application/json");
+    return res;
+  }
+
   // www → apex (preserve path + query)
   if (host === "www.sol.new" || host.startsWith("www.sol.new:")) {
     url.host = "sol.new";

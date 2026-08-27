@@ -15,9 +15,9 @@
   "startUrl": "/",
   "iconUrl": "https://sol.new/icon-512.png",
   "maskableIconUrl": "https://sol.new/icon-512.png",
-  "appVersion": "1.0.1",
-  "appVersionName": "1.0.1",
-  "appVersionCode": 2,
+  "appVersion": "1.0.2",
+  "appVersionName": "1.0.2",
+  "appVersionCode": 3,
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "./android.keystore",
