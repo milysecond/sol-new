@@ -114,9 +114,9 @@ export default function PortfolioPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 flex flex-col px-4 py-4 sm:px-6 sm:py-8 sm:items-center">
-        <PageTransition>
-          <div className="w-full sm:max-w-2xl space-y-6">
+      <main className="flex-1 w-full pb-24">
+        <PageTransition className="w-full">
+          <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-6">
             <div className="text-center space-y-2">
               <h1 className="text-3xl font-bold tracking-tight">Portfolio</h1>
               <p className="text-gray-500 dark:text-white/40 text-sm">
@@ -273,7 +273,7 @@ export default function PortfolioPage() {
                             )}
                             {nft.mint_address && (
                               <a
-                                href={`https://solscan.io/token/${nft.mint_address}${clusterParam}`}
+                                href={`/token/${nft.mint_address}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-0.5 text-xs text-purple-600 dark:text-purple-400"

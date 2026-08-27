@@ -184,6 +184,22 @@ export async function initDb() {
     )`,
     `CREATE INDEX IF NOT EXISTS idx_poap_claims_wallet ON poap_claims(wallet)`,
     `CREATE INDEX IF NOT EXISTS idx_poap_drops_issuer ON poap_drops(issuer)`,
+    `CREATE TABLE IF NOT EXISTS credit_balances (
+      wallet TEXT PRIMARY KEY,
+      balance_cents INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS credit_ledger (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      wallet TEXT NOT NULL,
+      delta_cents INTEGER NOT NULL,
+      balance_after INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      stripe_session_id TEXT UNIQUE,
+      note TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_credit_ledger_wallet ON credit_ledger(wallet)`,
     `CREATE TABLE IF NOT EXISTS punt_picks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       wallet TEXT NOT NULL,
@@ -226,6 +242,38 @@ export async function initDb() {
       wallet TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS fair_raffles (
+      id TEXT PRIMARY KEY,
+      slug TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      prize_mint TEXT NOT NULL,
+      prize_symbol TEXT NOT NULL,
+      prize_amount_ui TEXT NOT NULL,
+      prize_decimals INTEGER NOT NULL DEFAULT 6,
+      prize_amount_raw TEXT,
+      prize_program_id TEXT,
+      creator_wallet TEXT,
+      status TEXT NOT NULL DEFAULT 'open',
+      winner_wallet TEXT,
+      draw_id TEXT,
+      deposit_sig TEXT,
+      payout_sig TEXT,
+      refund_sig TEXT,
+      min_entries INTEGER NOT NULL DEFAULT 2,
+      max_entries INTEGER NOT NULL DEFAULT 10000,
+      closes_at TEXT,
+      drawn_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS fair_raffle_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      raffle_id TEXT NOT NULL,
+      wallet TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(raffle_id, wallet)
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_fair_raffle_entries_raffle
+      ON fair_raffle_entries(raffle_id, created_at)`,
     `CREATE TABLE IF NOT EXISTS short_links (
       code TEXT PRIMARY KEY,
       target_url TEXT NOT NULL,
@@ -310,6 +358,20 @@ export async function initDb() {
     );
   } catch {
     /* ignore */
+  }
+  for (const col of [
+    "ALTER TABLE fair_raffles ADD COLUMN prize_amount_raw TEXT",
+    "ALTER TABLE fair_raffles ADD COLUMN prize_program_id TEXT",
+    "ALTER TABLE fair_raffles ADD COLUMN creator_wallet TEXT",
+    "ALTER TABLE fair_raffles ADD COLUMN deposit_sig TEXT",
+    "ALTER TABLE fair_raffles ADD COLUMN payout_sig TEXT",
+    "ALTER TABLE fair_raffles ADD COLUMN refund_sig TEXT",
+  ]) {
+    try {
+      await db.execute(col);
+    } catch {
+      /* exists */
+    }
   }
   // Idempotent migration for the network column on existing deployments
   try {
@@ -956,6 +1018,253 @@ export async function getVrfDrawsByWallet(wallet: string, limit = 50) {
   return r.rows;
 }
 
+// ─── Fair raffles (wallet registration → VRF winner) ──────────────────────────
+
+export type FairRaffleRow = {
+  id: string;
+  slug: string;
+  title: string;
+  prize_mint: string;
+  prize_symbol: string;
+  prize_amount_ui: string;
+  prize_decimals: number;
+  prize_amount_raw: string | null;
+  prize_program_id: string | null;
+  creator_wallet: string | null;
+  status: string;
+  winner_wallet: string | null;
+  draw_id: string | null;
+  deposit_sig: string | null;
+  payout_sig: string | null;
+  refund_sig: string | null;
+  min_entries: number;
+  max_entries: number;
+  closes_at: string | null;
+  drawn_at: string | null;
+  created_at: string;
+};
+
+function rowRaffle(r: unknown): FairRaffleRow {
+  return r as FairRaffleRow;
+}
+
+export async function ensureDefaultTokenshitRaffle(): Promise<FairRaffleRow> {
+  const slug = "tokenshit-1m";
+  const existing = await db.execute({
+    sql: "SELECT * FROM fair_raffles WHERE slug = ? LIMIT 1",
+    args: [slug],
+  });
+  if (existing.rows[0]) return rowRaffle(existing.rows[0]);
+
+  const id = `raffle_${Date.now().toString(36)}`;
+  // Official promo raffle — prize distribution manual / treasury-funded
+  await db.execute({
+    sql: `INSERT INTO fair_raffles (
+      id, slug, title, prize_mint, prize_symbol, prize_amount_ui, prize_decimals,
+      prize_amount_raw, status, min_entries, max_entries, creator_wallet
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'open', 2, 10000, ?)`,
+    args: [
+      id,
+      slug,
+      "TOKENSHIT 1M Fair Draw",
+      "fEbiuDdZZ1QaWYpJFPqk23ZkaRnAyHg4aivhrCTshit",
+      "TOKENSHIT",
+      "1000000",
+      6,
+      String(BigInt(1_000_000) * BigInt(1_000_000)),
+      "sol.new",
+    ],
+  });
+  const row = await db.execute({
+    sql: "SELECT * FROM fair_raffles WHERE id = ? LIMIT 1",
+    args: [id],
+  });
+  return rowRaffle(row.rows[0]);
+}
+
+export async function getFairRaffleBySlug(slug: string) {
+  const r = await db.execute({
+    sql: "SELECT * FROM fair_raffles WHERE slug = ? LIMIT 1",
+    args: [slug],
+  });
+  return r.rows[0] ? rowRaffle(r.rows[0]) : null;
+}
+
+export async function getFairRaffleById(id: string) {
+  const r = await db.execute({
+    sql: "SELECT * FROM fair_raffles WHERE id = ? LIMIT 1",
+    args: [id],
+  });
+  return r.rows[0] ? rowRaffle(r.rows[0]) : null;
+}
+
+export async function listOpenFairRaffles(limit = 30) {
+  const r = await db.execute({
+    sql: `SELECT * FROM fair_raffles
+          WHERE status IN ('open', 'pending_fund')
+          ORDER BY
+            CASE status WHEN 'open' THEN 0 ELSE 1 END,
+            closes_at IS NULL, closes_at ASC, created_at DESC
+          LIMIT ?`,
+    args: [limit],
+  });
+  return r.rows.map(rowRaffle);
+}
+
+export async function listDueFairRaffles() {
+  const r = await db.execute({
+    sql: `SELECT * FROM fair_raffles
+          WHERE status = 'open'
+            AND closes_at IS NOT NULL
+            AND closes_at <= datetime('now')`,
+  });
+  return r.rows.map(rowRaffle);
+}
+
+export async function createFairRaffle(opts: {
+  id: string;
+  slug: string;
+  title: string;
+  prizeMint: string;
+  prizeSymbol: string;
+  prizeAmountUi: string;
+  prizeDecimals: number;
+  prizeAmountRaw: string;
+  prizeProgramId: string;
+  creatorWallet: string;
+  closesAt: string;
+  minEntries?: number;
+  maxEntries?: number;
+}) {
+  await db.execute({
+    sql: `INSERT INTO fair_raffles (
+      id, slug, title, prize_mint, prize_symbol, prize_amount_ui, prize_decimals,
+      prize_amount_raw, prize_program_id, creator_wallet, status,
+      min_entries, max_entries, closes_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_fund', ?, ?, ?)`,
+    args: [
+      opts.id,
+      opts.slug,
+      opts.title,
+      opts.prizeMint,
+      opts.prizeSymbol,
+      opts.prizeAmountUi,
+      opts.prizeDecimals,
+      opts.prizeAmountRaw,
+      opts.prizeProgramId,
+      opts.creatorWallet,
+      opts.minEntries ?? 2,
+      opts.maxEntries ?? 5000,
+      opts.closesAt,
+    ],
+  });
+}
+
+export async function markRaffleFunded(opts: {
+  id: string;
+  depositSig: string;
+}) {
+  await db.execute({
+    sql: `UPDATE fair_raffles SET status = 'open', deposit_sig = ?
+          WHERE id = ? AND status = 'pending_fund'`,
+    args: [opts.depositSig, opts.id],
+  });
+}
+
+export async function delayFairRaffle(opts: {
+  id: string;
+  creatorWallet: string;
+  closesAt: string;
+}) {
+  await db.execute({
+    sql: `UPDATE fair_raffles SET closes_at = ?
+          WHERE id = ? AND creator_wallet = ? AND status = 'open'`,
+    args: [opts.closesAt, opts.id, opts.creatorWallet],
+  });
+}
+
+export async function cancelFairRaffle(opts: {
+  id: string;
+  creatorWallet: string;
+  refundSig?: string | null;
+}) {
+  await db.execute({
+    sql: `UPDATE fair_raffles
+          SET status = 'cancelled', refund_sig = COALESCE(?, refund_sig)
+          WHERE id = ? AND creator_wallet = ? AND status IN ('open', 'pending_fund')`,
+    args: [opts.refundSig ?? null, opts.id, opts.creatorWallet],
+  });
+}
+
+export async function markRaffleDrawn(opts: {
+  raffleId: string;
+  winnerWallet: string;
+  drawId: string;
+  payoutSig?: string | null;
+}) {
+  await db.execute({
+    sql: `UPDATE fair_raffles
+          SET status = 'drawn', winner_wallet = ?, draw_id = ?, drawn_at = datetime('now'),
+              payout_sig = COALESCE(?, payout_sig)
+          WHERE id = ? AND status = 'open'`,
+    args: [
+      opts.winnerWallet,
+      opts.drawId,
+      opts.payoutSig ?? null,
+      opts.raffleId,
+    ],
+  });
+}
+
+export async function setRafflePayoutSig(id: string, payoutSig: string) {
+  await db.execute({
+    sql: `UPDATE fair_raffles SET payout_sig = ? WHERE id = ?`,
+    args: [payoutSig, id],
+  });
+}
+
+export async function countRaffleEntries(raffleId: string): Promise<number> {
+  const r = await db.execute({
+    sql: "SELECT COUNT(*) as c FROM fair_raffle_entries WHERE raffle_id = ?",
+    args: [raffleId],
+  });
+  return Number((r.rows[0] as unknown as { c?: number })?.c ?? 0);
+}
+
+export async function listRaffleEntries(raffleId: string, limit = 100) {
+  const r = await db.execute({
+    sql: `SELECT wallet, created_at FROM fair_raffle_entries
+          WHERE raffle_id = ?
+          ORDER BY created_at ASC
+          LIMIT ?`,
+    args: [raffleId, limit],
+  });
+  return r.rows as unknown as { wallet: string; created_at: string }[];
+}
+
+export async function isWalletEntered(raffleId: string, wallet: string) {
+  const r = await db.execute({
+    sql: "SELECT 1 FROM fair_raffle_entries WHERE raffle_id = ? AND wallet = ? LIMIT 1",
+    args: [raffleId, wallet],
+  });
+  return Boolean(r.rows[0]);
+}
+
+export async function registerRaffleEntry(raffleId: string, wallet: string) {
+  await db.execute({
+    sql: `INSERT INTO fair_raffle_entries (raffle_id, wallet) VALUES (?, ?)`,
+    args: [raffleId, wallet],
+  });
+}
+
+export async function getAllRaffleWallets(raffleId: string): Promise<string[]> {
+  const r = await db.execute({
+    sql: `SELECT wallet FROM fair_raffle_entries WHERE raffle_id = ? ORDER BY created_at ASC, id ASC`,
+    args: [raffleId],
+  });
+  return r.rows.map((row) => String((row as unknown as { wallet: string }).wallet));
+}
+
 export async function getStats() {
   const [wallets, tokens, nfts] = await Promise.all([
     db.execute("SELECT COUNT(*) as count FROM wallets"),
@@ -966,6 +1275,236 @@ export async function getStats() {
     wallets: wallets.rows[0].count,
     tokens: tokens.rows[0].count,
     nfts: nfts.rows[0].count,
+  };
+}
+
+export type TractionDay = {
+  /** UTC calendar day YYYY-MM-DD */
+  day: string;
+  signups: number;
+  tokens: number;
+  nfts: number;
+  gifts: number;
+  giftClaims: number;
+  creditsTx: number;
+  creditsCents: number;
+  shortLinks: number;
+  draws: number;
+  raffleEntries: number;
+  multisigs: number;
+  poapClaims: number;
+};
+
+export type TractionReport = {
+  timezone: "UTC";
+  generatedAt: string;
+  days: number;
+  totals: {
+    signups: number;
+    tokens: number;
+    nfts: number;
+    gifts: number;
+    giftClaims: number;
+    creditsTx: number;
+    creditsCents: number;
+    shortLinks: number;
+    draws: number;
+    raffleEntries: number;
+    multisigs: number;
+    poapClaims: number;
+    walletsAllTime: number;
+    tokensAllTime: number;
+    nftsAllTime: number;
+  };
+  today: TractionDay | null;
+  series: TractionDay[];
+};
+
+function emptyDay(day: string): TractionDay {
+  return {
+    day,
+    signups: 0,
+    tokens: 0,
+    nfts: 0,
+    gifts: 0,
+    giftClaims: 0,
+    creditsTx: 0,
+    creditsCents: 0,
+    shortLinks: 0,
+    draws: 0,
+    raffleEntries: 0,
+    multisigs: 0,
+    poapClaims: 0,
+  };
+}
+
+async function countByUtcDay(
+  sql: string,
+  args: (string | number)[] = [],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  try {
+    const r = await db.execute({ sql, args });
+    for (const row of r.rows) {
+      const day = String((row as { day?: unknown }).day || "").slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+      const c = Number((row as { c?: unknown }).c || 0);
+      map.set(day, (map.get(day) || 0) + (Number.isFinite(c) ? c : 0));
+    }
+  } catch {
+    /* table may not exist yet */
+  }
+  return map;
+}
+
+/** Daily activity buckets in UTC (date(created_at) is UTC for Turso/SQLite). */
+export async function getTractionReport(days = 30): Promise<TractionReport> {
+  const n = Math.min(90, Math.max(7, Math.floor(days) || 30));
+  // Inclusive window: last n UTC calendar days including today
+  const sinceExpr = `datetime('now', '-${n - 1} days', 'start of day')`;
+
+  const [
+    signups,
+    tokens,
+    nfts,
+    gifts,
+    giftClaims,
+    credits,
+    shortLinks,
+    draws,
+    raffleEntries,
+    multisigs,
+    poapClaims,
+    allTime,
+  ] = await Promise.all([
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM wallets
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM tokens
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM nfts
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM claim_links
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(COALESCE(claimed_at, created_at)) AS day, COUNT(*) AS c FROM claim_links
+       WHERE status IN ('claimed','reclaimed')
+         AND COALESCE(claimed_at, created_at) >= ${sinceExpr}
+       GROUP BY date(COALESCE(claimed_at, created_at))`,
+    ),
+    // credit_ledger: count txs + sum positive deltas
+    (async () => {
+      const count = await countByUtcDay(
+        `SELECT date(created_at) AS day, COUNT(*) AS c FROM credit_ledger
+         WHERE created_at >= ${sinceExpr} AND delta_cents > 0
+         GROUP BY date(created_at)`,
+      );
+      const cents = new Map<string, number>();
+      try {
+        const r = await db.execute(
+          `SELECT date(created_at) AS day, COALESCE(SUM(delta_cents),0) AS c FROM credit_ledger
+           WHERE created_at >= ${sinceExpr} AND delta_cents > 0
+           GROUP BY date(created_at)`,
+        );
+        for (const row of r.rows) {
+          const day = String((row as { day?: unknown }).day || "").slice(0, 10);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+          cents.set(day, Number((row as { c?: unknown }).c || 0));
+        }
+      } catch {
+        /* ignore */
+      }
+      return { count, cents };
+    })(),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM short_links
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM vrf_draws
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM fair_raffle_entries
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM multisigs
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    countByUtcDay(
+      `SELECT date(created_at) AS day, COUNT(*) AS c FROM poap_claims
+       WHERE created_at >= ${sinceExpr}
+       GROUP BY date(created_at)`,
+    ),
+    getStats(),
+  ]);
+
+  // Build UTC day list newest → oldest
+  const series: TractionDay[] = [];
+  const now = new Date();
+  for (let i = 0; i < n; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
+    const day = d.toISOString().slice(0, 10);
+    const row = emptyDay(day);
+    row.signups = signups.get(day) || 0;
+    row.tokens = tokens.get(day) || 0;
+    row.nfts = nfts.get(day) || 0;
+    row.gifts = gifts.get(day) || 0;
+    row.giftClaims = giftClaims.get(day) || 0;
+    row.creditsTx = credits.count.get(day) || 0;
+    row.creditsCents = credits.cents.get(day) || 0;
+    row.shortLinks = shortLinks.get(day) || 0;
+    row.draws = draws.get(day) || 0;
+    row.raffleEntries = raffleEntries.get(day) || 0;
+    row.multisigs = multisigs.get(day) || 0;
+    row.poapClaims = poapClaims.get(day) || 0;
+    series.push(row);
+  }
+
+  const sum = (key: keyof TractionDay) =>
+    series.reduce((a, r) => a + (typeof r[key] === "number" ? (r[key] as number) : 0), 0);
+
+  const totals = {
+    signups: sum("signups"),
+    tokens: sum("tokens"),
+    nfts: sum("nfts"),
+    gifts: sum("gifts"),
+    giftClaims: sum("giftClaims"),
+    creditsTx: sum("creditsTx"),
+    creditsCents: sum("creditsCents"),
+    shortLinks: sum("shortLinks"),
+    draws: sum("draws"),
+    raffleEntries: sum("raffleEntries"),
+    multisigs: sum("multisigs"),
+    poapClaims: sum("poapClaims"),
+    walletsAllTime: Number(allTime.wallets || 0),
+    tokensAllTime: Number(allTime.tokens || 0),
+    nftsAllTime: Number(allTime.nfts || 0),
+  };
+
+  return {
+    timezone: "UTC",
+    generatedAt: new Date().toISOString(),
+    days: n,
+    totals,
+    today: series[0] || null,
+    series,
   };
 }
 
@@ -1349,4 +1888,86 @@ export async function getWalletShortLinks(wallet: string, limit = 50): Promise<S
     args: [wallet, limit],
   });
   return r.rows.map((row) => mapShortLink(row as Record<string, unknown>));
+}
+
+// ─── Credits (fiat packs via Stripe Checkout / Apple Pay) ─────────────────
+
+export async function getCreditBalanceCents(wallet: string): Promise<number> {
+  const r = await db.execute({
+    sql: "SELECT balance_cents FROM credit_balances WHERE wallet = ? LIMIT 1",
+    args: [wallet],
+  });
+  const row = r.rows[0] as { balance_cents?: number } | undefined;
+  return Number(row?.balance_cents ?? 0);
+}
+
+/**
+ * Credit a wallet after Stripe payment. Idempotent on stripe_session_id.
+ * Returns new balance (or existing if already applied).
+ */
+export async function creditWalletFromStripe(opts: {
+  wallet: string;
+  deltaCents: number;
+  stripeSessionId: string;
+  note?: string;
+}): Promise<{ balanceCents: number; applied: boolean }> {
+  const wallet = opts.wallet.trim();
+  const delta = Math.floor(opts.deltaCents);
+  if (!wallet) throw new Error("wallet required");
+  if (delta <= 0) throw new Error("delta must be positive");
+  if (!opts.stripeSessionId) throw new Error("stripeSessionId required");
+
+  // Already applied?
+  const existing = await db.execute({
+    sql: "SELECT balance_after FROM credit_ledger WHERE stripe_session_id = ? LIMIT 1",
+    args: [opts.stripeSessionId],
+  });
+  if (existing.rows[0]) {
+    const after = Number(
+      (existing.rows[0] as unknown as { balance_after?: number }).balance_after ?? 0,
+    );
+    return {
+      balanceCents: after,
+      applied: false,
+    };
+  }
+
+  const cur = await getCreditBalanceCents(wallet);
+  const next = cur + delta;
+
+  try {
+    await db.execute({
+      sql: `INSERT INTO credit_ledger (wallet, delta_cents, balance_after, kind, stripe_session_id, note)
+            VALUES (?, ?, ?, 'purchase', ?, ?)`,
+      args: [wallet, delta, next, opts.stripeSessionId, opts.note || "credits pack"],
+    });
+  } catch (e) {
+    // Unique race: another writer applied the same session
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/unique|constraint/i.test(msg)) {
+      const again = await db.execute({
+        sql: "SELECT balance_after FROM credit_ledger WHERE stripe_session_id = ? LIMIT 1",
+        args: [opts.stripeSessionId],
+      });
+      if (again.rows[0]) {
+        return {
+          balanceCents: Number(
+            (again.rows[0] as unknown as { balance_after?: number }).balance_after ?? 0,
+          ),
+          applied: false,
+        };
+      }
+    }
+    throw e;
+  }
+
+  await db.execute({
+    sql: `INSERT INTO credit_balances (wallet, balance_cents, updated_at)
+          VALUES (?, ?, datetime('now'))
+          ON CONFLICT(wallet) DO UPDATE SET
+            balance_cents = excluded.balance_cents,
+            updated_at = datetime('now')`,
+    args: [wallet, next],
+  });
+  return { balanceCents: next, applied: true };
 }

@@ -6,9 +6,14 @@ import { PageTransition } from "@/components/page-transition";
 import { Coins, Image as ImageIcon, Check, ExternalLink, ChevronDown } from "lucide-react";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
+import { formatQty, useHideBalances } from "@/lib/privacy";
 import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair, ensureDocumentFocusForPasskey } from "@/lib/passkey-wallet";
-import { PrivateSendSheet } from "@/components/private-send-sheet";
+import dynamic from "next/dynamic";
+const PrivateSendSheet = dynamic(
+  () => import("@/components/private-send-sheet").then((m) => m.PrivateSendSheet),
+  { ssr: false },
+);
 import { SlideToSend } from "@/components/slide-to-send";
 import { resolveRecipient, looksLikeDomain, NAME_PLACEHOLDER } from "@/lib/resolve-name";
 import {
@@ -25,9 +30,12 @@ import {
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { friendlyError } from "@/lib/friendly-errors";
+import { FeedbackModal } from "@/components/feedback-modal";
+import { TxConfirm } from "@/components/tx-confirm";
 import {
   fetchWalletTokens,
   formatTokenUi,
+  formatAmountInput,
   uiToRawAmount,
   type WalletToken,
 } from "@/lib/wallet-tokens";
@@ -55,6 +63,8 @@ export default function SendPage() {
   const [status, setStatus] = useState<
     "idle" | "auth" | "sending" | "confirming" | "done" | "error"
   >("idle");
+  const [showFb, setShowFb] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txId, setTxId] = useState<string | null>(null);
   const [resolved, setResolved] = useState<{ owner: string; label?: string } | null>(null);
@@ -63,6 +73,7 @@ export default function SendPage() {
   const resolveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { publicKey, balance, usdcBalance, refreshBalance } = useWallet();
+  const [hideBalances] = useHideBalances();
   const { network, rpc } = useNetwork();
 
   const loadTokens = useCallback(async () => {
@@ -290,8 +301,9 @@ export default function SendPage() {
       setStatus("done");
       await refreshBalance();
       void loadTokens();
-      const { toast } = await import("sonner");
+      const { toast } = await import("@/lib/toast");
       toast.success("Transfer successful!");
+      setShowFb(true);
       try {
         new Audio("/chaching.mp3").play();
       } catch {
@@ -328,7 +340,7 @@ export default function SendPage() {
       setAmount(max);
     } else {
       setError(null);
-      setAmount(formatTokenUi(selected.uiAmount, selected.decimals));
+      setAmount(formatAmountInput(selected.uiAmount, selected.decimals));
     }
   };
 
@@ -485,7 +497,7 @@ export default function SendPage() {
               )}
 
               <SlideToSend
-                onConfirm={handleSend}
+                onConfirm={() => setConfirmOpen(true)}
                 disabled={!canSend}
                 loading={busy}
                 label={`Slide to send ${symbol}`}
@@ -558,8 +570,10 @@ export default function SendPage() {
                     token={t}
                     right={
                       <span className="font-mono text-xs tabular-nums text-right shrink-0">
-                        {formatTokenUi(t.uiAmount, t.decimals)}
-                        {t.valueUsd != null && (
+                        {hideBalances
+                          ? "••••"
+                          : formatTokenUi(t.uiAmount, t.decimals)}
+                        {!hideBalances && t.valueUsd != null && (
                           <span className="block text-[10px] text-gray-400">
                             {t.valueUsd >= 0.01
                               ? `$${t.valueUsd.toFixed(2)}`
@@ -577,6 +591,48 @@ export default function SendPage() {
           </div>
         </div>
       )}
+
+      {confirmOpen && selected && (
+        <div className="fixed-vv z-[200] flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => !busy && setConfirmOpen(false)} />
+          <div className="relative z-10 w-full sm:max-w-md px-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0">
+            <div className="rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-950 p-4 sm:p-5 shadow-2xl">
+              <TxConfirm
+                title="Confirm send"
+                subtitle="Review before passkey approval"
+                kind="send"
+                rows={[
+                  { label: "Amount", value: `${amount} ${selected.symbol}`, mono: true },
+                  { label: "To", value: resolved?.label || (recipient.length > 12 ? `${recipient.slice(0,4)}…${recipient.slice(-4)}` : recipient), mono: true },
+                  { label: "Network", value: network === "devnet" ? "Devnet" : "Mainnet" },
+                ]}
+                notice="You’ll approve with Face ID / passkey next."
+                confirmLabel="Send now"
+                busy={busy}
+                onCancel={() => setConfirmOpen(false)}
+                onConfirm={() => {
+                  setConfirmOpen(false);
+                  void handleSend();
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      <FeedbackModal
+        open={showFb && status === "done"}
+        onClose={() => setShowFb(false)}
+        tone="success"
+        title="Sent!"
+        body={txId ? `Transfer landed.` : "Transfer successful."}
+        primaryLabel="View receipt"
+        secondaryLabel="Done"
+        onPrimary={() => {
+          if (txId) window.location.href = `/receipt/${txId}`;
+          else setShowFb(false);
+        }}
+      />
+
     </WalletShell>
   );
 }

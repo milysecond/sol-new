@@ -1,5 +1,5 @@
 "use client";
-import { Coins, Rocket, Info, X, ArrowLeft, Users, Vote, Dog } from "lucide-react";
+import { Coins, Rocket, Info, X, ArrowLeft, Users, Vote, Dog, Sparkles } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { PageTransition } from "@/components/page-transition";
 
@@ -23,7 +23,7 @@ const DBC_PARTNER_CONFIG_DEVNET = new PublicKey("QfakkckSG6L7hkuxiDQRWF7AW26Mmrx
 const dbcPartnerConfig = (network: string) =>
   network === "devnet" ? DBC_PARTNER_CONFIG_DEVNET : DBC_PARTNER_CONFIG_MAINNET;
 
-type Style = "pick" | "meteora" | "genesis" | "pump" | "bags" | "metadao" | "bonkfun";
+type Style = "pick" | "meteora" | "orynth" | "genesis" | "pump" | "bags" | "metadao" | "bonkfun";
 
 // ─── Style picker ─────────────────────────────────────────────────────────────
 
@@ -64,6 +64,24 @@ const STYLE_OPTIONS: {
       website: "meteora.ag",
       twitter: "@MeteoraAG",
       outcome: "Meteora's own token — made by the team behind this launch style.",
+    },
+  },
+  {
+    key: "orynth",
+    label: "Orynth",
+    subtitle: "Partner DBC launch",
+    detail: "Launch via Orynth Partner API — Meteora DBC, sol.new earns partner fees, mints end in red.",
+    cost: "~0.05 SOL",
+    icon: <Sparkles size={22} />,
+    accent: "purple",
+    example: {
+      name: "TOKENSHIT",
+      ticker: "TOKENSHIT",
+      image: "/icon-192.png",
+      description: "Launched through sol.new × Orynth.",
+      website: "sol.new",
+      twitter: "@soldotnew",
+      outcome: "Partner fee share on volume — claimable by sol.new.",
     },
   },
   {
@@ -218,17 +236,43 @@ function TopTokensBrowse() {
     { name: string; symbol: string; mint_address: string; image_url: string | null; created_at: string }[]
   >([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    fetch(`/api/tokens/recent?limit=12&network=${network}`)
-      .then((r) => r.json())
-      .then((d) => {
-        const data = d as { tokens?: typeof tokens };
-        setTokens(data.tokens || []);
+    setLoadError(null);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 12_000);
+    fetch(`/api/tokens/recent?limit=12&network=${network}`, {
+      cache: "no-store",
+      signal: ctrl.signal,
+    })
+      .then(async (r) => {
+        const ct = r.headers.get("content-type") || "";
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        if (!ct.includes("application/json")) throw new Error("Bad response");
+        return r.json() as Promise<{ tokens?: typeof tokens; error?: string }>;
       })
-      .catch(() => setTokens([]))
-      .finally(() => setLoading(false));
+      .then((d) => {
+        if (cancelled) return;
+        setTokens(Array.isArray(d.tokens) ? d.tokens : []);
+        if (d.error && !d.tokens?.length) setLoadError(d.error);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setTokens([]);
+        setLoadError(e instanceof Error ? e.message : "Load failed");
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      ctrl.abort();
+    };
   }, [network]);
 
   return (
@@ -240,7 +284,33 @@ function TopTokensBrowse() {
         </Link>
       </div>
       {loading ? (
-        <p className="text-xs text-gray-400 text-center py-4">Loading…</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-14 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.04] animate-pulse"
+            />
+          ))}
+        </div>
+      ) : loadError && tokens.length === 0 ? (
+        <div className="text-center py-4 space-y-2">
+          <p className="text-xs text-gray-400">Couldn&apos;t load recent launches.</p>
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              setLoadError(null);
+              fetch(`/api/tokens/recent?limit=12&network=${network}`, { cache: "no-store" })
+                .then((r) => r.json() as Promise<{ tokens?: typeof tokens }>)
+                .then((d) => setTokens(d.tokens || []))
+                .catch(() => setTokens([]))
+                .finally(() => setLoading(false));
+            }}
+            className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline"
+          >
+            Retry
+          </button>
+        </div>
       ) : tokens.length === 0 ? (
         <p className="text-xs text-gray-400 text-center py-4">No launches yet on this network.</p>
       ) : (
@@ -334,7 +404,7 @@ function ExampleFormModal({
       aria-label={`How ${ex.name} was launched`}
     >
       <div
-        className="w-full sm:max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl"
+        className="w-full sm:max-w-lg lg:max-w-xl max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 flex items-center justify-between px-5 py-4 bg-white/90 dark:bg-black/90 backdrop-blur border-b border-black/10 dark:border-white/10">
@@ -405,7 +475,7 @@ function StylePicker({ onSelect }: { onSelect: (s: Exclude<Style, "pick">) => vo
 
   return (
     <PageTransition>
-      <div className="w-full sm:max-w-lg space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1">
           <AnimatedIcon icon={Coins} size={32} className="text-purple-400" />
           <h1 className="text-2xl font-bold tracking-tight">Launch a token</h1>
@@ -549,7 +619,7 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
 
   return (
     <PageTransition>
-      <div className="w-full sm:max-w-lg space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1 relative">
           <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
@@ -614,7 +684,7 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
               <button
                 onClick={handleLaunch}
                 disabled={!name || !ticker || !imageFile}
-                className={`w-full ${ac.btn} disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed`}
+                className={`w-full ${ac.btn} disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed`}
               >
                 {isBags ? "Launch my token" : "Launch on pump.fun"}
               </button>
@@ -792,7 +862,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
   return (
     <>
       <PageTransition>
-        <div className="w-full sm:max-w-lg space-y-4">
+        <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
           <div className="text-center space-y-1 relative">
             <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
               <ArrowLeft size={15} />
@@ -883,7 +953,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
             ) : (
               <>
                 <PromoInput onValidCode={setPromoCode} onClear={() => setPromoCode(null)} />
-                <button onClick={handleLaunch} disabled={!name || !ticker || !imageFile} className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed">
+                <button onClick={handleLaunch} disabled={!name || !ticker || !imageFile} className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed">
                   Launch token
                 </button>
               </>
@@ -897,7 +967,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
 
       {showInfo && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4" onClick={() => setShowInfo(false)}>
-          <div className="w-full sm:max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full sm:max-w-lg lg:max-w-xl max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 flex items-center justify-between px-5 py-4 bg-white/90 dark:bg-black/90 backdrop-blur border-b border-black/10 dark:border-white/10">
               <h2 className="text-lg font-bold flex items-center gap-2"><Info className="w-5 h-5 text-orange-400" /> How a token launch works</h2>
               <button type="button" onClick={() => setShowInfo(false)} aria-label="Close" className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer"><X className="w-5 h-5" /></button>
@@ -1068,7 +1138,7 @@ function GenesisForm({ onBack }: { onBack: () => void }) {
 
   return (
     <PageTransition>
-      <div className="w-full sm:max-w-lg space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1 relative">
           <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
@@ -1128,7 +1198,7 @@ function GenesisForm({ onBack }: { onBack: () => void }) {
         <button
           onClick={handleLaunch}
           disabled={busy || !name || !ticker || !imageFile}
-          className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {busy ? (status === "auth" ? "Authenticating…" : status === "uploading" ? "Uploading…" : "Creating…") : "Launch Genesis TGE"}
         </button>
@@ -1203,7 +1273,7 @@ function MetadaoForm({ onBack }: { onBack: () => void }) {
 
   return (
     <PageTransition>
-      <div className="w-full sm:max-w-lg space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1 relative">
           <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
@@ -1265,10 +1335,329 @@ function MetadaoForm({ onBack }: { onBack: () => void }) {
         <button
           onClick={handleCreate}
           disabled={busy || !valid}
-          className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {busy ? (status === "auth" ? "Authenticating…" : "Creating DAO…") : "Create Futarchy DAO"}
         </button>
+      </div>
+    </PageTransition>
+  );
+}
+
+
+// ─── Orynth Partner DBC launch ────────────────────────────────────────────────
+
+function OrynthForm({ onBack }: { onBack: () => void }) {
+  const [name, setName] = useState("");
+  const [ticker, setTicker] = useState("");
+  const [description, setDescription] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [twitter, setTwitter] = useState("");
+  const [telegram, setTelegram] = useState("");
+  const [website, setWebsite] = useState("https://sol.new");
+  const [status, setStatus] = useState<
+    "idle" | "auth" | "uploading" | "creating" | "signing" | "confirming" | "done" | "error"
+  >("idle");
+  const [error, setError] = useState<string | null>(null);
+  const [quoteSol, setQuoteSol] = useState<number | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const { publicKey, refreshBalance, balance } = useWallet();
+  const { rpc } = useNetwork();
+
+  const acceptImage = useCallback((file: File) => {
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  }, []);
+  useImagePaste(acceptImage);
+
+  useEffect(() => {
+    fetch("/api/orynth/quote", { cache: "no-store" })
+      .then((r) => r.json() as Promise<{ launchCost?: { requiredSol?: number } }>)
+      .then((j) => {
+        if (j.launchCost?.requiredSol != null) setQuoteSol(j.launchCost.requiredSol);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleLaunch = async () => {
+    if (!name || !ticker || !imageFile || !publicKey) return;
+    setError(null);
+    analytics.launchInitiated(ticker, "orynth");
+    try {
+      setStatus("auth");
+      const { keypair: userKeypair } = await getPasskeyKeypair();
+
+      const need = quoteSol ?? 0.05;
+      if ((balance ?? 0) < need - 0.001) {
+        throw new Error(
+          `Need ~${need.toFixed(3)} SOL to launch (balance ${(balance ?? 0).toFixed(4)}). Open Get funds.`,
+        );
+      }
+
+      setStatus("uploading");
+      const uploaded = await uploadImage(imageFile);
+      const imageUrl = uploaded.url;
+
+      setStatus("creating");
+      const prepRes = await fetch("/api/orynth/prepare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payerWalletAddress: publicKey,
+          name,
+          symbol: ticker,
+          description: description || `${name} launched on sol.new`,
+          imageUrl,
+          websiteUrl: website || "https://sol.new",
+          twitter: twitter || undefined,
+          telegram: telegram || undefined,
+          creatorUsername: publicKey.slice(0, 8),
+        }),
+      });
+      const prep = (await prepRes.json()) as {
+        ok?: boolean;
+        error?: string;
+        launchId?: string;
+        preparedTxHex?: string;
+        mintAddress?: string | null;
+      };
+      if (!prepRes.ok || !prep.launchId || !prep.preparedTxHex) {
+        throw new Error(prep.error || "Orynth prepare failed");
+      }
+
+      setStatus("signing");
+      const tx = Transaction.from(Buffer.from(prep.preparedTxHex, "hex"));
+      // poolCreator already signed server-side; payer signs here
+      tx.partialSign(userKeypair);
+      const signedTxHex = Buffer.from(tx.serialize()).toString("hex");
+
+      const subRes = await fetch("/api/orynth/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ launchId: prep.launchId, signedTxHex }),
+      });
+      const sub = (await subRes.json()) as {
+        ok?: boolean;
+        error?: string;
+        launch?: {
+          mintAddress?: string;
+          launchSignature?: string;
+          status?: string;
+          poolAddress?: string;
+        };
+        mintAddress?: string;
+      };
+      if (!subRes.ok) throw new Error(sub.error || "Orynth submit failed");
+
+      setStatus("confirming");
+      // poll status up to ~45s
+      let mint =
+        sub.launch?.mintAddress ||
+        sub.mintAddress ||
+        prep.mintAddress ||
+        null;
+      let sig = sub.launch?.launchSignature || null;
+      for (let i = 0; i < 15 && (!mint || !sig); i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const st = await fetch(
+          `/api/orynth/status?launchId=${encodeURIComponent(prep.launchId)}`,
+        ).then((r) => r.json() as Promise<{
+          launch?: { mintAddress?: string; launchSignature?: string; status?: string };
+          mintAddress?: string;
+          launchSignature?: string;
+          status?: string;
+        }>);
+        const L = st.launch || st;
+        mint = (L as { mintAddress?: string }).mintAddress || mint;
+        sig = (L as { launchSignature?: string }).launchSignature || sig;
+        if ((L as { status?: string }).status === "launched" && mint) break;
+        if ((L as { status?: string }).status === "failed") {
+          throw new Error("Orynth reported launch failed");
+        }
+      }
+
+      if (mint) {
+        await fetch("/api/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            wallet: publicKey,
+            name,
+            symbol: ticker,
+            description,
+            imageUrl,
+            mintAddress: mint,
+            network: "mainnet",
+            platform: "orynth",
+          }),
+        }).catch(() => {});
+      }
+
+      await refreshBalance();
+      if (mint) {
+        analytics.tokenCreated(mint, ticker);
+        analytics.launchCompleted(mint, ticker, "orynth");
+        router.push(`/token/${mint}`);
+      } else {
+        analytics.launchCompleted(prep.launchId, ticker, "orynth");
+        setStatus("done");
+        setError(null);
+        // stay with success message
+        throw new Error(
+          "Launch submitted — mint not ready yet. Check status shortly.",
+        );
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("mint not ready")) {
+        setStatus("done");
+        setError(msg);
+        return;
+      }
+      analytics.launchFailed(ticker, msg.slice(0, 120));
+      setError(friendlyError(e, "Couldn't launch via Orynth."));
+      setStatus("error");
+    }
+  };
+
+  const busy = status !== "idle" && status !== "error" && status !== "done";
+  const ac = ACCENT_CLASSES.purple;
+
+  return (
+    <PageTransition>
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
+        <div className="text-center space-y-1 relative">
+          <button
+            type="button"
+            onClick={onBack}
+            className="absolute left-0 top-0 text-gray-400 hover:text-gray-600 transition flex items-center gap-1 text-sm"
+          >
+            <ArrowLeft size={15} />
+          </button>
+          <AnimatedIcon icon={Sparkles} size={32} className={ac.text} />
+          <h1 className="text-2xl font-bold tracking-tight">Orynth launch</h1>
+          <p className="text-gray-500 dark:text-white/50 text-sm">
+            Partner DBC on Meteora · you pay ~{quoteSol?.toFixed(3) ?? "0.05"} SOL · fees to sol.new
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <input
+            type="text"
+            placeholder="Token name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={busy}
+            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 disabled:opacity-50"
+          />
+          <input
+            type="text"
+            placeholder="Ticker"
+            value={ticker}
+            onChange={(e) => setTicker(e.target.value.toUpperCase())}
+            maxLength={12}
+            disabled={busy}
+            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 font-mono disabled:opacity-50"
+          />
+          <textarea
+            placeholder="Description (optional)"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+            disabled={busy}
+            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 resize-none disabled:opacity-50"
+          />
+
+          <label
+            htmlFor="orynth-image"
+            className="flex items-center justify-center w-full bg-black/5 dark:bg-white/5 border border-dashed border-black/10 dark:border-white/10 rounded-xl px-4 py-4 cursor-pointer"
+          >
+            {imagePreview ? (
+              <div className="flex items-center gap-3">
+                <img src={imagePreview} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                <span className="text-sm text-gray-500">{imageFile?.name}</span>
+              </div>
+            ) : (
+              <span className="text-sm text-gray-400">Tap to upload or paste an image</span>
+            )}
+          </label>
+          <input
+            id="orynth-image"
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) acceptImage(f);
+            }}
+            className="sr-only"
+          />
+
+          <div className="grid grid-cols-3 gap-2">
+            <input
+              type="text"
+              placeholder="X / Twitter"
+              value={twitter}
+              onChange={(e) => setTwitter(e.target.value)}
+              disabled={busy}
+              className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2.5 text-xs disabled:opacity-50"
+            />
+            <input
+              type="text"
+              placeholder="Telegram"
+              value={telegram}
+              onChange={(e) => setTelegram(e.target.value)}
+              disabled={busy}
+              className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2.5 text-xs disabled:opacity-50"
+            />
+            <input
+              type="text"
+              placeholder="Website"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              disabled={busy}
+              className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2.5 text-xs disabled:opacity-50"
+            />
+          </div>
+
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+          {status === "done" && !error?.includes("Couldn't") && (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3 text-emerald-600 text-sm">
+              Launch submitted. Mint may appear shortly on your portfolio.
+            </div>
+          )}
+
+          {busy ? (
+            <p className="text-center text-sm text-gray-500">
+              {status === "auth" && "Face ID…"}
+              {status === "uploading" && "Uploading image…"}
+              {status === "creating" && "Orynth preparing…"}
+              {status === "signing" && "Signing & submitting…"}
+              {status === "confirming" && "Confirming on-chain…"}
+            </p>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => void handleLaunch()}
+                disabled={!name || !ticker || !imageFile || !publicKey}
+                className={`w-full ${ac.btn} disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5`}
+              >
+                Launch with Orynth
+              </button>
+              <p className="text-center text-xs text-gray-400">
+                ~{quoteSol?.toFixed(3) ?? "0.05"} SOL · mint ends in{" "}
+                <span className="font-mono text-purple-400">red</span> · partner fees to sol.new
+              </p>
+            </>
+          )}
+        </div>
       </div>
     </PageTransition>
   );
@@ -1282,12 +1671,15 @@ export default function TokenPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">
       <Navbar />
-      <main className="flex-1 flex flex-col px-4 py-4 sm:px-6 sm:py-8 sm:items-center">
+      <main className="flex-1 w-full pb-24">
+        <div className="app-shell py-5 sm:py-8 lg:py-10">
           {style === "pick" && <StylePicker onSelect={setStyle} />}
           {style === "meteora" && <MeteorForm onBack={() => setStyle("pick")} />}
+          {style === "orynth" && <OrynthForm onBack={() => setStyle("pick")} />}
           {(style === "pump" || style === "bags") && <PumpForm style={style} onBack={() => setStyle("pick")} />}
           {style === "genesis" && <GenesisForm onBack={() => setStyle("pick")} />}
           {style === "metadao" && <MetadaoForm onBack={() => setStyle("pick")} />}
+        </div>
       </main>
     </div>
   );

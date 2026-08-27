@@ -1,43 +1,31 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
-
-/** Default page enter: soft slide + fade (disabled when reduced motion). */
-export function PageTransition({ children }: { children: React.ReactNode }) {
-  const reduce = useReducedMotion();
+/**
+ * Local page section enter — soft slide-up + fade (slower, calmer).
+ * Does not fight sticky chrome (only content block, not full viewport).
+ */
+export function PageTransition({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <motion.div
-      initial={{ opacity: 0, x: reduce ? 0 : 16 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: reduce ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] }}
-    >
+    <div className={`w-full min-w-0 animate-page-enter ${className}`.trim()}>
       {children}
-    </motion.div>
+    </div>
   );
 }
 
+/** Soft enter without layout thrash. */
 export function FadeIn({
   children,
-  delay = 0,
   className = "",
 }: {
   children: React.ReactNode;
   delay?: number;
   className?: string;
 }) {
-  const reduce = useReducedMotion();
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: reduce ? 0 : 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{
-        duration: reduce ? 0 : 0.25,
-        ease: [0.22, 1, 0.36, 1],
-        delay: reduce ? 0 : delay,
-      }}
-      className={className}
-    >
-      {children}
-    </motion.div>
-  );
+  return <div className={`animate-page-enter ${className}`}>{children}</div>;
 }

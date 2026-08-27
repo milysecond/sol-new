@@ -8,6 +8,7 @@ import {
   shareOrCopy,
 } from "@/lib/share-copy";
 import { analytics } from "@/lib/analytics";
+import { toast } from "@/lib/toast";
 
 type Props = {
   publicKey: string;
@@ -41,6 +42,21 @@ function TelegramIcon({ className }: { className?: string }) {
 }
 
 /**
+ * Open an external share URL while preserving the user gesture on mobile.
+ * Prefer same-tab navigation when popup is blocked.
+ */
+function openShareUrl(url: string) {
+  try {
+    const w = window.open(url, "_blank", "noopener,noreferrer");
+    if (w) return;
+  } catch {
+    /* fall through */
+  }
+  // Popup blocked / in-app browser — same tab
+  window.location.assign(url);
+}
+
+/**
  * Ask friends for SOL/USDC via SMS, WhatsApp, Telegram, X, or system share.
  */
 export function RequestFundsShare({ publicKey, variant = "full", className = "" }: Props) {
@@ -53,7 +69,7 @@ export function RequestFundsShare({ publicKey, variant = "full", className = "" 
         publicKey,
         amountHint: amountHint.trim() || null,
       }),
-    [publicKey, amountHint]
+    [publicKey, amountHint],
   );
   const links = useMemo(() => requestFundsChannelLinks(payload), [payload]);
 
@@ -78,17 +94,25 @@ export function RequestFundsShare({ publicKey, variant = "full", className = "" 
     }
   };
 
-  const onXDm = async () => {
-    track("x_dm");
-    // Copy first so they can paste into a DM, then open Messages
-    try {
-      await navigator.clipboard.writeText(links.nativeText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    } catch {
-      /* ignore */
-    }
-    window.open(links.xMessages, "_blank", "noopener,noreferrer");
+  /** X: open compose with prefilled ask (reliable). Copy as backup for DM paste. */
+  const onX = () => {
+    track("x");
+    // Open FIRST (sync from click) so mobile doesn't drop the gesture
+    openShareUrl(links.xPost);
+    void navigator.clipboard
+      ?.writeText(links.nativeText)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+        try {
+          toast.success("Message copied — paste into an X DM if you prefer");
+        } catch {
+          /* toast optional */
+        }
+      })
+      .catch(() => {
+        /* clipboard may require permission; compose still has text */
+      });
   };
 
   const btn =
@@ -129,12 +153,12 @@ export function RequestFundsShare({ publicKey, variant = "full", className = "" 
       </a>
       <button
         type="button"
-        onClick={() => void onXDm()}
+        onClick={onX}
         className={btn}
-        aria-label="Copy and open X messages"
+        aria-label="Share request on X"
       >
         <XIcon className="w-5 h-5" />
-        X DM
+        X
       </button>
       <button
         type="button"
@@ -160,7 +184,7 @@ export function RequestFundsShare({ publicKey, variant = "full", className = "" 
         <div>
           <p className="text-sm font-semibold">Ask for funds</p>
           <p className="text-[11px] text-gray-500 dark:text-white/45">
-            SMS · WhatsApp · Telegram · X DM — sends your address + pay link
+            SMS · WhatsApp · Telegram · X — your address + pay link
           </p>
         </div>
       </div>
@@ -178,7 +202,7 @@ export function RequestFundsShare({ publicKey, variant = "full", className = "" 
       </label>
       {row}
       <p className="text-[10px] text-gray-400 text-center">
-        X DM copies the message then opens Messages — paste into a chat
+        X opens a prefilled post (and copies the message so you can paste into a DM)
       </p>
     </div>
   );

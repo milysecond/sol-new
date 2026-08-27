@@ -24,7 +24,7 @@ function short(pk: string) {
 /**
  * Gate actions behind the shared wallet-context session.
  * Prefers existing passkeys / saved wallets over "create new".
- * Wallet name is always the address.
+ * Wallets can have a custom label; address stays the same.
  */
 export function ConnectGate({
   children,
@@ -33,7 +33,7 @@ export function ConnectGate({
   children: React.ReactNode;
   action: string;
 }) {
-  const { publicKey, walletLabel, wallets, connect, recover, switchWallet, loading, error } =
+  const { publicKey, walletLabel, wallets, connect, recover, switchWallet, loading, error, clearLoading, connectExternal } =
     useWallet();
   const [isTgWebView, setIsTgWebView] = useState(false);
 
@@ -103,7 +103,7 @@ export function ConnectGate({
                             type="button"
                             disabled={loading}
                             onClick={() => {
-                              switchWallet(w.pubkey);
+                              void switchWallet(w.pubkey);
                             }}
                             className="w-full flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-white/50 dark:bg-white/5 px-3 py-2.5 text-left hover:border-purple-400/40 disabled:opacity-50"
                           >
@@ -126,7 +126,7 @@ export function ConnectGate({
                   type="button"
                   onClick={() => void recover({ forcePicker: true })}
                   disabled={loading}
-                  className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
+                  className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <>
@@ -140,6 +140,16 @@ export function ConnectGate({
                   )}
                 </button>
 
+                {loading && (
+                  <button
+                    type="button"
+                    onClick={() => clearLoading()}
+                    className="w-full text-sm font-medium text-amber-600 dark:text-amber-300 py-2"
+                  >
+                    Cancel — prompt stuck?
+                  </button>
+                )}
+
                 <a
                   href="/wallet/find"
                   className="block w-full text-center text-sm font-medium text-purple-600 dark:text-purple-400 py-1"
@@ -149,12 +159,48 @@ export function ConnectGate({
 
                 <button
                   type="button"
-                  onClick={() => void connect()}
+                  onClick={() => void connect({ createNew: true })}
                   disabled={loading}
-                  className="w-full bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white font-medium rounded-xl px-4 py-3 transition text-sm cursor-pointer disabled:opacity-40"
+                  className={`w-full font-semibold rounded-lg px-3.5 py-2.5 transition text-sm cursor-pointer disabled:opacity-40 ${
+                    hasSaved
+                      ? "bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/70"
+                      : "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-600/25 ring-2 ring-violet-400/40 animate-pulse"
+                  }`}
                 >
-                  {loading ? "Creating…" : "Create a new wallet"}
+                  {loading
+                    ? "…"
+                    : hasSaved
+                      ? "Create a new passkey wallet (only if needed)"
+                      : "✨ Create a new passkey wallet"}
                 </button>
+                {!hasSaved && (
+                  <p className="text-[11px] text-violet-600 dark:text-violet-300 font-medium -mt-1">
+                    New here? Tap above — Face ID / fingerprint, no seed phrase.
+                  </p>
+                )}
+
+                <div className="relative py-1">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-black/10 dark:border-white/10" />
+                  </div>
+                  <div className="relative flex justify-center text-[10px] uppercase tracking-wide">
+                    <span className="bg-white dark:bg-black px-2 text-gray-400">or</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void connectExternal()}
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-gray-800 dark:text-white/80 font-semibold rounded-lg px-3.5 py-2.5 transition text-sm cursor-pointer disabled:opacity-40"
+                >
+                  <Wallet className="w-4 h-4 text-violet-500" />
+                  Connect Phantom / Solflare / other wallets
+                </button>
+                <p className="text-[11px] text-gray-400 dark:text-white/35 leading-relaxed">
+                  Opens a wallet picker (Wallet Standard via ConnectorKit). Use funds already in
+                  Phantom, Solflare, Backpack, Glow, OKX, and more.
+                </p>
 
                 {walletLabel && (
                   <p className="text-[11px] font-mono text-gray-400 truncate" title={walletLabel}>

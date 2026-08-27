@@ -314,7 +314,7 @@ export default function PoapPage() {
   return (
     <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 w-full max-w-md mx-auto px-3 sm:px-4 pt-5 sm:pt-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
+      <main className="flex-1 app-shell pt-5 sm:pt-8 lg:pt-10 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <PageTransition>
           <div className="space-y-5">
             <div className="text-center space-y-1.5">
@@ -426,19 +426,19 @@ export default function PoapPage() {
                         setDragOver(false);
                       }}
                       onDrop={onDropImage}
-                      className={`relative rounded-xl border border-dashed px-3 py-6 text-center cursor-pointer transition ${
+                      className={`relative rounded-xl border border-dashed px-3 py-8 sm:py-6 text-center cursor-pointer transition touch-manipulation select-none min-h-[140px] flex flex-col items-center justify-center ${
                         dragOver
                           ? "border-violet-500 bg-violet-500/10"
-                          : "border-black/15 dark:border-white/15 bg-black/5 dark:bg-white/5 hover:border-violet-400/50"
+                          : "border-black/15 dark:border-white/15 bg-black/5 dark:bg-white/5 active:bg-violet-500/10 hover:border-violet-400/50"
                       }`}
                     >
                       {imagePreview ? (
-                        <div className="flex flex-col items-center gap-2">
+                        <div className="flex flex-col items-center gap-2 w-full">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={imagePreview}
                             alt=""
-                            className="w-24 h-24 rounded-xl object-cover border border-black/10 dark:border-white/10"
+                            className="w-28 h-28 sm:w-24 sm:h-24 rounded-xl object-cover border border-black/10 dark:border-white/10"
                           />
                           <p className="text-xs text-gray-500 truncate max-w-full px-2">
                             {imageName || "Image ready"}
@@ -449,30 +449,63 @@ export default function PoapPage() {
                               e.stopPropagation();
                               clearImage();
                             }}
-                            className="inline-flex items-center gap-1 text-xs text-red-500"
+                            className="inline-flex items-center gap-1 text-xs text-red-500 min-h-[44px] px-3"
                           >
                             <X className="w-3 h-3" /> Remove
                           </button>
                         </div>
                       ) : (
-                        <div className="space-y-1.5">
-                          <ImagePlus className="w-7 h-7 text-violet-500 mx-auto" />
-                          <p className="text-sm font-medium text-gray-700 dark:text-white/80">
-                            Drag & drop art here
+                        <div className="space-y-2 pointer-events-none">
+                          <ImagePlus className="w-9 h-9 text-violet-500 mx-auto" />
+                          <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+                            Tap to add art
                           </p>
-                          <p className="text-[11px] text-gray-400">
-                            or tap to upload · PNG / JPEG / WebP · max 5MB
+                          <p className="text-[11px] text-gray-400 px-2">
+                            PNG · JPEG · WebP · max 5MB
                           </p>
                         </div>
                       )}
+                      {/* Full-area native file control for iOS/Android — only when empty */}
+                      {!imagePreview && (
+                        <input
+                          ref={fileRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          capture="environment"
+                          onChange={onFileInput}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          aria-label="Upload POAP art"
+                        />
+                      )}
+                      {imagePreview && (
+                        <input
+                          ref={fileRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          onChange={onFileInput}
+                          className="hidden"
+                          aria-hidden
+                        />
+                      )}
                     </div>
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp,image/gif"
-                      onChange={onFileInput}
-                      className="sr-only"
-                    />
+                    {imagePreview && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // allow gallery pick without camera capture next time
+                          if (fileRef.current) {
+                            fileRef.current.removeAttribute("capture");
+                            fileRef.current.click();
+                            setTimeout(() => {
+                              fileRef.current?.setAttribute("capture", "environment");
+                            }, 500);
+                          }
+                        }}
+                        className="w-full text-xs text-violet-600 dark:text-violet-400 font-medium py-2"
+                      >
+                        Choose different photo from library
+                      </button>
+                    )}
                   </label>
                   <label className="block space-y-1">
                     <span className="text-xs text-gray-500">Max claims</span>

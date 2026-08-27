@@ -11,6 +11,7 @@ import { ConvertToSolCard } from "@/components/convert-to-sol-card";
 import { RequestFundsShare } from "@/components/request-funds-share";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
+import { addressPath, EXPLORER_LABEL } from "@/lib/explorer";
 
 function QrModal({
   open,
@@ -29,17 +30,21 @@ function QrModal({
     <BottomSheet
       open={open}
       onClose={onClose}
-      className="p-6 flex flex-col items-center gap-4 max-h-[90dvh] overflow-y-auto"
+      className="p-5 flex flex-col items-center gap-3 max-h-[90dvh] overflow-y-auto"
     >
-      <div className="bg-white rounded-2xl p-4">
-        <QrCode data={`solana:${publicKey}`} size={224} className="w-56 h-56" />
+      <p className="text-[11px] font-medium text-gray-500 dark:text-white/45 text-center">
+        Connected wallet · scan to pay this address
+      </p>
+      <div className="bg-white rounded-2xl p-3">
+        <QrCode data={`solana:${publicKey}`} size={240} className="w-60 h-60 max-w-[min(60vw,240px)] max-h-[min(60vw,240px)]" />
       </div>
-      <p className="text-gray-500 dark:text-gray-400 text-xs font-mono break-all text-center leading-relaxed">
+      <p className="text-gray-600 dark:text-white/70 text-[11px] font-mono break-all text-center leading-relaxed px-1">
         {publicKey}
       </p>
       <button
+        type="button"
         onClick={onCopy}
-        className="w-full flex items-center justify-center gap-1.5 bg-fuchsia-500 hover:bg-fuchsia-400 text-white font-semibold rounded-xl px-4 py-3 transition"
+        className="w-full flex items-center justify-center gap-1.5 bg-fuchsia-500 hover:bg-fuchsia-400 text-white font-semibold rounded-lg px-3.5 py-2.5 transition min-h-[48px]"
       >
         {copied ? (
           <>
@@ -52,18 +57,16 @@ function QrModal({
         )}
       </button>
       <div className="w-full">
-        <RequestFundsShare publicKey={publicKey} variant="full" />
+        <RequestFundsShare publicKey={publicKey} variant="compact" />
       </div>
     </BottomSheet>
   );
 }
 
 export default function WalletGetPage() {
-  const { publicKey, airdropping, airdropDone, handleAirdrop } = useWallet();
+  const { publicKey, airdropping, airdropDone, handleAirdrop, walletKind } = useWallet();
   const { network } = useNetwork();
   const [copied, setCopied] = useState(false);
-
-  const clusterParam = network === "devnet" ? "?cluster=devnet&hideSpam=true" : "?hideSpam=true";
   const [qrFullscreen, setQrFullscreen] = useState(false);
 
   useEffect(() => {
@@ -83,71 +86,97 @@ export default function WalletGetPage() {
 
   const copyAddress = useCallback(() => {
     if (!publicKey) return;
-    navigator.clipboard.writeText(publicKey);
+    void navigator.clipboard.writeText(publicKey);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [publicKey]);
 
+  // Always pin QR / ask / explorer to the live connected session
+  const receivePk = publicKey;
+
   return (
     <WalletShell>
       <PageTransition>
-        {publicKey && (
-          <>
-            <QrModal
-              open={qrFullscreen}
-              onClose={() => setQrFullscreen(false)}
-              publicKey={publicKey}
-              onCopy={copyAddress}
-              copied={copied}
-            />
-            {network === "mainnet" && <ConvertToSolCard />}
-            <div className="space-y-3">
-              <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-4 flex items-center gap-4">
-                <div
-                  className="shrink-0 cursor-pointer hover:shadow-md transition flex flex-col items-center"
+        {receivePk && (
+            <div className="space-y-2.5 sm:space-y-3">
+              <QrModal
+                open={qrFullscreen}
+                onClose={() => setQrFullscreen(false)}
+                publicKey={receivePk}
+                onCopy={copyAddress}
+                copied={copied}
+              />
+
+              {/* Seeker-first: big QR + id, less chrome */}
+              <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-3 sm:p-4 flex items-center gap-3">
+                <button
+                  type="button"
+                  className="shrink-0 cursor-pointer active:scale-[0.98] transition flex flex-col items-center touch-manipulation"
                   onClick={() => setQrFullscreen(true)}
+                  aria-label="Enlarge receive QR"
                 >
-                  <div className="bg-white rounded-lg p-2">
-                    <QrCode data={`solana:${publicKey}`} size={80} className="w-20 h-20" />
+                  <div className="bg-white rounded-lg p-1.5 sm:p-2">
+                    <QrCode
+                      data={`solana:${receivePk}`}
+                      size={96}
+                      className="w-[5.5rem] h-[5.5rem] sm:w-24 sm:h-24"
+                    />
                   </div>
-                  <p className="text-[10px] text-gray-400 dark:text-white/30 mt-1">Tap to enlarge</p>
-                </div>
-                <div className="flex-1 min-w-0 space-y-2">
-                  <p className="text-xs text-gray-500 dark:text-white/40">Send SOL or USDC to this address</p>
-                  <code className="text-xs font-mono text-fuchsia-400 dark:text-fuchsia-300 break-all block leading-relaxed">
-                    {publicKey}
+                  <p className="text-[10px] text-gray-400 dark:text-white/30 mt-0.5">Tap QR</p>
+                </button>
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <p className="text-[11px] font-medium text-gray-600 dark:text-white/55 leading-snug">
+                    Receive to{" "}
+                    <span className="text-fuchsia-600 dark:text-fuchsia-300">
+                      {walletKind === "external" ? "connected wallet" : "your passkey wallet"}
+                    </span>
+                  </p>
+                  <code className="text-[11px] sm:text-xs font-mono text-fuchsia-500 dark:text-fuchsia-300 break-all block leading-snug select-all">
+                    {receivePk}
                   </code>
-                  <button
-                    onClick={copyAddress}
-                    className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-white/50 hover:text-gray-700 dark:hover:text-white/70 transition cursor-pointer"
-                  >
-                    {copied ? (
-                      <>
-                        <Check size={12} className="text-green-400" /> Copied
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={12} /> Copy address
-                      </>
-                    )}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={copyAddress}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white transition min-h-[36px] px-1 -ml-1"
+                    >
+                      {copied ? (
+                        <>
+                          <Check size={13} className="text-green-400" /> Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={13} /> Copy
+                        </>
+                      )}
+                    </button>
+                    <Link
+                      href={addressPath(receivePk)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white transition min-h-[36px]"
+                    >
+                      <ExternalLink size={13} /> {EXPLORER_LABEL}
+                    </Link>
+                  </div>
                 </div>
               </div>
 
-              <RequestFundsShare publicKey={publicKey} variant="full" />
+              {network === "mainnet" && <ConvertToSolCard />}
+
+              <RequestFundsShare publicKey={receivePk} variant="full" />
 
               {network === "devnet" && (
                 <button
-                  onClick={handleAirdrop}
+                  type="button"
+                  onClick={() => void handleAirdrop()}
                   disabled={airdropping}
-                  className="w-full bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 text-yellow-300 font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  className="w-full bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 text-yellow-700 dark:text-yellow-300 font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 min-h-[48px] touch-manipulation active:scale-[0.98]"
                 >
-                  <Droplets size={14} className="inline mr-1" />
+                  <Droplets size={14} />
                   {airdropping ? (
-                    "Sending..."
+                    "Sending…"
                   ) : airdropDone ? (
                     <>
-                      <Check className="w-4 h-4 inline" /> 0.1 SOL sent!
+                      <Check className="w-4 h-4" /> 0.1 SOL sent!
                     </>
                   ) : (
                     "Airdrop 0.1 SOL"
@@ -155,25 +184,15 @@ export default function WalletGetPage() {
                 </button>
               )}
 
-              {network === "mainnet" && (
-                <Link
-                  href="/get"
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <DollarSign size={14} /> Get USDC
-                </Link>
-              )}
-
-              <a
-                href={`https://orbmarkets.io/address/${publicKey}${clusterParam}`}
-                target="_blank"
-                className="flex items-center justify-center gap-1.5 w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition text-center text-sm"
+              {/* Cash ramps live on /get — not inside wallet receive */}
+              <Link
+                href="/get"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 min-h-[48px] touch-manipulation active:scale-[0.98]"
               >
-                View on Orb Markets <ExternalLink className="w-3.5 h-3.5 inline ml-1" />
-              </a>
+                <DollarSign size={14} /> Get funds / credits
+              </Link>
             </div>
-          </>
-        )}
+          )}
       </PageTransition>
     </WalletShell>
   );

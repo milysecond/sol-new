@@ -87,7 +87,7 @@ export function mergeStocks(
       mcap: p?.mcap ?? null,
       premiumPct,
       jupUrl: `https://jup.ag/tokens/${t.mint}?ref=yfgv2ibxy07v`,
-      solscanUrl: `https://solscan.io/token/${t.mint}`,
+      solscanUrl: `/token/${t.mint}`,
     };
   });
 }

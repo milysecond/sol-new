@@ -124,7 +124,7 @@ export async function PATCH(
       emoji: "✏️",
       title: "Token metadata updated",
       fields: { mint, signer, ip },
-    });
+    }, { req });
 
     return NextResponse.json({ ok: true });
   } catch (e) {

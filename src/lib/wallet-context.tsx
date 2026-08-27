@@ -7,11 +7,17 @@ import {
   createPasskeyWallet,
   recoverPasskeyWallet,
   identifyPasskeyWallet,
+  provePasskeyWallet,
   signalPasskeyUserDetails,
 } from "./passkey-wallet";
 import { useNetwork } from "./network";
 import { analytics } from "./analytics";
 import { getUsdcBalance } from "./usdc";
+import {
+  openWalletPicker,
+  disconnectExternalWallet,
+  connectInjectedWallet,
+} from "./external-wallet";
 
 export interface WalletEntry {
   pubkey: string;
@@ -32,18 +38,26 @@ interface WalletState {
   usdcBalance: number | null;
   loading: boolean;
   error: string | null;
-  connect: (username?: string) => Promise<void>;
-  recover: (opts?: { forcePicker?: boolean }) => Promise<void>;
+  connect: (username?: string | { createNew?: boolean }) => Promise<string | null>;
+  recover: (opts?: { forcePicker?: boolean; forAddress?: string }) => Promise<string | null>;
   /** Probe one passkey from the full OS list; returns address (does not auto-activate). */
   identify: () => Promise<{ publicKey: string; credentialId: string; sol: number; usdc: number }>;
   /** Save/activate a discovered wallet with a label. */
   activateWallet: (entry: WalletEntry) => void;
   renameWallet: (pubkey: string, label: string) => void;
   removeWallet: (pubkey: string) => void;
-  switchWallet: (pubkey: string) => void;
+  switchWallet: (pubkey: string) => void | Promise<void>;
   refreshWalletListBalances: () => Promise<void>;
   disconnect: () => void;
   refreshBalance: () => Promise<void>;
+  /** Clear stuck Authenticating / Creating spinner (WebAuthn hang recovery). */
+  clearLoading: () => void;
+  /** passkey = Face ID wallet; external = ConnectorKit / inject */
+  walletKind: "passkey" | "external";
+  /** Opens multi-wallet picker (ConnectorKit). */
+  connectExternal: () => Promise<string | null>;
+  /** Called by ConnectorKit bridge after a wallet connects. */
+  activateExternal: (pubkey: string, label: string) => void;
   airdropping: boolean;
   airdropDone: boolean;
   handleAirdrop: () => Promise<void>;
@@ -58,8 +72,8 @@ const WalletContext = createContext<WalletState>({
   usdcBalance: null,
   loading: false,
   error: null,
-  connect: async () => {},
-  recover: async () => {},
+  connect: async () => null,
+  recover: async () => null,
   identify: async () => ({ publicKey: "", credentialId: "", sol: 0, usdc: 0 }),
   activateWallet: () => {},
   renameWallet: () => {},
@@ -68,6 +82,10 @@ const WalletContext = createContext<WalletState>({
   refreshWalletListBalances: async () => {},
   disconnect: () => {},
   refreshBalance: async () => {},
+  clearLoading: () => {},
+  walletKind: "passkey",
+  connectExternal: async () => null,
+  activateExternal: () => {},
   airdropping: false,
   airdropDone: false,
   handleAirdrop: async () => {},
@@ -87,6 +105,17 @@ function loadWallets(): WalletEntry[] {
 
 function saveWallets(wallets: WalletEntry[]) {
   localStorage.setItem("sol.new.wallets", JSON.stringify(wallets));
+}
+
+/** Friendly label: keep custom names; empty falls back to pubkey. */
+function normalizeLabel(pubkey: string, label?: string | null): string {
+  const cleaned = (label || "").trim().replace(/\s+/g, " ").slice(0, 32);
+  return cleaned || pubkey;
+}
+
+function isCustomLabel(pubkey: string, label?: string | null): boolean {
+  const l = (label || "").trim();
+  return Boolean(l) && l !== pubkey;
 }
 
 function upsertWallet(entry: WalletEntry): WalletEntry[] {
@@ -112,18 +141,24 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [walletBalances, setWalletBalances] = useState<WalletBalances>({});
   const [balance, setBalance] = useState<number | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
+  const [walletKind, setWalletKind] = useState<"passkey" | "external">("passkey");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { rpc, network } = useNetwork();
 
   useEffect(() => {
     const saved = localStorage.getItem("sol.new.wallet");
-    const savedWallets = loadWallets().map((w) => ({ ...w, label: w.pubkey }));
+    const savedWallets = loadWallets().map((w) => ({
+      ...w,
+      label: normalizeLabel(w.pubkey, w.label),
+    }));
     if (savedWallets.length) saveWallets(savedWallets);
     if (saved) {
       setPublicKey(saved);
-      setWalletLabel(saved);
-      localStorage.setItem("sol.new.walletLabel", saved);
+      const entry = savedWallets.find((w) => w.pubkey === saved);
+      const lbl = entry ? normalizeLabel(saved, entry.label) : saved;
+      setWalletLabel(lbl);
+      localStorage.setItem("sol.new.walletLabel", lbl);
     }
     setWallets(savedWallets);
   }, []);
@@ -182,8 +217,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!publicKey) return;
+    // Clear stale chain balances immediately on network/RPC change
     setBalance(null);
     setUsdcBalance(null);
+    setWalletBalances({});
     refreshBalance();
     const interval = setInterval(refreshBalance, 15000);
     return () => clearInterval(interval);
@@ -194,16 +231,22 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, [wallets.length, network]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const activateWallet = (entry: WalletEntry) => {
-    // Wallet name === address (product rule)
-    const labeled: WalletEntry = { ...entry, label: entry.pubkey };
+    const existing = loadWallets().find((w) => w.pubkey === entry.pubkey);
+    // Prefer explicit custom label on entry, else keep saved custom label, else pubkey
+    const label = isCustomLabel(entry.pubkey, entry.label)
+      ? normalizeLabel(entry.pubkey, entry.label)
+      : isCustomLabel(entry.pubkey, existing?.label)
+        ? normalizeLabel(entry.pubkey, existing?.label)
+        : entry.pubkey;
+    const labeled: WalletEntry = { ...entry, label };
     const updated = upsertWallet(labeled);
     setWallets(updated);
     setPublicKey(labeled.pubkey);
-    setWalletLabel(labeled.pubkey);
+    setWalletLabel(labeled.label);
     setBalance(null);
     setUsdcBalance(null);
     localStorage.setItem("sol.new.wallet", labeled.pubkey);
-    localStorage.setItem("sol.new.walletLabel", labeled.pubkey);
+    localStorage.setItem("sol.new.walletLabel", labeled.label);
     // Never leave a stale credentialId from a previous wallet
     if (labeled.credentialId) {
       localStorage.setItem("sol.new.credentialId", labeled.credentialId);
@@ -212,14 +255,65 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const connect = async (_username?: string) => {
+  const connect = async (username?: string | { createNew?: boolean }): Promise<string | null> => {
     setError(null);
     setLoading(true);
     try {
       if (!window.PublicKeyCredential) {
-        throw new Error("Passkeys require HTTPS.");
+        throw new Error("Passkeys require HTTPS (or localhost).");
       }
-      const result = await createPasskeyWallet();
+
+      const createNew =
+        typeof username === "object" && username?.createNew === true;
+
+      // Default Connect = unlock existing passkey. Only mint a new key when asked.
+      if (!createNew) {
+        const list = loadWallets();
+        const forcePicker =
+          list.length !== 1 || !list[0]?.credentialId;
+        try {
+          const result = await recoverPasskeyWallet({
+            forcePicker,
+            forAddress:
+              list.length === 1 && list[0]?.credentialId
+                ? list[0].pubkey
+                : undefined,
+          });
+          activateWallet({
+            pubkey: result.publicKey,
+            credentialId: result.credentialId,
+            label: result.publicKey,
+          });
+          fetch("/api/wallet", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              publicKey: result.publicKey,
+              credentialId: result.credentialId,
+            }),
+          }).catch(() => {});
+          analytics.walletRecovered();
+          return result.publicKey;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message.toLowerCase() : "";
+          const cancelled =
+            msg.includes("cancel") ||
+            msg.includes("not allowed") ||
+            msg.includes("abort") ||
+            msg.includes("denied");
+          if (list.length > 0 || cancelled) {
+            throw e;
+          }
+          // Fresh device with zero wallets: create below
+        }
+      }
+
+      const result = await createPasskeyWallet(
+        typeof username === "string" ? username : undefined,
+      );
+      if (!result?.publicKey || result.publicKey.length < 32) {
+        throw new Error("Passkey created but no wallet address was derived.");
+      }
       activateWallet({
         pubkey: result.publicKey,
         credentialId: result.credentialId,
@@ -229,25 +323,43 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       fetch("/api/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicKey: result.publicKey, credentialId: result.credentialId }),
+        body: JSON.stringify({
+          publicKey: result.publicKey,
+          credentialId: result.credentialId,
+        }),
       }).catch(() => {});
       analytics.walletCreated(result.publicKey);
+      return result.publicKey;
     } catch (e) {
       const { friendlyError } = await import("./friendly-errors");
-      setError(friendlyError(e, "We couldn't set up your wallet. Try again."));
+      const msg = friendlyError(
+        e,
+        "Couldn't create or unlock wallet. Try again, or use Find wallet.",
+      );
+      setError(msg);
+      return null;
     } finally {
       setLoading(false);
     }
   };
 
-  const recover = async (opts?: { forcePicker?: boolean }) => {
+  const recover = async (opts?: {
+    forcePicker?: boolean;
+    forAddress?: string;
+  }): Promise<string | null> => {
     setError(null);
     setLoading(true);
     try {
       if (!window.PublicKeyCredential) {
-        throw new Error("Passkeys require HTTPS.");
+        throw new Error("Passkeys require HTTPS (or localhost).");
       }
-      const result = await recoverPasskeyWallet({ forcePicker: opts?.forcePicker });
+      const result = await recoverPasskeyWallet({
+        forcePicker: opts?.forcePicker,
+        forAddress: opts?.forAddress,
+      });
+      if (!result?.publicKey) {
+        throw new Error("Passkey unlocked but no address was derived.");
+      }
       activateWallet({
         pubkey: result.publicKey,
         credentialId: result.credentialId,
@@ -256,12 +368,21 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       fetch("/api/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicKey: result.publicKey }),
+        body: JSON.stringify({
+          publicKey: result.publicKey,
+          credentialId: result.credentialId,
+        }),
       }).catch(() => {});
       analytics.walletRecovered();
+      return result.publicKey;
     } catch (e) {
       const { friendlyError } = await import("./friendly-errors");
-      setError(friendlyError(e, "We couldn't find your wallet. Try creating a new one."));
+      const msg = friendlyError(
+        e,
+        "We couldn't unlock that passkey. Try Find wallet, or pick the passkey named with your address.",
+      );
+      setError(msg);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -302,24 +423,24 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const renameWallet = (pubkey: string, _label: string) => {
-    // Name is always the address
+  const renameWallet = (pubkey: string, label: string) => {
     const list = loadWallets();
     const idx = list.findIndex((w) => w.pubkey === pubkey);
     if (idx < 0) return;
-    list[idx] = { ...list[idx], label: pubkey };
+    const nextLabel = normalizeLabel(pubkey, label);
+    list[idx] = { ...list[idx], label: nextLabel };
     saveWallets(list);
     setWallets([...list]);
     if (publicKey === pubkey) {
-      setWalletLabel(pubkey);
-      localStorage.setItem("sol.new.walletLabel", pubkey);
+      setWalletLabel(nextLabel);
+      localStorage.setItem("sol.new.walletLabel", nextLabel);
     }
     const entry = list[idx];
     if (entry.userId) {
       void signalPasskeyUserDetails({
         userId: entry.userId,
-        name: pubkey,
-        displayName: pubkey,
+        name: nextLabel,
+        displayName: nextLabel,
       });
     }
   };
@@ -339,10 +460,69 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const switchWallet = (pubkey: string) => {
+  const switchWallet = async (pubkey: string) => {
     const entry = loadWallets().find((w) => w.pubkey === pubkey);
     if (!entry) return;
-    activateWallet({ ...entry, label: entry.pubkey });
+    if (publicKey === pubkey) return;
+
+    // Require passkey signature (challenge) before activating another wallet
+    setError(null);
+    setLoading(true);
+    try {
+      const { toast } = await import("@/lib/toast");
+      toast.info(
+        `Authenticate to switch to ${
+          isCustomLabel(pubkey, entry.label)
+            ? entry.label
+            : `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`
+        }`,
+      );
+
+      const result = await provePasskeyWallet(pubkey);
+      if (result.publicKey !== pubkey) {
+        throw new Error("Passkey does not match that wallet");
+      }
+
+      activateWallet({
+        pubkey: result.publicKey,
+        credentialId: result.credentialId,
+        label: entry.label || result.publicKey,
+        userId: entry.userId,
+      });
+
+      fetch("/api/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          publicKey: result.publicKey,
+          credentialId: result.credentialId,
+        }),
+      }).catch(() => {});
+
+      toast.success(
+        `Switched to ${
+          isCustomLabel(pubkey, entry.label)
+            ? entry.label
+            : `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`
+        }`,
+      );
+    } catch (e) {
+      const { friendlyError } = await import("./friendly-errors");
+      setError(
+        friendlyError(
+          e,
+          `Sign with the passkey for ${pubkey.slice(0, 4)}…${pubkey.slice(-4)} to switch.`,
+        ),
+      );
+      try {
+        const { toast } = await import("@/lib/toast");
+        toast.error("Wallet switch cancelled or passkey mismatch");
+      } catch {
+        /* ignore */
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const [airdropping, setAirdropping] = useState(false);
@@ -353,31 +533,180 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setAirdropping(true);
     setAirdropDone(false);
     try {
-      await fetch("/api/airdrop", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: publicKey }),
-      });
-      await new Promise((r) => setTimeout(r, 3000));
-      await refreshBalance();
-      setAirdropDone(true);
-      const { toast } = await import("sonner");
-      toast.success("0.1 SOL airdropped!");
-      try {
-        new Audio("/chaching.mp3").play();
-      } catch {}
-      setTimeout(() => setAirdropDone(false), 3000);
-    } catch {
-      const { toast } = await import("sonner");
-      toast.error("Airdrop failed — try again");
+      const run = async (body: Record<string, unknown>) => {
+        const res = await fetch("/api/airdrop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          error?: string;
+          signature?: string;
+          needsClientBroadcast?: boolean;
+          needsBlockhash?: boolean;
+          transaction?: string;
+        };
+        return { res, data };
+      };
+
+      let { res, data } = await run({ address: publicKey });
+
+      if (res.ok && data.ok && data.signature) {
+        await new Promise((r) => setTimeout(r, 1200));
+        await refreshBalance();
+        setAirdropDone(true);
+        const { toast } = await import("@/lib/toast");
+        toast.money("0.1 SOL airdropped!");
+        setTimeout(() => setAirdropDone(false), 3000);
+        return;
+      }
+
+      // Browser path: blockhash → server signs → browser broadcasts (CF IP blocked from public devnet)
+      if (data.needsClientBroadcast || data.needsBlockhash) {
+        const { Connection } = await import("@solana/web3.js");
+        const endpoints = [
+          "https://api.devnet.solana.com",
+          "https://endpoints.omniatech.io/v1/sol/devnet/public",
+        ];
+        let conn: InstanceType<typeof Connection> | null = null;
+        let blockhash = "";
+        let lastValidBlockHeight = 0;
+        let lastErr: Error | null = null;
+        for (const url of endpoints) {
+          try {
+            const c = new Connection(url, "confirmed");
+            const bh = await c.getLatestBlockhash("finalized");
+            conn = c;
+            blockhash = bh.blockhash;
+            lastValidBlockHeight = bh.lastValidBlockHeight;
+            break;
+          } catch (e) {
+            lastErr = e instanceof Error ? e : new Error(String(e));
+          }
+        }
+        if (!conn || !blockhash) {
+          throw lastErr || new Error("Could not reach devnet from browser");
+        }
+
+        if (!data.transaction) {
+          ({ res, data } = await run({
+            address: publicKey,
+            blockhash,
+            lastValidBlockHeight,
+          }));
+        }
+        if (!data.transaction) {
+          throw new Error(data.error || "No signed airdrop transaction");
+        }
+
+        const raw = Uint8Array.from(atob(data.transaction), (c) => c.charCodeAt(0));
+        const sig = await conn.sendRawTransaction(raw, {
+          skipPreflight: false,
+          maxRetries: 5,
+        });
+        for (let i = 0; i < 30; i++) {
+          const st = await conn.getSignatureStatuses([sig]);
+          const v = st.value[0];
+          if (v?.err) throw new Error(`Tx failed: ${JSON.stringify(v.err)}`);
+          if (
+            v?.confirmationStatus === "confirmed" ||
+            v?.confirmationStatus === "finalized"
+          ) {
+            break;
+          }
+          if ((await conn.getBlockHeight("confirmed")) > lastValidBlockHeight) {
+            throw new Error("Airdrop expired before confirm — try again");
+          }
+          await new Promise((r) => setTimeout(r, 800));
+        }
+
+        await run({ address: publicKey, signature: sig });
+        await new Promise((r) => setTimeout(r, 1200));
+        await refreshBalance();
+        setAirdropDone(true);
+        const { toast } = await import("@/lib/toast");
+        toast.money("0.1 SOL airdropped!");
+        setTimeout(() => setAirdropDone(false), 3000);
+        return;
+      }
+
+      throw new Error(data.error || `Airdrop failed (${res.status})`);
+    } catch (e) {
+      const { toast } = await import("@/lib/toast");
+      const { friendlyError } = await import("./friendly-errors");
+      toast.error(friendlyError(e, "Airdrop failed — try again"));
     } finally {
       setAirdropping(false);
     }
   }, [publicKey, network, refreshBalance]);
 
+  const clearLoading = () => {
+    setLoading(false);
+    setError(null);
+  };
+
+  const activateExternal = useCallback((pk: string, label: string) => {
+    setError(null);
+    setPublicKey(pk);
+    setWalletLabel(label || "Wallet");
+    setWalletKind("external");
+    try {
+      sessionStorage.setItem("sol.new.wallet.kind", "external");
+      sessionStorage.setItem("sol.new.wallet", pk);
+    } catch { /* ignore */ }
+    try {
+      analytics.walletConnected("external");
+    } catch { /* ignore */ }
+    // refresh balances
+    void (async () => {
+      try {
+        const { Connection, PublicKey, LAMPORTS_PER_SOL } = await import("@solana/web3.js");
+        const conn = new Connection(rpc, "confirmed");
+        const owner = new PublicKey(pk);
+        const bal = await conn.getBalance(owner, "confirmed");
+        setBalance(bal / LAMPORTS_PER_SOL);
+        const u = await getUsdcBalance(conn, owner, network === "devnet" ? "devnet" : "mainnet");
+        setUsdcBalance(u);
+      } catch {
+        setBalance(null);
+        setUsdcBalance(null);
+      }
+    })();
+  }, [rpc, network]);
+
+  const connectExternal = async (): Promise<string | null> => {
+    setError(null);
+    try {
+      openWalletPicker();
+      return null; // address arrives via activateExternal after user picks
+    } catch (e) {
+      // Fallback: legacy inject if picker not mounted
+      try {
+        setLoading(true);
+        const { publicKey: pk, label } = await connectInjectedWallet();
+        activateExternal(pk, label);
+        return pk;
+      } catch (e2) {
+        const { friendlyError } = await import("./friendly-errors");
+        const msg = e2 instanceof Error && e2.message === "PICKER_OPENED"
+          ? null
+          : friendlyError(e2, "Could not open wallet picker");
+        if (msg) setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const disconnect = () => {
+    const wasExternal = walletKind === "external";
     setPublicKey(null);
     setWalletLabel(null);
+    setWalletKind("passkey");
+    try { sessionStorage.removeItem("sol.new.wallet.kind"); } catch { /* */ }
+    if (wasExternal) void disconnectExternalWallet();
     setBalance(null);
     setUsdcBalance(null);
     localStorage.removeItem("sol.new.wallet");
@@ -406,6 +735,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         refreshWalletListBalances,
         disconnect,
         refreshBalance,
+        clearLoading,
+        walletKind,
+        connectExternal,
+        activateExternal,
         airdropping,
         airdropDone,
         handleAirdrop,

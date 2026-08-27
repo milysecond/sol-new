@@ -8,8 +8,11 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
   const m = msg.toLowerCase();
 
   // Passkey / WebAuthn cancellation
-  if (m.includes("notallowederror") || m.includes("user cancelled") || m.includes("the operation either timed out") || m.includes("the user denied")) {
-    return "Face ID was cancelled. Tap the button to try again.";
+  if (m.includes("gift was not sent")) {
+    return "Passkey was cancelled. Gift was not sent — slide again and approve Face ID / fingerprint to continue.";
+  }
+  if (m.includes("notallowederror") || m.includes("user cancelled") || m.includes("the operation either timed out") || m.includes("the user denied") || m.includes("passkey authentication cancelled")) {
+    return "Passkey was cancelled. Nothing was sent — try again and approve Face ID / fingerprint.";
   }
   if (m.includes("document is not focused") || m.includes("is not focused")) {
     return "Tap Slide to send again — Face ID needs the page focused.";
@@ -28,24 +31,53 @@ export function friendlyError(e: unknown, fallback = "Something went wrong. Plea
     return "A wallet in this transaction has 0 SOL (often the network-fee payer). Try again — fees may come from your balance.";
   }
 
-  // Insufficient SOL (system program 0x1 / simulation logs)
+  // Insufficient SOL (system program 0x1 / simulation logs / Phantom wording)
   if (
     m.includes("insufficient lamports") ||
     m.includes("insufficient funds") ||
+    m.includes("not enough sol") ||
+    m.includes("insufficient sol") ||
     (m.includes("0x1") && (m.includes("transfer") || m.includes("simulation") || m.includes("custom program error")))
   ) {
-    if (m.includes("insufficient lamports") || m.includes("need ")) {
-      return "Not enough SOL after the network fee. Tap Max to send what you can, or add a little more SOL.";
-    }
-    return "Not enough SOL in your wallet. Add some from the Get page.";
+    return "Not enough SOL for this action (amount + network fee). Open Get funds, add SOL, then try again.";
+  }
+  if (m.includes("incorrect program id")) {
+    return "This token uses Token-2022. Refresh and try again — we fixed the gift builder.";
+  }
+  if (m.includes("failed to sign transaction") || m.includes("signing_failed") || m.includes("signing failed")) {
+    return "Wallet couldn't sign. Reconnect your wallet or use a passkey, then try again.";
+  }
+  if (m.includes("failed to send transaction") || m.includes("send_failed")) {
+    return "Wallet signed but send failed. Check balance/fees and try again.";
+  }
+  if (m.includes("user rejected") || m.includes("rejected the request") || m.includes("user denied transaction")) {
+    return "Transaction cancelled in the wallet app.";
   }
 
   // Network / RPC
   if (m.includes("blockhash not found") || m.includes("transaction was not confirmed")) {
     return "The network is congested. Try again in a moment.";
   }
-  if (m.includes("failed to fetch") || m.includes("networkerror")) {
+  // Privacy Cash / snarkjs
+  if (
+    m.includes("failed to fetch") ||
+    m.includes("networkerror") ||
+    m.includes("load of media") ||
+    m.includes("fetching the") && m.includes("wasm")
+  ) {
+    if (m.includes("circuit") || m.includes("zkey") || m.includes("wasm") || m.includes("snark") || m.includes("groth") || m.includes("prove")) {
+      return "Couldn't load the ZK circuit (large file). Stay on Wi‑Fi, hard-refresh, and try Shield again.";
+    }
+    if (m.includes("relayer") || m.includes("privacycash") || m.includes("/deposit") || m.includes("/withdraw") || m.includes("/utxos")) {
+      return "Privacy Cash relayer unreachable. Check you're on the right network (live = mainnet) and try again.";
+    }
     return "Lost your connection. Check your network and try again.";
+  }
+  if (m.includes("don't deposit more") || m.includes("deposit more than")) {
+    return msg;
+  }
+  if (m.includes("insufficient balance") && m.includes("sol")) {
+    return "Not enough SOL in your public wallet to shield that amount + fees.";
   }
   if (m.includes("429") || m.includes("rate limit")) {
     return "Too many requests too fast — wait a few seconds and retry.";

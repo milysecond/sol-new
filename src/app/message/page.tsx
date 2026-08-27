@@ -119,7 +119,7 @@ function SignSection({ onSigned }: { onSigned: (r: { message: string; signature:
       <button
         onClick={handleSign}
         disabled={!message || busy}
-        className="w-full bg-teal-500 hover:bg-teal-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full bg-teal-500 hover:bg-teal-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {busy ? <><Spinner size={16} /> Signing…</> : "Sign with Face ID"}
       </button>
@@ -141,7 +141,7 @@ function SignSection({ onSigned }: { onSigned: (r: { message: string; signature:
                   <Check size={16} /> Your message is on the blockchain — forever.
                 </div>
                 <a
-                  href={`https://explorer.solana.com/tx/${onchain.signature}${network === "devnet" ? "?cluster=devnet" : ""}`}
+                  href={`/receipt/${onchain.signature}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-1.5 w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white transition"
@@ -154,7 +154,7 @@ function SignSection({ onSigned }: { onSigned: (r: { message: string; signature:
                 <button
                   onClick={handleOnchain}
                   disabled={onchain.status === "sending"}
-                  className="w-full bg-black/10 dark:bg-white/10 hover:bg-black/15 dark:hover:bg-white/15 disabled:opacity-50 text-gray-900 dark:text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full bg-black/10 dark:bg-white/10 hover:bg-black/15 dark:hover:bg-white/15 disabled:opacity-50 text-gray-900 dark:text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {onchain.status === "sending"
                     ? <><Spinner size={16} /> Writing on-chain…</>
@@ -250,7 +250,7 @@ function VerifySection({
       <button
         onClick={handleVerify}
         disabled={!canVerify}
-        className="w-full bg-black/10 dark:bg-white/10 hover:bg-black/15 dark:hover:bg-white/15 disabled:opacity-50 text-gray-900 dark:text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
+        className="w-full bg-black/10 dark:bg-white/10 hover:bg-black/15 dark:hover:bg-white/15 disabled:opacity-50 text-gray-900 dark:text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed"
       >
         Verify
       </button>
@@ -277,8 +277,8 @@ export default function MessagePage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">
       <Navbar />
-      <main className="flex-1 flex flex-col px-4 py-4 sm:px-6 sm:py-8 sm:items-center">
-        <div className="w-full sm:max-w-lg space-y-4">
+      <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
+        <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
           <div className="text-center space-y-1">
             <AnimatedIcon icon={PenLine} size={32} className="text-teal-400" />
             <h1 className="text-2xl font-bold tracking-tight">Sign a message</h1>

@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       emoji: '📈',
       title: 'DBC pool created',
       fields: { name, symbol, network, mint: mintAddress, pool: poolAddr, creator: creatorWallet },
-    });
+    }, { req });
 
     return NextResponse.json({
       ok: true,
@@ -93,8 +93,8 @@ export async function POST(req: NextRequest) {
       lastValidBlockHeight,
       meteoraUrl: `https://app.meteora.ag/pools/${poolAddr}`,
       solscanUrl: network === "devnet"
-        ? `https://orbmarkets.io/address/${mintAddress}?cluster=devnet&hideSpam=true`
-        : `https://orbmarkets.io/address/${mintAddress}?hideSpam=true`,
+        ? `/token/${mintAddress}`
+        : `/token/${mintAddress}`,
     });
   } catch (e: any) {
     console.error("DBC pool creation error:", e);
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
       emoji: '⚠️',
       title: 'DBC pool create failed',
       fields: { error: e?.message || String(e) },
-    });
+    }, { req });
     return NextResponse.json(
       { error: e?.message || String(e), details: e?.logs || undefined },
       { status: 500 }

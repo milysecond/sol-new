@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
         amount: sourceAmountUsd || "user_picks",
         livemode: session.livemode ? "live" : "test",
       },
-    }).catch(() => {});
+    }, { req }).catch(() => {});
 
     return NextResponse.json({
       ok: true,

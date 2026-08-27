@@ -86,6 +86,7 @@ export type JupTokenBalance = {
   symbol?: string | null;
   name?: string | null;
   logoUri?: string | null;
+  programId?: string | null;
 };
 
 // ── Portfolio positions ───────────────────────────────────────────────────────
@@ -148,12 +149,14 @@ function sumUi(accounts: JupHoldingAccount[] | undefined): {
   amount: string;
   decimals: number;
   isFrozen?: boolean;
+  programId?: string;
 } {
   if (!accounts?.length) return { uiAmount: 0, amount: "0", decimals: 0 };
   let ui = 0;
   let raw = BigInt(0);
   let decimals = accounts[0]?.decimals ?? 0;
   let isFrozen = false;
+  let programId = accounts[0]?.programId;
   for (const a of accounts) {
     if (typeof a.uiAmount === "number") ui += a.uiAmount;
     else if (a.uiAmountString) ui += Number(a.uiAmountString) || 0;
@@ -166,12 +169,14 @@ function sumUi(accounts: JupHoldingAccount[] | undefined): {
     }
     if (a.decimals != null) decimals = a.decimals;
     if (a.isFrozen) isFrozen = true;
+    if (a.programId) programId = a.programId;
   }
   return {
     uiAmount: ui,
     amount: raw.toString(),
     decimals,
     isFrozen: isFrozen || undefined,
+    programId,
   };
 }
 
@@ -274,10 +279,78 @@ export async function jupWalletSnapshot(wallet: string): Promise<JupWalletSnapsh
       symbol: meta?.symbol ?? (mint === USDC ? "USDC" : mint === WSOL ? "SOL" : null),
       name: meta?.name ?? null,
       logoUri: meta?.logoURI ?? null,
+      programId: s.programId ?? null,
     });
   }
 
   tokens.sort((a, b) => (b.valueUsd ?? 0) - (a.valueUsd ?? 0));
+
+  // Enrich meme coins missing logo/symbol (holdings API often has none).
+  // Sequential-ish batches so Jupiter search isn't rate-limited on Workers.
+  const needMeta = tokens.filter((t) => !t.logoUri || !t.symbol || !t.name).slice(0, 24);
+  if (needMeta.length) {
+    try {
+      const { tokenSearch } = await import("@/lib/jup-ultra");
+      const applyHit = (
+        t: JupTokenBalance,
+        hit: {
+          id?: string;
+          symbol?: string;
+          name?: string;
+          icon?: string;
+          usdPrice?: number;
+          tokenProgram?: string;
+        },
+      ) => {
+        if (!t.symbol && hit.symbol) t.symbol = hit.symbol;
+        if (!t.name && hit.name) t.name = hit.name;
+        if (!t.logoUri && hit.icon) t.logoUri = hit.icon;
+        if (!t.programId && hit.tokenProgram) t.programId = hit.tokenProgram;
+        if (t.priceUsd == null && typeof hit.usdPrice === "number" && Number.isFinite(hit.usdPrice)) {
+          t.priceUsd = hit.usdPrice;
+          t.valueUsd = t.uiAmount * hit.usdPrice;
+        }
+      };
+
+      for (let i = 0; i < needMeta.length; i += 4) {
+        const batch = needMeta.slice(i, i + 4);
+        await Promise.all(
+          batch.map(async (t) => {
+            try {
+              const hits = await tokenSearch(t.mint);
+              const hit =
+                hits.find((h) => h.id === t.mint) ||
+                hits.find((h) => h.id?.toLowerCase() === t.mint.toLowerCase()) ||
+                hits[0];
+              if (hit && (hit.id === t.mint || hit.id?.toLowerCase() === t.mint.toLowerCase() || hits.length === 1)) {
+                applyHit(t, hit);
+              }
+            } catch {
+              /* skip */
+            }
+            // Local Turso registry fallback (TOKENSHIT etc.)
+            if (!t.symbol || !t.logoUri) {
+              try {
+                const { getTokenByMint } = await import("@/lib/db");
+                const row = (await getTokenByMint(t.mint)) as
+                  | { symbol?: string; name?: string; image_url?: string | null }
+                  | null;
+                if (row) {
+                  if (!t.symbol && row.symbol) t.symbol = String(row.symbol);
+                  if (!t.name && row.name) t.name = String(row.name);
+                  if (!t.logoUri && row.image_url) t.logoUri = String(row.image_url);
+                }
+              } catch {
+                /* db optional on edge */
+              }
+            }
+          }),
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }
 
   const positions = Array.isArray(positionsRes?.elements) ? positionsRes!.elements! : [];
   const positionsUsd = positions.reduce((acc, el) => {

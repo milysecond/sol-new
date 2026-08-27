@@ -157,10 +157,10 @@ export default function BurnPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 flex flex-col px-4 py-4 sm:px-6 sm:py-8 sm:items-center">
+      <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="reclaim rent">
           <PageTransition>
-            <div className="w-full sm:max-w-lg space-y-6">
+            <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-6">
               <div className="text-center space-y-2">
                 <Flame className="mx-auto text-orange-400" size={36} />
                 <h1 className="text-3xl font-bold tracking-tight">Burn / reclaim</h1>
@@ -247,7 +247,7 @@ export default function BurnPage() {
                 type="button"
                 disabled={busy || selectedEmpty.length === 0}
                 onClick={() => void closeSelected()}
-                className="w-full bg-orange-600 hover:bg-orange-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2"
+                className="w-full bg-orange-600 hover:bg-orange-500 disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2"
               >
                 {busy ? <Spinner size={16} /> : <Flame size={16} />}
                 Close {selectedEmpty.length} account
@@ -266,7 +266,7 @@ export default function BurnPage() {
                   {doneSigs.map((s) => (
                     <a
                       key={s}
-                      href={`https://solscan.io/tx/${s}`}
+                      href={`/receipt/${s}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block font-mono truncate hover:underline"

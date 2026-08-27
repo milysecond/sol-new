@@ -1,19 +1,57 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { PageTransition } from "@/components/page-transition";
 import { PortfolioDefiPanel } from "@/components/portfolio-defi-panel";
-import { resolveRecipient } from "@/lib/resolve-name";
+import { looksLikeDomain, resolveRecipient } from "@/lib/resolve-name";
 import { Spinner } from "@/components/spinner";
+import { useWallet } from "@/lib/wallet-context";
 
 export function PortfolioAddressClient({ address }: { address: string }) {
   const router = useRouter();
+  const { publicKey } = useWallet();
   const [input, setInput] = useState(address);
+  const [resolved, setResolved] = useState<string | null>(null);
+  const [domainLabel, setDomainLabel] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const raw = address.trim();
+    if (!raw) return;
+
+    if (!looksLikeDomain(raw) && !raw.includes(".")) {
+      setResolved(raw);
+      setDomainLabel(null);
+      return;
+    }
+
+    setResolving(true);
+    setError(null);
+    resolveRecipient(raw)
+      .then((result) => {
+        if (cancelled) return;
+        if (!result.ok) {
+          setError(result.error);
+          setResolved(null);
+          return;
+        }
+        setDomainLabel(result.resolvedAs || result.domain || raw);
+        setResolved(result.owner);
+        setInput(result.resolvedAs || result.domain || result.owner);
+      })
+      .finally(() => {
+        if (!cancelled) setResolving(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [address]);
 
   const lookup = async () => {
     const raw = input.trim();
@@ -26,23 +64,29 @@ export function PortfolioAddressClient({ address }: { address: string }) {
         setError(result.error);
         return;
       }
-      router.push(`/portfolio/${encodeURIComponent(result.owner)}`);
+      const pathKey = result.domain || result.owner;
+      router.push(`/portfolio/${encodeURIComponent(pathKey)}`);
     } finally {
       setResolving(false);
     }
   };
 
+  const isOther = Boolean(resolved && publicKey && resolved !== publicKey);
+
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 flex flex-col px-3 sm:px-6 py-4 sm:py-8 sm:items-center pb-24">
-        <PageTransition>
-          <div className="w-full sm:max-w-2xl space-y-5">
+      <main className="flex-1 w-full pb-24">
+        <PageTransition className="w-full">
+          <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-5">
             <div className="text-center space-y-1.5">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Portfolio</h1>
               <p className="text-sm text-gray-500 dark:text-white/45">
                 Token balances + Jupiter DeFi positions
               </p>
+              {domainLabel && (
+                <p className="text-xs font-mono text-purple-400">{domainLabel}</p>
+              )}
             </div>
 
             <div className="flex gap-2">
@@ -57,6 +101,7 @@ export function PortfolioAddressClient({ address }: { address: string }) {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") void lookup();
                   }}
+                  placeholder="wallet or name.sol / .bonk / .sns / .skr"
                   className="w-full pl-9 pr-3 py-2.5 min-h-[44px] rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm font-mono"
                   spellCheck={false}
                 />
@@ -70,9 +115,36 @@ export function PortfolioAddressClient({ address }: { address: string }) {
                 {resolving ? <Spinner size={14} /> : "Go"}
               </button>
             </div>
+            {publicKey && (
+              <div className="flex flex-wrap gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(`/portfolio/${encodeURIComponent(publicKey)}`)
+                  }
+                  className={`px-2.5 py-1.5 rounded-lg border transition ${
+                    resolved === publicKey
+                      ? "border-purple-500/50 bg-purple-500/10 text-purple-600 dark:text-purple-300"
+                      : "border-black/10 dark:border-white/10 text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  My wallet
+                </button>
+                {isOther && (
+                  <span className="px-2.5 py-1.5 text-amber-600 dark:text-amber-300">
+                    Viewing someone else&apos;s address
+                  </span>
+                )}
+              </div>
+            )}
             {error && <p className="text-xs text-rose-500">{error}</p>}
 
-            <PortfolioDefiPanel address={address} />
+            {resolving && !resolved && (
+              <div className="flex justify-center py-8">
+                <Spinner size={20} />
+              </div>
+            )}
+            {resolved && <PortfolioDefiPanel address={resolved} />}
           </div>
         </PageTransition>
       </main>

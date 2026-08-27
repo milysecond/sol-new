@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       emoji: "🚀",
       title: "Pump.fun create tx built",
       fields: { name, symbol, mint: mintKeypair.publicKey.toBase58(), creator: creatorWallet },
-    });
+    }, { req });
 
     return NextResponse.json({
       ok: true,

@@ -26,7 +26,7 @@ export function FaucetFooter() {
         <span className="font-mono">{faucet.balance.toFixed(2)} SOL</span>
       )}
       <a
-        href={`https://solscan.io/account/${faucet.address}?cluster=devnet`}
+        href={`/address/${faucet.address}`}
         target="_blank"
         className="hover:text-yellow-400 transition"
       >

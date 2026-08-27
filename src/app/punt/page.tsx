@@ -178,7 +178,10 @@ export default function PuntPage() {
   const load = useCallback(async (manual = false) => {
     if (manual) setRefreshing(true);
     try {
-      const r = await fetch("/api/punt", { cache: "no-store" });
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 15_000);
+      const r = await fetch("/api/punt", { cache: "no-store", signal: ctrl.signal });
+      clearTimeout(timer);
       const j = (await r.json()) as { matches?: PuntMatch[]; updatedAt?: number; error?: string };
       if (!r.ok || !j.matches) throw new Error(j.error || `HTTP ${r.status}`);
       setMatches(j.matches);
@@ -186,6 +189,8 @@ export default function PuntPage() {
       setError(null);
     } catch (e) {
       setError(String(e instanceof Error ? e.message : e));
+      // Leave loading: null → [] so UI shows error instead of infinite spinner
+      setMatches((prev) => prev ?? []);
     } finally {
       setRefreshing(false);
     }
@@ -218,7 +223,7 @@ export default function PuntPage() {
   useEffect(() => { loadPicks(); }, [loadPicks]);
 
   const handlePick = async (match: PuntMatch, pick: string) => {
-    const { toast } = await import("sonner");
+    const { toast } = await import("@/lib/toast");
     if (!publicKey) {
       toast("Connect your wallet up top to play — it's free.");
       return;
@@ -245,6 +250,7 @@ export default function PuntPage() {
   const [extMarkets, setExtMarkets] = useState<ExtMarket[]>([]);
   const [extLoading, setExtLoading] = useState(false);
   const [extError, setExtError] = useState<string | null>(null);
+  const [extNote, setExtNote] = useState<string | null>(null);
   const [q, setQ] = useState("");
 
   useEffect(() => {
@@ -252,6 +258,7 @@ export default function PuntPage() {
     let cancelled = false;
     setExtLoading(true);
     setExtError(null);
+    setExtNote(null);
     setExtMarkets([]);
     (async () => {
       try {
@@ -292,42 +299,49 @@ export default function PuntPage() {
             }),
           );
         } else {
-          // Kalshi public market list (best effort)
-          const res = await fetch(
-            "https://api.elections.kalshi.com/trade-api/v2/markets?limit=40&status=open",
-            { cache: "no-store" },
-          );
-          if (!res.ok) throw new Error("Could not load Kalshi");
-          const data = (await res.json()) as {
+          // Kalshi via same-origin proxy (CORS + rate-limit handled server-side)
+          const res = await fetch(`/api/punt/kalshi?limit=40`, {
+            cache: "no-store",
+          });
+          const data = (await res.json().catch(() => ({}))) as {
+            ok?: boolean;
+            error?: string;
+            warning?: string;
+            source?: string;
             markets?: Array<{
-              ticker?: string;
-              title?: string;
-              yes_bid?: number;
-              yes_ask?: number;
-              volume_24h?: number;
+              id: string;
+              title: string;
+              url: string;
+              price: string | null;
+              volume: string | null;
             }>;
           };
           if (cancelled) return;
+          const list = Array.isArray(data.markets) ? data.markets : [];
+          if (list.length === 0) {
+            throw new Error(data.error || data.warning || "Could not load Kalshi");
+          }
           setExtMarkets(
-            (data.markets || []).slice(0, 30).map((m, i) => {
-              const mid =
-                m.yes_bid != null && m.yes_ask != null
-                  ? (m.yes_bid + m.yes_ask) / 2
-                  : m.yes_bid ?? m.yes_ask;
-              return {
-                id: m.ticker || String(i),
-                title: m.title || m.ticker || "Market",
-                url: m.ticker
-                  ? `https://kalshi.com/markets/${m.ticker.toLowerCase()}`
-                  : "https://kalshi.com",
-                price: mid != null ? `${Math.round(mid)}¢` : null,
-                volume:
-                  m.volume_24h != null
-                    ? `${Math.round(m.volume_24h).toLocaleString()} contracts`
-                    : null,
-              };
-            }),
+            list.slice(0, 30).map((m, i) => ({
+              id: m.id || String(i),
+              title: m.title || "Market",
+              url: m.url || "https://kalshi.com",
+              price: m.price,
+              volume: m.volume,
+            })),
           );
+          // Soft warning (rate-limit / fallback) — not a hard fail
+          if (data.warning || data.source === "fallback" || data.source === "stale") {
+            setExtError(null);
+            setExtNote(
+              data.warning ||
+                (data.source === "fallback"
+                  ? "Showing Kalshi browse links (live feed busy)"
+                  : null),
+            );
+          } else {
+            setExtNote(null);
+          }
         }
       } catch (e) {
         if (!cancelled) setExtError(e instanceof Error ? e.message : "Load failed");
@@ -368,7 +382,7 @@ export default function PuntPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 w-full max-w-2xl mx-auto px-4 py-8 space-y-8">
+      <main className="flex-1 app-shell py-8 space-y-8">
         <PageTransition>
         <div className="text-center space-y-3">
           <AnimatedIcon icon={Trophy} size={40} className="text-green-600 dark:text-green-400" />
@@ -505,6 +519,11 @@ export default function PuntPage() {
                   {source}
                 </a>{" "}
                 directly.
+              </div>
+            )}
+            {extNote && !extError && (
+              <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl px-4 py-2.5 text-amber-800 dark:text-amber-200 text-xs text-center">
+                {extNote}
               </div>
             )}
             {!extLoading &&

@@ -2,14 +2,15 @@
 
 /**
  * Stripe fiat-to-crypto onramp.
- * Default: Stripe-hosted checkout at crypto.link.com (Apple Pay / card / bank).
- * Optional embed if STRIPE_PUBLISHABLE_KEY is set.
+ * Prefer Stripe-hosted checkout (crypto.link.com) — Apple Pay works there
+ * without relying on sol.new embed domain quirks. Same-tab open by default
+ * (Safari/iOS Apple Pay prefers top-level navigation).
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Spinner } from "@/components/spinner";
 import { friendlyError } from "@/lib/friendly-errors";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Smartphone } from "lucide-react";
 
 type StripeOnrampInstance = {
   createSession: (opts: {
@@ -105,11 +106,22 @@ function usePrefersDark(): boolean {
   return dark;
 }
 
+function isLikelyIosSafari(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  const iOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const webkit = /WebKit/.test(ua);
+  const notChrome = !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+  return iOS && webkit && notChrome;
+}
+
 export type StripeOnrampPanelProps = {
   wallet: string;
   amountUsd?: number;
   asset?: "usdc" | "sol";
   onComplete?: (status: string) => void;
+  /** Auto navigate to hosted checkout when ready (default true on iOS). */
+  autoOpen?: boolean;
 };
 
 export function StripeOnrampPanel({
@@ -117,6 +129,7 @@ export function StripeOnrampPanel({
   amountUsd = 50,
   asset = "usdc",
   onComplete,
+  autoOpen,
 }: StripeOnrampPanelProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
@@ -127,6 +140,22 @@ export function StripeOnrampPanel({
   const dark = usePrefersDark();
   const sessionKey = `${wallet}:${asset}:${amountUsd}`;
   const lastKey = useRef<string>("");
+  const didAutoOpen = useRef(false);
+
+  const shouldAuto =
+    autoOpen ?? (typeof window !== "undefined" ? isLikelyIosSafari() : false);
+
+  const openCheckout = useCallback((url: string, sameTab: boolean) => {
+    if (sameTab) {
+      window.location.assign(url);
+      return;
+    }
+    const w = window.open(url, "_blank", "noopener,noreferrer");
+    if (!w) {
+      // Popup blocked — fall back to same tab
+      window.location.assign(url);
+    }
+  }, []);
 
   const start = useCallback(async () => {
     if (!wallet) return;
@@ -152,16 +181,22 @@ export function StripeOnrampPanel({
         redirectUrl?: string | null;
         publishableKey?: string | null;
         sessionId?: string;
+        unsupportable?: boolean;
       };
       if (!res.ok || !data.ok) {
         throw new Error(data.error || "Could not start Apple Pay / card checkout");
       }
 
-      // Prefer hosted redirect (reliable, Apple Pay works on Stripe domain)
+      // Prefer hosted redirect — Apple Pay is fully supported on crypto.link.com
       if (data.redirectUrl) {
         setRedirectUrl(data.redirectUrl);
         setMode("redirect");
         lastKey.current = sessionKey;
+        if (shouldAuto && !didAutoOpen.current) {
+          didAutoOpen.current = true;
+          // Same-tab on iOS Safari (required for reliable Apple Pay sheet)
+          openCheckout(data.redirectUrl, true);
+        }
         return;
       }
 
@@ -200,11 +235,12 @@ export function StripeOnrampPanel({
     } finally {
       setBusy(false);
     }
-  }, [wallet, amountUsd, asset, dark, onComplete, sessionKey]);
+  }, [wallet, amountUsd, asset, dark, onComplete, sessionKey, shouldAuto, openCheckout]);
 
   useEffect(() => {
     if (!wallet) return;
     if (lastKey.current === sessionKey && mode !== "idle") return;
+    didAutoOpen.current = false;
     void start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey, wallet]);
@@ -220,11 +256,15 @@ export function StripeOnrampPanel({
         <div className="bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2 text-amber-800 dark:text-amber-200 text-xs space-y-2">
           <p>{error}</p>
           <p className="text-amber-700/80 dark:text-amber-200/70">
-            Stripe Crypto Onramp is geo-limited. Bank deposit (Bridge) works from more places.
+            Stripe Crypto Onramp is US/EU only (not Hawaii). In Australia use Transak above (Apple
+            Pay via Transak). Or try from a supported region.
           </p>
           <button
             type="button"
-            onClick={() => void start()}
+            onClick={() => {
+              didAutoOpen.current = false;
+              void start();
+            }}
             className="underline text-amber-700 dark:text-amber-300 hover:opacity-80 cursor-pointer"
           >
             Try again
@@ -234,26 +274,26 @@ export function StripeOnrampPanel({
 
       {mode === "redirect" && redirectUrl && (
         <div className="space-y-3">
-          <p className="text-xs text-gray-500 dark:text-white/40">
-            Secure Stripe checkout is ready. Pay with Apple Pay, card, Google Pay, or bank. Crypto
-            goes to your wallet on Solana.
-          </p>
-          <a
-            href={redirectUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl px-4 py-3 transition"
-          >
-            Open Apple Pay / card checkout <ExternalLink className="w-4 h-4" />
-          </a>
+          <div className="flex items-start gap-2 text-xs text-gray-500 dark:text-white/40">
+            <Smartphone className="w-4 h-4 shrink-0 mt-0.5 text-indigo-500" aria-hidden />
+            <p>
+              Stripe checkout ready. On iPhone, use <strong className="font-semibold">Continue in
+              this tab</strong> so Apple Pay can open. Crypto lands in your locked Solana wallet.
+            </p>
+          </div>
           <button
             type="button"
-            onClick={() => {
-              window.location.href = redirectUrl;
-            }}
-            className="w-full text-xs text-gray-400 hover:text-purple-500 transition cursor-pointer"
+            onClick={() => openCheckout(redirectUrl, true)}
+            className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer"
           >
-            Or continue in this tab
+            Continue — Apple Pay / card
+          </button>
+          <button
+            type="button"
+            onClick={() => openCheckout(redirectUrl, false)}
+            className="w-full flex items-center justify-center gap-2 text-xs text-gray-500 dark:text-white/45 hover:text-indigo-500 transition cursor-pointer py-2"
+          >
+            Open in new tab <ExternalLink className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
@@ -270,7 +310,7 @@ export function StripeOnrampPanel({
       )}
       {status === "rejected" && (
         <p className="text-xs text-amber-600 dark:text-amber-400">
-          Verification was not approved. Try again later or use bank deposit below.
+          Verification was not approved. Try again later or use bank deposit / Transak below.
         </p>
       )}
       <div
@@ -283,8 +323,8 @@ export function StripeOnrampPanel({
         }
       />
       <p className="text-[11px] text-gray-400 dark:text-white/30">
-        Powered by Stripe. Apple Pay, card, or bank. KYC handled by Stripe/Link. US and EU only
-        (not Hawaii). Destination is locked to your sol.new wallet.
+        Powered by Stripe Link. Apple Pay, card, Google Pay, or bank. KYC by Stripe. US and EU
+        (not Hawaii). Destination locked to your sol.new wallet.
       </p>
     </div>
   );

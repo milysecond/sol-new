@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 
 /** Direct entry: wheel mode */
 export default function WheelPage() {
-  redirect("/draw?mode=wheel");
+  permanentRedirect("/draw?mode=wheel");
 }

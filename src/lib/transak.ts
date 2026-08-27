@@ -86,7 +86,12 @@ export function buildTransakWidgetUrl(opts: BuildTransakWidgetOpts): string {
   params.set("defaultPaymentMethod", "apple_pay");
   // Prefer AUD for AU users; widget still offers other methods/currencies.
   params.set("defaultFiatCurrency", opts.fiatCurrency || "AUD");
+  // Help Transak surface Apple Pay first on supported devices
   if (opts.countryCode) params.set("countryCode", opts.countryCode);
+  // AU default country when AUD selected without explicit code
+  if (!opts.countryCode && (opts.fiatCurrency || "AUD").toUpperCase() === "AUD") {
+    params.set("countryCode", "AU");
+  }
   if (opts.fiatAmount != null && opts.fiatAmount > 0) {
     params.set("defaultFiatAmount", String(Math.round(opts.fiatAmount)));
   }
@@ -158,6 +163,9 @@ export async function createTransakWidgetUrl(
     defaultFiatCurrency: opts.fiatCurrency || "AUD",
   };
   if (opts.countryCode) widgetParams.countryCode = opts.countryCode;
+  else if ((opts.fiatCurrency || "AUD").toUpperCase() === "AUD") {
+    widgetParams.countryCode = "AU";
+  }
   if (opts.fiatAmount != null && opts.fiatAmount > 0) {
     widgetParams.defaultFiatAmount = Math.round(opts.fiatAmount);
   }

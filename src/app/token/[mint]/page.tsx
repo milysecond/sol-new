@@ -20,14 +20,64 @@ interface TokenData {
   created_at: string;
 }
 
-function ShareCopyButton({ text, icon }: { text: string; icon: 'tiktok' | 'instagram' }) {
+function ShareCopyButton({
+  text,
+  url,
+  icon,
+}: {
+  text: string;
+  url: string;
+  icon: "tiktok" | "instagram";
+}) {
   const [done, setDone] = useState(false);
-  const copy = () => { navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 2000); };
+  const label = icon === "tiktok" ? "TikTok" : "Instagram";
+
+  const share = async () => {
+    // iOS: Web Share sheet is the only reliable path into IG/TikTok
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({
+          title: text.slice(0, 80),
+          text,
+          url,
+        });
+        setDone(true);
+        setTimeout(() => setDone(false), 2000);
+        return;
+      }
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") return;
+    }
+    // Fallback: copy + try open app
+    try {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      setDone(true);
+      setTimeout(() => setDone(false), 2500);
+    } catch {
+      /* ignore */
+    }
+    // App deep links (may open install page if missing — better than silent fail)
+    try {
+      if (icon === "instagram") {
+        window.location.href = "instagram://app";
+      } else {
+        window.location.href = "snssdk1128://";
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
   return (
-    <button onClick={copy} className="p-3 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 transition cursor-pointer" title={`Copy for ${icon === 'tiktok' ? 'TikTok' : 'Instagram'}`}>
+    <button
+      type="button"
+      onClick={() => void share()}
+      className="p-3 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 transition cursor-pointer"
+      title={done ? "Shared / copied" : `Share to ${label}`}
+    >
       {done ? (
         <Check className="w-5 h-5 text-green-400" />
-      ) : icon === 'tiktok' ? (
+      ) : icon === "tiktok" ? (
         <svg className="w-5 h-5 text-gray-700 dark:text-white/70" viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
       ) : (
         <svg className="w-5 h-5 text-gray-700 dark:text-white/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
@@ -166,7 +216,7 @@ export default function LaunchPage() {
             </a>
             <button
               onClick={copyMint}
-              className="w-full flex items-center justify-center gap-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 transition cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 rounded-lg px-3.5 py-2.5 transition cursor-pointer"
             >
               {copied ? (
                 <>
@@ -216,7 +266,7 @@ export default function LaunchPage() {
               <div className="space-y-2">
                 <p className="text-xs text-gray-400 dark:text-white/30 text-center">Share</p>
                 <div className="flex justify-center gap-3">
-                  <a href={`https://x.com/intent/tweet?text=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer" className="p-3 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 transition" title="Share on X">
+                  <a href={`https://x.com/intent/post?text=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer" className="p-3 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 transition" title="Share on X">
                     <svg className="w-5 h-5 text-gray-700 dark:text-white/70" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
                   </a>
                   <a href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer" className="p-3 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 transition" title="Share on WhatsApp">
@@ -225,9 +275,12 @@ export default function LaunchPage() {
                   <a href={`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer" className="p-3 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 transition" title="Share on Telegram">
                     <svg className="w-5 h-5 text-gray-700 dark:text-white/70" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
                   </a>
-                  <ShareCopyButton text={text} icon="tiktok" />
-                  <ShareCopyButton text={text} icon="instagram" />
+                  <ShareCopyButton text={text} url={url} icon="tiktok" />
+                  <ShareCopyButton text={text} url={url} icon="instagram" />
                 </div>
+                <p className="text-[10px] text-center text-gray-400 dark:text-white/30">
+                  IG / TikTok open the system share sheet on iOS (or copy + open app)
+                </p>
               </div>
             );
           })()}
@@ -236,7 +289,7 @@ export default function LaunchPage() {
           <div className="pt-2">
             <Link
               href="/token"
-              className="w-full flex items-center justify-center gap-2 bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-xl px-4 py-3.5 transition"
+              className="w-full flex items-center justify-center gap-2 bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-lg px-3.5 py-2.5 transition"
             >
               Launch yours on sol.new
               <ArrowRight className="w-4 h-4" />

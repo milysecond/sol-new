@@ -21,8 +21,8 @@
     "head_sampling_rate": 1
   },
   "vars": {
-    "NEXT_PUBLIC_RPC_URL": "https://cassandra-bq5oqs-fast-mainnet.helius-rpc.com/",
-    "NEXT_PUBLIC_BRIDGE_ENABLED": "1",
+    "NEXT_PUBLIC_RPC_URL": "https://rpc.aex402.com",
+    "NEXT_PUBLIC_BRIDGE_ENABLED": "0",
     // BRIDGE_API_KEY + BRIDGE_API_BASE are Worker secrets (prod live key + api.bridge.xyz/v0)
     "CROSSMINT_PROJECT_ID": "659bb4f5-36d6-49a6-aee0-acedfd4eabf0",
     "RESEND_FROM": "sol.new <noreply@sol.new>",

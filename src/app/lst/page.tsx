@@ -230,10 +230,10 @@ export default function LstPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 flex flex-col px-4 py-4 sm:px-6 sm:py-8 sm:items-center">
+      <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="liquid stake">
           <PageTransition>
-            <div className="w-full sm:max-w-lg space-y-6">
+            <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-6">
               <div className="text-center space-y-2">
                 <Droplets className="mx-auto text-cyan-400" size={36} />
                 <h1 className="text-3xl font-bold tracking-tight">Liquid stake</h1>
@@ -370,7 +370,7 @@ export default function LstPage() {
                   type="button"
                   disabled={busy || !amountAtomic}
                   onClick={() => void submit()}
-                  className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2"
                 >
                   {busy ? <Spinner size={16} /> : null}
                   {direction === "stake" ? `Get ${lst.symbol}` : `Unstake to SOL`}
@@ -379,7 +379,7 @@ export default function LstPage() {
 
               {sig && (
                 <a
-                  href={`https://solscan.io/tx/${sig}`}
+                  href={`/receipt/${sig}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block text-xs text-cyan-400 font-mono truncate hover:underline"

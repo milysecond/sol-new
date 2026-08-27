@@ -6,6 +6,7 @@ import { Navbar } from "@/components/navbar";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
+import { broadcastSignedTx } from "@/lib/broadcast-tx";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { uploadImage, uploadMetadata } from "@/lib/api";
 import { useImagePaste } from "@/lib/use-image-paste";
@@ -91,7 +92,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { publicKey, refreshBalance } = useWallet();
-  const { rpc } = useNetwork();
+  const { rpc, rotateMainnetRpc } = useNetwork();
 
   const acceptImage = useCallback((file: File) => {
     setImageFile(file);
@@ -105,7 +106,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
     setError(null);
     try {
       setStatus("auth");
-      const { keypair: userKeypair } = await getPasskeyKeypair();
+      const { keypair: userKeypair } = await getPasskeyKeypair(publicKey);
 
       setStatus("uploading");
       const uploaded = await uploadImage(imageFile);
@@ -129,14 +130,24 @@ function CreateModal({ onClose }: { onClose: () => void }) {
       const tx = Transaction.from(txBytes);
       tx.partialSign(userKeypair);
 
-      const connection = new Connection(rpc, "confirmed");
-      const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
+      const sig = await broadcastSignedTx(tx, {
+        rpc,
+        rotateMainnetRpc,
+        skipPreflight: false,
+      });
 
       setStatus("confirming");
-      await connection.confirmTransaction(
-        { signature: sig, blockhash: data.blockhash!, lastValidBlockHeight: data.lastValidBlockHeight! },
-        "confirmed",
-      );
+      const connection = new Connection(rpc, "confirmed");
+      try {
+        await connection.confirmTransaction(
+          { signature: sig, blockhash: data.blockhash!, lastValidBlockHeight: data.lastValidBlockHeight! },
+          "confirmed",
+        );
+      } catch {
+        // confirmation may fail on flaky RPC — verify signature exists
+        const st = await connection.getSignatureStatuses([sig]);
+        if (!st?.value?.[0]) throw new Error("Transaction sent but not confirmed yet — check your wallet");
+      }
 
       // Save to our DB
       await fetch("/api/token", {
@@ -149,7 +160,12 @@ function CreateModal({ onClose }: { onClose: () => void }) {
       router.push(`/launch/${data.mint}`);
       onClose();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      const raw = e instanceof Error ? e.message : String(e);
+      setError(
+        /402|rate limit|payment required|pay \$/i.test(raw)
+          ? "Network was busy (RPC limit). Wait a few seconds and try Launch again."
+          : raw
+      );
       setStatus("error");
     }
   };
@@ -233,7 +249,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
             <button
               onClick={handleLaunch}
               disabled={busy || !name || !ticker || !imageFile}
-              className="w-full bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {busy ? <><Spinner size={16} /> {statusLabel}</> : <><Rocket size={16} /> Launch on pump.fun</>}
             </button>
@@ -284,7 +300,7 @@ export default function LaunchPage() {
           </div>
           <button
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 bg-purple-500 hover:bg-purple-400 text-white font-medium rounded-xl px-4 py-2.5 text-sm transition cursor-pointer"
+            className="flex items-center gap-1.5 bg-purple-500 hover:bg-purple-400 text-white font-medium rounded-lg px-3 py-2 text-sm transition cursor-pointer"
           >
             <Plus size={16} /> Create
           </button>

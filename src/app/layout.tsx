@@ -5,11 +5,18 @@ import { WalletProvider } from "@/lib/wallet-context";
 import { NetworkProvider } from "@/lib/network";
 import { ThemeProvider } from "@/lib/theme-context";
 import { PodPlayerProvider } from "@/lib/pod-player";
-import { Toaster } from "sonner";
+import { AppToaster } from "@/components/app-toaster";
+import { SfxBridge } from "@/components/sfx-bridge";
 import { InstallPrompt } from "@/components/install-prompt";
 import { PushPrompt } from "@/components/push-prompt";
 import { SiteFooter } from "@/components/site-footer";
 import { WalletBrowserTitle } from "@/components/wallet-browser-title";
+import { RouteTransition } from "@/components/route-transition";
+import { DeepLinkGuard } from "@/components/deep-link-guard";
+import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
+import { VisualViewportSync } from "@/components/visual-viewport-sync";
+import { SolanaConnectorProvider } from "@/components/solana-connector-provider";
+import { ExternalWalletBridge } from "@/components/external-wallet-bridge";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -77,6 +84,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var p=location.pathname+location.search+location.hash;if(p&&p!=="/"&&p.indexOf("/onboard")!==0){sessionStorage.setItem("solnew.deeplink.entry",p);sessionStorage.setItem("solnew.deeplink.entry.t",String(Date.now()))}}catch(e){}})();`,
+          }}
+        />
         {/* viewport also exported above; keep cover for PWA / notched devices */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.classList.add('dark')}catch(e){}})()` }} />
 
@@ -130,22 +142,31 @@ export default function RootLayout({
         <ThemeProvider>
         <NetworkProvider>
           <WalletProvider>
-            <WalletBrowserTitle />
-            <PodPlayerProvider>
-              <div className="min-h-screen flex flex-col">
-                <div className="flex-1 flex flex-col">{children}</div>
-                <SiteFooter />
-              </div>
-            </PodPlayerProvider>
+            <SolanaConnectorProvider>
+              <ExternalWalletBridge />
+              <WalletBrowserTitle />
+              <PodPlayerProvider>
+                <div className="min-h-app flex flex-col overflow-x-hidden">
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <RouteTransition>{children}</RouteTransition>
+                  </div>
+                  <SiteFooter />
+                </div>
+              </PodPlayerProvider>
+            </SolanaConnectorProvider>
           </WalletProvider>
         </NetworkProvider>
+          <AppToaster />
+          <SfxBridge />
         </ThemeProvider>
-        <Toaster theme="light" position="top-center" richColors />
         <InstallPrompt />
         <PushPrompt />
+        <DeepLinkGuard />
+        <KeyboardShortcuts />
+        <VisualViewportSync />
         <script
           dangerouslySetInnerHTML={{
-            __html: `if("serviceWorker"in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js"))`,
+            __html: `if("serviceWorker"in navigator)window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js").then(r=>r.update()).catch(()=>{})})`,
           }}
         />
       </body>

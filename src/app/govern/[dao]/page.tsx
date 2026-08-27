@@ -20,9 +20,9 @@ export default function GovernPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">
       <Navbar />
-      <main className="flex-1 flex flex-col px-4 py-4 sm:px-6 sm:py-8 sm:items-center">
+      <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <PageTransition>
-          <div className="w-full sm:max-w-lg space-y-5">
+          <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-5">
             <div className="text-center space-y-2">
               <AnimatedIcon icon={Vote} size={32} className="text-green-400" />
               <h1 className="text-2xl font-bold tracking-tight">Futarchy DAO created</h1>
@@ -54,7 +54,7 @@ export default function GovernPage() {
               href={`https://metadao.fi/dao/${dao}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-400 text-white font-semibold rounded-xl px-4 py-3.5 transition"
+              className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-400 text-white font-semibold rounded-lg px-3.5 py-2.5 transition"
             >
               Open on MetaDAO <ExternalLink size={15} />
             </a>

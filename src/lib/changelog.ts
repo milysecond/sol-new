@@ -14,6 +14,208 @@ export type ChangelogEntry = {
 /** Newest first. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-19",
+    title: "MoneyGram Ramps on Get funds",
+    items: [
+      "Cash in / cash out USDC via MoneyGram on /get (mainnet when live).",
+      "Sandbox keys still work for test; live keys flip production automatically.",
+    ],
+  },
+  {
+    date: "2026-08-15",
+    title: "Onboard: Just explore doesn’t loop",
+    items: [
+      "After setup, explore shows What’s next (wallet, funds, gift, apps).",
+      "Done cookie so / opens wallet, not Create anything again.",
+    ],
+  },
+  {
+    date: "2026-08-15",
+    title: "Traction dashboard",
+    items: [
+      "/traction — daily signups & activity in UTC+0.",
+      "API /api/traction?days=7|14|30|90",
+    ],
+  },
+  {
+    date: "2026-08-15",
+    title: "solnewlog includes geolocation",
+    items: [
+      "All Telegram log events attach IP + location (CF headers + IP lookup).",
+      "Wallet connect/create logs every time with city/region/coords when available.",
+    ],
+  },
+  {
+    date: "2026-08-15",
+    title: "Get funds: Stripe live + MoneyGram test only",
+    items: [
+      "Removed MoonPay, Transak, Bridge, and Stripe crypto on-ramp from /get.",
+      "Live: Stripe A$5 credits. Test: MoneyGram Ramps sandbox.",
+    ],
+  },
+  {
+    date: "2026-08-12",
+    title: "RPC pool failover",
+    items: [
+      "Mainnet: viviyan → velvet → cassandra backups.",
+      "Client probes healthy endpoint; server JSON-RPC fails over automatically.",
+    ],
+  },
+  {
+    date: "2026-08-12",
+    title: "Passkey: stop accidental new wallets",
+    items: [
+      "Connect unlocks an existing passkey — Create only when you ask.",
+      "Pinned credential per address; wrong passkey rejected with clear error.",
+      "Find wallet + safer credential binding when switching accounts.",
+    ],
+  },
+  {
+    date: "2026-08-12",
+    title: "MoneyGram Ramps sandbox",
+    items: [
+      "Cash in / cash out USDC via MoneyGram widget on /get (sandbox keys).",
+      "Server session API — secret never in the browser.",
+    ],
+  },
+  {
+    date: "2026-08-11",
+    title: "User raffles — prize CA + auto draw",
+    items: [
+      "Create raffle: prize mint + amount + run time.",
+      "Deposit to escrow · auto draw & on-chain payout · delay or cancel/refund.",
+    ],
+  },
+  {
+    date: "2026-08-11",
+    title: "Fair Draw raffle — TOKENSHIT 1M",
+    items: [
+      "Register with connected wallet on /draw to enter.",
+      "Prize: 1,000,000 TOKENSHIT (fEbiuDd…shit). Provably fair draw when ready.",
+    ],
+  },
+  {
+    date: "2026-08-11",
+    title: "On-chain age + address OG",
+    items: [
+      "Token/account age from oldest on-chain signature — not Turso.",
+      "OG cards for /address/<pubkey> with type, name, and chain age.",
+    ],
+  },
+  {
+    date: "2026-08-11",
+    title: "Address URLs by default",
+    items: [
+      "Lookups live at sol.new/address/<pubkey> — /scan redirects there.",
+      "Connected wallet defaults into the address URL.",
+    ],
+  },
+  {
+    date: "2026-08-11",
+    title: "Scan detects address type",
+    items: [
+      "Token-2022 mints no longer misread as wallets.",
+      "/scan shows wallet · token mint · token account · program badges.",
+      "Indexed TOKENSHIT mint fEbiuDd…shit in Turso.",
+    ],
+  },
+  {
+    date: "2026-08-09",
+    title: "iOS app camera for Pay scan",
+    items: [
+      "Native WKWebView grants camera for getUserMedia; NSCameraUsageDescription on app + Clip.",
+    ],
+  },
+  {
+    date: "2026-08-09",
+    title: "Pay scan works in Telegram",
+    items: [
+      "Detect in-app browsers — Take photo of QR + Open in Safari when live camera is blocked.",
+    ],
+  },
+  {
+    date: "2026-08-09",
+    title: "Pay by scanning Solana Pay QR",
+    items: [
+      "/pay Scan & pay — camera QR, paste link, passkey send (SOL/USDC).",
+      "Request tab still creates payment QRs; POS unchanged for merchants.",
+    ],
+  },
+  {
+    date: "2026-08-09",
+    title: "Menu: categories, search, A–Z, drag",
+    items: [
+      "More menu recategorized — no duplicates, search, Groups / A–Z / Custom drag order.",
+      "Home grid shares the same catalog; rearrange + A–Z sort.",
+    ],
+  },
+  {
+    date: "2026-08-09",
+    title: "POS + Subscriptions hub",
+    items: [
+      "/pos — merchant point of sale with tip, QR, live Solana Pay confirm.",
+      "/sub — credits pack + Stripe status + on-chain USDC plans roadmap.",
+      "BACKLOG.md for cross-session work.",
+    ],
+  },
+  {
+    date: "2026-08-08",
+    title: "A$5 credits via Apple Pay",
+    items: [
+      "Buy sol.new credits with Stripe Checkout + Apple Pay (works in Australia).",
+      "Not crypto on-ramp — digital credits for platform use.",
+    ],
+  },
+  {
+    date: "2026-08-08",
+    title: "AU buy: MoonPay + Transak fallback",
+    items: [
+      "Australia Apple Pay path via MoonPay (AUD), same-tab checkout.",
+      "Transak kept as optional fallback; hard paymentMethod lock removed.",
+    ],
+  },
+  {
+    date: "2026-08-08",
+    title: "Buy crypto works in Australia",
+    items: [
+      "Transak is the AU path: Apple Pay + AUD, same-tab checkout on iPhone.",
+      "Stripe onramp hidden for Australian users (US/EU only).",
+    ],
+  },
+  {
+    date: "2026-08-08",
+    title: "Stripe Apple Pay domain fix",
+    items: [
+      "Registered sol.new (+ www) for Apple Pay / Google Pay / Link on Stripe.",
+      "Updated Apple merchant domain association file; iOS opens checkout same-tab.",
+    ],
+  },
+  {
+    date: "2026-08-08",
+    title: "SEO: GSC redirect + soft 404 hygiene",
+    items: [
+      "Sitemap drops pure aliases (/wheel,/flip,/dice); robots blocks /link/ and /l/.",
+      "Missing short links and unknown POAPs return real 404s.",
+      "Alias routes use permanent redirects (308).",
+    ],
+  },
+  {
+    date: "2026-08-08",
+    title: "Seeker dApp Store 1.0.1",
+    items: [
+      "sol.new updated on Solana Mobile / Seeker store — onboard, gifts, POAP, swap.",
+    ],
+  },
+  {
+    date: "2026-08-07",
+    title: "Brand orbs + toast/push SFX",
+    items: [
+      "Thinking Orbs tinted to sol.new violet.",
+      "Toasts play success/error/notify sounds; airdrop/claim use cha-ching.",
+      "Push notifications: OS sound on + in-app chime when tab is open.",
+    ],
+  },
+  {
     date: "2026-08-05",
     title: "App Clip GTM — full product",
     items: [

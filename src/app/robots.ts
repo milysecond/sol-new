@@ -1,6 +1,6 @@
 import { MetadataRoute } from "next";
 
-// AI answer engines — explicitly allowed so sol.new can be cited in their results.
+// AI answer engines — allowed on public product pages (disallow list still applies).
 const AI_CRAWLERS = [
   "GPTBot",
   "OAI-SearchBot",
@@ -15,16 +15,35 @@ const AI_CRAWLERS = [
   "CCBot",
 ];
 
+/**
+ * Keep crawl budget on real product pages.
+ * - `/link/<code>` and `/l/<code>` always bounce → GSC "Page with redirect"
+ * - Bare `/link` (create UI) stays allowed (Disallow `/link/` does not match `/link`)
+ */
 export default function robots(): MetadataRoute.Robots {
+  const disallow = [
+    "/api/",
+    "/admin",
+    "/admin/",
+    "/images/",
+    "/metadata/",
+    "/l/",
+    "/link/",
+    "/u/",
+  ];
+
   return {
     rules: [
       {
         userAgent: "*",
         allow: "/",
-        // Keep private/transient surfaces out of the index.
-        disallow: ["/api/", "/admin", "/images/", "/metadata/"],
+        disallow,
       },
-      ...AI_CRAWLERS.map((ua) => ({ userAgent: ua, allow: "/" })),
+      ...AI_CRAWLERS.map((ua) => ({
+        userAgent: ua,
+        allow: "/",
+        disallow,
+      })),
     ],
     sitemap: "https://sol.new/sitemap.xml",
     host: "https://sol.new",

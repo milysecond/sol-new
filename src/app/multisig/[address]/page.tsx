@@ -520,7 +520,7 @@ export default function MultisigDetailPage() {
 
   const networkOfRecord = view?.foundOnNetwork ?? network;
   const cluster = networkOfRecord === "devnet" ? "?cluster=devnet" : "";
-  const explorer = (a: string) => `https://solscan.io/account/${a}${cluster}`;
+  const explorer = (a: string) => `/address/${a}`;
   const isMember = view?.members.some((m) => publicKey && m.key === publicKey);
   const networkMismatch = view && view.foundOnNetwork !== network;
 
@@ -901,7 +901,7 @@ export default function MultisigDetailPage() {
                   (modal === "add-member" && !newMemberAddr.trim()) ||
                   (modal === "change-threshold" && newThreshold === view.threshold)
                 }
-                className="w-full bg-fuchsia-500 hover:bg-fuchsia-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full bg-fuchsia-500 hover:bg-fuchsia-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {submitting ? (
                   <><Spinner size={16} className="text-white" /> Submitting…</>

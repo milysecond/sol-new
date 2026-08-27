@@ -19,10 +19,19 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  // Default product entry: onboarding (URL stays `/`)
+  // Default product entry:
+  // - first visit → onboard
+  // - finished onboard (cookie) → wallet app (not marketing “Create anything”)
   if (path === "/" || path === "") {
-    url.pathname = "/onboard";
+    const done = request.cookies.get("sol_new_onboard_done")?.value === "1";
+    url.pathname = done ? "/wallet/get" : "/onboard";
     return NextResponse.rewrite(url);
+  }
+
+  // Bare /wallet → Get (main wallet content). Avoid empty client-only redirect shell.
+  if (path === "/wallet" || path === "/wallet/") {
+    url.pathname = "/wallet/get";
+    return NextResponse.redirect(url, 308);
   }
 
   // Common crawler dead-ends
@@ -48,33 +57,83 @@ export function middleware(request: NextRequest) {
   }
 
   // Canonical wallet/token/program lookup: /address/<pubkey>
-  // Bare /address → scan form. Query ?address= still works via /scan.
-  if (path === "/address" || path === "/address/") {
-    url.pathname = "/scan";
-    return NextResponse.rewrite(url);
-  }
-  const addressLookup = path.match(/^\/address\/([^/]+)\/?$/);
-  if (addressLookup?.[1]) {
-    let addr = addressLookup[1];
-    try {
-      addr = decodeURIComponent(addr);
-    } catch {
-      /* keep raw */
-    }
-    url.pathname = "/scan";
-    url.searchParams.set("address", addr);
-    return NextResponse.rewrite(url);
-  }
-
-  // Legacy: /scan?address=X → pretty /address/X (shareable)
+  // Do NOT rewrite /address → /scan (that steals metadata + confuses crawlers).
+  // Scan UI already resolves both /address and /address/<pk> pathnames.
   if (path === "/scan" || path === "/scan/") {
     const q = url.searchParams.get("address") || url.searchParams.get("wallet");
+    const dest = request.nextUrl.clone();
     if (q && q.trim()) {
-      const dest = request.nextUrl.clone();
-      dest.pathname = `/address/${encodeURIComponent(q.trim())}`;
+      dest.pathname = `/address/${q.trim()}`;
       dest.search = "";
       return NextResponse.redirect(dest, 308);
     }
+    dest.pathname = "/address";
+    dest.search = "";
+    return NextResponse.redirect(dest, 308);
+  }
+  if (path === "/address" || path === "/address/") {
+    const q = url.searchParams.get("address") || url.searchParams.get("wallet");
+    if (q && q.trim()) {
+      const dest = request.nextUrl.clone();
+      dest.pathname = `/address/${q.trim()}`;
+      dest.search = "";
+      return NextResponse.redirect(dest, 308);
+    }
+    return NextResponse.next();
+  }
+  // /address/<pk> — let the app route handle (metadata + Scan UI). No rewrite.
+
+  // /explorer aliases — Solscan-shaped paths → in-app surfaces
+  if (path === "/explorer" || path === "/explorer/") {
+    const q =
+      url.searchParams.get("q") ||
+      url.searchParams.get("query") ||
+      url.searchParams.get("address") ||
+      url.searchParams.get("tx");
+    if (q && q.trim()) {
+      const dest = request.nextUrl.clone();
+      // leave classification to the page via ?q= — strip other noise
+      dest.pathname = "/explorer";
+      dest.search = `?q=${encodeURIComponent(q.trim())}`;
+      return NextResponse.redirect(dest, 308);
+    }
+    return NextResponse.next();
+  }
+  const explorerTx = path.match(/^\/explorer\/(?:tx|transaction)\/([^/]+)\/?$/i);
+  if (explorerTx?.[1]) {
+    const dest = request.nextUrl.clone();
+    dest.pathname = `/receipt/${explorerTx[1]}`;
+    dest.search = "";
+    return NextResponse.redirect(dest, 308);
+  }
+  const explorerAddr = path.match(
+    /^\/explorer\/(?:address|account|wallet)\/([^/]+)\/?$/i,
+  );
+  if (explorerAddr?.[1]) {
+    const dest = request.nextUrl.clone();
+    dest.pathname = `/address/${explorerAddr[1]}`;
+    dest.search = "";
+    return NextResponse.redirect(dest, 308);
+  }
+  const explorerToken = path.match(/^\/explorer\/token\/([^/]+)\/?$/i);
+  if (explorerToken?.[1]) {
+    const dest = request.nextUrl.clone();
+    dest.pathname = `/token/${explorerToken[1]}`;
+    dest.search = "";
+    return NextResponse.redirect(dest, 308);
+  }
+  // bare /explorer/<value> — pubkey or signature
+  const explorerBare = path.match(/^\/explorer\/([^/]+)\/?$/);
+  if (explorerBare?.[1] && explorerBare[1] !== "address" && explorerBare[1] !== "tx" && explorerBare[1] !== "token") {
+    const v = explorerBare[1];
+    const dest = request.nextUrl.clone();
+    dest.search = "";
+    if (v.length >= 80) {
+      dest.pathname = `/receipt/${v}`;
+    } else {
+      dest.pathname = `/address/${v}`;
+    }
+    return NextResponse.redirect(dest, 308);
   }
 
   return NextResponse.next();

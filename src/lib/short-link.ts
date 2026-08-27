@@ -45,12 +45,19 @@ export function isValidCustomCode(code: string): boolean {
 
 /**
  * Normalize and validate a destination URL.
- * Only http(s). Rejects javascript:, data:, etc.
+ * Only http(s). Rejects javascript:, data:, bare hosts like "abc", etc.
  */
-export function normalizeTargetUrl(raw: string): { ok: true; url: string } | { ok: false; error: string } {
+export function normalizeTargetUrl(
+  raw: string,
+): { ok: true; url: string } | { ok: false; error: string } {
   const trimmed = raw.trim();
   if (!trimmed) return { ok: false, error: "Enter a URL" };
   if (trimmed.length > 2048) return { ok: false, error: "URL is too long" };
+
+  // Reject whitespace / obvious junk
+  if (/\s/.test(trimmed)) {
+    return { ok: false, error: "URL cannot contain spaces" };
+  }
 
   let withScheme = trimmed;
   if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) {
@@ -67,12 +74,64 @@ export function normalizeTargetUrl(raw: string): { ok: true; url: string } | { o
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     return { ok: false, error: "Only http and https URLs are allowed" };
   }
-  if (!parsed.hostname || parsed.hostname === "localhost") {
-    // allow localhost in dev? reject for production safety
-    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
-      return { ok: false, error: "Local URLs are not allowed" };
+
+  const host = parsed.hostname.toLowerCase().replace(/\.$/, "");
+  if (!host) return { ok: false, error: "URL is missing a domain" };
+
+  if (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "0.0.0.0" ||
+    host === "[::1]" ||
+    host.endsWith(".localhost")
+  ) {
+    return { ok: false, error: "Local URLs are not allowed" };
+  }
+
+  // Reject IP-only if private (basic)
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+    const parts = host.split(".").map(Number);
+    if (
+      parts[0] === 10 ||
+      parts[0] === 127 ||
+      (parts[0] === 192 && parts[1] === 168) ||
+      (parts[0] === 172 && parts[1]! >= 16 && parts[1]! <= 31)
+    ) {
+      return { ok: false, error: "Private IP addresses are not allowed" };
+    }
+  } else {
+    // Public hostnames must look like a real domain: label.label (needs a dot)
+    // Rejects bare words like "abc" → https://abc/
+    if (!host.includes(".")) {
+      return {
+        ok: false,
+        error: "Enter a full domain (e.g. example.com), not just a name",
+      };
+    }
+    const labels = host.split(".");
+    if (labels.some((l) => !l || l.length > 63)) {
+      return { ok: false, error: "Invalid domain" };
+    }
+    // Each label: alnum + hyphens, not starting/ending with hyphen
+    for (const l of labels) {
+      if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/i.test(l) && !/^xn--[a-z0-9-]+$/i.test(l)) {
+        return { ok: false, error: "Invalid domain name" };
+      }
+    }
+    const tld = labels[labels.length - 1] || "";
+    // TLD at least 2 chars, not purely numeric
+    if (tld.length < 2 || /^\d+$/.test(tld)) {
+      return { ok: false, error: "Invalid domain extension" };
+    }
+    // Require at least one letter in TLD (catches foo.12)
+    if (!/[a-z]/i.test(tld)) {
+      return { ok: false, error: "Invalid domain extension" };
     }
   }
+
+  // Drop credentials in URL
+  parsed.username = "";
+  parsed.password = "";
 
   return { ok: true, url: parsed.toString() };
 }

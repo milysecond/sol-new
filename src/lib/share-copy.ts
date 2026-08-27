@@ -46,6 +46,7 @@ export function receiptSharePayload(opts: {
   direction?: "sent" | "received" | null;
   counterparty?: string | null;
   origin?: string;
+  failed?: boolean;
 }): SharePayload {
   const origin = opts.origin || (typeof window !== "undefined" ? window.location.origin : "https://sol.new");
   const url = `${origin}/receipt/${opts.signature}`;
@@ -57,14 +58,19 @@ export function receiptSharePayload(opts: {
     : null;
 
   let line1 = `Solana payment: ${amt}`;
-  if (opts.direction === "sent" && who) line1 = `Sent ${amt} to ${who}`;
-  if (opts.direction === "received" && who) line1 = `Received ${amt} from ${who}`;
+  if (opts.failed) {
+    line1 = `Failed transfer: ${amt} (not completed)`;
+  } else if (opts.direction === "sent" && who) {
+    line1 = `Sent ${amt} to ${who}`;
+  } else if (opts.direction === "received" && who) {
+    line1 = `Received ${amt} from ${who}`;
+  }
 
   return {
-    title: `${amt} on Solana`,
+    title: opts.failed ? `Failed: ${amt}` : `${amt} on Solana`,
     text: [
       line1,
-      "Verified receipt on sol.new",
+      opts.failed ? "On-chain status: FAILED" : "Verified receipt on sol.new",
       url,
     ].join("\n"),
     url,
@@ -119,6 +125,37 @@ export function requestFundsSharePayload(opts: {
   return { title, text, url: payUrl };
 }
 
+/** Share a resolved Solana name profile (/id/{name}) */
+export function nameIdSharePayload(opts: {
+  domain: string;
+  owner: string;
+  kindLabel?: string | null;
+  origin?: string;
+}): SharePayload {
+  const origin =
+    opts.origin ||
+    (typeof window !== "undefined" ? window.location.origin : "https://sol.new");
+  const domain = opts.domain.trim();
+  const owner = opts.owner.trim();
+  const short =
+    owner.length > 12 ? `${owner.slice(0, 4)}…${owner.slice(-4)}` : owner;
+  const url = `${origin}/id/${encodeURIComponent(domain)}`;
+  const kind = opts.kindLabel?.trim();
+  const title = `${domain} on sol.new`;
+  const text = [
+    `Solana name: ${domain}`,
+    kind ? `Network: ${kind}` : null,
+    `Owner: ${owner}`,
+    `Portfolio: ${origin}/portfolio/${encodeURIComponent(domain)}`,
+    "",
+    url,
+    `(${short})`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return { title, text, url };
+}
+
 /** Deep-link builders for request-funds channels */
 export function requestFundsChannelLinks(payload: SharePayload) {
   const full = payload.text.includes(payload.url)
@@ -134,12 +171,12 @@ export function requestFundsChannelLinks(payload: SharePayload) {
     whatsapp: `https://wa.me/?text=${enc}`,
     telegram: `https://t.me/share/url?url=${encUrl}&text=${encTitle}%0A%0A${enc}`,
     /**
-     * X has no public “compose DM with body” without a recipient id.
-     * Intent tweet posts the ask; users can also open Messages from X app.
-     * Also expose messages home for manual DM paste.
+     * X has no public compose-DM-with-body without a recipient.
+     * intent/post is reliable on mobile web + app. Avoid x.com/messages (Unable to load).
      */
-    xPost: `https://x.com/intent/tweet?text=${enc}`,
-    xMessages: "https://x.com/messages",
+    xPost: `https://x.com/intent/post?text=${enc}`,
+    /** @deprecated alias of xPost */
+    xMessages: `https://x.com/intent/post?text=${enc}`,
     nativeText: full,
   };
 }

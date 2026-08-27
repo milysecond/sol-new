@@ -83,13 +83,12 @@ const more = [
   { href: "/gift", label: "Gift" },
   { href: "/token", label: "Launch a token" },
   { href: "/loan", label: "Loan" },
-  { href: "/frame", label: "LinkedIn frame" },
 ];
 
 export default function StarterPage() {
   return (
     <main className="min-h-[100dvh] bg-white text-black dark:bg-black dark:text-white">
-      <div className="mx-auto w-full max-w-lg px-4 pb-20 pt-3 sm:pt-5">
+      <div className="app-shell-wide pb-20 pt-3 sm:pt-5 lg:pt-8">
         <div className="mb-3 flex items-center gap-1">
           <PageBack />
         </div>

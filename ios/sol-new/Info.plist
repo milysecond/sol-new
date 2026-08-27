@@ -40,6 +40,10 @@
 	</dict>
 	<key>NSFaceIDUsageDescription</key>
 	<string>sol.new uses Face ID to authenticate your passkey-secured wallet.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>sol.new uses the camera to scan Solana Pay QR codes so you can pay merchants.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Microphone access may be requested with the camera for in-app media features.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>sol.new can save QR codes and receipts to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

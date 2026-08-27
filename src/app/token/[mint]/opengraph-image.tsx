@@ -79,15 +79,24 @@ export default async function OpengraphImage({ params }: { params: Promise<{ min
   let symbol = "";
   let rawImage: string | null = null;
   let createdAt: string | null = null;
+  let ageRelative: string | null = null;
 
   try {
     const res = await fetch(`${API_BASE}/api/token/${mint}`, { cache: "no-store" });
     if (res.ok) {
-      const token = (await res.json()) as { name?: string; symbol?: string; image_url?: string | null; created_at?: string | null };
+      const token = (await res.json()) as {
+        name?: string;
+        symbol?: string;
+        image_url?: string | null;
+        created_at?: string | null;
+        age_relative?: string | null;
+      };
       name = token.name || name;
       symbol = token.symbol || "";
       rawImage = token.image_url ?? null;
+      // On-chain age only (API no longer exposes Turso created_at as age)
       createdAt = token.created_at ?? null;
+      ageRelative = token.age_relative ?? null;
     }
   } catch {}
 
@@ -208,7 +217,7 @@ export default async function OpengraphImage({ params }: { params: Promise<{ min
                 color: "rgba(255,255,255,0.95)",
               }}
             >
-              {timeAgo(createdAt)}
+              {ageRelative || timeAgo(createdAt)}
             </div>
             {createdAt && (
               <div

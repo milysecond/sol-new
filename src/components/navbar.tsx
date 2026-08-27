@@ -4,46 +4,46 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Coins,
-  Image,
-  ShieldCheck,
   Wallet,
   Droplets,
   Zap,
   ExternalLink,
   Copy,
   LogOut,
-  Sparkles,
   Bell,
   BellOff,
-  Activity,
-  AtSign,
   MoreHorizontal,
-  X,
   Gift,
   Trophy,
-  HandCoins,
-  Newspaper,
-  Star,
-  Receipt,
-  Dices,
-  Link2,
-  TrendingUp,
-  Landmark,
-  Layers,
   FolderOpen,
-  Flame,
-  Users,
-  ArrowLeftRight,
-  Award,
+  Image,
+  Menu,
 } from "lucide-react";
+import { AppNavMenu } from "@/components/app-nav-menu";
+import { AppSideNav } from "@/components/app-side-nav";
+import {
+  readNavMenuStyle,
+  NAV_MENU_STYLE_EVENT,
+  type NavMenuStyle,
+} from "@/lib/nav-style";
+import {
+  readBottomNavHrefs,
+  resolveBottomNav,
+  BOTTOM_NAV_EVENT,
+} from "@/lib/bottom-nav";
 import { getPushPermission, subscribePush, unsubscribePush, type PushPermission } from "@/lib/push-client";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { SocialLinks } from "@/components/social-links";
 import { Spinner } from "@/components/spinner";
 import { PageBack } from "@/components/page-back";
+import { WalletInfoModal } from "@/components/wallet-info-modal";
+import { CommandPaletteButton, AppCommandPalette } from "@/components/app-command-palette";
 import { useDefaultToken } from "@/lib/currency-pref";
+import { formatSol, useHideBalances } from "@/lib/privacy";
 import type { LucideIcon } from "lucide-react";
 
 /** Desktop top nav — short, high-traffic only. */
@@ -51,6 +51,7 @@ const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/wallet", label: "Wallet", icon: Wallet },
   { href: "/token", label: "Token", icon: Coins },
   { href: "/gift", label: "Gift", icon: Gift },
+  { href: "/memes", label: "Memes", icon: Image },
   { href: "/punt", label: "Punt", icon: Trophy },
   { href: "/portfolio", label: "Portfolio", icon: FolderOpen },
 ];
@@ -60,54 +61,9 @@ const TABLET_NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/wallet", label: "Wallet", icon: Wallet },
   { href: "/token", label: "Token", icon: Coins },
   { href: "/gift", label: "Gift", icon: Gift },
+  { href: "/memes", label: "Memes", icon: Image },
   { href: "/punt", label: "Punt", icon: Trophy },
   { href: "/portfolio", label: "Port", icon: FolderOpen },
-];
-
-type MoreItem = { href: string; label: string; icon: LucideIcon };
-
-const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
-  {
-    title: "Create",
-    items: [
-      { href: "/token", label: "Token", icon: Coins },
-      { href: "/nft", label: "Mint NFT", icon: Image },
-      { href: "/multisig", label: "Multisig", icon: ShieldCheck },
-    ],
-  },
-  {
-    title: "Money",
-    items: [
-      { href: "/get", label: "Get funds", icon: HandCoins },
-      { href: "/pay", label: "Pay", icon: HandCoins },
-      { href: "/split", label: "Split", icon: Users },
-      { href: "/gift", label: "Gift", icon: Gift },
-      { href: "/poap", label: "POAP", icon: Award },
-      { href: "/earn", label: "Earn", icon: TrendingUp },
-      { href: "/loan", label: "Loan", icon: Landmark },
-      { href: "/swap", label: "Swap", icon: ArrowLeftRight },
-      { href: "/stake", label: "Stake", icon: Landmark },
-      { href: "/lst", label: "Liquid", icon: Droplets },
-    ],
-  },
-  {
-    title: "Explore",
-    items: [
-      { href: "/portfolio", label: "Portfolio", icon: FolderOpen },
-      { href: "/nfts", label: "NFTs", icon: Layers },
-      { href: "/lists", label: "Lists", icon: Star },
-      { href: "/scan", label: "Scan", icon: Activity },
-      { href: "/receipt", label: "Receipt", icon: Receipt },
-      { href: "/poap", label: "POAP", icon: Award },
-      { href: "/draw", label: "Draw", icon: Dices },
-      { href: "/punt", label: "Punt", icon: Trophy },
-      { href: "/burn", label: "Burn", icon: Flame },
-      { href: "/id", label: "Names", icon: AtSign },
-      { href: "/link", label: "Links", icon: Link2 },
-      { href: "/news", label: "News", icon: Newspaper },
-      { href: "/whats-new", label: "What's new", icon: Sparkles },
-    ],
-  },
 ];
 
 const MOBILE_PRIMARY = [
@@ -115,6 +71,7 @@ const MOBILE_PRIMARY = [
   { href: "/wallet", label: "Wallet", icon: Wallet },
   { href: "/token", label: "Token", icon: Coins },
   { href: "/gift", label: "Gift", icon: Gift },
+  { href: "/memes", label: "Memes", icon: Image },
 ];
 
 export function Navbar() {
@@ -131,15 +88,69 @@ export function Navbar() {
     airdropping,
     airdropDone,
     handleAirdrop,
+    refreshBalance,
   } = useWallet();
+  const [hideBalances] = useHideBalances();
   const { network, toggle } = useNetwork();
   const [defaultToken, setDefaultToken] = useDefaultToken();
   const [showMenu, setShowMenu] = useState(false);
+  const [walletSheet, setWalletSheet] = useState(false);
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [copiedAddr, setCopiedAddr] = useState(false);
   const [pushPermission, setPushPermission] = useState<PushPermission>("default");
   const [pushLoading, setPushLoading] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const [showMore, setShowMore] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<NavMenuStyle>("sidebar");
+  const [bottomHrefs, setBottomHrefs] = useState<string[]>([
+    "/home",
+    "/wallet",
+    "/token",
+    "/gift",
+    "/memes",
+  ]);
+  const [navHeaderH, setNavHeaderH] = useState(56);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => {
+    setPortalReady(true);
+    setMenuStyle(readNavMenuStyle());
+    setBottomHrefs(readBottomNavHrefs());
+    const onStyle = () => setMenuStyle(readNavMenuStyle());
+    const onBottom = () => setBottomHrefs(readBottomNavHrefs());
+    window.addEventListener(NAV_MENU_STYLE_EVENT, onStyle);
+    window.addEventListener(BOTTOM_NAV_EVENT, onBottom);
+    window.addEventListener("storage", onStyle);
+    window.addEventListener("storage", onBottom);
+    return () => {
+      window.removeEventListener(NAV_MENU_STYLE_EVENT, onStyle);
+      window.removeEventListener(BOTTOM_NAV_EVENT, onBottom);
+      window.removeEventListener("storage", onStyle);
+      window.removeEventListener("storage", onBottom);
+    };
+  }, []);
+
+  // Measure sticky header so side drawer sits below it
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setNavHeaderH(Math.round(r.bottom));
+    };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
 
   useEffect(() => {
     setPushPermission(getPushPermission());
@@ -151,7 +162,44 @@ export function Navbar() {
     setShowMenu(false);
   }, [pathname]);
 
+  // Position menu in viewport coords (escape transform stacking contexts)
+  useEffect(() => {
+    if (!showMenu) {
+      setMenuPos(null);
+      return;
+    }
+    const place = () => {
+      const el = menuBtnRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const right = Math.max(8, window.innerWidth - r.right);
+      const top = r.bottom + 8;
+      setMenuPos({ top, right });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [showMenu]);
+
+  // Lock body scroll lightly while menu open
+  useEffect(() => {
+    if (!showMenu) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [showMenu]);
+
   const shortKey = publicKey ? `${publicKey.slice(0, 4)}...${publicKey.slice(-4)}` : null;
+  const displayName =
+    walletLabel && publicKey && walletLabel !== publicKey
+      ? walletLabel
+      : shortKey;
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -162,34 +210,49 @@ export function Navbar() {
     );
   };
 
-  const moreActive = MORE_GROUPS.some((g) => g.items.some((i) => isActive(i.href)));
+  const primaryHrefs = [
+    ...bottomHrefs,
+    "/punt",
+    "/portfolio",
+  ];
+  const moreActive = Boolean(
+    pathname &&
+      pathname !== "/" &&
+      !primaryHrefs.some(
+        (h) => pathname === h || (h !== "/home" && pathname.startsWith(h + "/")),
+      ),
+  );
 
   return (
-    <nav>
-      <div className="sticky top-0 z-30 border-b border-black/10 dark:border-white/10 bg-white/80 dark:bg-black/80 backdrop-blur-md safe-top">
-        <div className="flex items-center justify-between gap-2 px-2 sm:px-5 lg:px-6 py-2 sm:py-3 max-w-[1400px] mx-auto w-full">
-          <div className="flex items-center gap-1 sm:gap-2 min-w-0">
-            <PageBack className="shrink-0 -ml-0.5" />
-
+    <>
+    <nav className="relative z-[80]">
+      <div ref={headerRef} className="sticky top-0 z-[80] border-b border-black/10 dark:border-white/10 bg-white/90 dark:bg-black/90 backdrop-blur-md safe-top">
+        <div className="flex items-center justify-between gap-1.5 sm:gap-3 px-2.5 sm:px-5 lg:px-6 py-2 sm:py-2.5 max-w-[1400px] mx-auto w-full">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            {/* Logo — standard left position, always links home */}
             <Link
-              href="/"
+              href="/home"
               onDoubleClick={() => router.push("/dir")}
-              className="flex items-center gap-2 shrink-0 min-h-[40px] px-1 justify-center"
+              className="flex items-center gap-2 shrink-0 h-8 pl-0.5 pr-1 justify-center rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition"
+              aria-label="sol.new home"
             >
-              <img src="/icon-192.png" alt="sol.new" className="w-8 h-8 rounded-lg" />
+              <img src="/icon-192.png" alt="sol.new" className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg" />
               <span className="text-lg sm:text-xl font-bold tracking-tight hidden md:inline">
                 sol<span className="text-purple-500 dark:text-purple-400">.new</span>
               </span>
             </Link>
 
+            {/* Back sits after logo — nested routes only */}
+            <PageBack />
+
             <button
               type="button"
               onClick={toggle}
-              className="cursor-pointer shrink-0 min-h-[36px] inline-flex items-center justify-center"
+              className="cursor-pointer shrink-0 h-8 inline-flex items-center justify-center"
               title={`Switch to ${network === "mainnet" ? "devnet" : "mainnet"}`}
             >
               <span
-                className={`inline-flex items-center justify-center min-w-[2.5rem] text-[10px] font-medium border rounded-md px-1.5 py-1 transition-colors ${
+                className={`inline-flex items-center justify-center h-7 min-w-[2.25rem] text-[10px] font-semibold border rounded-md px-2 leading-none transition-colors ${
                   network === "devnet"
                     ? "text-yellow-700 dark:text-yellow-400 bg-yellow-500/10 border-yellow-500/20"
                     : "text-green-700 dark:text-green-400 bg-green-500/10 border-green-500/20"
@@ -199,7 +262,7 @@ export function Navbar() {
               </span>
             </button>
 
-            <div className="hidden md:flex lg:hidden items-center gap-0.5 ml-1">
+            <div className="hidden md:flex lg:hidden items-center gap-0.5 ml-0.5">
               {TABLET_NAV.map((item) => {
                 const active = isActive(item.href);
                 return (
@@ -207,27 +270,27 @@ export function Navbar() {
                     key={item.href}
                     href={item.href}
                     title={item.label}
-                    className={`min-h-[44px] min-w-[48px] inline-flex flex-col items-center justify-center gap-0.5 px-2 rounded-xl text-[10px] transition ${
+                    className={`h-8 min-w-[40px] inline-flex flex-col items-center justify-center gap-0.5 px-2 rounded-lg text-[10px] transition ${
                       active
                         ? "bg-purple-500/15 text-purple-700 dark:text-purple-300"
                         : "text-gray-500 dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5"
                     }`}
                   >
-                    <item.icon size={18} />
+                    <item.icon size={16} />
                     <span className="leading-none">{item.label}</span>
                   </Link>
                 );
               })}
             </div>
 
-            <div className="hidden lg:flex items-center gap-0.5 ml-1">
+            <div className="hidden lg:flex items-center gap-0.5 ml-0.5">
               {NAV_ITEMS.map((item) => {
                 const active = isActive(item.href);
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`px-2.5 py-1.5 rounded-lg text-sm transition whitespace-nowrap ${
+                    className={`h-8 px-2.5 inline-flex items-center rounded-lg text-sm transition whitespace-nowrap ${
                       active
                         ? "bg-purple-500/15 text-purple-800 dark:text-purple-200"
                         : "text-gray-500 dark:text-white/40 hover:text-gray-800 dark:hover:text-white/70 hover:bg-black/5 dark:hover:bg-white/5"
@@ -238,50 +301,136 @@ export function Navbar() {
                   </Link>
                 );
               })}
-              <button
-                type="button"
-                onClick={() => setShowMore(true)}
-                className={`px-2.5 py-1.5 rounded-lg text-sm transition cursor-pointer ${
-                  moreActive
-                    ? "bg-purple-500/15 text-purple-800 dark:text-purple-200"
-                    : "text-gray-500 dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5"
-                }`}
-              >
-                <MoreHorizontal size={15} className="inline mr-1" />
-                More
-              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
+            <SocialLinks className="hidden sm:flex" />
+            <CommandPaletteButton onClick={() => setCmdOpen(true)} />
             <ThemeToggle />
+
+            {/* Menu button on the right (standard) */}
+            {pushPermission !== "unsupported" && (
+              <button
+                type="button"
+                onClick={async () => {
+                  setPushLoading(true);
+                  try {
+                    if (pushPermission === "granted") {
+                      await unsubscribePush();
+                      setPushPermission("default");
+                    } else if (pushPermission !== "denied") {
+                      await subscribePush(publicKey ?? undefined);
+                      setPushPermission(getPushPermission());
+                    }
+                  } finally {
+                    setPushLoading(false);
+                  }
+                }}
+                disabled={pushLoading || pushPermission === "denied"}
+                aria-label={
+                  pushPermission === "granted"
+                    ? "Notifications on — click to turn off"
+                    : pushPermission === "denied"
+                      ? "Notifications blocked in browser"
+                      : "Enable notifications"
+                }
+                title={
+                  pushPermission === "denied"
+                    ? "Blocked in browser settings"
+                    : pushPermission === "granted"
+                      ? "Notifications on"
+                      : "Enable notifications"
+                }
+                className={`inline-flex items-center justify-center gap-1 h-8 px-2 rounded-lg text-sm transition border ${
+                  pushPermission === "granted"
+                    ? "text-purple-600 dark:text-purple-400 border-purple-400/30 bg-purple-500/10 hover:bg-purple-500/15"
+                    : pushPermission === "denied"
+                      ? "text-gray-400 border-black/10 dark:border-white/10 opacity-50 cursor-not-allowed"
+                      : "text-gray-700 dark:text-white/70 border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
+                }`}
+              >
+                {pushLoading ? (
+                  <Spinner size={14} className="shrink-0 text-current" />
+                ) : (
+                  <Bell size={15} className="shrink-0" />
+                )}
+                <span className="hidden md:inline font-medium text-xs">
+                  {pushLoading
+                    ? pushPermission === "granted"
+                      ? "Turning off"
+                      : "Enabling"
+                    : pushPermission === "granted"
+                      ? "Alerts on"
+                      : pushPermission === "denied"
+                        ? "Blocked"
+                        : "Notify"}
+                </span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowMore((v) => !v)}
+              aria-label="Open menu"
+              className="inline-flex items-center justify-center gap-1 h-8 px-2 rounded-lg text-sm text-gray-700 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/10 transition border border-black/10 dark:border-white/10"
+            >
+              <Menu size={15} />
+              <span className="hidden lg:inline font-medium text-xs">Menu</span>
+            </button>
             {publicKey ? (
               <div className="relative">
                 <button
+                  ref={menuBtnRef}
                   type="button"
-                  onClick={() => setShowMenu(!showMenu)}
-                  className="flex items-center gap-1.5 sm:gap-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-2.5 sm:px-3 py-2 min-h-[40px] text-xs sm:text-sm hover:border-purple-400/30 transition cursor-pointer"
+                  onClick={() => {
+                    setWalletSheet(true);
+                    setShowMenu(false);
+                  }}
+                  aria-expanded={walletSheet}
+                  aria-haspopup="dialog"
+                  className="flex items-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg h-8 px-2 sm:px-2.5 text-xs sm:text-sm hover:border-purple-400/30 transition cursor-pointer touch-manipulation active:scale-[0.98]"
                 >
-                  <Wallet size={14} className="text-purple-500 dark:text-purple-400 sm:hidden" />
+                  <Wallet size={14} className="text-purple-500 dark:text-purple-400 sm:hidden shrink-0" />
                   {balance !== null ? (
-                    <span className="text-purple-600 dark:text-purple-400 font-mono">
-                      {balance.toFixed(balance < 1 ? 3 : 2)}
-                      <span className="hidden sm:inline"> SOL</span>
+                    <span className="text-purple-600 dark:text-purple-400 font-mono tabular-nums">
+                      {hideBalances ? (
+                        "••••"
+                      ) : (
+                        <>
+                          {balance.toFixed(balance < 1 ? 3 : 2)}
+                          <span className="hidden sm:inline"> SOL</span>
+                        </>
+                      )}
                     </span>
                   ) : (
                     <span className="inline-flex items-center text-purple-500">
                       <Spinner size={12} className="text-purple-500" />
                     </span>
                   )}
-                  <span className="text-gray-700 dark:text-white/60 max-w-[90px] truncate font-mono">
-                    {shortKey}
+                  <span
+                    className={`text-gray-700 dark:text-white/60 max-w-[72px] sm:max-w-[90px] truncate ${
+                      walletLabel && publicKey && walletLabel !== publicKey ? "" : "font-mono"
+                    }`}
+                  >
+                    {displayName}
                   </span>
                 </button>
 
-                {showMenu && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                    <div className="absolute right-0 top-full mt-2 z-50 bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-xl overflow-hidden min-w-[220px] max-w-[min(100vw-1.5rem,320px)] shadow-lg">
+                {showMenu &&
+                  portalReady &&
+                  menuPos &&
+                  createPortal(
+                    <>
+                      <div
+                        className="fixed inset-0 z-[200] bg-black/40"
+                        onClick={() => setShowMenu(false)}
+                        aria-hidden
+                      />
+                      <div
+                        role="menu"
+                        className="fixed z-[210] bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-xl overflow-y-auto max-h-[min(70vh,520px)] min-w-[240px] w-[min(100vw-1rem,320px)] shadow-2xl"
+                        style={{ top: menuPos.top, right: menuPos.right }}
+                      >
                       <div className="px-4 py-3 border-b border-black/10 dark:border-white/10">
                         {publicKey && (
                           <p
@@ -291,10 +440,17 @@ export function Navbar() {
                             {publicKey}
                           </p>
                         )}
-                        <p className="text-[10px] text-gray-400 mt-1">Wallet name = address</p>
+                        {walletLabel && walletLabel !== publicKey && (
+                          <p className="text-sm font-semibold text-purple-600 dark:text-purple-400 mt-1 truncate">
+                            {walletLabel}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-gray-400 mt-1">
+                          Label wallets in Settings · address stays the same
+                        </p>
                         {balance !== null ? (
                           <p className="text-sm font-mono text-purple-600 dark:text-purple-400 mt-2">
-                            {balance.toFixed(4)} SOL
+                            {formatSol(hideBalances, balance, 4)}
                           </p>
                         ) : (
                           <p className="text-sm font-mono text-purple-500 mt-2 flex items-center gap-1.5">
@@ -311,6 +467,13 @@ export function Navbar() {
                         className="block px-4 py-2.5 text-sm text-gray-700 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5"
                       >
                         <Wallet size={14} className="inline mr-1.5" /> Wallet
+                      </Link>
+                      <Link
+                        href="/wallet/settings"
+                        onClick={() => setShowMenu(false)}
+                        className="block px-4 py-2.5 text-sm text-gray-700 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5"
+                      >
+                        Label wallets…
                       </Link>
                       <Link
                         href="/portfolio"
@@ -340,14 +503,13 @@ export function Navbar() {
                           ))}
                         </div>
                       </div>
-                      <a
-                        href={`https://orbmarkets.io/address/${publicKey}${network === "devnet" ? "?cluster=devnet&hideSpam=true" : "?hideSpam=true"}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <Link
+                        href={`/address/${publicKey}`}
+                        onClick={() => setShowMenu(false)}
                         className="block px-4 py-2.5 text-sm text-gray-700 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5"
                       >
-                        <ExternalLink size={14} className="inline mr-1.5" /> View on Orb
-                      </a>
+                        <ExternalLink size={14} className="inline mr-1.5" /> View address
+                      </Link>
                       <button
                         type="button"
                         onClick={() => {
@@ -398,14 +560,19 @@ export function Navbar() {
                           disabled={pushLoading || pushPermission === "denied"}
                           className="block w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer disabled:opacity-40"
                         >
-                          {pushPermission === "granted" ? (
+                          {pushLoading ? (
+                            <>
+                              <Spinner size={14} className="inline mr-1.5" />
+                              {pushPermission === "granted" ? "Turning off…" : "Enabling…"}
+                            </>
+                          ) : pushPermission === "granted" ? (
                             <>
                               <BellOff size={14} className="inline mr-1.5" /> Turn off notifications
                             </>
                           ) : (
                             <>
                               <Bell size={14} className="inline mr-1.5" />
-                              {pushLoading ? "Enabling…" : "Enable notifications"}
+                              Enable notifications
                             </>
                           )}
                         </button>
@@ -420,7 +587,7 @@ export function Navbar() {
                               key={w.pubkey}
                               type="button"
                               onClick={() => {
-                                switchWallet(w.pubkey);
+                                void switchWallet(w.pubkey);
                                 setShowMenu(false);
                               }}
                               className={`flex items-center justify-between w-full px-4 py-2 text-sm cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 ${
@@ -429,7 +596,11 @@ export function Navbar() {
                                   : "text-gray-600 dark:text-white/60"
                               }`}
                             >
-                              <span className="truncate max-w-[130px]">{w.label}</span>
+                              <span className="truncate max-w-[130px]">
+                                {w.label && w.label !== w.pubkey
+                                  ? w.label
+                                  : `${w.pubkey.slice(0, 4)}…${w.pubkey.slice(-4)}`}
+                              </span>
                               <span className="text-[10px] font-mono text-gray-400 ml-2 shrink-0">
                                 {w.pubkey.slice(0, 4)}…{w.pubkey.slice(-4)}
                               </span>
@@ -463,31 +634,40 @@ export function Navbar() {
                       >
                         <LogOut size={14} className="inline mr-1.5" /> Disconnect
                       </button>
-                    </div>
-                  </>
-                )}
+                      </div>
+                    </>,
+                    document.body,
+                  )}
               </div>
             ) : (
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => connect()}
+                  onClick={() => void connect()}
                   disabled={loading}
-                  className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-xl px-3.5 py-2 min-h-[40px] transition cursor-pointer disabled:opacity-50"
+                  className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg px-3 py-1.5 min-h-[32px] transition cursor-pointer disabled:opacity-50"
                 >
-                  {loading ? "..." : "Connect"}
+                  {loading ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Spinner size={12} className="text-white" />
+                      Connecting
+                    </span>
+                  ) : (
+                    "Connect"
+                  )}
                 </button>
                 <button
                   type="button"
-                  onClick={() => recover({ forcePicker: true })}
+                  onClick={() => void connect({ createNew: true })}
                   disabled={loading}
-                  className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 text-sm rounded-xl px-3 py-2 min-h-[40px] transition cursor-pointer disabled:opacity-50 hidden sm:block"
+                  className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 text-sm rounded-lg px-2.5 py-1.5 min-h-[32px] transition cursor-pointer disabled:opacity-50 hidden sm:block"
+                  title="Only if you need a brand-new wallet"
                 >
-                  Recover
+                  New
                 </button>
                 <Link
                   href="/wallet/find"
-                  className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 text-sm rounded-xl px-3 py-2 min-h-[40px] transition hidden sm:flex items-center"
+                  className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 text-sm rounded-lg px-2.5 py-1.5 min-h-[32px] transition hidden sm:flex items-center"
                 >
                   Find
                 </Link>
@@ -498,12 +678,12 @@ export function Navbar() {
       </div>
 
       {/* Phone bottom nav */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-white/95 dark:bg-black/95 backdrop-blur border-t border-black/10 dark:border-white/10 flex items-stretch justify-around px-1 pt-1 safe-bottom">
-        {MOBILE_PRIMARY.map((item) => (
+      <div className="fixed bottom-0 left-0 right-0 z-[90] sm:hidden bg-white/95 dark:bg-black/95 backdrop-blur border-t border-black/10 dark:border-white/10 flex items-stretch justify-around px-1 pt-1 safe-bottom">
+        {resolveBottomNav(bottomHrefs).map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-xl flex-1 max-w-[72px] min-h-[52px] transition active:scale-95 touch-manipulation ${
+            className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-xl flex-1 max-w-[72px] min-h-[44px] transition active:scale-95 touch-manipulation ${
               isActive(item.href)
                 ? "text-purple-600 dark:text-purple-400"
                 : "text-gray-500 dark:text-white/40"
@@ -516,67 +696,30 @@ export function Navbar() {
         <button
           type="button"
           onClick={() => setShowMore(true)}
-          className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-xl flex-1 max-w-[72px] min-h-[52px] transition active:scale-95 touch-manipulation cursor-pointer ${
+          className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-xl flex-1 max-w-[72px] min-h-[44px] transition active:scale-95 touch-manipulation cursor-pointer ${
             moreActive ? "text-purple-600 dark:text-purple-400" : "text-gray-500 dark:text-white/40"
           }`}
         >
-          <MoreHorizontal size={22} />
-          <span className="text-[10px] font-medium">More</span>
+          {menuStyle === "sidebar" ? <Menu size={22} /> : <MoreHorizontal size={22} />}
+          <span className="text-[10px] font-medium">
+            {menuStyle === "sidebar" ? "Menu" : "More"}
+          </span>
         </button>
       </div>
 
-      {/* More tray — phones + desktop "More" */}
-      {showMore && (
-        <>
-          <div
-            className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm"
-            onClick={() => setShowMore(false)}
-          />
-          <div className="fixed bottom-0 left-0 right-0 z-[70] bg-white dark:bg-black border-t border-black/10 dark:border-white/10 rounded-t-2xl pb-safe animate-[slideUp_0.2s_ease-out] max-h-[85dvh] overflow-y-auto sm:left-1/2 sm:right-auto sm:bottom-auto sm:top-20 sm:-translate-x-1/2 sm:w-full sm:max-w-lg sm:rounded-2xl sm:border sm:shadow-xl">
-            <div className="flex justify-center pt-2 pb-1 sm:hidden">
-              <div className="w-10 h-1 rounded-full bg-black/15 dark:bg-white/15" />
-            </div>
-            <div className="flex items-center justify-between px-5 pt-2 pb-2 sticky top-0 bg-white dark:bg-black z-10">
-              <span className="text-sm font-semibold text-gray-900 dark:text-white">Menu</span>
-              <button
-                type="button"
-                onClick={() => setShowMore(false)}
-                className="text-gray-400 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
-                aria-label="Close"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="px-3 pb-10 space-y-4">
-              {MORE_GROUPS.map((group) => (
-                <div key={group.title}>
-                  <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-white/30 px-2 mb-1.5">
-                    {group.title}
-                  </p>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-1">
-                    {group.items.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setShowMore(false)}
-                        className={`flex flex-col items-center gap-1.5 px-2 py-3 min-h-[72px] rounded-xl transition active:scale-95 touch-manipulation ${
-                          isActive(item.href)
-                            ? "text-purple-700 dark:text-purple-300 bg-purple-500/15"
-                            : "text-gray-700 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/5"
-                        }`}
-                      >
-                        <item.icon size={22} />
-                        <span className="text-[11px] font-medium text-center leading-tight">
-                          {item.label}
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
+      {menuStyle === "sidebar" ? (
+        <AppSideNav
+          open={showMore}
+          onClose={() => setShowMore(false)}
+          isActive={isActive}
+          topOffset={navHeaderH}
+        />
+      ) : (
+        <AppNavMenu
+          open={showMore}
+          onClose={() => setShowMore(false)}
+          isActive={isActive}
+        />
       )}
 
       {airdropping && (
@@ -588,5 +731,106 @@ export function Navbar() {
         </div>
       )}
     </nav>
+
+      {publicKey && (
+        <WalletInfoModal
+          open={walletSheet}
+          onClose={() => setWalletSheet(false)}
+          address={publicKey}
+          label={walletLabel || undefined}
+          balanceSol={hideBalances ? null : balance}
+          balanceLoading={!hideBalances && balance === null}
+          balanceDisplay={
+            hideBalances ? (
+              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">••••</p>
+            ) : undefined
+          }
+          networkLabel={network === "devnet" ? "devnet" : "mainnet"}
+          isDevnet={network === "devnet"}
+          copied={copiedAddr}
+          defaultToken={defaultToken}
+          onDefaultToken={setDefaultToken}
+          wallets={wallets}
+          onSwitchWallet={(pk) => {
+            void switchWallet(pk);
+            setWalletSheet(false);
+          }}
+          pushPermission={pushPermission}
+          pushLoading={pushLoading}
+          onTogglePush={async () => {
+            setPushLoading(true);
+            try {
+              if (pushPermission === "granted") {
+                await unsubscribePush();
+                setPushPermission("default");
+              } else {
+                await subscribePush(publicKey ?? undefined);
+                setPushPermission(getPushPermission());
+              }
+            } finally {
+              setPushLoading(false);
+            }
+          }}
+          airdropping={airdropping}
+          airdropDone={airdropDone}
+          onAirdrop={() => {
+            handleAirdrop();
+          }}
+          onCopy={async () => {
+            try {
+              await navigator.clipboard.writeText(publicKey);
+              setCopiedAddr(true);
+              setTimeout(() => setCopiedAddr(false), 1500);
+            } catch {
+              /* ignore */
+            }
+          }}
+          onSend={() => {
+            setWalletSheet(false);
+            router.push("/wallet/send");
+          }}
+          onReceive={() => {
+            setWalletSheet(false);
+            router.push(`/address/${publicKey}`);
+          }}
+          onViewAddress={() => {
+            setWalletSheet(false);
+            router.push(`/address/${publicKey}`);
+          }}
+          onPrivate={() => {
+            setWalletSheet(false);
+            router.push("/private");
+          }}
+          onWallet={() => {
+            setWalletSheet(false);
+            router.push("/wallet");
+          }}
+          onPortfolio={() => {
+            setWalletSheet(false);
+            router.push("/portfolio");
+          }}
+          onSettings={() => {
+            setWalletSheet(false);
+            router.push("/wallet/settings");
+          }}
+          onLabelWallets={() => {
+            setWalletSheet(false);
+            router.push("/wallet/settings");
+          }}
+          onFindWallet={() => {
+            setWalletSheet(false);
+            router.push("/wallet/find");
+          }}
+          onRefresh={() => {
+            void refreshBalance();
+          }}
+          onDisconnect={() => {
+            disconnect();
+            setWalletSheet(false);
+          }}
+        />
+      )}
+      <AppCommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
+    </>
   );
 }

@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
         vault: data.vault,
         ip,
       },
-    });
+    }, { req });
     return NextResponse.json({ ok: true, id: Number(id) });
   } catch (e) {
     notifyEvent({
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       emoji: '⚠️',
       title: 'Multisig save failed',
       fields: { ip, error: String(e) },
-    });
+    }, { req });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

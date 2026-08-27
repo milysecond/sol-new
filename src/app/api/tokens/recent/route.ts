@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { initDb, getRecentTokens, countTokens } from "@/lib/db";
 
 const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 50;
+const MAX_LIMIT = 60;
 
 export async function GET(req: NextRequest) {
   try {

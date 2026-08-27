@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useState, useCallback, useEffect, useMemo, useRef, Suspense } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   Search, ExternalLink, ShieldCheck, ShieldAlert,
   ShieldX, Copy, Check, Coins, Activity, Code2, AlertTriangle,
@@ -13,6 +13,7 @@ import { Navbar } from "@/components/navbar";
 import { useWallet } from "@/lib/wallet-context";
 import { analytics } from "@/lib/analytics";
 import { PortfolioDefiPanel } from "@/components/portfolio-defi-panel";
+import { AddressTxHistory } from "@/components/address-tx-history";
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 
@@ -86,6 +87,49 @@ function Badge({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
   );
 }
 
+const ADDRESS_TYPE_META: Record<
+  string,
+  { label: string; className: string; icon: React.ElementType }
+> = {
+  token_mint: {
+    label: "Token mint",
+    className: "bg-orange-500/15 text-orange-600 dark:text-orange-300 border-orange-400/30",
+    icon: Coins,
+  },
+  token_account: {
+    label: "Token account",
+    className: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30",
+    icon: Layers,
+  },
+  program: {
+    label: "Program",
+    className: "bg-purple-500/15 text-purple-600 dark:text-purple-300 border-purple-400/30",
+    icon: Code2,
+  },
+  wallet: {
+    label: "Wallet",
+    className: "bg-sky-500/15 text-sky-600 dark:text-sky-300 border-sky-400/30",
+    icon: WalletIcon,
+  },
+};
+
+function AddressTypeBadge({ type }: { type: string }) {
+  const meta = ADDRESS_TYPE_META[type] || {
+    label: type || "Unknown",
+    className: "bg-gray-500/10 text-gray-500 border-gray-400/20",
+    icon: Search,
+  };
+  const Icon = meta.icon;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${meta.className}`}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {meta.label}
+    </span>
+  );
+}
+
 // ── Program View ──────────────────────────────────────────────────────────────
 
 type ProgramData = {
@@ -112,7 +156,7 @@ function ProgramView({ data }: { data: ProgramData }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-lg font-bold">{pw?.name ?? "Solana Program"}</h2>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-500/10 text-purple-500">Program</span>
+            <AddressTypeBadge type="program" />
           </div>
           <p className="font-mono text-xs text-gray-500 dark:text-white/40 mt-0.5 flex items-center gap-1">
             {data.address} <CopyButton text={data.address} />
@@ -146,7 +190,7 @@ function ProgramView({ data }: { data: ProgramData }) {
             label="Upgrade Authority"
             value={data.upgradeAuthority ?? "No authority (immutable)"}
             mono={!!data.upgradeAuthority}
-            url={data.upgradeAuthority ? `https://solscan.io/account/${data.upgradeAuthority}` : undefined}
+            url={data.upgradeAuthority ? `/address/${data.upgradeAuthority}` : undefined}
             icon={ShieldAlert}
           />
         )}
@@ -169,7 +213,7 @@ function ProgramView({ data }: { data: ProgramData }) {
                 </span>
                 <span className="flex-1 truncate font-mono text-xs">{u.authority ?? u.signer ?? "—"}</span>
                 {u.signature && (
-                  <a href={`https://solscan.io/tx/${u.signature}`} target="_blank" rel="noopener noreferrer">
+                  <a href={`/receipt/${u.signature}`} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="w-3.5 h-3.5 text-gray-400 hover:text-purple-500" />
                   </a>
                 )}
@@ -185,15 +229,16 @@ function ProgramView({ data }: { data: ProgramData }) {
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition">
           <Activity className="w-3.5 h-3.5" /> Programwatch
         </a>
-        <a href={data.solscanUrl} target="_blank" rel="noopener noreferrer"
+        <a href={`/address/${data.address}`}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition">
-          <ExternalLink className="w-3.5 h-3.5" /> Solscan
+          <ExternalLink className="w-3.5 h-3.5" /> sol.new
         </a>
-        <a href={data.explorerUrl} target="_blank" rel="noopener noreferrer"
+        <a href={`/explorer/address/${data.address}`}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition">
           <ExternalLink className="w-3.5 h-3.5" /> Explorer
         </a>
       </div>
+      <AddressTxHistory address={data.address} title="Program transactions" />
     </div>
   );
 }
@@ -204,6 +249,7 @@ type Risk = { name: string; level: string; description: string };
 
 type TokenData = {
   type: "token";
+  addressType?: string;
   address: string;
   name: string;
   symbol: string;
@@ -218,16 +264,34 @@ type TokenData = {
   metadataUri: string | null;
   imageUrl: string | null;
   description: string | null;
+  tokenProgram?: string | null;
   score: number | null;
   risks: Risk[];
   rugged: boolean;
   createdAt: string | null;
+  ageRelative?: string | null;
+  ageAbsolute?: string | null;
+  ageSource?: string | null;
   topHolders: any[];
   rugcheckUrl: string;
   solscanUrl: string;
   jupiterUrl: string;
   dexscreenerUrl: string;
 };
+
+type TokenAccountData = {
+  type: "token_account";
+  addressType?: string;
+  address: string;
+  mint: string | null;
+  owner: string | null;
+  amount: string | number | null;
+  decimals: number | null;
+  tokenProgram?: string | null;
+  mintMeta?: TokenData | null;
+  solscanUrl: string;
+};
+
 
 const RISK_COLOR: Record<string, string> = {
   danger: "text-rose-500 bg-rose-500/10 border-rose-400/20",
@@ -272,6 +336,12 @@ function TokenView({ data }: { data: TokenData }) {
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-xl font-bold">{data.name}</h2>
             <span className="text-sm text-gray-400 dark:text-white/40 font-mono">${data.symbol}</span>
+            <AddressTypeBadge type={data.addressType || "token_mint"} />
+            {data.tokenProgram && (
+              <span className="text-[10px] font-mono uppercase tracking-wide text-gray-400 border border-black/10 dark:border-white/10 rounded-full px-2 py-0.5">
+                {data.tokenProgram}
+              </span>
+            )}
           </div>
           <p className="font-mono text-xs text-gray-500 dark:text-white/40 mt-0.5 flex items-center gap-1">
             {short(data.address)} <CopyButton text={data.address} />
@@ -303,21 +373,21 @@ function TokenView({ data }: { data: TokenData }) {
           label="Mint Authority"
           value={data.mintAuthority ?? "None (fixed)"}
           mono={!!data.mintAuthority}
-          url={data.mintAuthority ? `https://solscan.io/account/${data.mintAuthority}` : undefined}
+          url={data.mintAuthority ? `/address/${data.mintAuthority}` : undefined}
           icon={data.mintable ? Unlock : Lock}
         />
         <Field
           label="Freeze Authority"
           value={data.freezeAuthority ?? "None"}
           mono={!!data.freezeAuthority}
-          url={data.freezeAuthority ? `https://solscan.io/account/${data.freezeAuthority}` : undefined}
+          url={data.freezeAuthority ? `/address/${data.freezeAuthority}` : undefined}
           icon={Lock}
         />
         <Field
           label="Update Authority"
           value={data.updateAuthority ?? "None"}
           mono={!!data.updateAuthority}
-          url={data.updateAuthority ? `https://solscan.io/account/${data.updateAuthority}` : undefined}
+          url={data.updateAuthority ? `/address/${data.updateAuthority}` : undefined}
           icon={ShieldAlert}
         />
         <Field
@@ -335,8 +405,12 @@ function TokenView({ data }: { data: TokenData }) {
           icon={ImageIcon}
         />
         <Field
-          label="Created"
-          value={fmtDate(data.createdAt)}
+          label="Age (on-chain)"
+          value={
+            data.ageRelative && data.ageRelative !== "unknown"
+              ? `${data.ageRelative}${data.ageAbsolute ? ` · ${data.ageAbsolute}` : ""}`
+              : fmtDate(data.createdAt)
+          }
           icon={CalendarDays}
         />
       </div>
@@ -369,7 +443,7 @@ function TokenView({ data }: { data: TokenData }) {
             {data.topHolders.map((h: any, i: number) => (
               <div key={i} className="flex items-center gap-3 px-4 py-2 text-xs">
                 <span className="w-5 text-gray-400 dark:text-white/30">{i + 1}</span>
-                <a href={`https://solscan.io/account/${h.address}`} target="_blank" rel="noopener noreferrer"
+                <a href={`/address/${h.address}`} target="_blank" rel="noopener noreferrer"
                   className="flex-1 font-mono text-gray-600 dark:text-white/60 hover:text-purple-500 dark:hover:text-purple-400 truncate">
                   {h.address}
                 </a>
@@ -394,11 +468,15 @@ function TokenView({ data }: { data: TokenData }) {
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition">
           <LineChart className="w-3.5 h-3.5" /> DexScreener
         </a>
-        <a href={data.solscanUrl} target="_blank" rel="noopener noreferrer"
+        <a href={`/address/${data.address}`} 
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition">
-          <ExternalLink className="w-3.5 h-3.5" /> Solscan
+          <ExternalLink className="w-3.5 h-3.5" /> sol.new
         </a>
       </div>
+      <AddressTxHistory
+          address={data.address}
+          title="Mint transactions"
+        />
     </div>
   );
 }
@@ -412,7 +490,78 @@ function WalletView({
   sol?: number;
   usdc?: number | null;
 }) {
-  return <PortfolioDefiPanel address={address} compact />;
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-2 flex-wrap">
+        <AddressTypeBadge type="wallet" />
+        <span className="font-mono text-xs text-gray-500 break-all">{address}</span>
+        <CopyButton text={address} />
+      </div>
+      {/* Desktop: portfolio + history side by side */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 xl:gap-6 xl:items-start">
+        <div className="min-w-0 space-y-3">
+          <PortfolioDefiPanel address={address} compact />
+        </div>
+        <div className="min-w-0 space-y-3">
+          <AddressTxHistory address={address} title="Transaction history" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TokenAccountView({ data }: { data: TokenAccountData }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <AddressTypeBadge type="token_account" />
+        {data.tokenProgram && (
+          <span className="text-[10px] font-mono uppercase tracking-wide text-gray-400 border border-black/10 dark:border-white/10 rounded-full px-2 py-0.5">
+            {data.tokenProgram}
+          </span>
+        )}
+      </div>
+      <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] px-4 py-1">
+        <Field label="Account" value={data.address} mono icon={Layers} />
+        <Field
+          label="Mint"
+          value={data.mint}
+          mono
+          url={data.mint ? `/address/${data.mint}` : undefined}
+          icon={Coins}
+        />
+        <Field
+          label="Owner"
+          value={data.owner}
+          mono
+          url={data.owner ? `/address/${data.owner}` : undefined}
+          icon={WalletIcon}
+        />
+        <Field
+          label="Balance"
+          value={
+            data.amount != null
+              ? `${data.amount}${data.mintMeta?.symbol ? ` ${data.mintMeta.symbol}` : ""}`
+              : null
+          }
+          icon={Coins}
+        />
+      </div>
+      {data.mintMeta && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Mint</p>
+          <TokenView data={data.mintMeta} />
+        </div>
+      )}
+      <AddressTxHistory address={data.address} title="Account transactions" />
+      <a
+        href={`/address/${data.address}`}
+        className="inline-flex items-center gap-1 text-xs text-purple-500 hover:underline"
+      >
+        sol.new <ExternalLink className="w-3 h-3" />
+      </a>
+    </div>
+  );
 }
 
 // ── Main scan result ──────────────────────────────────────────────────────────
@@ -420,9 +569,11 @@ function WalletView({
 type ScanResult =
   | ({ type: "program" } & ProgramData)
   | ({ type: "token" } & TokenData)
+  | ({ type: "token_account" } & TokenAccountData)
   | {
       type: "wallet";
       address: string;
+      addressType?: string;
       sol?: number;
       usdc?: number | null;
       balances?: { sol: number; usdc: number | null };
@@ -434,56 +585,108 @@ function ScanInner() {
   const { publicKey } = useWallet();
   const params = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
 
   const [input, setInput] = useState("");
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastScanned = useRef<string>("");
 
-  const scan = useCallback(async (address: string) => {
+  /** Address from /address/<pk> path or ?address= / ?wallet= */
+  const pathAddress = useMemo(() => {
+    const m = pathname?.match(/^\/address\/([^/]+)\/?$/);
+    if (!m?.[1] || m[1] === "opengraph-image") return null;
+    try {
+      return decodeURIComponent(m[1]).trim();
+    } catch {
+      return m[1].trim();
+    }
+  }, [pathname]);
+
+  const queryAddress = useMemo(() => {
+    const q = params.get("address") ?? params.get("wallet");
+    return q?.trim() || null;
+  }, [params]);
+
+  const resolvedAddress = pathAddress || queryAddress;
+
+  /** Canonical shareable URL — base58 is URL-safe */
+  const goAddress = useCallback(
+    (address: string, { replace = false }: { replace?: boolean } = {}) => {
+      const a = address.trim();
+      if (!a) return;
+      const path = `/address/${a}`;
+      if (pathname === path) return;
+      if (replace) router.replace(path);
+      else router.push(path);
+    },
+    [router, pathname],
+  );
+
+  const scan = useCallback(async (address: string, opts?: { force?: boolean }) => {
     const a = address.trim();
     if (!a) return;
+    if (!opts?.force && lastScanned.current === a) return;
+    lastScanned.current = a;
     setLoading(true);
     setError(null);
     setResult(null);
     try {
       const res = await fetch(`/api/scan?address=${encodeURIComponent(a)}`);
       const json = (await res.json()) as ScanResult & { error?: string };
-      if (!res.ok || json.error) throw new Error((json as any).error || "Scan failed");
+      if (!res.ok || json.error) throw new Error((json as { error?: string }).error || "Scan failed");
       setResult(json);
-    } catch (e: any) {
-      setError(e.message || "Something went wrong");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+      lastScanned.current = "";
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Auto-populate + scan whenever URL (or connected wallet default) has an address
   useEffect(() => {
-    const q = params.get("address") ?? params.get("wallet");
-    if (q) { setInput(q); scan(q); }
-    else if (publicKey) setInput(publicKey);
-  }, [params, publicKey, scan]);
+    if (resolvedAddress) {
+      setInput(resolvedAddress);
+      void scan(resolvedAddress);
+      // Pretty URL if we only had query string
+      if (!pathAddress && queryAddress) {
+        goAddress(queryAddress, { replace: true });
+      }
+      return;
+    }
+
+    // Bare /address or /scan — default to connected wallet
+    if (publicKey) {
+      setInput(publicKey);
+      goAddress(publicKey, { replace: true });
+      void scan(publicKey);
+    }
+  }, [resolvedAddress, pathAddress, queryAddress, publicKey, scan, goAddress]);
 
   const submit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     const a = input.trim();
     if (!a) return;
-    router.push(`/address/${encodeURIComponent(a)}`);
-    scan(a);
+    goAddress(a);
+    void scan(a, { force: true });
   };
 
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 flex flex-col px-4 py-6 sm:px-6 sm:py-10 sm:items-center">
-        <div className="w-full sm:max-w-2xl space-y-6">
+      <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
+        <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-6">
           <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-2 text-purple-500 dark:text-purple-400">
               <Search size={22} />
-              <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Scan</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                Address
+              </h1>
             </div>
             <p className="text-gray-500 dark:text-white/40 text-sm">
-              Paste any Solana address — wallet, token, or program.{" "}
+              Paste any Solana address — we detect wallet, token mint, token account, or program.{" "}
               <span className="hidden sm:inline text-gray-400 dark:text-white/30">
                 sol.new/address/…
               </span>
@@ -501,7 +704,13 @@ function ScanInner() {
                 className="flex-1 bg-transparent py-3 text-sm font-mono outline-none placeholder:text-gray-400 dark:placeholder:text-white/25"
               />
               {input && (
-                <button type="button" onClick={() => setInput("")} className="text-gray-400 hover:text-gray-600 dark:hover:text-white/60 text-lg leading-none">×</button>
+                <button
+                  type="button"
+                  onClick={() => setInput("")}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-white/60 text-lg leading-none"
+                >
+                  ×
+                </button>
               )}
             </div>
             <button
@@ -510,21 +719,28 @@ function ScanInner() {
               className="px-4 rounded-xl bg-purple-500/20 text-purple-600 dark:text-purple-300 border border-purple-400/50 text-sm font-medium hover:bg-purple-500/30 transition disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
             >
               {loading ? <Spinner size={20} /> : <Search size={15} />}
-              <span className="hidden sm:inline">Scan</span>
+              <span className="hidden sm:inline">Look up</span>
             </button>
           </form>
 
-          {publicKey && !result && !loading && (
+          {publicKey && !result && !loading && input !== publicKey && (
             <button
+              type="button"
               onClick={() => {
                 setInput(publicKey);
-                router.push(`/address/${encodeURIComponent(publicKey)}`);
-                scan(publicKey);
+                goAddress(publicKey);
+                void scan(publicKey, { force: true });
               }}
               className="mx-auto block text-xs text-purple-500 dark:text-purple-400 hover:underline"
             >
-              Scan my connected wallet →
+              My wallet → /address/{publicKey.slice(0, 4)}…{publicKey.slice(-4)}
             </button>
+          )}
+
+          {result && (
+            <p className="text-center text-[11px] text-gray-400 dark:text-white/30 font-mono break-all">
+              sol.new/address/{result.type === "wallet" || result.type === "token" || result.type === "token_account" || result.type === "program" ? (result as { address: string }).address : input}
+            </p>
           )}
 
           {error && (
@@ -541,9 +757,26 @@ function ScanInner() {
           )}
 
           {result && (
-            <div className="bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-2xl p-4 sm:p-6">
+            <div className="bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-2xl p-4 sm:p-6 lg:p-8 space-y-3 lg:space-y-4">
+              <div className="flex items-center gap-2">
+                <AddressTypeBadge
+                  type={
+                    result.type === "token"
+                      ? "token_mint"
+                      : result.type === "token_account"
+                        ? "token_account"
+                        : result.type === "program"
+                          ? "program"
+                          : "wallet"
+                  }
+                />
+                <span className="text-[11px] text-gray-400">Address type detected</span>
+              </div>
               {result.type === "program" && <ProgramView data={result as ProgramData} />}
               {result.type === "token" && <TokenView data={result as TokenData} />}
+              {result.type === "token_account" && (
+                <TokenAccountView data={result as TokenAccountData} />
+              )}
               {result.type === "wallet" && (
                 <WalletView
                   address={result.address}

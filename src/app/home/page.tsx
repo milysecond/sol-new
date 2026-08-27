@@ -13,6 +13,9 @@ import {
 import { useWallet } from "@/lib/wallet-context";
 import { Spinner } from "@/components/spinner";
 import { ParticleReveal } from "@/components/canvasui/ParticleReveal";
+import { Navbar } from "@/components/navbar";
+import { HomeIconGrid } from "@/components/home-icon-grid";
+import { FaucetFooter } from "@/components/faucet-footer";
 import {
   Coins,
   Image as ImageIcon,
@@ -30,6 +33,7 @@ import {
   Landmark,
   Droplets,
   Award,
+  Sparkles,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -48,6 +52,8 @@ const PRODUCTS: Product[] = [
   { index: "03", href: "/wallet", title: "Wallets", blurb: "A Solana wallet secured by Face ID. Get SOL, send, and manage it all.", icon: Wallet, accent: "#e879f9" },
   { index: "04", href: "/multisig", title: "Multisig", blurb: "Shared wallets with multiple signers — for couples, teams, and DAOs.", icon: ShieldCheck, accent: "#60a5fa" },
   { index: "05", href: "/pay", title: "Payments", blurb: "Create a Solana Pay link or QR anyone can pay with, in SOL or USDC.", icon: CreditCard, accent: "#a855f7" },
+  { index: "05b", href: "/pos", title: "POS", blurb: "Point of sale — charge, tip, big QR, live payment confirm.", icon: CreditCard, accent: "#8b5cf6" },
+  { index: "05c", href: "/sub", title: "Subscriptions", blurb: "Credits packs and on-chain USDC plans.", icon: Sparkles, accent: "#e879f9" },
   { index: "06", href: "/gift", title: "Gifts", blurb: "Send SOL with a link — even to people without a wallet. They claim it with Face ID.", icon: Gift, accent: "#f59e0b" },
   { index: "06b", href: "/poap", title: "POAP", blurb: "Proof you were there. Create a drop, share a QR, collectors claim with Face ID.", icon: Award, accent: "#8b5cf6" },
   { index: "07", href: "/earn", title: "Earn", blurb: "Protected USDC yield. Deposit and withdraw with your passkey.", icon: TrendingUp, accent: "#34d399" },
@@ -105,8 +111,99 @@ function KineticHeadline({ lines }: { lines: string[] }) {
   );
 }
 
-export default function MarketingSplash() {
+export default function HomePage() {
   const { publicKey, connect, loading } = useWallet();
+  const [ready, setReady] = useState(false);
+  const [onboarded, setOnboarded] = useState(false);
+
+  useEffect(() => {
+    try {
+      setOnboarded(
+        localStorage.getItem("sol.new.onboard.done") === "1" ||
+          Boolean(localStorage.getItem("sol.new.wallet")),
+      );
+    } catch {
+      /* ignore */
+    }
+    setReady(true);
+  }, [publicKey]);
+
+  // Signed-in / already onboarded → app home (not marketing landing)
+  if (ready && (publicKey || onboarded)) {
+    return (
+      <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
+        <Navbar />
+        <main className="flex-1 app-shell-wide py-6 sm:py-10 lg:py-12 space-y-6 pb-28">
+          <header className="space-y-1">
+            <p className="text-[11px] uppercase tracking-wider text-violet-500 font-semibold">
+              sol.new
+            </p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              {publicKey ? "Your apps" : "Welcome back"}
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-white/45">
+              {publicKey
+                ? `Wallet ${publicKey.slice(0, 4)}…${publicKey.slice(-4)} · pick a tool`
+                : "Connect your passkey wallet, then jump into any app."}
+            </p>
+          </header>
+          {!publicKey && (
+            <button
+              type="button"
+              onClick={() => void connect()}
+              disabled={loading}
+              className="w-full sm:w-auto min-h-[48px] px-6 rounded-2xl bg-violet-600 hover:bg-violet-500 text-white font-semibold disabled:opacity-50"
+            >
+              {loading ? "Connecting…" : "Connect wallet"}
+            </button>
+          )}
+          <HomeIconGrid />
+          <div className="flex flex-wrap gap-3 text-sm">
+            <Link
+              href="/wallet/get"
+              className="text-violet-600 dark:text-violet-400 font-medium hover:underline"
+            >
+              Open wallet →
+            </Link>
+            <Link
+              href="/get"
+              className="text-gray-500 hover:text-violet-500 font-medium"
+            >
+              Get funds
+            </Link>
+            <Link
+              href="/whats-new"
+              className="text-gray-500 hover:text-violet-500 font-medium"
+            >
+              What&apos;s new
+            </Link>
+          </div>
+        </main>
+        <FaucetFooter />
+      </div>
+    );
+  }
+
+  if (!ready) {
+    return (
+      <div className="min-h-dvh bg-[#08070d] text-white flex items-center justify-center">
+        <Spinner size={28} />
+      </div>
+    );
+  }
+
+  return <MarketingSplash connect={connect} loading={loading} publicKey={publicKey} />;
+}
+
+export function MarketingSplash({
+  publicKey,
+  connect,
+  loading,
+}: {
+  publicKey: string | null;
+  connect: (u?: string | { createNew?: boolean }) => Promise<string | null>;
+  loading: boolean;
+}) {
   const heroRef = useRef<HTMLDivElement>(null);
 
   const mx = useMotionValue(0.5);
@@ -261,7 +358,7 @@ export default function MarketingSplash() {
               >
                 {publicKey ? (
                   <Link
-                    href="/"
+                    href="/wallet"
                     className="group inline-flex items-center justify-center gap-2 rounded-full bg-white text-black font-semibold px-7 py-4 text-base hover:bg-white/90 transition-colors"
                   >
                     Open your wallet

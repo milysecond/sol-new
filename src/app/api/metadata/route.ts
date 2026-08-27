@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
       emoji: "📝",
       title: "Metadata stored",
       fields: { id, name: body.name, symbol: body.symbol, ip, sizeBytes: json.length },
-    });
+    }, { req });
 
     return NextResponse.json({ id, uri });
   } catch (e) {
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       emoji: "⚠️",
       title: "Metadata store failed",
       fields: { ip, error: String(e) },
-    });
+    }, { req });
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

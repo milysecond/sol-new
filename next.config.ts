@@ -1,48 +1,55 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["dev.sol.new", "192.168.1.105"],
+  allowedDevOrigins: [
+    "dev.sol.new",
+    "192.168.1.105",
+    "192.168.1.164",
+    "*.trycloudflare.com",
+  ],
+  // Keep fat browser/WASM stacks out of the Cloudflare Worker server graph
+  serverExternalPackages: [
+    "privacycash",
+    "@lightprotocol/hasher.rs",
+    "three",
+    "gsap",
+    "canvas-confetti",
+    "snarkjs",
+    "ffjavascript",
+  ],
   async redirects() {
     return [
-      // /launch/:mint was the post-launch page until 2026-05-03.
-      // Permanent redirect so any previously-shared links keep working.
       {
         source: "/launch/:mint",
         destination: "/token/:mint",
         permanent: true,
       },
-      // /dev aliases the staging Pages deployment.
       {
         source: "/dev",
         destination: "https://dev.sol.new",
         permanent: false,
       },
-      // /learn aliases the learn subdomain.
       {
         source: "/learn",
         destination: "https://learn.sol.new",
         permanent: false,
       },
-      // Legacy playbook path → primary starter host (full Solly curriculum).
-      // /starter is an in-app page on sol.new (home tile) — do not redirect it away.
       {
         source: "/playbook",
         destination: "https://starter.sol.new",
         permanent: false,
       },
-      // /memes → meme generator app
+      // /memes is now a first-party page using memes.sol.new API
       {
-        source: "/memes",
-        destination: "https://memes.metasal.xyz",
-        permanent: false,
+        source: "/frame",
+        destination: "/home",
+        permanent: true,
       },
       {
-        source: "/meme",
-        destination: "https://memes.metasal.xyz",
-        permanent: false,
+        source: "/frame/:path*",
+        destination: "/home",
+        permanent: true,
       },
-
-      // --- GSC indexing cleanup: dead / legacy paths that were returning 404 ---
       { source: "/copyright", destination: "/privacy", permanent: true },
       { source: "/about", destination: "/", permanent: true },
       { source: "/blog", destination: "/whats-new", permanent: true },

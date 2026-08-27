@@ -8,6 +8,7 @@ export const metadata: Metadata = pageMeta({
   path: "/scan",
 });
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+/** Layout kept for legacy /scan deep links before middleware 308 → /address. */
+export default function ScanLayout({ children }: { children: React.ReactNode }) {
   return children;
 }

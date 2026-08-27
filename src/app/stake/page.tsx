@@ -18,6 +18,7 @@ import { useNetwork } from "@/lib/network";
 import {
   getPasskeyKeypair,
   signVersionedAndSend,
+  ensureDocumentFocusForPasskey,
 } from "@/lib/passkey-wallet";
 import {
   DEFAULT_VOTE,
@@ -156,10 +157,17 @@ export default function StakePage() {
         throw new Error(`Minimum stake is ${MIN_STAKE_SOL} SOL`);
       }
 
+      const need = sol + rentLamports / LAMPORTS_PER_SOL + 0.002;
+      if ((balance ?? 0) + 1e-9 < need) {
+        throw new Error(
+          `Not enough SOL. Need about ${need.toFixed(3)} SOL (stake + rent + fees). You have ${(balance ?? 0).toFixed(4)}. Open Get funds first.`,
+        );
+      }
+
       // Unique seed for createWithSeed (alnum, ≤32)
       const seed = `sn${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.slice(
         0,
-        32
+        32,
       );
 
       const bRes = await fetch("/api/stake/build", {
@@ -184,7 +192,8 @@ export default function StakePage() {
       }
       if (bData.rentLamports) setRentLamports(bData.rentLamports);
 
-      // Single Face ID at send time
+      // Single Face ID at send time — keep page focused (desktop Safari)
+      ensureDocumentFocusForPasskey();
       let signature: string;
       if (bData.sponsored) {
         signature = await signVersionedAndSend(bData.tx, rpc, publicKey);
@@ -203,7 +212,7 @@ export default function StakePage() {
         });
         await connection.confirmTransaction(
           { signature, blockhash, lastValidBlockHeight },
-          "confirmed"
+          "confirmed",
         );
       }
 
@@ -212,16 +221,8 @@ export default function StakePage() {
       await loadStakes();
     } catch (e) {
       console.error("[stake]", e);
-      const msg = errText(e);
-      // Passkey focus
-      if (/not focused|notallowed|cancelled|aborted/i.test(msg)) {
-        setError("Face ID cancelled or page lost focus — tap Stake SOL again.");
-      } else if (/insufficient|not enough sol/i.test(msg)) {
-        setError(msg);
-      } else {
-        // Always surface real cause (was getting swallowed)
-        setError(msg.length > 280 ? `${msg.slice(0, 280)}…` : msg);
-      }
+      const { friendlyError } = await import("@/lib/friendly-errors");
+      setError(friendlyError(e, "Staking failed — check balance and try again."));
     } finally {
       setBusy(false);
     }
@@ -326,10 +327,10 @@ export default function StakePage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 flex flex-col px-4 py-4 sm:px-6 sm:py-8 sm:items-center">
+      <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="stake SOL">
           <PageTransition>
-            <div className="w-full sm:max-w-lg space-y-6">
+            <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-6">
               <div className="text-center space-y-2">
                 <Landmark className="mx-auto text-purple-400" size={36} />
                 <h1 className="text-3xl font-bold tracking-tight">Stake SOL</h1>
@@ -426,7 +427,7 @@ export default function StakePage() {
                   type="button"
                   disabled={busy || !amount}
                   onClick={() => void handleStake()}
-                  className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2"
                 >
                   {busy ? <Spinner size={16} /> : null}
                   Stake SOL
@@ -495,7 +496,7 @@ export default function StakePage() {
 
               {sig && (
                 <a
-                  href={`https://solscan.io/tx/${sig}`}
+                  href={`/receipt/${sig}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block text-xs text-purple-400 font-mono truncate hover:underline"
@@ -505,8 +506,16 @@ export default function StakePage() {
               )}
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-red-400 text-xs whitespace-pre-wrap break-words">
-                  {error}
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-red-400 text-xs whitespace-pre-wrap break-words space-y-2">
+                  <p>{error}</p>
+                  {/not enough sol|get funds|insufficient/i.test(error) && (
+                    <a
+                      href="/get"
+                      className="inline-flex text-purple-300 font-semibold underline"
+                    >
+                      Open Get funds →
+                    </a>
+                  )}
                 </div>
               )}
 

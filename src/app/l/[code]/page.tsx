@@ -1,13 +1,13 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { Calendar, ExternalLink, Link2, MousePointerClick, ShieldAlert } from "lucide-react";
+import { headers } from "next/headers";
+import { notFound, redirect } from "next/navigation";
+import { Calendar, ExternalLink, Link2, MousePointerClick } from "lucide-react";
 import { initDb, getShortLink, incrementShortLinkClicks } from "@/lib/db";
 import {
   absoluteShortUrl,
   describeShortLinkDestination,
   formatShortLinkCreated,
-  isTrustedShortLinkHost,
   normalizeCode,
   shortLinkDisplayTitle,
   shortPath,
@@ -15,6 +15,32 @@ import {
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+/** Social preview bots only — search engines get honest redirect/404. */
+function isShareCrawler(ua: string): boolean {
+  const u = ua.toLowerCase();
+  if (u.includes("googlebot") || u.includes("bingbot") || u.includes("duckduckbot") || u.includes("yandex")) {
+    return false;
+  }
+  return (
+    u.includes("twitterbot") ||
+    u.includes("facebookexternalhit") ||
+    u.includes("facebot") ||
+    u.includes("linkedinbot") ||
+    u.includes("slackbot") ||
+    u.includes("discordbot") ||
+    u.includes("telegrambot") ||
+    u.includes("whatsapp") ||
+    u.includes("skypeuripreview") ||
+    u.includes("redditbot") ||
+    u.includes("pinterest") ||
+    u.includes("embedly") ||
+    u.includes("quora link preview") ||
+    u.includes("applebot") ||
+    u.includes("iframely") ||
+    u.includes("opengraph")
+  );
+}
 
 async function loadLink(rawCode: string) {
   const code = normalizeCode(rawCode || "");
@@ -39,8 +65,9 @@ export async function generateMetadata({
 
   if (!link) {
     return {
-      title: `Short link ${shortPath(code || "…")} — sol.new`,
-      description: "sol.new short link. Create free short URLs for Solana tools and the open web.",
+      title: `Link not found — sol.new`,
+      description: "This short link does not exist or has expired.",
+      robots: { index: false, follow: false },
     };
   }
 
@@ -48,65 +75,62 @@ export async function generateMetadata({
   const title = shortLinkDisplayTitle(link.title, dest);
   const description = [
     dest.summary,
-    dest.host ? `Destination: ${dest.host}.` : null,
-    link.clicks > 0 ? `${link.clicks.toLocaleString()} opens.` : null,
-    "Shared via sol.new short links.",
+    dest.host ? `→ ${dest.host}` : null,
+    link.clicks > 0 ? `${link.clicks.toLocaleString()} opens` : null,
   ]
     .filter(Boolean)
-    .join(" ")
+    .join(" · ")
     .slice(0, 160);
 
   const url = absoluteShortUrl(code);
   return {
-    title: `${title} — sol.new${shortPath(code)}`,
+    title: `${title} · ${dest.siteName}`,
     description,
+    robots: { index: false, follow: true },
     alternates: { canonical: url },
     openGraph: {
-      title,
-      description,
+      title: `${title}`,
+      description: `${dest.siteName} · ${dest.host}${link.clicks > 0 ? ` · ${link.clicks} opens` : ""}`,
       url,
       siteName: "sol.new",
       type: "website",
+      images: [{ url: `${url}/opengraph-image`, width: 1200, height: 630, alt: title }],
     },
     twitter: {
       card: "summary_large_image",
       title,
-      description,
+      description: `${dest.siteName} · ${dest.kind}`,
       creator: "@soldotnew",
+      images: [`${url}/opengraph-image`],
     },
   };
 }
 
 /**
  * Short link landing:
- * - Trusted sol.new destinations: immediate redirect
- * - External destinations: informative interstitial until user confirms (?go=1)
+ * - Missing/expired/invalid → real 404
+ * - Humans + search bots: auto-forward
+ * - Social preview bots: OG shell (noindex)
  */
 export default async function ShortLinkPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ go?: string }>;
 }) {
   const { code: raw } = await params;
-  const { go } = await searchParams;
   const loaded = await loadLink(raw);
 
-  if (loaded.invalid) redirect("/link?e=invalid");
-  if ("expired" in loaded && loaded.expired) {
-    redirect(`/link?e=expired&code=${encodeURIComponent(loaded.code)}`);
-  }
-  if (!loaded.link) {
-    redirect(`/link?e=missing&code=${encodeURIComponent(loaded.code)}`);
+  if (loaded.invalid || !loaded.link || ("expired" in loaded && loaded.expired)) {
+    notFound();
   }
 
   const { code, link } = loaded;
   const dest = describeShortLinkDestination(link.targetUrl);
-  const trusted = isTrustedShortLinkHost(dest.hostname);
-  const confirmed = go === "1";
+  const h = await headers();
+  const ua = h.get("user-agent") || "";
+  const crawler = isShareCrawler(ua);
 
-  if (trusted || confirmed) {
+  if (!crawler) {
     incrementShortLinkClicks(code).catch(() => {});
     redirect(link.targetUrl);
   }
@@ -117,7 +141,7 @@ export default async function ShortLinkPage({
 
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md space-y-5">
+      <div className="mx-auto w-full max-w-md px-4 sm:px-6 py-5 sm:py-8 space-y-5">
         <div className="text-center space-y-2">
           <p className="text-xs font-medium uppercase tracking-wide text-sky-500">
             sol.new short link
@@ -164,14 +188,6 @@ export default async function ShortLinkPage({
                 {link.targetUrl}
               </p>
             </div>
-            {link.title?.trim() && (
-              <div>
-                <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-white/30 mb-1">
-                  Label
-                </p>
-                <p className="text-sm text-gray-800 dark:text-white/80">{link.title.trim()}</p>
-              </div>
-            )}
           </div>
 
           <div className="grid grid-cols-2 gap-px bg-black/5 dark:bg-white/10 border-t border-black/5 dark:border-white/5">
@@ -193,30 +209,13 @@ export default async function ShortLinkPage({
           </div>
         </div>
 
-        <div className="flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2.5 text-left">
-          <ShieldAlert className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden />
-          <p className="text-xs text-amber-900/80 dark:text-amber-100/70 leading-relaxed">
-            You are leaving sol.new. sol.new does not control{" "}
-            <span className="font-medium">{dest.siteName}</span>. Only continue if you trust this
-            destination.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <Link
-            href={`${shortPath(code)}?go=1`}
-            className="w-full bg-sky-500 hover:bg-sky-400 text-white font-semibold rounded-xl px-4 py-3.5 transition text-center inline-flex items-center justify-center gap-2"
-          >
-            {dest.continueLabel}
-            <ExternalLink className="w-4 h-4 opacity-90" aria-hidden />
-          </Link>
-          <Link
-            href="/link"
-            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 transition text-center text-sm"
-          >
-            Cancel
-          </Link>
-        </div>
+        <a
+          href={link.targetUrl}
+          className="w-full bg-sky-500 hover:bg-sky-400 text-white font-semibold rounded-lg px-3.5 py-2.5 transition text-center inline-flex items-center justify-center gap-2"
+        >
+          {dest.continueLabel}
+          <ExternalLink className="w-4 h-4 opacity-90" aria-hidden />
+        </a>
 
         <p className="text-center text-[11px] text-gray-400 dark:text-white/30">
           Make your own free short links at{" "}
