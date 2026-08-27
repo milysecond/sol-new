@@ -78,6 +78,14 @@ const nextConfig: NextConfig = {
       { source: "/en/:path*", destination: "/:path*", permanent: true },
     ];
   },
+  async headers() {
+    const json = [{ key: "Content-Type", value: "application/json" }];
+    return [
+      { source: "/.well-known/apple-app-site-association", headers: json },
+      { source: "/apple-app-site-association", headers: json },
+      { source: "/.well-known/assetlinks.json", headers: json },
+    ];
+  },
 };
 
 export default nextConfig;

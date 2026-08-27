@@ -1,0 +1,25 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": [
+          "4CK2SMVS2Y.xyz.solnew.app"
+        ],
+        "components": [
+          { "/": "/*" }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "4CK2SMVS2Y.xyz.solnew.app"
+    ]
+  },
+  "appclips": {
+    "apps": [
+      "4CK2SMVS2Y.xyz.solnew.app.Clip"
+    ]
+  }
+}
