@@ -174,12 +174,12 @@ function loggedInUser(): string {
 
 function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number) {
   const pad = Math.max(10, Math.floor(w * 0.02));
-  const fontSize = Math.max(13, Math.floor(w * 0.028));
+  const fontSize = Math.max(7, Math.floor(Math.min(w, h) * 0.012));
   ctx.save();
-  ctx.font = `700 ${fontSize}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
-  ctx.lineWidth = Math.max(1, fontSize * 0.08);
-  ctx.strokeStyle = "rgba(0,0,0,0.45)";
-  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.font = `500 ${fontSize}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
+  ctx.lineWidth = Math.max(0.6, fontSize * 0.06);
+  ctx.strokeStyle = "rgba(0,0,0,0.18)";
+  ctx.fillStyle = "rgba(255,255,255,0.28)";
   ctx.textAlign = "left";
   ctx.textBaseline = "bottom";
   ctx.strokeText(WATERMARK, pad, h - pad);
