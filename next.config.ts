@@ -16,6 +16,7 @@ const nextConfig: NextConfig = {
     "canvas-confetti",
     "snarkjs",
     "ffjavascript",
+    "@raydium-io/raydium-sdk-v2",
   ],
   async redirects() {
     return [

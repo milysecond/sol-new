@@ -1,5 +1,5 @@
 "use client";
-import { Coins, Rocket, Info, X, ArrowLeft, Users, Vote, Dog, Sparkles } from "lucide-react";
+import { Coins, Rocket, Info, X, ArrowLeft, Users, Vote, Dog, Bot, ExternalLink, Sparkles, Layers } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { PageTransition } from "@/components/page-transition";
 
@@ -12,7 +12,7 @@ import { useImagePaste } from "@/lib/use-image-paste";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
-import { Connection, Keypair, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, Transaction, VersionedTransaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { PromoInput } from "@/components/promo-input";
 import { DynamicBondingCurveClient } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { analytics } from "@/lib/analytics";
@@ -23,7 +23,7 @@ const DBC_PARTNER_CONFIG_DEVNET = new PublicKey("QfakkckSG6L7hkuxiDQRWF7AW26Mmrx
 const dbcPartnerConfig = (network: string) =>
   network === "devnet" ? DBC_PARTNER_CONFIG_DEVNET : DBC_PARTNER_CONFIG_MAINNET;
 
-type Style = "pick" | "meteora" | "genesis" | "pump" | "bags" | "metadao" | "bonkfun";
+type Style = "pick" | "meteora" | "genesis" | "pump" | "bags" | "metadao" | "bonkfun" | "virtuals" | "jup" | "launchlab";
 
 // ─── Style picker ─────────────────────────────────────────────────────────────
 
@@ -101,6 +101,60 @@ const STYLE_OPTIONS: {
       website: "bags.fm",
       twitter: "@finnbags",
       outcome: "The Bags founder's own creator coin — trading fees flow back to the creator.",
+    },
+  },
+  {
+    key: "jup",
+    label: "Jupiter",
+    subtitle: "Studio bonding curve",
+    detail: "Jupiter Studio meme preset. USDC curve 16k → 69k, then Meteora. Official Studio API.",
+    cost: "Studio fee",
+    icon: <Sparkles size={22} />,
+    accent: "lime",
+    example: {
+      name: "Jupiter",
+      ticker: "JUP",
+      image: "/examples/jup.svg",
+      description: "The liquidity and trading layer of Solana.",
+      website: "jup.ag",
+      twitter: "@JupiterExchange",
+      outcome: "Studio launches graduate to a Meteora pool with locked LP.",
+    },
+  },
+  {
+    key: "launchlab",
+    label: "LaunchLab",
+    subtitle: "Raydium bonding curve",
+    detail: "Raydium LaunchLab JustSendit-style create. Graduates to Raydium CPMM. Official SDK.",
+    cost: "~0.03 SOL",
+    icon: <Layers size={22} />,
+    accent: "indigo",
+    example: {
+      name: "Raydium",
+      ticker: "RAY",
+      image: "/examples/launchlab.svg",
+      description: "Raydium AMM and LaunchLab.",
+      website: "raydium.io",
+      twitter: "@RaydiumProtocol",
+      outcome: "LaunchLab tokens graduate to Raydium CPMM once the SOL target is hit.",
+    },
+  },
+  {
+    key: "virtuals",
+    label: "Virtuals",
+    subtitle: "AI agent token (Solana)",
+    detail: "Tokenize an AI agent on Virtuals Protocol. Solana agent ownership — complete the launch on Virtuals.",
+    cost: "On Virtuals",
+    icon: <Bot size={22} />,
+    accent: "cyan",
+    example: {
+      name: "VIRTUAL",
+      ticker: "VIRTUAL",
+      image: "/examples/virtuals.svg",
+      description: "Virtuals Protocol — co-ownership layer for AI agents.",
+      website: "virtuals.io",
+      twitter: "@virtuals_io",
+      outcome: "Agent tokens pair with VIRTUAL; Solana launch guide from @virtuals_io.",
     },
   },
   {
@@ -190,6 +244,24 @@ const ACCENT_CLASSES: Record<string, { border: string; bg: string; text: string;
     bg: "bg-amber-500/5",
     text: "text-amber-600 dark:text-amber-400",
     btn: "bg-amber-500 hover:bg-amber-400",
+  },
+  cyan: {
+    border: "border-cyan-400/40",
+    bg: "bg-cyan-500/5",
+    text: "text-cyan-600 dark:text-cyan-400",
+    btn: "bg-cyan-500 hover:bg-cyan-400",
+  },
+  lime: {
+    border: "border-lime-400/40",
+    bg: "bg-lime-500/5",
+    text: "text-lime-600 dark:text-lime-400",
+    btn: "bg-lime-500 hover:bg-lime-400",
+  },
+  indigo: {
+    border: "border-indigo-400/40",
+    bg: "bg-indigo-500/5",
+    text: "text-indigo-600 dark:text-indigo-400",
+    btn: "bg-indigo-500 hover:bg-indigo-400",
   },
 };
 
@@ -1327,7 +1399,402 @@ function MetadaoForm({ onBack }: { onBack: () => void }) {
   );
 }
 
+// ─── Virtuals Protocol (Solana agent tokens) ─────────────────────────────────
 
+const VIRTUALS_APP = "https://app.virtuals.io";
+const VIRTUALS_GUIDE = "https://x.com/virtuals_io/status/2091895515848069309";
+
+function VirtualsForm({ onBack }: { onBack: () => void }) {
+  const [name, setName] = useState("");
+  const [ticker, setTicker] = useState("");
+  const [description, setDescription] = useState("");
+
+  const openLaunch = () => {
+    analytics.launchInitiated(ticker || "agent", "virtuals");
+    window.open(VIRTUALS_APP, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <PageTransition>
+      <div className="space-y-5 max-w-lg mx-auto">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-white/50 hover:text-gray-800 dark:hover:text-white"
+        >
+          <ArrowLeft size={16} /> All styles
+        </button>
+        <div className="flex items-center gap-3">
+          <span className="text-cyan-500">
+            <Bot size={28} />
+          </span>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Virtuals</h1>
+            <p className="text-sm text-gray-500 dark:text-white/45">
+              Tokenize an AI agent on Solana
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-cyan-400/30 bg-cyan-500/5 px-4 py-3 text-xs text-gray-600 dark:text-white/65 space-y-2 leading-relaxed">
+          <p>
+            Virtuals Protocol is the co-ownership layer for AI agents. Solana agent tokenization is
+            live — complete mint + curve on Virtuals (not in-app yet).
+          </p>
+          <a
+            href={VIRTUALS_GUIDE}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-cyan-600 dark:text-cyan-400 font-medium underline"
+          >
+            Complete guide to agent tokenization on Solana <ExternalLink size={12} />
+          </a>
+        </div>
+
+        <div className="space-y-3">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Agent / token name"
+            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400"
+          />
+          <input
+            value={ticker}
+            onChange={(e) => setTicker(e.target.value.toUpperCase().slice(0, 12))}
+            placeholder="TICKER"
+            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 font-mono text-gray-900 dark:text-white placeholder:text-gray-400"
+          />
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="What the agent does (optional — paste into Virtuals)"
+            rows={3}
+            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-400"
+          />
+        </div>
+
+        <ol className="text-xs text-gray-500 dark:text-white/45 space-y-1.5 list-decimal pl-4">
+          <li>Open Virtuals → Launch Token</li>
+          <li>Upload logo, name, ticker</li>
+          <li>Connect wallet on Solana</li>
+        </ol>
+
+        <button
+          type="button"
+          onClick={openLaunch}
+          className="w-full min-h-[48px] bg-cyan-500 hover:bg-cyan-400 text-black font-semibold rounded-xl px-4 py-3 inline-flex items-center justify-center gap-2 touch-manipulation active:scale-[0.98]"
+        >
+          Continue on Virtuals <ExternalLink size={16} />
+        </button>
+        <p className="text-[11px] text-center text-gray-400">
+          Opens {VIRTUALS_APP.replace("https://", "")}
+          {ticker ? ` · take $${ticker} with you` : ""}
+          {name ? ` (${name})` : ""}
+        </p>
+      </div>
+    </PageTransition>
+  );
+}
+
+function JupForm({ onBack }: { onBack: () => void }) {
+  const [name, setName] = useState("");
+  const [ticker, setTicker] = useState("");
+  const [description, setDescription] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [twitter, setTwitter] = useState("");
+  const [telegram, setTelegram] = useState("");
+  const [website, setWebsite] = useState("");
+  const [status, setStatus] = useState<"idle" | "auth" | "uploading" | "creating" | "confirming" | "done" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const { publicKey, refreshBalance } = useWallet();
+  const ac = ACCENT_CLASSES.lime;
+
+  const acceptImage = useCallback((file: File) => {
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  }, []);
+  useImagePaste(acceptImage);
+
+  const handleLaunch = async () => {
+    if (!name || !ticker || !imageFile || !publicKey) return;
+    setError(null);
+    analytics.launchInitiated(ticker, "jup-studio");
+    try {
+      setStatus("auth");
+      const { keypair: userKeypair } = await getPasskeyKeypair();
+
+      setStatus("creating");
+      const ctype = imageFile.type || "image/png";
+      const built = await fetch("/api/launch/studio/create-tx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          creator: publicKey,
+          tokenName: name,
+          tokenSymbol: ticker,
+          tokenImageContentType: ctype,
+        }),
+      });
+      const data = (await built.json()) as {
+        ok?: boolean;
+        transaction?: string;
+        mint?: string;
+        imagePresignedUrl?: string;
+        metadataPresignedUrl?: string;
+        imageUrl?: string;
+        error?: string;
+      };
+      if (!data.ok || !data.transaction || !data.mint) throw new Error(data.error ?? "Studio did not return a tx");
+
+      setStatus("uploading");
+      if (data.imagePresignedUrl) {
+        const putImg = await fetch(data.imagePresignedUrl, { method: "PUT", headers: { "Content-Type": ctype }, body: imageFile });
+        if (!putImg.ok) throw new Error("Studio image upload failed");
+      }
+      if (data.metadataPresignedUrl) {
+        const putMeta = await fetch(data.metadataPresignedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            symbol: ticker,
+            description,
+            image: data.imageUrl,
+            website,
+            twitter,
+            telegram,
+          }),
+        });
+        if (!putMeta.ok) throw new Error("Studio metadata upload failed");
+      }
+
+      const tx = VersionedTransaction.deserialize(Buffer.from(data.transaction, "base64"));
+      tx.sign([userKeypair]);
+      const signed = Buffer.from(tx.serialize()).toString("base64");
+
+      setStatus("confirming");
+      const form = new FormData();
+      form.append("transaction", signed);
+      form.append("owner", publicKey);
+      form.append("content", description || "");
+      const submitted = await fetch("/api/launch/studio/submit", { method: "POST", body: form });
+      const result = (await submitted.json()) as { ok?: boolean; error?: string; result?: { signature?: string; txid?: string } };
+      if (!submitted.ok || !result.ok) throw new Error(result.error ?? "Studio submit failed");
+
+      await fetch("/api/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet: publicKey,
+          name,
+          symbol: ticker,
+          description,
+          imageUrl: data.imageUrl,
+          mintAddress: data.mint,
+          network: "mainnet",
+        }),
+      }).catch(() => {});
+
+      await refreshBalance();
+      analytics.tokenCreated(data.mint, ticker);
+      router.push(`/launch/${data.mint}`);
+    } catch (e: unknown) {
+      analytics.launchFailed(ticker, String(e).slice(0, 120));
+      setError(friendlyError(e instanceof Error ? e.message : String(e)));
+      setStatus("error");
+    }
+  };
+
+  const busy = status !== "idle" && status !== "error";
+  return (
+    <PageTransition>
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
+        <div className="text-center space-y-1 relative">
+          <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
+            <ArrowLeft size={15} />
+          </button>
+          <AnimatedIcon icon={Sparkles} size={32} className={ac.text} />
+          <h1 className="text-2xl font-bold tracking-tight">Jupiter Studio</h1>
+          <p className="text-gray-500 dark:text-white/50 text-sm">Meme preset · USDC curve 16k → 69k · Meteora LP</p>
+        </div>
+        <div className="space-y-3">
+          <input type="text" placeholder="Token name" value={name} onChange={(e) => setName(e.target.value)} disabled={busy} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-lime-400/50 transition disabled:opacity-50" />
+          <input type="text" placeholder="Ticker (e.g. JUP)" value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} maxLength={10} disabled={busy} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-lime-400/50 transition font-mono disabled:opacity-50" />
+          <textarea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} disabled={busy} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-lime-400/50 transition resize-none disabled:opacity-50" />
+          <label htmlFor="jup-image" className="flex items-center justify-center w-full bg-black/5 dark:bg-white/5 border border-dashed border-black/10 dark:border-white/10 rounded-xl px-4 py-4 cursor-pointer hover:border-black/20 dark:hover:border-white/20 transition overflow-hidden">
+            {imagePreview ? (
+              <div className="flex items-center gap-3">
+                <img src={imagePreview} alt="preview" className="w-12 h-12 rounded-lg object-cover" />
+                <span className="text-gray-500 dark:text-white/50 text-sm">{imageFile?.name}</span>
+              </div>
+            ) : (
+              <span className="text-gray-400 dark:text-white/30 text-sm">Tap to upload or paste an image</span>
+            )}
+          </label>
+          <input id="jup-image" ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={(e) => { const f = e.target.files?.[0]; if (f) acceptImage(f); }} className="sr-only" />
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { key: "twitter", placeholder: "X / Twitter", value: twitter, set: setTwitter },
+              { key: "telegram", placeholder: "Telegram", value: telegram, set: setTelegram },
+              { key: "website", placeholder: "Website", value: website, set: setWebsite },
+            ].map(({ key, placeholder, value, set }) => (
+              <input key={key} type="text" placeholder={placeholder} value={value} onChange={(e) => set(e.target.value)} disabled={busy} className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none text-xs disabled:opacity-50" />
+            ))}
+          </div>
+          {error && <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">{error}</div>}
+          {busy ? (
+            <p className="text-center text-sm text-gray-500 dark:text-white/50">
+              {status === "auth" && "Signing in…"}
+              {status === "uploading" && "Uploading image…"}
+              {status === "creating" && "Building Studio tx…"}
+              {status === "confirming" && "Submitting…"}
+            </p>
+          ) : (
+            <>
+              <button onClick={handleLaunch} disabled={!name || !ticker || !imageFile || !publicKey} className={`w-full ${ac.btn} disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 text-black font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed`}>
+                Launch on Jupiter Studio
+              </button>
+              <p className="text-center text-xs text-gray-400 dark:text-white/30">USDC meme curve · graduates to Meteora</p>
+            </>
+          )}
+        </div>
+      </div>
+    </PageTransition>
+  );
+}
+
+function LaunchLabForm({ onBack }: { onBack: () => void }) {
+  const [name, setName] = useState("");
+  const [ticker, setTicker] = useState("");
+  const [description, setDescription] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [twitter, setTwitter] = useState("");
+  const [telegram, setTelegram] = useState("");
+  const [website, setWebsite] = useState("");
+  const [status, setStatus] = useState<"idle" | "auth" | "uploading" | "creating" | "confirming" | "done" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const { publicKey, refreshBalance } = useWallet();
+  const { rpc } = useNetwork();
+  const ac = ACCENT_CLASSES.indigo;
+
+  const acceptImage = useCallback((file: File) => {
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  }, []);
+  useImagePaste(acceptImage);
+
+  const handleLaunch = async () => {
+    if (!name || !ticker || !imageFile || !publicKey) return;
+    setError(null);
+    analytics.launchInitiated(ticker, "launchlab");
+    try {
+      setStatus("auth");
+      const { keypair: userKeypair } = await getPasskeyKeypair();
+      setStatus("uploading");
+      const uploaded = await uploadImage(imageFile);
+      const socials: Record<string, string> = {};
+      if (twitter) socials.twitter = twitter;
+      if (telegram) socials.telegram = telegram;
+      if (website) socials.website = website;
+      const metadata = await uploadMetadata({ name, symbol: ticker, description, image: uploaded.url, ...socials });
+      setStatus("creating");
+      const { createLaunchLabTx } = await import("@/lib/launchlab");
+      const connection = new Connection(rpc, "confirmed");
+      const { mint } = await createLaunchLabTx({
+        connection,
+        owner: userKeypair,
+        name,
+        symbol: ticker,
+        uri: metadata.uri,
+      });
+      setStatus("confirming");
+      await fetch("/api/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet: publicKey,
+          name,
+          symbol: ticker,
+          description,
+          imageUrl: uploaded.url,
+          metadataUri: metadata.uri,
+          mintAddress: mint,
+          network: "mainnet",
+        }),
+      }).catch(() => {});
+      await refreshBalance();
+      analytics.tokenCreated(mint, ticker);
+      router.push(`/launch/${mint}`);
+    } catch (e: unknown) {
+      analytics.launchFailed(ticker, String(e).slice(0, 120));
+      setError(friendlyError(e instanceof Error ? e.message : String(e)));
+      setStatus("error");
+    }
+  };
+
+  const busy = status !== "idle" && status !== "error";
+  return (
+    <PageTransition>
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
+        <div className="text-center space-y-1 relative">
+          <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
+            <ArrowLeft size={15} />
+          </button>
+          <AnimatedIcon icon={Layers} size={32} className={ac.text} />
+          <h1 className="text-2xl font-bold tracking-tight">Raydium LaunchLab</h1>
+          <p className="text-gray-500 dark:text-white/50 text-sm">JustSendit-style create · graduates to Raydium CPMM</p>
+        </div>
+        <div className="space-y-3">
+          <input type="text" placeholder="Token name" value={name} onChange={(e) => setName(e.target.value)} disabled={busy} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none disabled:opacity-50" />
+          <input type="text" placeholder="Ticker" value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} maxLength={10} disabled={busy} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none font-mono disabled:opacity-50" />
+          <textarea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} disabled={busy} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none resize-none disabled:opacity-50" />
+          <label htmlFor="ll-image" className="flex items-center justify-center w-full bg-black/5 dark:bg-white/5 border border-dashed border-black/10 dark:border-white/10 rounded-xl px-4 py-4 cursor-pointer overflow-hidden">
+            {imagePreview ? (
+              <div className="flex items-center gap-3">
+                <img src={imagePreview} alt="preview" className="w-12 h-12 rounded-lg object-cover" />
+                <span className="text-gray-500 dark:text-white/50 text-sm">{imageFile?.name}</span>
+              </div>
+            ) : (
+              <span className="text-gray-400 dark:text-white/30 text-sm">Tap to upload or paste an image</span>
+            )}
+          </label>
+          <input id="ll-image" ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={(e) => { const f = e.target.files?.[0]; if (f) acceptImage(f); }} className="sr-only" />
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { key: "twitter", placeholder: "X / Twitter", value: twitter, set: setTwitter },
+              { key: "telegram", placeholder: "Telegram", value: telegram, set: setTelegram },
+              { key: "website", placeholder: "Website", value: website, set: setWebsite },
+            ].map(({ key, placeholder, value, set }) => (
+              <input key={key} type="text" placeholder={placeholder} value={value} onChange={(e) => set(e.target.value)} disabled={busy} className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 text-xs disabled:opacity-50" />
+            ))}
+          </div>
+          {error && <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">{error}</div>}
+          {busy ? (
+            <p className="text-center text-sm text-gray-500 dark:text-white/50">
+              {status === "auth" && "Signing in…"}
+              {status === "uploading" && "Uploading image…"}
+              {status === "creating" && "Building LaunchLab tx…"}
+              {status === "confirming" && "Confirming…"}
+            </p>
+          ) : (
+            <>
+              <button onClick={handleLaunch} disabled={!name || !ticker || !imageFile || !publicKey} className={`w-full ${ac.btn} disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed`}>
+                Launch on LaunchLab
+              </button>
+              <p className="text-center text-xs text-gray-400 dark:text-white/30">Raydium SDK · SOL curve · CPMM at graduation</p>
+            </>
+          )}
+        </div>
+      </div>
+    </PageTransition>
+  );
+}
 
 // ─── Main page ─
 
@@ -1344,6 +1811,9 @@ export default function TokenPage() {
           {(style === "pump" || style === "bags") && <PumpForm style={style} onBack={() => setStyle("pick")} />}
           {style === "genesis" && <GenesisForm onBack={() => setStyle("pick")} />}
           {style === "metadao" && <MetadaoForm onBack={() => setStyle("pick")} />}
+          {style === "virtuals" && <VirtualsForm onBack={() => setStyle("pick")} />}
+          {style === "jup" && <JupForm onBack={() => setStyle("pick")} />}
+          {style === "launchlab" && <LaunchLabForm onBack={() => setStyle("pick")} />}
         </div>
       </main>
     </div>
