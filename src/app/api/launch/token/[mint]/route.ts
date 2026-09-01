@@ -4,6 +4,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { PumpFunSDK } from "pumpdotfun-sdk";
 import { mainnetRpcUrl } from "@/lib/rpc-server";
+import { mobulaMintLookup } from "@/lib/mobula";
 
 const PUMP_API = "https://client-api-2-74b1891ee9f9.herokuapp.com";
 
@@ -24,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ min
   const provider = new AnchorProvider(connection, dummyWallet as any, { commitment: "confirmed" });
   const sdk = new PumpFunSDK(provider);
 
-  const [pumpData, bondingCurve, dexData] = await Promise.allSettled([
+  const [pumpData, bondingCurve, dexData, mobulaData] = await Promise.allSettled([
     fetch(`${PUMP_API}/coins/${mint}`, {
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(6_000),
@@ -35,11 +36,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ min
     fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, {
       signal: AbortSignal.timeout(6_000),
     }).then((r) => (r.ok ? r.json() : null)),
+
+    mobulaMintLookup(mint),
   ]);
 
   const pump = pumpData.status === "fulfilled" ? pumpData.value : null;
   const curve = bondingCurve.status === "fulfilled" ? bondingCurve.value : null;
   const dex = dexData.status === "fulfilled" ? dexData.value : null;
+  const mobula = mobulaData.status === "fulfilled" ? mobulaData.value : null;
 
   const pairs = (dex as any)?.pairs ?? [];
   const pair = pairs[0] ?? null;
@@ -64,21 +68,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ min
     progress = 100;
   }
 
-  const priceUsd = pair?.priceUsd ? parseFloat(pair.priceUsd) : null;
-  const marketCapUsd = pair?.fdv ?? null;
-  const volume24h = pair?.volume?.h24 ?? null;
+  const priceUsd = pair?.priceUsd ? parseFloat(pair.priceUsd) : mobula?.priceUsd ?? null;
+  const marketCapUsd = pair?.fdv ?? mobula?.marketCapUsd ?? null;
+  const volume24h = pair?.volume?.h24 ?? mobula?.volume24h ?? null;
 
   return NextResponse.json(
     {
       mint,
-      name: pump?.name ?? null,
-      symbol: pump?.symbol ?? null,
+      name: pump?.name ?? mobula?.name ?? null,
+      symbol: pump?.symbol ?? mobula?.symbol ?? null,
       description: pump?.description ?? null,
-      imageUrl: pump?.image_uri ?? null,
+      imageUrl: pump?.image_uri ?? mobula?.logo ?? null,
       metadataUri: pump?.metadata_uri ?? null,
-      twitter: pump?.twitter ?? null,
-      telegram: pump?.telegram ?? null,
-      website: pump?.website ?? null,
+      twitter: pump?.twitter ?? mobula?.twitter ?? null,
+      telegram: pump?.telegram ?? mobula?.telegram ?? null,
+      website: pump?.website ?? mobula?.website ?? null,
       creator: pump?.creator ?? null,
       createdAt: pump?.created_timestamp ? new Date(pump.created_timestamp).toISOString() : null,
       complete: curveData?.complete ?? false,
@@ -87,6 +91,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ min
       marketCapUsd,
       volume24h,
       pairAddress: pair?.pairAddress ?? null,
+      launchpad: mobula?.launchpad ?? (pump ? "Pump.fun" : null),
       bondingCurve: curveData,
     },
     { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" } },
