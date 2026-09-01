@@ -17,6 +17,7 @@ import { PromoInput } from "@/components/promo-input";
 import { DynamicBondingCurveClient } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { analytics } from "@/lib/analytics";
 import { friendlyError } from "@/lib/friendly-errors";
+import { TOKEN_LAUNCH_PRICES, tokenLaunchCostLabel } from "@/lib/token-launch-pricing";
 
 const DBC_PARTNER_CONFIG_MAINNET = new PublicKey("8G4yr6Q7wHvpRBGj1u9ZisY9Q95HNAxBQknaqUNanpvA");
 const DBC_PARTNER_CONFIG_DEVNET = new PublicKey("QfakkckSG6L7hkuxiDQRWF7AW26MmrxBqgvMMmMzc3H");
@@ -53,7 +54,7 @@ const STYLE_OPTIONS: {
     label: "Meteora",
     subtitle: "Custom bonding curve",
     detail: "Your own curve parameters, 1B supply, creator allocation, DAMM v2 graduation.",
-    cost: "~0.045 SOL",
+    cost: tokenLaunchCostLabel("meteora"),
     icon: <Coins size={22} />,
     accent: "orange",
     example: {
@@ -72,7 +73,7 @@ const STYLE_OPTIONS: {
     label: "Pump",
     subtitle: "pump.fun bonding curve",
     detail: "Launch on pump.fun's program. Free to create — just on-chain rent. Graduates to Raydium.",
-    cost: "~0.008 SOL",
+    cost: tokenLaunchCostLabel("pump"),
     icon: <Rocket size={22} />,
     accent: "purple",
     example: {
@@ -90,7 +91,7 @@ const STYLE_OPTIONS: {
     label: "Bags",
     subtitle: "Creator social token",
     detail: "Your personal token tied to your identity. Followers can hold a piece of your brand.",
-    cost: "~0.008 SOL",
+    cost: tokenLaunchCostLabel("bags"),
     icon: <Users size={22} />,
     accent: "blue",
     example: {
@@ -108,7 +109,7 @@ const STYLE_OPTIONS: {
     label: "Jupiter",
     subtitle: "Studio bonding curve",
     detail: "Jupiter Studio meme preset. USDC curve 16k → 69k, then Meteora. Official Studio API.",
-    cost: "Studio fee",
+    cost: tokenLaunchCostLabel("jup"),
     icon: <Sparkles size={22} />,
     accent: "lime",
     example: {
@@ -126,7 +127,7 @@ const STYLE_OPTIONS: {
     label: "LaunchLab",
     subtitle: "Raydium bonding curve",
     detail: "Raydium LaunchLab JustSendit-style create. Graduates to Raydium CPMM. Official SDK.",
-    cost: "~0.03 SOL",
+    cost: tokenLaunchCostLabel("launchlab"),
     icon: <Layers size={22} />,
     accent: "indigo",
     example: {
@@ -144,7 +145,7 @@ const STYLE_OPTIONS: {
     label: "Bonk",
     subtitle: "bonk.fun bonding curve",
     detail: "Launch on LetsBonk's curve. Graduates to Raydium — fees fund BONK burns.",
-    cost: "Coming soon",
+    cost: tokenLaunchCostLabel("bonkfun"),
     icon: <Dog size={22} />,
     accent: "amber",
     disabled: true,
@@ -163,7 +164,7 @@ const STYLE_OPTIONS: {
     label: "Genesis",
     subtitle: "Fair launch / TGE",
     detail: "Time-based deposit window. Price set by demand. Tokens claimed after the window closes.",
-    cost: "~0.01 SOL",
+    cost: tokenLaunchCostLabel("genesis"),
     icon: <Coins size={22} />,
     accent: "orange",
     example: {
@@ -181,7 +182,7 @@ const STYLE_OPTIONS: {
     label: "Metadao",
     subtitle: "Futarchy governance",
     detail: "On-chain prediction markets decide proposals. Governance by market consensus.",
-    cost: "~0.05 SOL",
+    cost: tokenLaunchCostLabel("metadao"),
     icon: <Vote size={22} />,
     accent: "green",
     example: {
@@ -555,6 +556,45 @@ function StylePicker({ onSelect }: { onSelect: (s: Exclude<Style, "pick">) => vo
 
         <TopTokensBrowse />
         <ExampleTokens />
+
+        <div className="rounded-2xl border border-black/10 dark:border-white/10 overflow-hidden">
+          <div className="px-4 py-3 border-b border-black/10 dark:border-white/10 flex items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Launch pricing (mainnet)</h2>
+            <Link href="/docs#token-launch" className="text-[11px] text-purple-500 hover:underline">
+              Full table
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-black/5 dark:bg-white/5 text-[10px] uppercase tracking-wide text-gray-500 dark:text-white/40">
+                <tr>
+                  <th className="px-3 py-2">Pad</th>
+                  <th className="px-3 py-2">You pay</th>
+                  <th className="px-3 py-2">Trade</th>
+                  <th className="px-3 py-2">Quote / grad</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/5 dark:divide-white/5">
+                {TOKEN_LAUNCH_PRICES.filter((p) => p.live).map((p) => (
+                  <tr key={p.id}>
+                    <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{p.label}</td>
+                    <td className="px-3 py-2 font-mono">{p.costLabel}</td>
+                    <td className="px-3 py-2 font-mono">
+                      {p.tradeFeeBps != null ? `${(p.tradeFeeBps / 100).toFixed(2)}%` : "-"}
+                    </td>
+                    <td className="px-3 py-2 text-gray-500 dark:text-white/45">
+                      {p.quote} / {p.graduation}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="px-3 py-2 text-[11px] text-gray-400 dark:text-white/30">
+            Only Meteora 0.045 is a hard min (0.040 rent + 0.005 sol.new). Other SOL figures are typical rent.
+            85 SOL / 69k USDC are curve targets, not create fees. Image + metadata upload is free.
+          </p>
+        </div>
       </div>
 
       {exampleFor && <ExampleFormModal option={exampleFor} onClose={() => setExampleFor(null)} />}

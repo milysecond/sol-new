@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { TOKEN_LAUNCH_PRICES } from "@/lib/token-launch-pricing";
 
 type Action = { id: string; label: string; sol: number; usd: number | null; note: string };
 type Costs = { solUsd: number | null; priceSource: string | null; updatedAt: string; actions: Action[] };
@@ -131,6 +132,43 @@ export default function DocsPage() {
             Live SOL price refreshed every 30s. Devnet is free aside from base tx fees. Custom short links are
             0.01 SOL. Loan rates are protocol APYs, not platform fees.
           </p>
+        </section>
+
+        <section id="token-launch" className="space-y-3">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Token launch (/token)</h2>
+          <p>
+            Create at <Link href="/token" className="text-violet-500 hover:underline">/token</Link>.
+            Only Meteora has a sol.new take (0.005 SOL, promo can waive). Everything else is protocol rent + their trade fee.
+          </p>
+          <div className="overflow-x-auto rounded-xl border border-black/10 dark:border-white/10">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-black/5 dark:bg-white/5 text-[10px] uppercase tracking-wide text-gray-500 dark:text-white/40">
+                <tr>
+                  <th className="px-4 py-2">Pad</th>
+                  <th className="px-4 py-2">Launch SOL</th>
+                  <th className="px-4 py-2">Trade fee</th>
+                  <th className="px-4 py-2">Quote / graduation</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/5 dark:divide-white/5">
+                {TOKEN_LAUNCH_PRICES.filter((p) => p.live).map((p) => (
+                    <tr key={p.id}>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900 dark:text-white">{p.label}</div>
+                        <div className="text-[11px] text-gray-400 dark:text-white/30">{p.note}</div>
+                      </td>
+                      <td className="px-4 py-3 font-mono">{p.costLabel}</td>
+                      <td className="px-4 py-3 font-mono">
+                        {p.tradeFeeBps != null ? `${(p.tradeFeeBps / 100).toFixed(2)}%` : "-"}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 dark:text-white/45">
+                        {p.quote} / {p.graduation}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section className="space-y-3">
