@@ -27,6 +27,26 @@ export function jupStudioHeaders(json = false): HeadersInit {
   return h;
 }
 
+export function formatStudioError(data: unknown, status: number): string {
+  if (!data || typeof data !== "object") return `Studio HTTP ${status}`;
+  const d = data as Record<string, unknown>;
+  const errors = d.errors;
+  if (errors && typeof errors === "object") {
+    const parts: string[] = [];
+    for (const [k, v] of Object.entries(errors as Record<string, unknown>)) {
+      if (Array.isArray(v)) parts.push(`${k}: ${v.join(", ")}`);
+      else if (v && typeof v === "object") parts.push(`${k}: ${JSON.stringify(v)}`);
+      else if (v != null) parts.push(`${k}: ${String(v)}`);
+    }
+    if (parts.length) return parts.join(" · ");
+  }
+  if (Array.isArray(d.error)) return d.error.map(String).join(" · ");
+  if (typeof d.error === "string" && d.error) return d.error;
+  if (typeof d.errorMessage === "string" && d.errorMessage) return d.errorMessage;
+  if (typeof d.message === "string" && d.message) return d.message;
+  return `Studio HTTP ${status}`;
+}
+
 /** Meme preset from Jupiter Studio docs (USDC curve, 16k → 69k). */
 export function studioMemeCreateBody(opts: {
   creator: string;
@@ -34,6 +54,7 @@ export function studioMemeCreateBody(opts: {
   tokenSymbol: string;
   tokenImageContentType: string;
 }) {
+  const type = opts.tokenImageContentType === "image/jpg" ? "image/jpeg" : opts.tokenImageContentType;
   return {
     buildCurveByMarketCapParam: {
       quoteMint: STUDIO_USDC,
@@ -43,7 +64,7 @@ export function studioMemeCreateBody(opts: {
       lockedVestingParam: {
         totalLockedVestingAmount: 0,
         cliffUnlockAmount: 0,
-        numberOfVestingPeriod: 0,
+        numberOfVestingPeriod: 1,
         totalVestingDuration: 0,
         cliffDurationFromMigrationTime: 0,
       },
@@ -53,7 +74,7 @@ export function studioMemeCreateBody(opts: {
     isLpLocked: true,
     tokenName: opts.tokenName,
     tokenSymbol: opts.tokenSymbol,
-    tokenImageContentType: opts.tokenImageContentType,
+    tokenImageContentType: type || "image/png",
     creator: opts.creator,
   };
 }
@@ -83,7 +104,7 @@ export async function studioCreateTx(body: unknown): Promise<StudioCreateTx> {
     throw new Error(text.slice(0, 200) || `Studio create-tx HTTP ${res.status}`);
   }
   if (!res.ok) {
-    throw new Error(String(data.errorMessage || data.error || `Studio create-tx HTTP ${res.status}`));
+    throw new Error(formatStudioError(data, res.status));
   }
   return data;
 }
@@ -102,11 +123,7 @@ export async function studioSubmit(form: FormData): Promise<unknown> {
     /* keep text */
   }
   if (!res.ok) {
-    const err =
-      typeof data === "object" && data && "error" in data
-        ? String((data as { error?: string }).error)
-        : text.slice(0, 200);
-    throw new Error(err || `Studio submit HTTP ${res.status}`);
+    throw new Error(formatStudioError(data, res.status));
   }
   return data;
 }
