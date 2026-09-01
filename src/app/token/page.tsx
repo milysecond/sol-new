@@ -1,5 +1,5 @@
 "use client";
-import { Coins, Rocket, Info, X, ArrowLeft, Users, Vote, Dog, Bot, ExternalLink, Sparkles, Layers } from "lucide-react";
+import { Coins, Rocket, Info, X, ArrowLeft, Users, Vote, Dog, Sparkles, Layers } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { PageTransition } from "@/components/page-transition";
 
@@ -23,7 +23,7 @@ const DBC_PARTNER_CONFIG_DEVNET = new PublicKey("QfakkckSG6L7hkuxiDQRWF7AW26Mmrx
 const dbcPartnerConfig = (network: string) =>
   network === "devnet" ? DBC_PARTNER_CONFIG_DEVNET : DBC_PARTNER_CONFIG_MAINNET;
 
-type Style = "pick" | "meteora" | "genesis" | "pump" | "bags" | "metadao" | "bonkfun" | "virtuals" | "jup" | "launchlab";
+type Style = "pick" | "meteora" | "genesis" | "pump" | "bags" | "metadao" | "bonkfun" | "jup" | "launchlab";
 
 // ─── Style picker ─────────────────────────────────────────────────────────────
 
@@ -137,24 +137,6 @@ const STYLE_OPTIONS: {
       website: "raydium.io",
       twitter: "@RaydiumProtocol",
       outcome: "LaunchLab tokens graduate to Raydium CPMM once the SOL target is hit.",
-    },
-  },
-  {
-    key: "virtuals",
-    label: "Virtuals",
-    subtitle: "AI agent token (Solana)",
-    detail: "Tokenize an AI agent on Virtuals Protocol. Solana agent ownership — complete the launch on Virtuals.",
-    cost: "On Virtuals",
-    icon: <Bot size={22} />,
-    accent: "cyan",
-    example: {
-      name: "VIRTUAL",
-      ticker: "VIRTUAL",
-      image: "/examples/virtuals.svg",
-      description: "Virtuals Protocol — co-ownership layer for AI agents.",
-      website: "virtuals.io",
-      twitter: "@virtuals_io",
-      outcome: "Agent tokens pair with VIRTUAL; Solana launch guide from @virtuals_io.",
     },
   },
   {
@@ -1399,103 +1381,6 @@ function MetadaoForm({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ─── Virtuals Protocol (Solana agent tokens) ─────────────────────────────────
-
-const VIRTUALS_APP = "https://app.virtuals.io";
-const VIRTUALS_GUIDE = "https://x.com/virtuals_io/status/2091895515848069309";
-
-function VirtualsForm({ onBack }: { onBack: () => void }) {
-  const [name, setName] = useState("");
-  const [ticker, setTicker] = useState("");
-  const [description, setDescription] = useState("");
-
-  const openLaunch = () => {
-    analytics.launchInitiated(ticker || "agent", "virtuals");
-    window.open(VIRTUALS_APP, "_blank", "noopener,noreferrer");
-  };
-
-  return (
-    <PageTransition>
-      <div className="space-y-5 max-w-lg mx-auto">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-white/50 hover:text-gray-800 dark:hover:text-white"
-        >
-          <ArrowLeft size={16} /> All styles
-        </button>
-        <div className="flex items-center gap-3">
-          <span className="text-cyan-500">
-            <Bot size={28} />
-          </span>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Virtuals</h1>
-            <p className="text-sm text-gray-500 dark:text-white/45">
-              Tokenize an AI agent on Solana
-            </p>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-cyan-400/30 bg-cyan-500/5 px-4 py-3 text-xs text-gray-600 dark:text-white/65 space-y-2 leading-relaxed">
-          <p>
-            Virtuals Protocol is the co-ownership layer for AI agents. Solana agent tokenization is
-            live — complete mint + curve on Virtuals (not in-app yet).
-          </p>
-          <a
-            href={VIRTUALS_GUIDE}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-cyan-600 dark:text-cyan-400 font-medium underline"
-          >
-            Complete guide to agent tokenization on Solana <ExternalLink size={12} />
-          </a>
-        </div>
-
-        <div className="space-y-3">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Agent / token name"
-            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400"
-          />
-          <input
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value.toUpperCase().slice(0, 12))}
-            placeholder="TICKER"
-            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 font-mono text-gray-900 dark:text-white placeholder:text-gray-400"
-          />
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="What the agent does (optional — paste into Virtuals)"
-            rows={3}
-            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-400"
-          />
-        </div>
-
-        <ol className="text-xs text-gray-500 dark:text-white/45 space-y-1.5 list-decimal pl-4">
-          <li>Open Virtuals → Launch Token</li>
-          <li>Upload logo, name, ticker</li>
-          <li>Connect wallet on Solana</li>
-        </ol>
-
-        <button
-          type="button"
-          onClick={openLaunch}
-          className="w-full min-h-[48px] bg-cyan-500 hover:bg-cyan-400 text-black font-semibold rounded-xl px-4 py-3 inline-flex items-center justify-center gap-2 touch-manipulation active:scale-[0.98]"
-        >
-          Continue on Virtuals <ExternalLink size={16} />
-        </button>
-        <p className="text-[11px] text-center text-gray-400">
-          Opens {VIRTUALS_APP.replace("https://", "")}
-          {ticker ? ` · take $${ticker} with you` : ""}
-          {name ? ` (${name})` : ""}
-        </p>
-      </div>
-    </PageTransition>
-  );
-}
-
 function JupForm({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState("");
   const [ticker, setTicker] = useState("");
@@ -1811,7 +1696,6 @@ export default function TokenPage() {
           {(style === "pump" || style === "bags") && <PumpForm style={style} onBack={() => setStyle("pick")} />}
           {style === "genesis" && <GenesisForm onBack={() => setStyle("pick")} />}
           {style === "metadao" && <MetadaoForm onBack={() => setStyle("pick")} />}
-          {style === "virtuals" && <VirtualsForm onBack={() => setStyle("pick")} />}
           {style === "jup" && <JupForm onBack={() => setStyle("pick")} />}
           {style === "launchlab" && <LaunchLabForm onBack={() => setStyle("pick")} />}
         </div>
