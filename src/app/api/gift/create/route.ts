@@ -17,8 +17,10 @@ import {
   giftAmountToBase,
   isNativeGiftToken,
   isUsdcGiftToken,
+  newGiftClaimCode,
   type GiftToken,
 } from "@/lib/gift-link";
+import { initDb, saveClaimLink } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -170,13 +172,30 @@ export async function POST(req: NextRequest) {
     const sender = new PublicKey(body.wallet);
     const { keypair: gift, secret } = createGiftKeypair();
     const isSpl = !isNativeGiftToken(token);
+    const claimCode = newGiftClaimCode();
 
     const claimUrl = buildGiftUrl(
       secret,
       network,
       typeof body.message === "string" ? body.message : undefined,
       requestOrigin(req),
+      claimCode,
     );
+
+    try {
+      await initDb();
+      await saveClaimLink({
+        publicKey: gift.publicKey.toBase58(),
+        sender: body.private === true ? "private" : body.wallet!,
+        amountLamports: Number(amountBase),
+        network,
+        token,
+        claimCode,
+        claimSecret: secret,
+      });
+    } catch {
+      /* Turso down: still return long-form URL via fallback if code missing */
+    }
 
     const { blockhash, lastValidBlockHeight } =
       await connection.getLatestBlockhash("confirmed");
@@ -270,6 +289,7 @@ export async function POST(req: NextRequest) {
           hopPubkey: hop.publicKey.toBase58(),
           giftPubkey: gift.publicKey.toBase58(),
           secret,
+          claimCode,
           claimUrl,
           amount: amountUi,
           amountLamports: amountBase,
@@ -317,6 +337,7 @@ export async function POST(req: NextRequest) {
         hopPubkey: hop.publicKey.toBase58(),
         giftPubkey: gift.publicKey.toBase58(),
         secret,
+        claimCode,
         claimUrl,
         amount: amountUi,
         amountLamports: amountBase,
@@ -356,6 +377,7 @@ export async function POST(req: NextRequest) {
       transaction: Buffer.from(serialized).toString("base64"),
       giftPubkey: gift.publicKey.toBase58(),
       secret,
+      claimCode,
       claimUrl,
       amount: amountUi,
       amountLamports: amountBase,

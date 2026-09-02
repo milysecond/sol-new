@@ -175,8 +175,8 @@ export default function DocsPage() {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Gifts</h2>
           <p>
             Create at <Link href="/gift" className="text-violet-500 hover:underline">/gift</Link>. Claim at{" "}
-            <code className="text-xs">/claim#&lt;secret&gt;</code>. The secret lives only in the URL fragment —
-            we never store it.
+            <code className="text-xs">/c/&lt;8+ chars&gt;</code>. Sender gets a short code. The claim seed is stored
+            server-side so chat apps cannot chop a hash. Incomplete codes say ask them to resend.
           </p>
           <ol className="list-decimal pl-5 space-y-1 text-xs sm:text-sm">
             <li>

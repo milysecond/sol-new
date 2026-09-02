@@ -24,7 +24,7 @@ function CreditsBuySection() {
 
   const refresh = useCallback(async () => {
     if (!publicKey) {
-      setOk(null);
+      setOk(true);
       return;
     }
     try {
@@ -161,6 +161,13 @@ function CreditsBuySection() {
     }
   };
 
+  if (!publicKey) {
+    return (
+      <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-5 text-xs text-gray-500 dark:text-white/50">
+        A$5 Apple Pay credits. Face ID below is only to receive them.
+      </div>
+    );
+  }
   if (ok === null) {
     return (
       <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-5 text-xs text-gray-500 flex items-center gap-2">
@@ -258,17 +265,35 @@ export default function GetPage() {
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
-        <ConnectGate action="get SOL">
-          <PageTransition>
+        <PageTransition>
           <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-8">
             <div className="text-center space-y-3">
               <AnimatedIcon icon={Download} size={40} className="text-purple-400" />
               <h1 className="text-3xl font-bold tracking-tight">Get funds</h1>
               <p className="text-gray-500 dark:text-white/50">
-                Receive SOL or USDC to your wallet.
+                A$5 Apple Pay, or receive SOL to your wallet.
               </p>
             </div>
 
+            <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-5 space-y-2 ring-1 ring-sky-500/10">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">A$5 / Apple Pay</p>
+              <p className="text-xs text-gray-500 dark:text-white/50 leading-relaxed">
+                Paid path when there is no sender. Face ID is only to land funds in your wallet.
+              </p>
+            </div>
+            <CrossmintFundCard />
+            <details className="rounded-xl border border-black/10 dark:border-white/10">
+              <summary className="cursor-pointer list-none px-4 py-3 text-xs font-semibold text-gray-500 dark:text-white/50 flex items-center justify-between">
+                <span>App credits (optional)</span>
+                <span className="text-[10px] font-medium text-gray-400">A$5 Stripe</span>
+              </summary>
+              <div className="px-2 pb-2">
+                <CreditsBuySection />
+              </div>
+            </details>
+
+            <ConnectGate action="get SOL">
+              <div className="space-y-8">
             {/* Your address */}
             <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-5 space-y-3">
               <p className="text-xs text-gray-500 dark:text-white/40 uppercase tracking-wider">Your address</p>
@@ -317,24 +342,8 @@ export default function GetPage() {
               </div>
             )}
 
-            {/* Crossmint Token Checkout (Apple Pay) — no USDC onramp */}
-            <CrossmintFundCard />
-
-            {/* Optional sol.new app credits (Stripe) — secondary */}
-            <details className="rounded-xl border border-black/10 dark:border-white/10 open:pb-0">
-              <summary className="cursor-pointer list-none px-4 py-3 text-xs font-semibold text-gray-500 dark:text-white/50 flex items-center justify-between">
-                <span>App credits (optional)</span>
-                <span className="text-[10px] font-medium text-gray-400">A$5 Stripe</span>
-              </summary>
-              <div className="px-2 pb-2">
-                <CreditsBuySection />
-              </div>
-            </details>
-
-            {/* MoneyGram — sandbox/test only (devnet) */}
             {network === "devnet" && <MoneyGramRampsCard />}
 
-            {/* View on explorer */}
             <a
               href={solscanUrl}
               target="_blank"
@@ -342,9 +351,10 @@ export default function GetPage() {
             >
               View on sol.new <ExternalLink className="w-3.5 h-3.5 inline ml-1" />
             </a>
+              </div>
+            </ConnectGate>
           </div>
-          </PageTransition>
-        </ConnectGate>
+        </PageTransition>
       </main>
     </div>
   );

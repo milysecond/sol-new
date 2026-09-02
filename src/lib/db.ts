@@ -394,6 +394,23 @@ export async function initDb() {
   } catch {
     // column already exists
   }
+  try {
+    await db.execute("ALTER TABLE claim_links ADD COLUMN claim_code TEXT");
+  } catch {
+    // column already exists
+  }
+  try {
+    await db.execute("ALTER TABLE claim_links ADD COLUMN claim_secret TEXT");
+  } catch {
+    // column already exists
+  }
+  try {
+    await db.execute(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_claim_links_code ON claim_links (claim_code)",
+    );
+  } catch {
+    // index already exists
+  }
   // POAP geo-lock columns (existing drops)
   for (const sql of [
     "ALTER TABLE poap_drops ADD COLUMN geo_lat REAL",
@@ -797,20 +814,46 @@ export async function getInactivePushSubscriptions(minHours: number, maxHours: n
 }
 
 // ─── Claim links (gifts) ─────────────────────────────────────────────────────
-// Status bookkeeping only — the claim secret never touches the server; funds
-// move on-chain regardless of what this table says.
-
+// Gift claim links. Short codes (sol.new/c/xxxxxxxx) store the claim seed
+// so chat apps can chop long URLs. The code is the bearer token.
 export async function saveClaimLink(data: {
   publicKey: string;
   sender: string;
   amountLamports: number; // base units of the gifted token
   network: string;
   token?: string;
+  claimCode?: string;
+  claimSecret?: string;
 }) {
   await db.execute({
-    sql: `INSERT OR IGNORE INTO claim_links (public_key, sender, amount_lamports, network, token) VALUES (?, ?, ?, ?, ?)`,
-    args: [data.publicKey, data.sender, data.amountLamports, data.network, data.token || "SOL"],
+    sql: `INSERT INTO claim_links (public_key, sender, amount_lamports, network, token, claim_code, claim_secret)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(public_key) DO UPDATE SET
+            sender = excluded.sender,
+            amount_lamports = excluded.amount_lamports,
+            network = excluded.network,
+            token = excluded.token,
+            claim_code = COALESCE(excluded.claim_code, claim_links.claim_code),
+            claim_secret = COALESCE(excluded.claim_secret, claim_links.claim_secret)`,
+    args: [
+      data.publicKey,
+      data.sender,
+      data.amountLamports,
+      data.network,
+      data.token || "SOL",
+      data.claimCode || null,
+      data.claimSecret || null,
+    ],
   });
+}
+
+export async function getClaimLinkByCode(code: string) {
+  const r = await db.execute({
+    sql: `SELECT public_key, sender, amount_lamports, network, token, status, claimed_at, created_at, claim_code, claim_secret
+          FROM claim_links WHERE claim_code = ? LIMIT 1`,
+    args: [code],
+  });
+  return r.rows[0] ?? null;
 }
 
 export async function getClaimLink(publicKey: string) {

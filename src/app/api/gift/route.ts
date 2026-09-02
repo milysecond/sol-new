@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
-import { initDb, saveClaimLink, getClaimLink, markClaimLinkClaimed } from "@/lib/db";
+import { initDb, saveClaimLink, getClaimLink, getClaimLinkByCode, markClaimLinkClaimed } from "@/lib/db";
 import { notifyEvent } from "@/lib/notify";
 
 const recentIPs = new Map<string, number[]>();
@@ -73,6 +73,24 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     await initDb();
+    const code = (req.nextUrl.searchParams.get("code") || "").trim();
+    if (code) {
+      if (!/^[A-Za-z0-9]{8,16}$/.test(code)) {
+        return NextResponse.json({ found: false, truncated: code.length > 0 && code.length < 8 });
+      }
+      const row = await getClaimLinkByCode(code);
+      if (!row) return NextResponse.json({ found: false });
+      const secret = (row as { claim_secret?: string | null }).claim_secret || null;
+      const claimed = row.status === "claimed" || row.status === "reclaimed";
+      return NextResponse.json({
+        found: true,
+        publicKey: row.public_key,
+        status: row.status,
+        network: row.network,
+        token: (row as { token?: string }).token || "SOL",
+        secret: claimed ? null : secret,
+      });
+    }
     const pk = req.nextUrl.searchParams.get("pk");
     if (!isPubkeyish(pk)) {
       return NextResponse.json({ error: "Invalid pk" }, { status: 400 });

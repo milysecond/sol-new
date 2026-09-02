@@ -14,6 +14,7 @@ const GUARD_MS = 12_000;
  */
 const DEEP_PREFIXES = [
   "/claim",
+  "/c/",
   "/link/",
   "/l/",
   "/gift",
