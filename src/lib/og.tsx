@@ -107,6 +107,7 @@ export async function featureOgImage(opts: {
   accent?: OgAccent;
   /** Small path shown under brand, e.g. sol.new/token */
   path?: string;
+  stats?: { label: string; value: string }[];
 }) {
   const accent = ACCENTS[opts.accent || "purple"];
   const [logo, fonts] = await Promise.all([fetchLogo(), loadFonts()]);
@@ -299,6 +300,54 @@ export async function featureOgImage(opts: {
             >
               {opts.subtitle}
             </div>
+            {opts.stats && opts.stats.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  gap: 16,
+                  marginTop: 28,
+                }}
+              >
+                {opts.stats.map((s) => (
+                  <div
+                    key={s.label}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      padding: "14px 22px",
+                      borderRadius: 16,
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: "rgba(255,255,255,0.04)",
+                      minWidth: 180,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        fontSize: 14,
+                        fontWeight: 700,
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
+                        color: accent.label,
+                      }}
+                    >
+                      {s.label}
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        fontSize: 28,
+                        fontWeight: 800,
+                        letterSpacing: "-0.03em",
+                        marginTop: 6,
+                      }}
+                    >
+                      {s.value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Footer */}
