@@ -1,10 +1,10 @@
 /**
- * Raydium LaunchLab create (browser). Dynamic-imported from the token form
- * so the Cloudflare Worker never packs @raydium-io/raydium-sdk-v2.
- * JustSendit-style: SOL quote, 85 SOL raise, create-only (no dev buy).
+ * Raydium LaunchLab create (browser only).
+ * Dynamic-import the SDK so the Cloudflare Worker never packs it.
  */
+"use client";
+
 import { Connection, Keypair } from "@solana/web3.js";
-import { Raydium, TxVersion, LAUNCHPAD_PROGRAM, LAUNCHPAD_CONFIG } from "@raydium-io/raydium-sdk-v2";
 import BN from "bn.js";
 
 export async function createLaunchLabTx(opts: {
@@ -14,6 +14,8 @@ export async function createLaunchLabTx(opts: {
   symbol: string;
   uri: string;
 }): Promise<{ mint: string; signature: string }> {
+  const sdk = await import("@raydium-io/raydium-sdk-v2");
+  const { Raydium, TxVersion, LAUNCHPAD_PROGRAM, LAUNCHPAD_CONFIG } = sdk;
   const mint = Keypair.generate();
   const raydium = await Raydium.load({
     owner: opts.owner,

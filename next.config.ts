@@ -87,6 +87,13 @@ const nextConfig: NextConfig = {
       { source: "/.well-known/assetlinks.json", headers: json },
     ];
   },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push("@raydium-io/raydium-sdk-v2");
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

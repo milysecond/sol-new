@@ -34,7 +34,8 @@ for (const p of walk(path.join(root, "server-functions"))) {
     p.includes(`${path.sep}node_modules${path.sep}@lightprotocol`) ||
     p.includes(`${path.sep}node_modules${path.sep}privacycash`) ||
     p.includes(`${path.sep}node_modules${path.sep}snarkjs`) ||
-    p.includes(`${path.sep}node_modules${path.sep}ffjavascript`)
+    p.includes(`${path.sep}node_modules${path.sep}ffjavascript`) ||
+    p.includes(`${path.sep}node_modules${path.sep}@raydium-io`)
   ) {
     const parts = p.split(`${path.sep}node_modules${path.sep}`);
     if (parts.length >= 2) {
@@ -62,12 +63,12 @@ if (fs.existsSync(handler)) {
   let t = fs.readFileSync(handler, "utf8");
   const before = t.length;
   t = t.replace(
-    /import\(["'][^"']*(?:@lightprotocol|privacycash|snarkjs|ffjavascript|index_browser_fat|hasher_wasm|light_wasm)[^"']*["']\)/g,
-    'Promise.reject(new Error("ZK stack is browser-only"))',
+    /import\(["'][^"']*(?:@lightprotocol|privacycash|snarkjs|ffjavascript|@raydium-io|index_browser_fat|hasher_wasm|light_wasm)[^"']*["']\)/g,
+    'Promise.reject(new Error("heavy SDK is browser-only"))',
   );
   t = t.replace(
-    /require\(["'][^"']*(?:@lightprotocol|privacycash|snarkjs|ffjavascript)[^"']*["']\)/g,
-    '(() => { throw new Error("ZK stack is browser-only") })()',
+    /require\(["'][^"']*(?:@lightprotocol|privacycash|snarkjs|ffjavascript|@raydium-io)[^"']*["']\)/g,
+    '(() => { throw new Error("heavy SDK is browser-only") })()',
   );
   fs.writeFileSync(handler, t);
   console.log("patched handler.mjs", before, "->", t.length);
