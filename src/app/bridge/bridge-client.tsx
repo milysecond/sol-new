@@ -20,8 +20,8 @@ export default function BridgePage() {
   const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
-    if (publicKey && !dest) setDest(publicKey);
-  }, [publicKey, dest]);
+    if (publicKey) setDest(publicKey);
+  }, [publicKey]);
 
   const load = useCallback(async (address: string) => {
     setBusy(true);
