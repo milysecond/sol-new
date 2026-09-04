@@ -14,7 +14,8 @@ export async function createLaunchLabTx(opts: {
   symbol: string;
   uri: string;
 }): Promise<{ mint: string; signature: string }> {
-  const sdk = await import("@raydium-io/raydium-sdk-v2");
+  const spec = "@" + "raydium-io/raydium-sdk-v2";
+  const sdk = await import(/* webpackIgnore: true */ spec);
   const { Raydium, TxVersion, LAUNCHPAD_PROGRAM, LAUNCHPAD_CONFIG } = sdk;
   const mint = Keypair.generate();
   const raydium = await Raydium.load({
