@@ -621,7 +621,7 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { publicKey, refreshBalance } = useWallet();
-  const { rpc, network } = useNetwork();
+  const { rpc, network, rotateDevnetRpc } = useNetwork();
 
   const acceptImage = useCallback((file: File) => {
     setImageFile(file);
@@ -664,8 +664,22 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
       const tx = Transaction.from(Buffer.from(data.tx, "base64"));
       tx.partialSign(userKeypair);
 
-      const connection = new Connection(rpc, "confirmed");
-      const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
+      let connection = new Connection(rpc, "confirmed");
+      let sig: string;
+      try {
+        sig = await connection.sendRawTransaction(tx.serialize(), {
+          skipPreflight: network === "devnet",
+          maxRetries: 3,
+        });
+      } catch (sendErr) {
+        const msg = sendErr instanceof Error ? sendErr.message : String(sendErr);
+        if (!/Blockhash not found|block height exceeded/i.test(msg)) throw sendErr;
+        connection = new Connection(network === "devnet" ? rotateDevnetRpc() : rpc, "confirmed");
+        sig = await connection.sendRawTransaction(tx.serialize(), {
+          skipPreflight: true,
+          maxRetries: 3,
+        });
+      }
 
       setStatus("confirming");
       await connection.confirmTransaction(
@@ -702,7 +716,7 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
       router.push(network === "devnet" ? `/address/${data.mint}` : `/launch/${data.mint}`);
     } catch (e: unknown) {
       analytics.launchFailed(ticker, String(e).slice(0, 120));
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendlyError(e instanceof Error ? e.message : String(e)));
       setStatus("error");
     }
   };
