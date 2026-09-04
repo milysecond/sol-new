@@ -92,7 +92,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { publicKey, refreshBalance } = useWallet();
-  const { rpc, rotateMainnetRpc } = useNetwork();
+  const { rpc, network, rotateMainnetRpc } = useNetwork();
 
   const acceptImage = useCallback((file: File) => {
     setImageFile(file);
@@ -121,7 +121,13 @@ function CreateModal({ onClose }: { onClose: () => void }) {
       const res = await fetch("/api/launch/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, symbol: ticker, metadataUri: metadata.uri, creatorWallet: publicKey }),
+        body: JSON.stringify({
+          name,
+          symbol: ticker,
+          metadataUri: metadata.uri,
+          creatorWallet: publicKey,
+          network,
+        }),
       });
       const data = await res.json() as { ok?: boolean; tx?: string; mint?: string; blockhash?: string; lastValidBlockHeight?: number; error?: string };
       if (!data.ok || !data.tx || !data.mint) throw new Error(data.error ?? "Failed to build transaction");
@@ -153,11 +159,20 @@ function CreateModal({ onClose }: { onClose: () => void }) {
       await fetch("/api/token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet: publicKey, name, symbol: ticker, description, imageUrl, metadataUri: metadata.uri, mintAddress: data.mint, network: "mainnet" }),
+        body: JSON.stringify({
+          wallet: publicKey,
+          name,
+          symbol: ticker,
+          description,
+          imageUrl,
+          metadataUri: metadata.uri,
+          mintAddress: data.mint,
+          network,
+        }),
       }).catch(() => {});
 
       await refreshBalance();
-      router.push(`/launch/${data.mint}`);
+      router.push(network === "devnet" ? `/address/${data.mint}` : `/launch/${data.mint}`);
       onClose();
     } catch (e: unknown) {
       const raw = e instanceof Error ? e.message : String(e);
