@@ -41,6 +41,7 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
     links: [
       { label: "your wallet", href: "/wallet" },
       { label: "get funds", href: "/get" },
+      { label: "bridge USDC", href: "/bridge" },
       { label: "send a gift link", href: "/gift" },
       { label: "pay / scan & pay", href: "/pay" },
       { label: "point of sale", href: "/pos" },
