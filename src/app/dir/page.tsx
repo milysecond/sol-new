@@ -51,6 +51,7 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
       { label: "find wallet", href: "/wallet/find" },
       { label: "earn USDC", href: "/earn" },
       { label: "lend & borrow", href: "/loan" },
+      { label: "lock tokens", href: "/lock" },
       { label: "swap tokens", href: "/swap" },
       { label: "stake SOL", href: "/stake" },
       { label: "liquid stake", href: "/lst" },

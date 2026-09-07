@@ -32,6 +32,7 @@ import {
   LineChart,
   Landmark,
   ArrowLeftRight,
+  Lock,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -72,6 +73,7 @@ const SECTIONS: Section[] = [
       { href: "/burn", title: "Burn / reclaim", blurb: "Close empty token accounts, reclaim SOL rent.", icon: Flame },
       { href: "/earn", title: "Earn", blurb: "Protected USDC yield. Deposit and withdraw with Face ID.", icon: TrendingUp },
       { href: "/loan", title: "Loan", blurb: "Supply assets to earn, or borrow against collateral.", icon: Landmark },
+      { href: "/lock", title: "Lock", blurb: "Cliff unlock on Jupiter Lock. No protocol fee.", icon: Lock },
       { href: "/swap", title: "Swap", blurb: "Trade SOL, USDC, and any token with Face ID.", icon: ArrowLeftRight },
       { href: "/stake", title: "Stake SOL", blurb: "Native validator staking. Delegate, deactivate, withdraw.", icon: TrendingUp },
       { href: "/lst", title: "Liquid stake", blurb: "LSTs: jitoSOL, mSOL, INF, and more.", icon: TrendingUp },
