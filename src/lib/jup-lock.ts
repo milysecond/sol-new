@@ -23,50 +23,69 @@ export const MEMO_PROGRAM = new PublicKey(
   "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
 );
 
-const CREATE_V2 = Buffer.from([181, 155, 104, 183, 182, 128, 35, 47]);
-const CLAIM_V2 = Buffer.from([229, 87, 46, 162, 21, 157, 231, 114]);
-const CREATE_META = Buffer.from([93, 78, 33, 103, 173, 125, 70, 0]);
-/** Anchor disc for VestingEscrow — GPA memcmp base58 */
+const CREATE_V2 = u8a([181, 155, 104, 183, 182, 128, 35, 47]);
+const CLAIM_V2 = u8a([229, 87, 46, 162, 21, 157, 231, 114]);
+const CREATE_META = u8a([93, 78, 33, 103, 173, 125, 70, 0]);
+/** Anchor disc for VestingEscrow - GPA memcmp base58 */
 export const ESCROW_DISC_B58 = "hteFiUjrzUz";
 
-function u64le(n: bigint | number): Buffer {
-  const b = Buffer.alloc(8);
-  b.writeBigUInt64LE(BigInt(n));
+function u8a(n: number[]): Uint8Array {
+  return Uint8Array.from(n);
+}
+function concat(parts: Uint8Array[]): Uint8Array {
+  const len = parts.reduce((a, p) => a + p.length, 0);
+  const out = new Uint8Array(len);
+  let o = 0;
+  for (const p of parts) {
+    out.set(p, o);
+    o += p.length;
+  }
+  return out;
+}
+function u64le(n: bigint | number): Uint8Array {
+  const b = new Uint8Array(8);
+  new DataView(b.buffer).setBigUint64(0, BigInt(n), true);
   return b;
 }
-function u32le(n: number): Buffer {
-  const b = Buffer.alloc(4);
-  b.writeUInt32LE(n);
+function u32le(n: number): Uint8Array {
+  const b = new Uint8Array(4);
+  new DataView(b.buffer).setUint32(0, n >>> 0, true);
   return b;
 }
-function u8(n: number): Buffer {
-  return Buffer.from([n & 0xff]);
+function u8(n: number): Uint8Array {
+  return Uint8Array.of(n & 0xff);
 }
-function borshStr(s: string): Buffer {
-  const raw = Buffer.from(s, "utf8");
-  return Buffer.concat([u32le(raw.length), raw]);
+function borshStr(s: string): Uint8Array {
+  const raw = new TextEncoder().encode(s);
+  return concat([u32le(raw.length), raw]);
+}
+function readU64le(data: Uint8Array, o: number): bigint {
+  const view = new DataView(data.buffer, data.byteOffset + o, 8);
+  return view.getBigUint64(0, true);
 }
 
 /** Option::Some(RemainingAccountsInfo { slices: [] }) */
-const REMAINING_NONE_SOME_EMPTY = Buffer.from([1, 0, 0, 0, 0]);
+const REMAINING_NONE_SOME_EMPTY = u8a([1, 0, 0, 0, 0]);
+
+const utf8 = (s: string) => new TextEncoder().encode(s);
 
 export function eventAuthorityPda(): PublicKey {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("__event_authority")],
+    [utf8("__event_authority")],
     JUP_LOCK_PROGRAM,
   )[0];
 }
 
 export function escrowPda(base: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("escrow"), base.toBuffer()],
+    [utf8("escrow"), base.toBuffer()],
     JUP_LOCK_PROGRAM,
   );
 }
 
 export function escrowMetadataPda(escrow: PublicKey): PublicKey {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("escrow_metadata"), escrow.toBuffer()],
+    [utf8("escrow_metadata"), escrow.toBuffer()],
     JUP_LOCK_PROGRAM,
   )[0];
 }
@@ -93,7 +112,7 @@ export type ParsedLock = {
   claimableAmount: string;
 };
 
-export function parseVestingEscrow(pubkey: PublicKey, data: Buffer): ParsedLock | null {
+export function parseVestingEscrow(pubkey: PublicKey, data: Uint8Array): ParsedLock | null {
   if (data.length < 8 + 32 * 4 + 8 + 8 * 9) return null;
   let o = 8;
   const recipient = new PublicKey(data.subarray(o, o + 32)); o += 32;
@@ -105,14 +124,14 @@ export function parseVestingEscrow(pubkey: PublicKey, data: Buffer): ParsedLock 
   const cancelMode = data[o]; o += 1;
   const tokenProgramFlag = data[o]; o += 1;
   o += 4; // padding0
-  const cliffTime = Number(data.readBigUInt64LE(o)); o += 8;
-  const frequency = Number(data.readBigUInt64LE(o)); o += 8;
-  const cliffUnlockAmount = data.readBigUInt64LE(o); o += 8;
-  const amountPerPeriod = data.readBigUInt64LE(o); o += 8;
-  const numberOfPeriod = Number(data.readBigUInt64LE(o)); o += 8;
-  const totalClaimedAmount = data.readBigUInt64LE(o); o += 8;
-  const vestingStartTime = Number(data.readBigUInt64LE(o)); o += 8;
-  const cancelledAt = Number(data.readBigUInt64LE(o)); o += 8;
+  const cliffTime = Number(readU64le(data, o)); o += 8;
+  const frequency = Number(readU64le(data, o)); o += 8;
+  const cliffUnlockAmount = readU64le(data, o); o += 8;
+  const amountPerPeriod = readU64le(data, o); o += 8;
+  const numberOfPeriod = Number(readU64le(data, o)); o += 8;
+  const totalClaimedAmount = readU64le(data, o); o += 8;
+  const vestingStartTime = Number(readU64le(data, o)); o += 8;
+  const cancelledAt = Number(readU64le(data, o)); o += 8;
 
   const now = Math.floor(Date.now() / 1000);
   let unlocked = BigInt(0);
@@ -182,7 +201,7 @@ export function buildCreateLockIxs(opts: {
   const now = Math.floor(Date.now() / 1000);
   const cliff = Math.max(opts.cliffUnix, now);
 
-  const params = Buffer.concat([
+  const params = concat([
     u64le(now),
     u64le(cliff),
     u64le(1), // frequency 1s (unused when amountPerPeriod = 0)
@@ -192,7 +211,7 @@ export function buildCreateLockIxs(opts: {
     u8(0), // update recipient: none
     u8(1), // cancel: creator only
   ]);
-  const data = Buffer.concat([CREATE_V2, params, REMAINING_NONE_SOME_EMPTY]);
+  const data = concat([CREATE_V2, params, REMAINING_NONE_SOME_EMPTY]);
 
   const ixs: TransactionInstruction[] = [
     createAssociatedTokenAccountIdempotentInstruction(
@@ -224,13 +243,13 @@ export function buildCreateLockIxs(opts: {
         { pubkey: eventAuth, isSigner: false, isWritable: false },
         { pubkey: JUP_LOCK_PROGRAM, isSigner: false, isWritable: false },
       ],
-      data,
+      data: Buffer.from(data),
     }),
   ];
 
   const title = (opts.title || "Lock").slice(0, 64);
   const meta = escrowMetadataPda(escrow);
-  const metaData = Buffer.concat([
+  const metaData = concat([
     CREATE_META,
     borshStr(title),
     borshStr(title),
@@ -247,7 +266,7 @@ export function buildCreateLockIxs(opts: {
         { pubkey: opts.payer, isSigner: true, isWritable: true },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
-      data: metaData,
+      data: Buffer.from(metaData),
     }),
   );
 
@@ -275,7 +294,7 @@ export function buildClaimIx(opts: {
     false,
     tokenProgram,
   );
-  const data = Buffer.concat([
+  const data = concat([
     CLAIM_V2,
     u64le(opts.maxAmount),
     REMAINING_NONE_SOME_EMPTY,
@@ -293,7 +312,7 @@ export function buildClaimIx(opts: {
       { pubkey: eventAuthorityPda(), isSigner: false, isWritable: false },
       { pubkey: JUP_LOCK_PROGRAM, isSigner: false, isWritable: false },
     ],
-    data,
+    data: Buffer.from(data),
   });
 }
 
