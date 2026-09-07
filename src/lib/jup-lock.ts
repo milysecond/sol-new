@@ -115,7 +115,7 @@ export function parseVestingEscrow(pubkey: PublicKey, data: Buffer): ParsedLock 
   const cancelledAt = Number(data.readBigUInt64LE(o)); o += 8;
 
   const now = Math.floor(Date.now() / 1000);
-  let unlocked = 0n;
+  let unlocked = BigInt(0);
   if (cancelledAt === 0 && now >= cliffTime) {
     unlocked += cliffUnlockAmount;
     if (frequency > 0 && numberOfPeriod > 0) {
@@ -125,7 +125,7 @@ export function parseVestingEscrow(pubkey: PublicKey, data: Buffer): ParsedLock 
     }
   }
   const claimed = totalClaimedAmount;
-  const claimable = unlocked > claimed ? unlocked - claimed : 0n;
+  const claimable = unlocked > claimed ? unlocked - claimed : BigInt(0);
 
   return {
     address: pubkey.toBase58(),
