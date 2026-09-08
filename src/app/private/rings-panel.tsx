@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { FlaskConical, Shield } from "lucide-react";
 import { Spinner } from "@/components/spinner";
 import { useNetwork } from "@/lib/network";
 
-type RingRow = {
-  programId: string;
-  paused: boolean;
-};
+/** Shielded pool that registers Helius Rings (from @heliuslabs/zolana). */
+const SHIELDED_POOL = "sppXZU59VoYodv9Accs4hHNTjYiuYmDFyFVjUjPxFsG";
+
+type RingRow = { address: string };
 
 export function RingsPanel() {
   const { network, rpc, toggle } = useNetwork();
@@ -20,15 +21,12 @@ export function RingsPanel() {
     setBusy(true);
     setError(null);
     try {
-      const zolana = await import("@heliuslabs/zolana");
-      const client = await zolana.createZolanaClient({ solanaRpcUrl: rpc });
-      const list = await zolana.listRegisteredRings(client);
-      setRings(
-        list.map((r) => ({
-          programId: String(r.programId),
-          paused: Boolean(r.paused),
-        })),
-      );
+      const conn = new Connection(rpc, "confirmed");
+      const pid = new PublicKey(SHIELDED_POOL);
+      const accs = await conn.getProgramAccounts(pid, {
+        dataSlice: { offset: 0, length: 0 },
+      });
+      setRings(accs.slice(0, 24).map((a) => ({ address: a.pubkey.toBase58() })));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setRings([]);
@@ -50,7 +48,8 @@ export function RingsPanel() {
           <p className="font-semibold text-sm">Helius Rings</p>
           <p className="text-xs text-gray-500 dark:text-white/45 leading-relaxed">
             Confidential transfers on Solana. Amount and asset encrypted. Sender and recipient stay
-            public. Live on <strong>devnet</strong> while audits finish. SDK @heliuslabs/zolana.
+            public. Devnet while audits finish. Pool {SHIELDED_POOL.slice(0, 8)}... SDK
+            @heliuslabs/zolana (Node, not in this Worker).
           </p>
         </div>
       </div>
@@ -80,29 +79,26 @@ export function RingsPanel() {
           >
             {busy ? (
               <span className="inline-flex items-center gap-2 justify-center">
-                <Spinner size={16} /> Loading rings
+                <Spinner size={16} /> Loading pool
               </span>
             ) : (
-              "Refresh registered rings"
+              "Refresh ring pool"
             )}
           </button>
-          {error && (
-            <p className="text-xs text-red-400 break-words">
-              Rings SDK could not talk to this RPC yet. {error.slice(0, 240)}
-            </p>
-          )}
+          {error && <p className="text-xs text-red-400 break-words">{error.slice(0, 240)}</p>}
           {rings && rings.length === 0 && !error && (
-            <p className="text-xs text-gray-400">No rings registered on this pool yet.</p>
+            <p className="text-xs text-gray-400">No accounts on the shielded pool yet.</p>
           )}
           {rings && rings.length > 0 && (
             <ul className="space-y-2">
               {rings.map((r) => (
                 <li
-                  key={r.programId}
+                  key={r.address}
                   className="rounded-xl border border-black/10 dark:border-white/10 px-3 py-2 text-xs font-mono break-all"
                 >
-                  {r.programId}
-                  {r.paused ? " (paused)" : ""}
+                  <a href={`/address/${r.address}`} className="text-cyan-500 hover:underline">
+                    {r.address}
+                  </a>
                 </li>
               ))}
             </ul>
