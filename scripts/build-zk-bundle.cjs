@@ -88,6 +88,35 @@ function buildOne(t) {
 
 for (const t of targets) buildOne(t);
 
+// Helius Rings browser bundle (devnet confidential transfers)
+{
+  const outfile = path.join(outDir, "helius-rings.js");
+  console.log("build:zk rings", path.relative(root, outfile));
+  execFileSync(
+    "npx",
+    [
+      "esbuild",
+      path.join(root, "scripts/rings-entry.js"),
+      "--bundle",
+      "--format=esm",
+      "--platform=browser",
+      "--target=es2022",
+      `--outfile=${outfile}`,
+      "--alias:crypto=crypto-browserify",
+      "--alias:stream=stream-browserify",
+      "--alias:events=events",
+      "--alias:buffer=buffer",
+      "--define:global=globalThis",
+      "--loader:.wasm=file",
+      "--asset-names=[name]",
+      "--public-path=/zk/",
+      "--main-fields=browser,module,main",
+      `--inject:${shim}`,
+    ],
+    { stdio: "inherit", cwd: root },
+  );
+}
+
 // wasm siblings
 const wasmSrc = path.join(
   root,
