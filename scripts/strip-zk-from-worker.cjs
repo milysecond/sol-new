@@ -35,7 +35,8 @@ for (const p of walk(path.join(root, "server-functions"))) {
     p.includes(`${path.sep}node_modules${path.sep}privacycash`) ||
     p.includes(`${path.sep}node_modules${path.sep}snarkjs`) ||
     p.includes(`${path.sep}node_modules${path.sep}ffjavascript`) ||
-    p.includes(`${path.sep}node_modules${path.sep}@raydium-io`)
+    p.includes(`${path.sep}node_modules${path.sep}@raydium-io`) ||
+    p.includes(`${path.sep}node_modules${path.sep}@heliuslabs`)
   ) {
     const parts = p.split(`${path.sep}node_modules${path.sep}`);
     if (parts.length >= 2) {
@@ -63,11 +64,11 @@ if (fs.existsSync(handler)) {
   let t = fs.readFileSync(handler, "utf8");
   const before = t.length;
   t = t.replace(
-    /import\(["'][^"']*(?:@lightprotocol|privacycash|snarkjs|ffjavascript|@raydium-io|index_browser_fat|hasher_wasm|light_wasm)[^"']*["']\)/g,
+    /import\(["'][^"']*(?:@lightprotocol|privacycash|snarkjs|ffjavascript|@raydium-io|@heliuslabs|index_browser_fat|hasher_wasm|light_wasm)[^"']*["']\)/g,
     'Promise.reject(new Error("heavy SDK is browser-only"))',
   );
   t = t.replace(
-    /require\(["'][^"']*(?:@lightprotocol|privacycash|snarkjs|ffjavascript|@raydium-io)[^"']*["']\)/g,
+    /require\(["'][^"']*(?:@lightprotocol|privacycash|snarkjs|ffjavascript|@raydium-io|@heliuslabs)[^"']*["']\)/g,
     '(() => { throw new Error("heavy SDK is browser-only") })()',
   );
   fs.writeFileSync(handler, t);

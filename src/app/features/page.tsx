@@ -33,6 +33,7 @@ import {
   Landmark,
   ArrowLeftRight,
   Lock,
+  EyeOff,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -65,6 +66,7 @@ const SECTIONS: Section[] = [
     intro: "Passkey-secured Solana. No seed phrase, no install.",
     items: [
       { href: "/wallet", title: "Wallet", blurb: "Create or recover with Face ID / fingerprint.", icon: Wallet },
+      { href: "/private", title: "Private", blurb: "Privacy Cash ZK and Helius Rings. Also /anon and /prv8.", icon: EyeOff },
       { href: "/get", title: "Get funds", blurb: "A$5 Apple Pay, or receive on-chain.", icon: Coins },
       { href: "/bridge", title: "Bridge", blurb: "USDC from Base, Arbitrum, Ethereum, or Sui via GUM.", icon: ArrowLeftRight },
       { href: "/wallet/send", title: "Send", blurb: "Transfer from your passkey wallet.", icon: ArrowUpRight },

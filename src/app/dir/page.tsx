@@ -40,6 +40,7 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
     section: "money",
     links: [
       { label: "your wallet", href: "/wallet" },
+      { label: "private / anon / prv8", href: "/private" },
       { label: "get funds", href: "/get" },
       { label: "bridge USDC", href: "/bridge" },
       { label: "send a gift link", href: "/gift" },

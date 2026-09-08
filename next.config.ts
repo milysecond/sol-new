@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: [
     "privacycash",
     "@lightprotocol/hasher.rs",
+    "@heliuslabs/zolana",
     "three",
     "gsap",
     "canvas-confetti",
@@ -91,6 +92,7 @@ const nextConfig: NextConfig = {
     if (isServer) {
       config.externals = config.externals || [];
       config.externals.push("@raydium-io/raydium-sdk-v2");
+      config.externals.push("@heliuslabs/zolana");
     }
     return config;
   },
