@@ -1,5 +1,5 @@
 "use client";
-import { Coins, Rocket, Info, X, ArrowLeft, Users, Vote, Dog, Sparkles, Layers } from "lucide-react";
+import { Coins, Rocket, Info, X, ArrowLeft, Users, Vote, Dog, Sparkles, Layers, TrendingUp } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { PageTransition } from "@/components/page-transition";
 
@@ -21,13 +21,14 @@ import { TOKEN_LAUNCH_PRICES, tokenLaunchCostLabel } from "@/lib/token-launch-pr
 import dynamic from "next/dynamic";
 
 const LaunchLabForm = dynamic(() => import("./launchlab-form"), { ssr: false });
+const StonkForm = dynamic(() => import("./stonk-form"), { ssr: false });
 
 const DBC_PARTNER_CONFIG_MAINNET = new PublicKey("8G4yr6Q7wHvpRBGj1u9ZisY9Q95HNAxBQknaqUNanpvA");
 const DBC_PARTNER_CONFIG_DEVNET = new PublicKey("QfakkckSG6L7hkuxiDQRWF7AW26MmrxBqgvMMmMzc3H");
 const dbcPartnerConfig = (network: string) =>
   network === "devnet" ? DBC_PARTNER_CONFIG_DEVNET : DBC_PARTNER_CONFIG_MAINNET;
 
-type Style = "pick" | "meteora" | "genesis" | "pump" | "bags" | "metadao" | "bonkfun" | "jup" | "launchlab";
+type Style = "pick" | "meteora" | "genesis" | "pump" | "bags" | "metadao" | "bonkfun" | "jup" | "launchlab" | "stonk";
 
 // ─── Style picker ─────────────────────────────────────────────────────────────
 
@@ -141,6 +142,24 @@ const STYLE_OPTIONS: {
       website: "raydium.io",
       twitter: "@RaydiumProtocol",
       outcome: "LaunchLab tokens graduate to Raydium CPMM once the SOL target is hit.",
+    },
+  },
+  {
+    key: "stonk",
+    label: "Stonk",
+    subtitle: "stonkfun.xyz quote pair",
+    detail: "Launch vs NVDAx, SPYx, SOL, or another mint. StonkFun public API. Passkey signs the fee.",
+    cost: tokenLaunchCostLabel("stonk"),
+    icon: <TrendingUp size={22} />,
+    accent: "green",
+    example: {
+      name: "STONK",
+      ticker: "STONK",
+      image: "/examples/jup.svg",
+      description: "StonkFun launchpad token.",
+      website: "stonkfun.xyz",
+      twitter: "@launchonsf",
+      outcome: "Quoted against tokenized stocks and other mints on LaunchLab.",
     },
   },
   {
@@ -1641,6 +1660,7 @@ export default function TokenPage() {
           {style === "metadao" && <MetadaoForm onBack={() => setStyle("pick")} />}
           {style === "jup" && <JupForm onBack={() => setStyle("pick")} />}
           {style === "launchlab" && <LaunchLabForm onBack={() => setStyle("pick")} />}
+          {style === "stonk" && <StonkForm onBack={() => setStyle("pick")} />}
         </div>
       </main>
     </div>

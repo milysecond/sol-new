@@ -90,6 +90,7 @@ const SECTIONS: Section[] = [
     intro: "Ship tokens, NFTs, and shared wallets in minutes.",
     items: [
       { href: "/token", title: "Token", blurb: "Launch an SPL token with a bonding curve.", icon: Coins },
+      { href: "/stonk", title: "StonkFun", blurb: "Launch vs stocks, SOL, or another mint on stonkfun.xyz.", icon: TrendingUp },
       { href: "/nft", title: "Mint NFT", blurb: "Image to NFT - standard or compressed.", icon: Image },
       { href: "/multisig", title: "Multisig", blurb: "Shared wallet with multiple signers.", icon: ShieldCheck },
       { href: "/launch", title: "Live launches", blurb: "Browse recent token launches.", icon: Rocket },

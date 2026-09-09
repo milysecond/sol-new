@@ -140,6 +140,16 @@ export const NAV_ITEMS: NavItem[] = [
     home: true,
   },
   {
+    href: "/stonk",
+    label: "Stonk",
+    title: "StonkFun",
+    desc: "Launch vs stocks or SOL",
+    icon: TrendingUp,
+    color: "text-emerald-500 dark:text-emerald-400",
+    category: "create",
+    home: true,
+  },
+  {
     href: "/nft",
     label: "Mint NFT",
     title: "NFT",
