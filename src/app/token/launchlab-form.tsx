@@ -13,6 +13,7 @@ import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { analytics } from "@/lib/analytics";
 import { friendlyError } from "@/lib/friendly-errors";
+import { TokenSocials, useTokenSocials } from "@/components/token-socials";
 
 const ac = {
   text: "text-indigo-400",
@@ -25,9 +26,7 @@ export default function LaunchLabForm({ onBack }: { onBack: () => void }) {
   const [description, setDescription] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [twitter, setTwitter] = useState("");
-  const [telegram, setTelegram] = useState("");
-  const [website, setWebsite] = useState("");
+  const socials = useTokenSocials();
   const [status, setStatus] = useState<
     "idle" | "auth" | "uploading" | "creating" | "confirming" | "done" | "error"
   >("idle");
@@ -52,16 +51,12 @@ export default function LaunchLabForm({ onBack }: { onBack: () => void }) {
       const { keypair: userKeypair } = await getPasskeyKeypair();
       setStatus("uploading");
       const uploaded = await uploadImage(imageFile);
-      const socials: Record<string, string> = {};
-      if (twitter) socials.twitter = twitter;
-      if (telegram) socials.telegram = telegram;
-      if (website) socials.website = website;
       const metadata = await uploadMetadata({
         name,
         symbol: ticker,
         description,
         image: uploaded.url,
-        ...socials,
+        ...socials.filled,
       });
       setStatus("creating");
       const { createLaunchLabTx } = await import("@/lib/launchlab");
@@ -165,23 +160,7 @@ export default function LaunchLabForm({ onBack }: { onBack: () => void }) {
             }}
             className="sr-only"
           />
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { key: "twitter", placeholder: "X / Twitter", value: twitter, set: setTwitter },
-              { key: "telegram", placeholder: "Telegram", value: telegram, set: setTelegram },
-              { key: "website", placeholder: "Website", value: website, set: setWebsite },
-            ].map(({ key, placeholder, value, set }) => (
-              <input
-                key={key}
-                type="text"
-                placeholder={placeholder}
-                value={value}
-                onChange={(e) => set(e.target.value)}
-                disabled={busy}
-                className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 text-xs disabled:opacity-50"
-              />
-            ))}
-          </div>
+          <TokenSocials socials={socials} accent="indigo" disabled={busy} />
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">{error}</div>
           )}

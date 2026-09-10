@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, TrendingUp } from "lucide-react";
 import { Transaction } from "@solana/web3.js";
@@ -13,6 +13,7 @@ import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { analytics } from "@/lib/analytics";
 import { friendlyError } from "@/lib/friendly-errors";
 import { extractPairs, type StonkPair } from "@/lib/stonkfun";
+import { TokenSocials, useTokenSocials } from "@/components/token-socials";
 
 const ac = {
   text: "text-emerald-400",
@@ -38,11 +39,10 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
   const [description, setDescription] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [twitter, setTwitter] = useState("");
-  const [telegram, setTelegram] = useState("");
-  const [website, setWebsite] = useState("");
+  const socials = useTokenSocials();
   const [pairs, setPairs] = useState<StonkPair[]>([]);
   const [pairsBusy, setPairsBusy] = useState(true);
+  const [pairQ, setPairQ] = useState("");
   const [quoteMint, setQuoteMint] = useState("");
   const [status, setStatus] = useState<
     "idle" | "auth" | "preparing" | "signing" | "submitting" | "done" | "error"
@@ -99,6 +99,19 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
     };
   }, []);
 
+  const filteredPairs = useMemo(() => {
+    const q = pairQ.trim().toLowerCase();
+    if (!q) return pairs;
+    return pairs.filter(
+      (p) =>
+        p.symbol.toLowerCase().includes(q) ||
+        (p.name || "").toLowerCase().includes(q) ||
+        p.mint.toLowerCase().includes(q),
+    );
+  }, [pairs, pairQ]);
+
+  const selectedPair = pairs.find((p) => p.mint === quoteMint);
+
   const handleLaunch = async () => {
     if (!name || !ticker || !imageFile || !publicKey || !quoteMint) return;
     if (network !== "mainnet") {
@@ -123,9 +136,7 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
           mode: "standard",
           logo,
           ...(description ? { description } : {}),
-          ...(twitter ? { twitter } : {}),
-          ...(telegram ? { telegram } : {}),
-          ...(website ? { website } : {}),
+          ...socials.filled,
         }),
       });
       const prepared = (await prepRes.json()) as {
@@ -235,21 +246,47 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
 
         <div className="space-y-3">
           <label className="block text-xs text-gray-400">Quote pair</label>
-          <select
-            value={quoteMint}
-            onChange={(e) => setQuoteMint(e.target.value)}
-            disabled={busy || pairs.length === 0}
-            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white disabled:opacity-50"
-          >
-            {pairsBusy && <option value="">Loading pairs</option>}
-            {!pairsBusy && pairs.length === 0 && <option value="">No pairs</option>}
-            {pairs.map((p) => (
-              <option key={p.mint} value={p.mint}>
-                {p.symbol}
-                {p.name && p.name !== p.symbol ? ` · ${p.name}` : ""}
-              </option>
+          <input
+            type="search"
+            value={pairQ}
+            onChange={(e) => setPairQ(e.target.value)}
+            placeholder="Filter: NVDAx, SPYx, SOL, mint"
+            disabled={busy || pairsBusy}
+            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 disabled:opacity-50"
+          />
+          {selectedPair && (
+            <p className="text-xs text-emerald-500">
+              Selected {selectedPair.symbol}
+              {selectedPair.name && selectedPair.name !== selectedPair.symbol ? ` · ${selectedPair.name}` : ""}
+            </p>
+          )}
+          <div className="max-h-40 overflow-y-auto rounded-xl border border-black/10 dark:border-white/10 divide-y divide-black/5 dark:divide-white/5">
+            {pairsBusy && <p className="px-4 py-3 text-sm text-gray-400">Loading pairs</p>}
+            {!pairsBusy && filteredPairs.length === 0 && (
+              <p className="px-4 py-3 text-sm text-gray-400">No match</p>
+            )}
+            {filteredPairs.slice(0, 60).map((p) => (
+              <button
+                key={p.mint}
+                type="button"
+                disabled={busy}
+                onClick={() => setQuoteMint(p.mint)}
+                className={`w-full text-left px-4 py-2.5 text-sm ${
+                  quoteMint === p.mint
+                    ? "bg-emerald-500/15 text-emerald-500"
+                    : "hover:bg-black/5 dark:hover:bg-white/5"
+                }`}
+              >
+                <span className="font-semibold">{p.symbol}</span>
+                {p.name && p.name !== p.symbol ? (
+                  <span className="text-gray-400"> · {p.name}</span>
+                ) : null}
+              </button>
             ))}
-          </select>
+          </div>
+          {filteredPairs.length > 60 && (
+            <p className="text-xs text-gray-400">{filteredPairs.length} matches. Type more to narrow.</p>
+          )}
           <input
             type="text"
             placeholder="Token name"
@@ -299,23 +336,7 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
             }}
             className="sr-only"
           />
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { key: "twitter", placeholder: "X / Twitter", value: twitter, set: setTwitter },
-              { key: "telegram", placeholder: "Telegram", value: telegram, set: setTelegram },
-              { key: "website", placeholder: "Website", value: website, set: setWebsite },
-            ].map(({ key, placeholder, value, set }) => (
-              <input
-                key={key}
-                type="text"
-                placeholder={placeholder}
-                value={value}
-                onChange={(e) => set(e.target.value)}
-                disabled={busy}
-                className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 text-xs disabled:opacity-50"
-              />
-            ))}
-          </div>
+          <TokenSocials socials={socials} accent="emerald" disabled={busy} />
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">
               {error}
