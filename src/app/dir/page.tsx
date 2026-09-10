@@ -29,6 +29,7 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
     links: [
       { label: "launch a token", href: "/token" },
       { label: "StonkFun", href: "/stonk" },
+      { label: "top stonks", href: "/stonks" },
       { label: "mint an NFT", href: "/nft" },
       { label: "browse NFTs", href: "/nfts" },
       { label: "get a .sol name", href: "/id" },

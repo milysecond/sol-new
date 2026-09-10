@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
-import { stonkfunFetch, type StonkSubmitResult } from "@/lib/stonkfun";
-
-export const runtime = "edge";
+import { stonkfunFetch, unwrapData, type StonkSubmitResult } from "@/lib/stonkfun";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const result = await stonkfunFetch<StonkSubmitResult>("/launches/submit", {
+    const raw = await stonkfunFetch("/launches/submit", {
       method: "POST",
       body: JSON.stringify(body),
     });
+    const result = unwrapData<StonkSubmitResult>(raw);
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     return NextResponse.json(

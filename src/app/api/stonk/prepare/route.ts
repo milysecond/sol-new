@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
-import { stonkfunFetch, type StonkPrepareResult } from "@/lib/stonkfun";
-
-export const runtime = "edge";
+import { stonkfunFetch, unwrapData, type StonkPrepareResult } from "@/lib/stonkfun";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const prepared = await stonkfunFetch<StonkPrepareResult>("/launches/prepare", {
+    const raw = await stonkfunFetch("/launches/prepare", {
       method: "POST",
       body: JSON.stringify(body),
     });
+    const prepared = unwrapData<StonkPrepareResult>(raw);
     return NextResponse.json({ ok: true, ...prepared });
   } catch (e) {
     return NextResponse.json(

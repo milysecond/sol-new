@@ -134,6 +134,7 @@ const SECTIONS: Section[] = [
       { href: "/address", title: "Address", blurb: "sol.new/address/<pubkey> — wallet, token, or program lookup.", icon: Activity },
       { href: "/scan", title: "Scan", blurb: "Wallet, token, or program lookup.", icon: Activity },
       { href: "/stocks", title: "Stocks", blurb: "Tokenized equities screener on Solana.", icon: LineChart },
+      { href: "/stonks", title: "Top stonks", blurb: "Highest mcap. Full list on stonkscreener.com.", icon: TrendingUp },
       { href: "/lists", title: "Lists", blurb: "Watchlists and quotes.", icon: List },
       { href: "/gallery", title: "Gallery", blurb: "Token gallery.", icon: Image },
       { href: "/compare", title: "Compare", blurb: "Side-by-side token compare.", icon: List },

@@ -12,7 +12,7 @@ import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
 import { analytics } from "@/lib/analytics";
 import { friendlyError } from "@/lib/friendly-errors";
-import type { StonkPair } from "@/lib/stonkfun";
+import { extractPairs, type StonkPair } from "@/lib/stonkfun";
 
 const ac = {
   text: "text-emerald-400",
@@ -42,6 +42,7 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
   const [telegram, setTelegram] = useState("");
   const [website, setWebsite] = useState("");
   const [pairs, setPairs] = useState<StonkPair[]>([]);
+  const [pairsBusy, setPairsBusy] = useState(true);
   const [quoteMint, setQuoteMint] = useState("");
   const [status, setStatus] = useState<
     "idle" | "auth" | "preparing" | "signing" | "submitting" | "done" | "error"
@@ -61,20 +62,36 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch("/api/stonk/pairs");
-        const json = (await res.json()) as { ok?: boolean; error?: string; pairs?: StonkPair[] };
-        if (!json.ok) throw new Error(json.error || "pairs failed");
+      setPairsBusy(true);
+      const apply = (list: StonkPair[]) => {
         if (cancelled) return;
-        const list = json.pairs || [];
         setPairs(list);
         const pref =
           list.find((p) => p.symbol === "NVDAx") ||
           list.find((p) => p.symbol === "SPYx") ||
           list[0];
         if (pref) setQuoteMint(pref.mint);
-      } catch (e) {
-        if (!cancelled) setError(friendlyError(e, "Could not load StonkFun pairs."));
+      };
+      try {
+        const res = await fetch("/api/stonk/pairs");
+        const json = (await res.json()) as { ok?: boolean; error?: string; pairs?: StonkPair[] };
+        if (json.ok && json.pairs?.length) {
+          apply(json.pairs);
+          return;
+        }
+        throw new Error(json.error || "pairs failed");
+      } catch {
+        try {
+          const res = await fetch("https://www.stonkfun.xyz/api/public/v1/pairs?launchable=true&pageSize=100");
+          const raw = await res.json();
+          const list = extractPairs(raw);
+          if (!list.length) throw new Error("empty");
+          apply(list);
+        } catch (e) {
+          if (!cancelled) setError(friendlyError(e, "Could not load pairs."));
+        }
+      } finally {
+        if (!cancelled) setPairsBusy(false);
       }
     })();
     return () => {
@@ -196,7 +213,10 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
           <AnimatedIcon icon={TrendingUp} size={32} className={ac.text} />
           <h1 className="text-2xl font-bold tracking-tight">StonkFun</h1>
           <p className="text-gray-500 dark:text-white/50 text-sm">
-            Pair a new coin with stocks, SOL, or another mint. LaunchLab curve.
+            Pair a new coin with stocks, SOL, or another mint. LaunchLab curve.{" "}
+            <a href="/stonks" className="text-emerald-500 underline">
+              Top stonks
+            </a>
           </p>
         </div>
 
@@ -221,7 +241,8 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
             disabled={busy || pairs.length === 0}
             className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white disabled:opacity-50"
           >
-            {pairs.length === 0 && <option value="">Loading pairs</option>}
+            {pairsBusy && <option value="">Loading pairs</option>}
+            {!pairsBusy && pairs.length === 0 && <option value="">No pairs</option>}
             {pairs.map((p) => (
               <option key={p.mint} value={p.mint}>
                 {p.symbol}

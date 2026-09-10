@@ -1,26 +1,17 @@
 import { NextResponse } from "next/server";
-import { stonkfunFetch, type StonkPair } from "@/lib/stonkfun";
-
-export const runtime = "edge";
+import { extractPairs, stonkfunFetch } from "@/lib/stonkfun";
 
 export async function GET() {
   try {
-    const data = await stonkfunFetch<{ pairs?: StonkPair[] } | StonkPair[]>(
-      "/pairs?launchable=true",
-    );
-    const pairs = Array.isArray(data)
-      ? data
-      : Array.isArray(data.pairs)
-        ? data.pairs
-        : [];
-    return NextResponse.json({
-      ok: true,
-      pairs: pairs.map((p) => ({
-        mint: p.mint,
-        symbol: p.symbol,
-        name: p.name || p.symbol,
-      })),
-    });
+    let raw: unknown;
+    try {
+      raw = await stonkfunFetch("/pairs?launchable=true&pageSize=100");
+    } catch {
+      raw = await stonkfunFetch("/pairs?pageSize=100");
+    }
+    const pairs = extractPairs(raw);
+    if (!pairs.length) throw new Error("No pairs in response");
+    return NextResponse.json({ ok: true, pairs });
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : String(e) },
