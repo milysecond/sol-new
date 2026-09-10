@@ -14,7 +14,7 @@ import { analytics } from "@/lib/analytics";
 import { friendlyError } from "@/lib/friendly-errors";
 import { extractPairs, type StonkPair } from "@/lib/stonkfun";
 import { TokenSocials, useTokenSocials } from "@/components/token-socials";
-import { uploadImage, uploadMetadata } from "@/lib/api";
+import { uploadImage, uploadMetadata, madeAtSolNew } from "@/lib/api";
 
 const STONK_LINKS = ["website", "twitter", "telegram"] as const;
 const MINT_KINDS = ["STNK", "NEW", "random"] as const;
@@ -217,7 +217,7 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
           symbol: ticker,
           mode: "standard",
           logo,
-          ...(description ? { description } : {}),
+          description: madeAtSolNew(description),
           ...socials.filled,
         }),
       });

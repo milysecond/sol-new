@@ -7,7 +7,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/components/navbar";
-import { uploadImage, uploadMetadata } from "@/lib/api";
+import { uploadImage, uploadMetadata, madeAtSolNew } from "@/lib/api";
 import { useImagePaste } from "@/lib/use-image-paste";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
@@ -1485,7 +1485,7 @@ function JupForm({ onBack }: { onBack: () => void }) {
           body: JSON.stringify({
             name,
             symbol: ticker,
-            description,
+            description: madeAtSolNew(description),
             image: data.imageUrl,
             ...socials.filled,
           }),
