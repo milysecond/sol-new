@@ -60,3 +60,15 @@ export async function releaseStnkMint(publicKey: string) {
     },
   ]);
 }
+
+export async function getStnkSecret(publicKey: string): Promise<string | null> {
+  const [rowRes] = await pipeline([
+    {
+      sql: "SELECT private_key FROM stnk_keypairs WHERE public_key = ? LIMIT 1",
+      args: [{ type: "text", value: publicKey }],
+    },
+  ]);
+  const row = rowRes?.rows?.[0];
+  const secret = cell(row, 0);
+  return secret || null;
+}

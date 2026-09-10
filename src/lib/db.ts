@@ -713,6 +713,15 @@ export async function releaseGroundKey(publicKey: string) {
   });
 }
 
+export async function getGroundSecret(publicKey: string): Promise<string | null> {
+  const row = await db.execute({
+    sql: "SELECT secret_key FROM ground_keys WHERE public_key = ? LIMIT 1",
+    args: [publicKey],
+  });
+  if (!row.rows.length) return null;
+  return (row.rows[0].secret_key as string) || null;
+}
+
 export async function countAvailableKeys(prefix: string) {
   const result = await db.execute({
     sql: "SELECT COUNT(*) as count FROM ground_keys WHERE prefix = ? AND consumed = 0",

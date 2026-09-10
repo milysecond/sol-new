@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, TrendingUp } from "lucide-react";
-import { Connection, Keypair, Transaction } from "@solana/web3.js";
+import { Connection, Transaction } from "@solana/web3.js";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { PageTransition } from "@/components/page-transition";
 import { useImagePaste } from "@/lib/use-image-paste";
@@ -35,13 +35,6 @@ function fileToDataUrl(file: File): Promise<string> {
 
 async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms));
-}
-
-async function keypairFromSecret(secret: string): Promise<Keypair> {
-  const { default: bs58 } = await import("bs58");
-  const s = secret.trim();
-  if (s.startsWith("[")) return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(s) as number[]));
-  return Keypair.fromSecretKey(bs58.decode(s));
 }
 
 export default function StonkForm({ onBack }: { onBack?: () => void }) {
@@ -145,12 +138,11 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ kind: mintKind }),
           })
-        ).json()) as { ok?: boolean; error?: string; mint?: string; secretKey?: string };
-        if (!claimed.ok || !claimed.mint || !claimed.secretKey) {
+        ).json()) as { ok?: boolean; error?: string; mint?: string };
+        if (!claimed.ok || !claimed.mint) {
           throw new Error(claimed.error || "Could not claim mint");
         }
         claimedMint = claimed.mint;
-        const mintKp = await keypairFromSecret(claimed.secretKey);
         const priceRes = await fetch(`/api/stonk/pricing?quoteMint=${encodeURIComponent(quoteMint)}`);
         const priceJson = (await priceRes.json()) as {
           ok?: boolean;
@@ -180,7 +172,7 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
           name,
           symbol: ticker,
           uri: metadata.uri,
-          mint: mintKp,
+          mintPubkey: claimedMint,
           configId: priceJson.pricing.curve.configId,
           platformId: priceJson.pricing.platform?.standard,
           raiseRaw: priceJson.pricing.raise?.raw,

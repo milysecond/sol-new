@@ -17,12 +17,12 @@ export async function POST(req: Request) {
       await initDb().catch(() => {});
       const key = await claimGroundKey("NEW");
       if (!key) return NextResponse.json({ ok: false, error: "No NEW mints left" }, { status: 503 });
-      return NextResponse.json({ ok: true, mint: key.publicKey, secretKey: key.secretKey });
+      return NextResponse.json({ ok: true, mint: key.publicKey });
     }
     if (kind === "STNK") {
       const key = await claimStnkMint();
       if (!key) return NextResponse.json({ ok: false, error: "No STNK mints left" }, { status: 503 });
-      return NextResponse.json({ ok: true, mint: key.publicKey, secretKey: key.secretKey });
+      return NextResponse.json({ ok: true, mint: key.publicKey });
     }
     return NextResponse.json({ ok: false, error: "Pick STNK or NEW" }, { status: 400 });
   } catch (e) {
