@@ -706,6 +706,13 @@ export async function markGroundKeyUsed(publicKey: string, wallet: string) {
   });
 }
 
+export async function releaseGroundKey(publicKey: string) {
+  await db.execute({
+    sql: "UPDATE ground_keys SET consumed = 0, consumed_by = NULL WHERE public_key = ? AND consumed_by = 'pending'",
+    args: [publicKey],
+  });
+}
+
 export async function countAvailableKeys(prefix: string) {
   const result = await db.execute({
     sql: "SELECT COUNT(*) as count FROM ground_keys WHERE prefix = ? AND consumed = 0",

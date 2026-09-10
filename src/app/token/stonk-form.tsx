@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, TrendingUp } from "lucide-react";
-import { Transaction } from "@solana/web3.js";
+import { Connection, Keypair, Transaction } from "@solana/web3.js";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { PageTransition } from "@/components/page-transition";
 import { useImagePaste } from "@/lib/use-image-paste";
@@ -14,8 +14,11 @@ import { analytics } from "@/lib/analytics";
 import { friendlyError } from "@/lib/friendly-errors";
 import { extractPairs, type StonkPair } from "@/lib/stonkfun";
 import { TokenSocials, useTokenSocials } from "@/components/token-socials";
+import { uploadImage, uploadMetadata } from "@/lib/api";
 
 const STONK_LINKS = ["website", "twitter", "telegram"] as const;
+const MINT_KINDS = ["STNK", "NEW", "random"] as const;
+type MintKind = (typeof MINT_KINDS)[number];
 const ac = {
   text: "text-emerald-400",
   btn: "bg-emerald-500 hover:bg-emerald-400",
@@ -34,6 +37,13 @@ async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms));
 }
 
+async function keypairFromSecret(secret: string): Promise<Keypair> {
+  const { default: bs58 } = await import("bs58");
+  const s = secret.trim();
+  if (s.startsWith("[")) return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(s) as number[]));
+  return Keypair.fromSecretKey(bs58.decode(s));
+}
+
 export default function StonkForm({ onBack }: { onBack?: () => void }) {
   const [name, setName] = useState("");
   const [ticker, setTicker] = useState("");
@@ -45,14 +55,15 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
   const [pairsBusy, setPairsBusy] = useState(true);
   const [pairQ, setPairQ] = useState("");
   const [quoteMint, setQuoteMint] = useState("");
+  const [mintKind, setMintKind] = useState<MintKind>("random");
   const [status, setStatus] = useState<
-    "idle" | "auth" | "preparing" | "signing" | "submitting" | "done" | "error"
+    "idle" | "auth" | "preparing" | "signing" | "creating" | "submitting" | "done" | "error"
   >("idle");
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { publicKey, refreshBalance } = useWallet();
-  const { network, toggle } = useNetwork();
+  const { network, toggle, rpc } = useNetwork();
 
   const acceptImage = useCallback((file: File) => {
     setImageFile(file);
@@ -121,9 +132,79 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
     }
     setError(null);
     analytics.launchInitiated(ticker, "stonk");
+    let claimedMint = "";
     try {
       setStatus("auth");
       const { keypair } = await getPasskeyKeypair();
+
+      if (mintKind === "STNK" || mintKind === "NEW") {
+        setStatus("preparing");
+        const claimed = (await (
+          await fetch("/api/stonk/vanity", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ kind: mintKind }),
+          })
+        ).json()) as { ok?: boolean; error?: string; mint?: string; secretKey?: string };
+        if (!claimed.ok || !claimed.mint || !claimed.secretKey) {
+          throw new Error(claimed.error || "Could not claim mint");
+        }
+        claimedMint = claimed.mint;
+        const mintKp = await keypairFromSecret(claimed.secretKey);
+        const priceRes = await fetch(`/api/stonk/pricing?quoteMint=${encodeURIComponent(quoteMint)}`);
+        const priceJson = (await priceRes.json()) as {
+          ok?: boolean;
+          error?: string;
+          pricing?: {
+            raise?: { raw?: string };
+            curve?: { configId?: string };
+            platform?: { standard?: string };
+          };
+        };
+        if (!priceJson.ok || !priceJson.pricing?.curve?.configId) {
+          throw new Error(priceJson.error || "No LaunchLab pricing for that pair");
+        }
+        setStatus("creating");
+        const uploaded = await uploadImage(imageFile);
+        const metadata = await uploadMetadata({
+          name,
+          symbol: ticker,
+          description,
+          image: uploaded.url,
+          ...socials.filled,
+        });
+        const { createLaunchLabTx } = await import("@/lib/launchlab");
+        const { mint } = await createLaunchLabTx({
+          connection: new Connection(rpc, "confirmed"),
+          owner: keypair,
+          name,
+          symbol: ticker,
+          uri: metadata.uri,
+          mint: mintKp,
+          configId: priceJson.pricing.curve.configId,
+          platformId: priceJson.pricing.platform?.standard,
+          raiseRaw: priceJson.pricing.raise?.raw,
+        });
+        await fetch("/api/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            wallet: publicKey,
+            name,
+            symbol: ticker,
+            description,
+            imageUrl: uploaded.url,
+            metadataUri: metadata.uri,
+            mintAddress: mint,
+            network: "mainnet",
+          }),
+        }).catch(() => {});
+        await refreshBalance();
+        analytics.tokenCreated(mint, ticker);
+        router.push(`/launch/${mint}`);
+        return;
+      }
+
       setStatus("preparing");
       const logo = await fileToDataUrl(imageFile);
       const prepRes = await fetch("/api/stonk/prepare", {
@@ -202,6 +283,13 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
       analytics.tokenCreated(mint, ticker);
       router.push(`/launch/${mint}`);
     } catch (e: unknown) {
+      if (claimedMint && (mintKind === "STNK" || mintKind === "NEW")) {
+        fetch("/api/stonk/vanity", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: mintKind, releaseMint: claimedMint }),
+        }).catch(() => {});
+      }
       analytics.launchFailed(ticker, String(e).slice(0, 120));
       setError(friendlyError(e instanceof Error ? e.message : String(e)));
       setStatus("error");
@@ -288,6 +376,31 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
           {filteredPairs.length > 60 && (
             <p className="text-xs text-gray-400">{filteredPairs.length} matches. Type more to narrow.</p>
           )}
+          <div>
+            <p className="text-xs text-gray-400 mb-2">Mint</p>
+            <div className="grid grid-cols-3 gap-2">
+              {MINT_KINDS.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setMintKind(k)}
+                  className={`py-2 rounded-xl text-sm border transition cursor-pointer ${
+                    mintKind === k
+                      ? "border-emerald-400/50 bg-emerald-500/10 text-emerald-400"
+                      : "border-black/10 dark:border-white/10 text-gray-500 dark:text-white/40"
+                  }`}
+                >
+                  {k === "random" ? "Random" : k}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              {mintKind === "STNK" && "Mint ends with STNK. LaunchLab vs your quote."}
+              {mintKind === "NEW" && "Mint starts with NEW. LaunchLab vs your quote."}
+              {mintKind === "random" && "StonkFun assigns the mint."}
+            </p>
+          </div>
           <input
             type="text"
             placeholder="Token name"
@@ -346,7 +459,8 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
           {busy ? (
             <p className="text-center text-sm text-gray-500 dark:text-white/50">
               {status === "auth" && "Signing in"}
-              {status === "preparing" && "Preparing StonkFun quote"}
+              {status === "preparing" && "Preparing mint"}
+              {status === "creating" && "Creating on LaunchLab"}
               {status === "signing" && "Face ID"}
               {status === "submitting" && "Submitting bundle"}
             </p>
