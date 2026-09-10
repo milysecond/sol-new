@@ -15,6 +15,7 @@ import { friendlyError } from "@/lib/friendly-errors";
 import { extractPairs, type StonkPair } from "@/lib/stonkfun";
 import { TokenSocials, useTokenSocials } from "@/components/token-socials";
 
+const STONK_LINKS = ["website", "twitter", "telegram"] as const;
 const ac = {
   text: "text-emerald-400",
   btn: "bg-emerald-500 hover:bg-emerald-400",
@@ -39,7 +40,7 @@ export default function StonkForm({ onBack }: { onBack?: () => void }) {
   const [description, setDescription] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const socials = useTokenSocials();
+  const socials = useTokenSocials([...STONK_LINKS]);
   const [pairs, setPairs] = useState<StonkPair[]>([]);
   const [pairsBusy, setPairsBusy] = useState(true);
   const [pairQ, setPairQ] = useState("");

@@ -101,18 +101,19 @@ const ACCENT: Record<string, string> = {
   blue: "bg-blue-500/20 border-blue-400/50 text-blue-400",
 };
 
-export function useTokenSocials() {
+export function useTokenSocials(allowed?: SocialKey[]) {
+  const keys = allowed ?? (Object.keys(SOCIAL_DEFAULTS) as SocialKey[]);
   const [active, setActive] = useState<Set<SocialKey>>(new Set());
   const [values, setValues] = useState<TokenSocialValues>({ ...SOCIAL_DEFAULTS });
   const filled = useMemo(() => {
     const out: Record<string, string> = {};
-    for (const k of Object.keys(SOCIAL_DEFAULTS) as SocialKey[]) {
+    for (const k of keys) {
       const v = values[k]?.trim();
       if (v && v !== SOCIAL_DEFAULTS[k]) out[k] = v;
     }
     return out;
-  }, [values]);
-  return { active, setActive, values, setValues, filled };
+  }, [values, keys]);
+  return { active, setActive, values, setValues, filled, keys };
 }
 
 export function TokenSocials({
@@ -125,12 +126,13 @@ export function TokenSocials({
   disabled?: boolean;
 }) {
   const on = ACCENT[accent] || ACCENT.orange;
-  const { active, setActive, values, setValues } = socials;
+  const { active, setActive, values, setValues, keys } = socials;
+  const shown = KEYS.filter((k) => keys.includes(k.key));
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs text-gray-400 dark:text-white/30">Add links:</span>
-        {KEYS.map(({ key, label, icon }) => (
+        {shown.map(({ key, label, icon }) => (
           <button
             key={key}
             type="button"
@@ -152,7 +154,7 @@ export function TokenSocials({
           </button>
         ))}
       </div>
-      {KEYS.filter((k) => active.has(k.key)).map(({ key, placeholder }) => (
+      {shown.filter((k) => active.has(k.key)).map(({ key, placeholder }) => (
         <input
           key={key}
           type={key === "website" ? "url" : "text"}
