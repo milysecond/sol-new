@@ -1,5 +1,5 @@
 /**
- * Native SOL ↔ WSOL helpers for Jupiter Lend and other SPL flows.
+ * Native SOL <-> WSOL helpers for Jupiter Lend and other SPL flows.
  */
 import {
   Connection,
@@ -14,7 +14,9 @@ import {
   TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
   createCloseAccountInstruction,
+  createInitializeAccountInstruction,
   createSyncNativeInstruction,
+  createTransferCheckedInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 
@@ -31,13 +33,14 @@ export function wsolAta(owner: PublicKey): PublicKey {
 async function sendLegacy(
   connection: Connection,
   tx: Transaction,
-  payer: Keypair
+  payer: Keypair,
+  extra: Keypair[] = []
 ): Promise<string> {
   const { blockhash, lastValidBlockHeight } =
     await connection.getLatestBlockhash("confirmed");
   tx.recentBlockhash = blockhash;
   tx.feePayer = payer.publicKey;
-  tx.sign(payer);
+  tx.sign(payer, ...extra);
   const sig = await connection.sendRawTransaction(tx.serialize(), {
     skipPreflight: false,
     maxRetries: 3,
@@ -123,4 +126,62 @@ export async function unwrapAllWsol(
     )
   );
   return sendLegacy(connection, tx, payer);
+}
+
+/**
+ * Unwrap wSOL back to native SOL.
+ * Full amount closes the ATA. Partial uses a temp account then closes it.
+ */
+export async function unwrapSol(
+  connection: Connection,
+  payer: Keypair,
+  uiAmount: number
+): Promise<string> {
+  if (!(uiAmount > 0)) throw new Error("Unwrap amount must be positive");
+  const ata = wsolAta(payer.publicKey);
+  let raw = 0;
+  try {
+    const res = await connection.getTokenAccountBalance(ata, "confirmed");
+    raw = Number(res.value.amount || 0);
+  } catch {
+    throw new Error("No wSOL in this wallet");
+  }
+  const want = Math.round(uiAmount * LAMPORTS_PER_SOL);
+  if (want > raw) throw new Error("Not enough wSOL");
+  if (want === raw) {
+    const sig = await unwrapAllWsol(connection, payer);
+    if (!sig) throw new Error("Nothing to unwrap");
+    return sig;
+  }
+
+  const tmp = Keypair.generate();
+  const rent = await connection.getMinimumBalanceForRentExemption(165);
+  const tx = new Transaction().add(
+    SystemProgram.createAccount({
+      fromPubkey: payer.publicKey,
+      newAccountPubkey: tmp.publicKey,
+      lamports: rent,
+      space: 165,
+      programId: TOKEN_PROGRAM_ID,
+    }),
+    createInitializeAccountInstruction(tmp.publicKey, NATIVE_MINT, payer.publicKey, TOKEN_PROGRAM_ID),
+    createTransferCheckedInstruction(
+      ata,
+      NATIVE_MINT,
+      tmp.publicKey,
+      payer.publicKey,
+      want,
+      9,
+      [],
+      TOKEN_PROGRAM_ID
+    ),
+    createCloseAccountInstruction(
+      tmp.publicKey,
+      payer.publicKey,
+      payer.publicKey,
+      [],
+      TOKEN_PROGRAM_ID
+    )
+  );
+  return sendLegacy(connection, tx, payer, [tmp]);
 }

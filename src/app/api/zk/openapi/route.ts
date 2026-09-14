@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 const DOCS = "https://zk.sol.new";
 const CANDIDATES = [
+  "/docs/json",
   "/openapi.json",
   "/docs/openapi.json",
   "/swagger.json",

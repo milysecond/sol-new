@@ -14,6 +14,7 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
+import { ZK_PC_PREFIX, zkSolRelayerActive } from "@/lib/zk-sol";
 
 if (typeof window !== "undefined") {
   const w = window as unknown as Record<string, unknown>;
@@ -109,7 +110,11 @@ async function loadPrivacyUtils(network: PrivacyNetwork): Promise<PrivacyCashUti
 export async function getUtxoOffset(network: PrivacyNetwork = "mainnet"): Promise<number> {
   try {
     const base =
-      network === "devnet" ? resolveDevnetRelayer() : RELAYER_ROOT.mainnet;
+      network === "devnet"
+        ? resolveDevnetRelayer()
+        : zkSolRelayerActive()
+          ? ZK_PC_PREFIX
+          : RELAYER_ROOT.mainnet;
     if (!base) return 0;
     const res = await fetch(`${base}/merkle/root?token=sol`);
     const j = (await res.json()) as { nextIndex?: number };

@@ -67,7 +67,7 @@ const SECTIONS: Section[] = [
     items: [
       { href: "/wallet", title: "Wallet", blurb: "Create or recover with Face ID / fingerprint.", icon: Wallet },
       { href: "/private", title: "Private", blurb: "Privacy Cash ZK and Helius Rings. Also /anon and /prv8.", icon: EyeOff },
-      { href: "/zk", title: "ZK", blurb: "zk.sol.new API and live Swagger docs.", icon: ShieldCheck },
+      { href: "/zk", title: "ZK", blurb: "Shield SOL via zk.sol.new. Passkey signs.", icon: ShieldCheck },
       { href: "/get", title: "Get funds", blurb: "A$5 Apple Pay, or receive on-chain.", icon: Coins },
       { href: "/bridge", title: "Bridge", blurb: "USDC from Base, Arbitrum, Ethereum, or Sui via GUM.", icon: ArrowLeftRight },
       { href: "/wallet/send", title: "Send", blurb: "Transfer from your passkey wallet.", icon: ArrowUpRight },
@@ -78,6 +78,7 @@ const SECTIONS: Section[] = [
       { href: "/loan", title: "Loan", blurb: "Supply assets to earn, or borrow against collateral.", icon: Landmark },
       { href: "/lock", title: "Lock", blurb: "Cliff unlock on Jupiter Lock. No protocol fee.", icon: Lock },
       { href: "/swap", title: "Swap", blurb: "Trade SOL, USDC, and any token with Face ID.", icon: ArrowLeftRight },
+      { href: "/wrap", title: "Wrap", blurb: "SOL to wSOL and unwrap back. Face ID. No fee.", icon: ArrowLeftRight },
       { href: "/stake", title: "Stake SOL", blurb: "Native validator staking. Delegate, deactivate, withdraw.", icon: TrendingUp },
       { href: "/lst", title: "Liquid stake", blurb: "LSTs: jitoSOL, mSOL, INF, and more.", icon: TrendingUp },
       { href: "/id", title: ".sol name", blurb: "Check and register a Solana name.", icon: AtSign },

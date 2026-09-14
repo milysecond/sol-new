@@ -7,8 +7,8 @@ export const contentType = ogContentType;
 export default async function Image() {
   return featureOgImage({
     eyebrow: "ZK",
-    title: "zk.sol.new docs",
-    subtitle: "Live OpenAPI. Shield and prove on Solana.",
+    title: "Shield on zk.sol.new",
+    subtitle: "Passkey ZK. Relayer + indexer on zk.sol.new.",
     cta: "Open /zk",
     accent: "purple",
     path: "sol.new/zk",

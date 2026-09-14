@@ -4,7 +4,7 @@ import { ZkClient } from "./zk-client";
 
 export const metadata: Metadata = pageMeta({
   title: "ZK - sol.new",
-  description: "zk.sol.new API. Shield, prove, and send with the live docs.",
+  description: "Shield SOL via zk.sol.new. Passkey signs. Proofs stay in the browser.",
   path: "/zk",
 });
 
