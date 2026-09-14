@@ -46,20 +46,20 @@ import { useDefaultToken } from "@/lib/currency-pref";
 import { formatSol, useHideBalances } from "@/lib/privacy";
 import type { LucideIcon } from "lucide-react";
 
-/** Desktop top nav — short, high-traffic only. Rest lives in Menu. */
+/** Desktop top nav — 28d GA: rent, memes, token, wallet. Rest in Menu. */
 const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/wallet", label: "Wallet", icon: Wallet },
-  { href: "/token", label: "Token", icon: Coins },
-  { href: "/gift", label: "Gift", icon: Gift },
+  { href: "/rent", label: "Rent", icon: Droplets },
   { href: "/memes", label: "Memes", icon: Image },
+  { href: "/token", label: "Token", icon: Coins },
+  { href: "/wallet", label: "Wallet", icon: Wallet },
 ];
 
 /** Tablet icon strip. */
 const TABLET_NAV: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/wallet", label: "Wallet", icon: Wallet },
-  { href: "/token", label: "Token", icon: Coins },
-  { href: "/gift", label: "Gift", icon: Gift },
+  { href: "/rent", label: "Rent", icon: Droplets },
   { href: "/memes", label: "Memes", icon: Image },
+  { href: "/token", label: "Token", icon: Coins },
+  { href: "/wallet", label: "Wallet", icon: Wallet },
 ];
 
 const MOBILE_PRIMARY = [
