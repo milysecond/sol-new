@@ -135,14 +135,14 @@ export function WrapClient() {
       <main className="flex-1 w-full min-w-0">
         <ConnectGate action="wrap SOL">
           <PageTransition>
-            <div className="app-shell py-6 sm:py-10 space-y-6">
-              <div className="text-center lg:text-left space-y-2">
+            <div className="app-shell max-w-lg mx-auto py-6 sm:py-10 space-y-5">
+              <div className="text-center space-y-2">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-cyan-500/15 text-cyan-500">
                   <Repeat className="w-6 h-6" />
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Wrap</h1>
-                <p className="text-sm text-gray-500 dark:text-white/50 max-w-xl">
-                  SOL to wSOL and back. Same wallet. Face ID signs. No protocol fee.
+                <p className="text-sm text-gray-500 dark:text-white/50">
+                  SOL to wSOL and back. Face ID. No fee.
                 </p>
               </div>
 

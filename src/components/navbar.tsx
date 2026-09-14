@@ -18,7 +18,6 @@ import {
   BellOff,
   MoreHorizontal,
   Gift,
-  Trophy,
   FolderOpen,
   Image,
   Menu,
@@ -47,14 +46,12 @@ import { useDefaultToken } from "@/lib/currency-pref";
 import { formatSol, useHideBalances } from "@/lib/privacy";
 import type { LucideIcon } from "lucide-react";
 
-/** Desktop top nav — short, high-traffic only. */
+/** Desktop top nav — short, high-traffic only. Rest lives in Menu. */
 const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/wallet", label: "Wallet", icon: Wallet },
   { href: "/token", label: "Token", icon: Coins },
   { href: "/gift", label: "Gift", icon: Gift },
   { href: "/memes", label: "Memes", icon: Image },
-  { href: "/punt", label: "Punt", icon: Trophy },
-  { href: "/portfolio", label: "Portfolio", icon: FolderOpen },
 ];
 
 /** Tablet icon strip. */
@@ -63,8 +60,6 @@ const TABLET_NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/token", label: "Token", icon: Coins },
   { href: "/gift", label: "Gift", icon: Gift },
   { href: "/memes", label: "Memes", icon: Image },
-  { href: "/punt", label: "Punt", icon: Trophy },
-  { href: "/portfolio", label: "Port", icon: FolderOpen },
 ];
 
 const MOBILE_PRIMARY = [
@@ -228,8 +223,8 @@ export function Navbar() {
     <>
     <nav className="relative z-[80]">
       <div ref={headerRef} className="sticky top-0 z-[80] border-b border-black/10 dark:border-white/10 bg-white/90 dark:bg-black/90 backdrop-blur-md safe-top">
-        <div className="flex items-center justify-between gap-1.5 sm:gap-3 px-2.5 sm:px-5 lg:px-6 py-2 sm:py-2.5 max-w-[1400px] mx-auto w-full">
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+        <div className="flex items-center justify-between gap-2 px-2.5 sm:px-5 lg:px-6 py-2 sm:py-2.5 max-w-[1400px] mx-auto w-full min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 overflow-hidden">
             {/* Logo — standard left position, always links home */}
             <Link
               href="/home"
@@ -305,8 +300,8 @@ export function Navbar() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
-            <SocialLinks className="hidden sm:flex" />
+          <div className="flex items-center gap-1 shrink-0 relative z-[1]">
+            <SocialLinks className="hidden xl:flex" />
             <CommandPaletteButton onClick={() => setCmdOpen(true)} />
             <ThemeToggle />
 
@@ -356,7 +351,7 @@ export function Navbar() {
                 ) : (
                   <Bell size={15} className="shrink-0" />
                 )}
-                <span className="hidden md:inline font-medium text-xs">
+                <span className="hidden xl:inline font-medium text-xs">
                   {pushLoading
                     ? pushPermission === "granted"
                       ? "Turning off"
@@ -376,7 +371,7 @@ export function Navbar() {
               className="inline-flex items-center justify-center gap-1 h-8 px-2 rounded-lg text-sm text-gray-700 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/10 transition border border-black/10 dark:border-white/10"
             >
               <Menu size={15} />
-              <span className="hidden lg:inline font-medium text-xs">Menu</span>
+              <span className="hidden xl:inline font-medium text-xs">Menu</span>
             </button>
             {publicKey ? (
               <div className="relative">
