@@ -265,6 +265,8 @@ type TokenData = {
   imageUrl: string | null;
   description: string | null;
   tokenProgram?: string | null;
+  launchpad?: string | null;
+  launchpadId?: string | null;
   score: number | null;
   risks: Risk[];
   rugged: boolean;
@@ -337,6 +339,11 @@ function TokenView({ data }: { data: TokenData }) {
             <h2 className="text-xl font-bold">{data.name}</h2>
             <span className="text-sm text-gray-400 dark:text-white/40 font-mono">${data.symbol}</span>
             <AddressTypeBadge type={data.addressType || "token_mint"} />
+            {data.launchpad && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border bg-violet-500/15 text-violet-600 dark:text-violet-300 border-violet-400/30">
+                {data.launchpad}
+              </span>
+            )}
             {data.tokenProgram && (
               <span className="text-[10px] font-mono uppercase tracking-wide text-gray-400 border border-black/10 dark:border-white/10 rounded-full px-2 py-0.5">
                 {data.tokenProgram}
