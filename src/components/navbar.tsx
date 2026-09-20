@@ -81,6 +81,7 @@ export function Navbar() {
     switchWallet,
     disconnect,
     loading,
+    connectExternal,
     airdropping,
     airdropDone,
     handleAirdrop,
@@ -651,6 +652,16 @@ export function Navbar() {
                   ) : (
                     "Connect"
                   )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void connectExternal()}
+                  disabled={loading}
+                  title="Phantom, Solflare, Backpack"
+                  className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/80 text-sm rounded-lg px-2.5 py-1.5 min-h-[32px] transition cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
+                >
+                  <Wallet size={14} />
+                  <span className="hidden sm:inline">Wallet</span>
                 </button>
                 <button
                   type="button"

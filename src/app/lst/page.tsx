@@ -14,7 +14,7 @@ import { PageTransition } from "@/components/page-transition";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { getPasskeyKeypair } from "@/lib/passkey-wallet";
+import { signUserTxB64 } from "@/lib/user-sign";
 import { friendlyError } from "@/lib/friendly-errors";
 import { DEFAULT_LST, SANCTUM_LSTS, WSOL_MINT, type LstOption } from "@/lib/lsts";
 
@@ -58,7 +58,7 @@ async function signOrderTx(txB64: string, keypair: Keypair): Promise<string> {
 }
 
 export default function LstPage() {
-  const { publicKey, balance, refreshBalance } = useWallet();
+  const { publicKey, balance, refreshBalance, walletKind } = useWallet();
   const { rpc, network } = useNetwork();
   const [lsts, setLsts] = useState<EnrichedLst[]>(SANCTUM_LSTS);
   const [lst, setLst] = useState<EnrichedLst>(DEFAULT_LST);
@@ -169,8 +169,7 @@ export default function LstPage() {
       if (!oRes.ok) throw new Error(order.error || "Quote failed");
       if (!order.tx) throw new Error("No transaction returned. Try again.");
 
-      const { keypair } = await getPasskeyKeypair(publicKey);
-      const signedTx = await signOrderTx(order.tx, keypair);
+      const signedTx = await signUserTxB64(order.tx, { publicKey, walletKind });
 
       const eRes = await fetch("/api/lst/execute", {
         method: "POST",

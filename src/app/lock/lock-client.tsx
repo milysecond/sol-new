@@ -23,7 +23,7 @@ import { Spinner } from "@/components/spinner";
 import { TokenMetaRow } from "@/components/token-meta";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { getPasskeyKeypair } from "@/lib/passkey-wallet";
+import { sendUserTransaction } from "@/lib/user-sign";
 import { friendlyError } from "@/lib/friendly-errors";
 import { addressPath } from "@/lib/explorer";
 import {
@@ -71,7 +71,7 @@ function toRaw(ui: string, decimals: number): bigint {
 }
 
 export default function LockPage() {
-  const { publicKey, balance } = useWallet();
+  const { publicKey, balance, walletKind } = useWallet();
   const { rpc, network } = useNetwork();
   const [title, setTitle] = useState("Lock");
   const [holdings, setHoldings] = useState<WalletToken[]>([]);
@@ -149,19 +149,14 @@ export default function LockPage() {
     void load();
   }, [load]);
 
-  const send = async (tx: Transaction, extra: Keypair[], keypair: Keypair) => {
+  const send = async (tx: Transaction, extra: Keypair[] = []) => {
     const connection = new Connection(rpc, "confirmed");
-    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-    tx.feePayer = keypair.publicKey;
-    tx.recentBlockhash = blockhash;
-    if (extra.length) tx.partialSign(...extra);
-    tx.partialSign(keypair);
-    const signature = await connection.sendRawTransaction(tx.serialize(), {
-      skipPreflight: false,
-      maxRetries: 3,
+    return sendUserTransaction(tx, {
+      publicKey: publicKey!,
+      walletKind,
+      connection,
+      extraSigners: extra,
     });
-    await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
-    return signature;
   };
 
   const onCreate = async () => {
@@ -179,10 +174,10 @@ export default function LockPage() {
       const cliffUnix = Math.floor(unlockAt.getTime() / 1000);
       const token2022 = selected.programId === TOKEN_2022_PROGRAM_ID.toBase58();
 
-      const { keypair } = await getPasskeyKeypair(publicKey);
+      const owner = new PublicKey(publicKey);
       const base = Keypair.generate();
       const ixs = buildCreateLockIxs({
-        payer: keypair.publicKey,
+        payer: owner,
         base,
         mint: mintPk,
         token2022,
@@ -193,12 +188,12 @@ export default function LockPage() {
       });
 
       if (mintPk.equals(NATIVE_MINT) || selected.isNativeSol) {
-        const ata = getAssociatedTokenAddressSync(NATIVE_MINT, keypair.publicKey);
+        const ata = getAssociatedTokenAddressSync(NATIVE_MINT, owner);
         ixs.splice(
           1,
           0,
           SystemProgram.transfer({
-            fromPubkey: keypair.publicKey,
+            fromPubkey: owner,
             toPubkey: ata,
             lamports: Number(raw),
           }),
@@ -207,7 +202,7 @@ export default function LockPage() {
       }
 
       const tx = new Transaction().add(...ixs);
-      const signature = await send(tx, [base], keypair);
+      const signature = await send(tx, [base]);
       setSig(signature);
       setAmount("");
       await load();
@@ -225,20 +220,20 @@ export default function LockPage() {
     setSig(null);
     setBusy("claim");
     try {
-      const { keypair } = await getPasskeyKeypair(publicKey);
+      const owner = new PublicKey(publicKey);
       const max = BigInt(lock.claimableAmount);
       if (max <= BigInt(0)) throw new Error("Nothing to claim yet");
       const tx = new Transaction().add(
-        claimAtaIx(keypair.publicKey, new PublicKey(lock.mint), lock.token2022),
+        claimAtaIx(owner, new PublicKey(lock.mint), lock.token2022),
         buildClaimIx({
           escrow: new PublicKey(lock.address),
           mint: new PublicKey(lock.mint),
-          recipient: keypair.publicKey,
+          recipient: owner,
           token2022: lock.token2022,
           maxAmount: max,
         }),
       );
-      const signature = await send(tx, [], keypair);
+      const signature = await send(tx);
       setSig(signature);
       await load();
     } catch (e) {

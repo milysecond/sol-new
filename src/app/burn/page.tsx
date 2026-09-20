@@ -19,7 +19,7 @@ import { PageTransition } from "@/components/page-transition";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { getPasskeyKeypair } from "@/lib/passkey-wallet";
+import { sendUserTransaction } from "@/lib/user-sign";
 import { friendlyError } from "@/lib/friendly-errors";
 
 type BurnAccount = {
@@ -37,7 +37,7 @@ type BurnAccount = {
 const CHUNK = 8;
 
 export default function BurnPage() {
-  const { publicKey, refreshBalance } = useWallet();
+  const { publicKey, refreshBalance, walletKind } = useWallet();
   const { rpc, network } = useNetwork();
   const [accounts, setAccounts] = useState<BurnAccount[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -111,7 +111,6 @@ export default function BurnPage() {
     setError(null);
     setDoneSigs([]);
     try {
-      const { keypair } = await getPasskeyKeypair(publicKey);
       const connection = new Connection(rpc, "confirmed");
       const owner = new PublicKey(publicKey);
       const sigs: string[] = [];
@@ -129,18 +128,11 @@ export default function BurnPage() {
           ),
         );
         tx.add(...ixs);
-        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-        tx.recentBlockhash = blockhash;
-        tx.feePayer = owner;
-        tx.sign(keypair);
-        const signature = await connection.sendRawTransaction(tx.serialize(), {
-          skipPreflight: false,
-          maxRetries: 3,
+        const signature = await sendUserTransaction(tx, {
+          publicKey,
+          walletKind,
+          connection,
         });
-        await connection.confirmTransaction(
-          { signature, blockhash, lastValidBlockHeight },
-          "confirmed",
-        );
         sigs.push(signature);
       }
 
