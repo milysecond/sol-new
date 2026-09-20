@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
 import { ArrowDownToLine, ArrowUpFromLine, Repeat } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { PageTransition } from "@/components/page-transition";
@@ -16,9 +16,9 @@ import { formatAmountInput } from "@/lib/wallet-tokens";
 import { addressPath, txPath } from "@/lib/explorer";
 import {
   WSOL_MINT,
+  buildUnwrapTx,
+  buildWrapTx,
   getWsolUiBalance,
-  unwrapSol,
-  wrapSol,
 } from "@/lib/wsol";
 
 type Mode = "wrap" | "unwrap";
@@ -27,7 +27,7 @@ const HINT = "FhzDkMVUDWa11BtxnGQ4FexNf3wcu5EzuQux1EJJ1qC1";
 
 export function WrapClient() {
   const { rpc, network } = useNetwork();
-  const { publicKey, balance, refreshBalance } = useWallet();
+  const { publicKey, balance, refreshBalance, walletKind } = useWallet();
   const [mode, setMode] = useState<Mode>("wrap");
   const [amount, setAmount] = useState("");
   const [wsol, setWsol] = useState(0);
@@ -108,16 +108,51 @@ export function WrapClient() {
     setError(null);
     setSig(null);
     try {
-      const { keypair } = await getPasskeyKeypair(publicKey);
+      const owner = new PublicKey(publicKey);
       const conn = new Connection(rpc, "confirmed");
-      const signature =
-        mode === "wrap"
-          ? await wrapSol(conn, keypair, ui)
-          : await unwrapSol(conn, keypair, ui);
+      const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
+      let tx: Transaction;
+      let extra: Keypair[] = [];
+      if (mode === "wrap") {
+        tx = buildWrapTx(owner, ui);
+      } else {
+        const built = await buildUnwrapTx(conn, owner, ui);
+        tx = built.tx;
+        extra = built.extra;
+      }
+      tx.feePayer = owner;
+      tx.recentBlockhash = blockhash;
+      extra.forEach((k) => tx.partialSign(k));
+
+      let signature: string;
+      if (walletKind === "external") {
+        const { signAndSendWithExternal, signTransactionWithInjected } = await import(
+          "@/lib/external-wallet"
+        );
+        const sent = await signAndSendWithExternal(tx, { skipPreflight: false, maxRetries: 3 });
+        if (sent) {
+          signature = sent;
+        } else {
+          const signed = await signTransactionWithInjected(tx);
+          const raw = signed.serialize();
+          signature = await conn.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 3 });
+        }
+      } else {
+        const { keypair } = await getPasskeyKeypair(publicKey);
+        tx.partialSign(keypair);
+        signature = await conn.sendRawTransaction(tx.serialize(), {
+          skipPreflight: false,
+          maxRetries: 3,
+        });
+      }
+      await conn.confirmTransaction(
+        { signature, blockhash, lastValidBlockHeight },
+        "confirmed",
+      );
       setSig(signature);
       setAmount("");
       refreshBalance();
-      setWsol(await getWsolUiBalance(conn, keypair.publicKey));
+      setWsol(await getWsolUiBalance(conn, owner));
     } catch (e) {
       setError(friendlyError(e, "Wrap failed"));
     } finally {

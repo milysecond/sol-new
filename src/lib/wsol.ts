@@ -57,31 +57,38 @@ async function sendLegacy(
  * @param uiAmount SOL amount (human)
  * @param extraLamports tiny buffer for protocol rounding (default 0)
  */
+export function buildWrapTx(
+  owner: PublicKey,
+  uiAmount: number,
+  extraLamports = 0
+): Transaction {
+  if (!(uiAmount > 0)) throw new Error("Wrap amount must be positive");
+  const lamports = Math.ceil(uiAmount * LAMPORTS_PER_SOL) + Math.max(0, extraLamports);
+  const ata = wsolAta(owner);
+  return new Transaction().add(
+    createAssociatedTokenAccountIdempotentInstruction(
+      owner,
+      ata,
+      owner,
+      NATIVE_MINT,
+      TOKEN_PROGRAM_ID
+    ),
+    SystemProgram.transfer({
+      fromPubkey: owner,
+      toPubkey: ata,
+      lamports,
+    }),
+    createSyncNativeInstruction(ata, TOKEN_PROGRAM_ID)
+  );
+}
+
 export async function wrapSol(
   connection: Connection,
   payer: Keypair,
   uiAmount: number,
   extraLamports = 0
 ): Promise<string> {
-  if (!(uiAmount > 0)) throw new Error("Wrap amount must be positive");
-  const lamports = Math.ceil(uiAmount * LAMPORTS_PER_SOL) + Math.max(0, extraLamports);
-  const ata = wsolAta(payer.publicKey);
-  const tx = new Transaction().add(
-    createAssociatedTokenAccountIdempotentInstruction(
-      payer.publicKey,
-      ata,
-      payer.publicKey,
-      NATIVE_MINT,
-      TOKEN_PROGRAM_ID
-    ),
-    SystemProgram.transfer({
-      fromPubkey: payer.publicKey,
-      toPubkey: ata,
-      lamports,
-    }),
-    createSyncNativeInstruction(ata, TOKEN_PROGRAM_ID)
-  );
-  return sendLegacy(connection, tx, payer);
+  return sendLegacy(connection, buildWrapTx(payer.publicKey, uiAmount, extraLamports), payer);
 }
 
 /** WSOL ATA ui balance (0 if missing). */
@@ -132,13 +139,13 @@ export async function unwrapAllWsol(
  * Unwrap wSOL back to native SOL.
  * Full amount closes the ATA. Partial uses a temp account then closes it.
  */
-export async function unwrapSol(
+export async function buildUnwrapTx(
   connection: Connection,
-  payer: Keypair,
+  owner: PublicKey,
   uiAmount: number
-): Promise<string> {
+): Promise<{ tx: Transaction; extra: Keypair[] }> {
   if (!(uiAmount > 0)) throw new Error("Unwrap amount must be positive");
-  const ata = wsolAta(payer.publicKey);
+  const ata = wsolAta(owner);
   let raw = 0;
   try {
     const res = await connection.getTokenAccountBalance(ata, "confirmed");
@@ -149,39 +156,43 @@ export async function unwrapSol(
   const want = Math.round(uiAmount * LAMPORTS_PER_SOL);
   if (want > raw) throw new Error("Not enough wSOL");
   if (want === raw) {
-    const sig = await unwrapAllWsol(connection, payer);
-    if (!sig) throw new Error("Nothing to unwrap");
-    return sig;
+    const tx = new Transaction().add(
+      createCloseAccountInstruction(ata, owner, owner, [], TOKEN_PROGRAM_ID)
+    );
+    return { tx, extra: [] };
   }
 
   const tmp = Keypair.generate();
   const rent = await connection.getMinimumBalanceForRentExemption(165);
   const tx = new Transaction().add(
     SystemProgram.createAccount({
-      fromPubkey: payer.publicKey,
+      fromPubkey: owner,
       newAccountPubkey: tmp.publicKey,
       lamports: rent,
       space: 165,
       programId: TOKEN_PROGRAM_ID,
     }),
-    createInitializeAccountInstruction(tmp.publicKey, NATIVE_MINT, payer.publicKey, TOKEN_PROGRAM_ID),
+    createInitializeAccountInstruction(tmp.publicKey, NATIVE_MINT, owner, TOKEN_PROGRAM_ID),
     createTransferCheckedInstruction(
       ata,
       NATIVE_MINT,
       tmp.publicKey,
-      payer.publicKey,
+      owner,
       want,
       9,
       [],
       TOKEN_PROGRAM_ID
     ),
-    createCloseAccountInstruction(
-      tmp.publicKey,
-      payer.publicKey,
-      payer.publicKey,
-      [],
-      TOKEN_PROGRAM_ID
-    )
+    createCloseAccountInstruction(tmp.publicKey, owner, owner, [], TOKEN_PROGRAM_ID)
   );
-  return sendLegacy(connection, tx, payer, [tmp]);
+  return { tx, extra: [tmp] };
+}
+
+export async function unwrapSol(
+  connection: Connection,
+  payer: Keypair,
+  uiAmount: number
+): Promise<string> {
+  const { tx, extra } = await buildUnwrapTx(connection, payer.publicKey, uiAmount);
+  return sendLegacy(connection, tx, payer, extra);
 }
