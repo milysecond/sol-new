@@ -39,7 +39,7 @@ track('custom_event', { key: 'value' });
 ## Dashboards
 
 - **GA4**: configured via `NEXT_PUBLIC_GA_ID` (layout loads gtag)
-- **Umami** (optional): https://stats.sal.fun if the script is enabled in layout
+- **Umami** (optional): not used on this host
 
 ## Privacy
 

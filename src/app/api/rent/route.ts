@@ -117,7 +117,7 @@ export async function GET(req: Request) {
       {
         ok: true,
         price,
-        /** Primary: SPL token account (165 bytes) — same as minrent.sal.fun */
+        /** Primary: SPL token account (165 bytes) - same as minrent.sol.new */
         rentLamports: tokenLamports,
         rentInSol: tokenLamports / 1e9,
         rentInUsd: price > 0 ? (tokenLamports / 1e9) * price : null,
