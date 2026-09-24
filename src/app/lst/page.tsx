@@ -14,7 +14,7 @@ import { PageTransition } from "@/components/page-transition";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { getPasskeyKeypair } from "@/lib/passkey-wallet";
+import { signUserTxB64 } from "@/lib/user-sign";
 import { friendlyError } from "@/lib/friendly-errors";
 import { DEFAULT_LST, SANCTUM_LSTS, WSOL_MINT, type LstOption } from "@/lib/lsts";
 
@@ -58,7 +58,7 @@ async function signOrderTx(txB64: string, keypair: Keypair): Promise<string> {
 }
 
 export default function LstPage() {
-  const { publicKey, balance, refreshBalance } = useWallet();
+  const { publicKey, balance, refreshBalance, walletKind } = useWallet();
   const { rpc, network } = useNetwork();
   const [lsts, setLsts] = useState<EnrichedLst[]>(SANCTUM_LSTS);
   const [lst, setLst] = useState<EnrichedLst>(DEFAULT_LST);
@@ -169,8 +169,7 @@ export default function LstPage() {
       if (!oRes.ok) throw new Error(order.error || "Quote failed");
       if (!order.tx) throw new Error("No transaction returned. Try again.");
 
-      const { keypair } = await getPasskeyKeypair(publicKey);
-      const signedTx = await signOrderTx(order.tx, keypair);
+      const signedTx = await signUserTxB64(order.tx, { publicKey, walletKind });
 
       const eRes = await fetch("/api/lst/execute", {
         method: "POST",
@@ -233,7 +232,7 @@ export default function LstPage() {
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="liquid stake">
           <PageTransition>
-            <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-6">
+            <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-6">
               <div className="text-center space-y-2">
                 <Droplets className="mx-auto text-cyan-400" size={36} />
                 <h1 className="text-3xl font-bold tracking-tight">Liquid stake</h1>
@@ -370,7 +369,7 @@ export default function LstPage() {
                   type="button"
                   disabled={busy || !amountAtomic}
                   onClick={() => void submit()}
-                  className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2"
                 >
                   {busy ? <Spinner size={16} /> : null}
                   {direction === "stake" ? `Get ${lst.symbol}` : `Unstake to SOL`}

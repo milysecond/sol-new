@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Connection, PublicKey, Transaction } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
@@ -11,12 +11,16 @@ import {
   SPL_GIFT_FUND_LAMPORTS,
   buildGiftFundingInstructions,
   buildGiftUrl,
+  buildSplGiftInstructions,
+  buildUsdcGiftInstructions,
   createGiftKeypair,
   giftAmountToBase,
   isNativeGiftToken,
   isUsdcGiftToken,
+  newGiftClaimCode,
   type GiftToken,
 } from "@/lib/gift-link";
+import { initDb, saveClaimLink } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +94,10 @@ export async function POST(req: NextRequest) {
       decimals?: number;
       programId?: string;
       symbol?: string;
+      /** Private: fund via one-time hop so gift is not funded directly from main wallet */
+      private?: boolean;
     };
+    const isPrivate = body.private === true;
 
     if (!isPubkeyish(body.wallet)) {
       return NextResponse.json({ error: "Invalid wallet" }, { status: 400 });
@@ -164,17 +171,196 @@ export async function POST(req: NextRequest) {
 
     const sender = new PublicKey(body.wallet);
     const { keypair: gift, secret } = createGiftKeypair();
+    const isSpl = !isNativeGiftToken(token);
+    const claimCode = newGiftClaimCode();
+
+    const claimUrl = buildGiftUrl(
+      secret,
+      network,
+      typeof body.message === "string" ? body.message : undefined,
+      requestOrigin(req),
+      claimCode,
+    );
+
+    try {
+      await initDb();
+      await saveClaimLink({
+        publicKey: gift.publicKey.toBase58(),
+        sender: body.private === true ? "private" : body.wallet!,
+        amountLamports: Number(amountBase),
+        network,
+        token,
+        claimCode,
+        claimSecret: secret,
+      });
+    } catch {
+      /* Turso down: still return long-form URL via fallback if code missing */
+    }
+
+    const { blockhash, lastValidBlockHeight } =
+      await connection.getLatestBlockhash("confirmed");
+
+    const registerBody = {
+      publicKey: gift.publicKey.toBase58(),
+      sender: isPrivate ? "private" : body.wallet,
+      amountLamports: amountBase,
+      network,
+      token,
+      private: isPrivate,
+    };
+
+    // ── Private: two-tx hop so gift parent is ephemeral, not main wallet ──
+    if (isPrivate) {
+      const hop = Keypair.generate();
+      const hopSecret = Buffer.from(hop.secretKey).toString("base64");
+      // hop pays tx2 fee + claim buffer on gift
+      const HOP_TX_FEE = 15_000;
+      const fundToHop = isNativeGiftToken(token)
+        ? Number(amountBase) + CLAIM_FEE_LAMPORTS + HOP_TX_FEE
+        : SPL_GIFT_FUND_LAMPORTS + HOP_TX_FEE + 5_000;
+
+      // Tx1: main wallet → hop (SOL always; + SPL if token gift)
+      const tx1 = new Transaction();
+      tx1.add(
+        SystemProgram.transfer({
+          fromPubkey: sender,
+          toPubkey: hop.publicKey,
+          lamports: fundToHop,
+        }),
+      );
+      if (!isNativeGiftToken(token)) {
+        // token path: move SPL (+ rent SOL) to hop, then hop funds gift
+        const tx1b = new Transaction();
+        if (token === "USDC" || isUsdcGiftToken(token, network)) {
+          tx1b.add(
+            ...buildUsdcGiftInstructions(sender, hop.publicKey, Number(amountBase), network),
+            SystemProgram.transfer({
+              fromPubkey: sender,
+              toPubkey: hop.publicKey,
+              lamports: HOP_TX_FEE,
+            }),
+          );
+        } else {
+          const mint = new PublicKey(token);
+          const prog = programId ? new PublicKey(programId) : undefined;
+          tx1b.add(
+            ...buildSplGiftInstructions(
+              sender,
+              hop.publicKey,
+              amountBase,
+              mint,
+              decimals,
+              prog,
+            ),
+            SystemProgram.transfer({
+              fromPubkey: sender,
+              toPubkey: hop.publicKey,
+              lamports: HOP_TX_FEE,
+            }),
+          );
+        }
+        tx1b.recentBlockhash = blockhash;
+        tx1b.feePayer = sender;
+
+        // Tx2: hop → gift
+        const tx2 = new Transaction().add(
+          ...buildGiftFundingInstructions(
+            hop.publicKey,
+            gift.publicKey,
+            amountBase,
+            token,
+            network,
+            { decimals, programId },
+          ),
+        );
+        tx2.recentBlockhash = blockhash;
+        tx2.feePayer = hop.publicKey;
+
+        return NextResponse.json({
+          ok: true,
+          private: true,
+          transaction: Buffer.from(
+            tx1b.serialize({ requireAllSignatures: false, verifySignatures: false }),
+          ).toString("base64"),
+          transaction2: Buffer.from(
+            tx2.serialize({ requireAllSignatures: false, verifySignatures: false }),
+          ).toString("base64"),
+          hopSecret,
+          hopPubkey: hop.publicKey.toBase58(),
+          giftPubkey: gift.publicKey.toBase58(),
+          secret,
+          claimCode,
+          claimUrl,
+          amount: amountUi,
+          amountLamports: amountBase,
+          token,
+          symbol:
+            body.symbol ||
+            (token === "USDC" ? "USDC" : token === "SOL" ? "SOL" : undefined),
+          decimals,
+          programId,
+          network,
+          blockhash,
+          lastValidBlockHeight,
+          fees: {
+            claimFeeLamports: CLAIM_FEE_LAMPORTS,
+            splFundLamports: isSpl ? SPL_GIFT_FUND_LAMPORTS : 0,
+            hop: true,
+          },
+          register: { method: "POST", path: "/api/gift", body: registerBody },
+        });
+      }
+
+      // SOL private
+      tx1.recentBlockhash = blockhash;
+      tx1.feePayer = sender;
+      const tx2 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: hop.publicKey,
+          toPubkey: gift.publicKey,
+          lamports: Number(amountBase) + CLAIM_FEE_LAMPORTS,
+        }),
+      );
+      tx2.recentBlockhash = blockhash;
+      tx2.feePayer = hop.publicKey;
+
+      return NextResponse.json({
+        ok: true,
+        private: true,
+        transaction: Buffer.from(
+          tx1.serialize({ requireAllSignatures: false, verifySignatures: false }),
+        ).toString("base64"),
+        transaction2: Buffer.from(
+          tx2.serialize({ requireAllSignatures: false, verifySignatures: false }),
+        ).toString("base64"),
+        hopSecret,
+        hopPubkey: hop.publicKey.toBase58(),
+        giftPubkey: gift.publicKey.toBase58(),
+        secret,
+        claimCode,
+        claimUrl,
+        amount: amountUi,
+        amountLamports: amountBase,
+        token,
+        symbol: "SOL",
+        decimals: 9,
+        network,
+        blockhash,
+        lastValidBlockHeight,
+        fees: { claimFeeLamports: CLAIM_FEE_LAMPORTS, splFundLamports: 0, hop: true },
+        register: { method: "POST", path: "/api/gift", body: registerBody },
+      });
+    }
+
+    // ── Standard: fund gift directly from main wallet ──
     const ixs = buildGiftFundingInstructions(
       sender,
       gift.publicKey,
       amountBase,
       token,
       network,
-      { decimals, programId }
+      { decimals, programId },
     );
-
-    const { blockhash, lastValidBlockHeight } =
-      await connection.getLatestBlockhash("confirmed");
 
     const tx = new Transaction().add(...ixs);
     tx.recentBlockhash = blockhash;
@@ -185,20 +371,13 @@ export async function POST(req: NextRequest) {
       verifySignatures: false,
     });
 
-    const claimUrl = buildGiftUrl(
-      secret,
-      network,
-      typeof body.message === "string" ? body.message : undefined,
-      requestOrigin(req)
-    );
-
-    const isSpl = !isNativeGiftToken(token);
-
     return NextResponse.json({
       ok: true,
+      private: false,
       transaction: Buffer.from(serialized).toString("base64"),
       giftPubkey: gift.publicKey.toBase58(),
       secret,
+      claimCode,
       claimUrl,
       amount: amountUi,
       amountLamports: amountBase,
@@ -216,13 +395,7 @@ export async function POST(req: NextRequest) {
       register: {
         method: "POST",
         path: "/api/gift",
-        body: {
-          publicKey: gift.publicKey.toBase58(),
-          sender: body.wallet,
-          amountLamports: amountBase,
-          network,
-          token,
-        },
+        body: registerBody,
       },
     });
   } catch (e) {
@@ -248,6 +421,7 @@ export async function GET() {
       symbol: "optional display symbol",
       network: "mainnet | devnet (optional)",
       message: "optional claim note, max 80 chars",
+      private: "optional bool — hop wallet so gift is not funded by main address",
     },
     flow: [
       "1. POST /api/gift/create → transaction + secret + claimUrl",

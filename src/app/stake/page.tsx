@@ -15,11 +15,7 @@ import { PageTransition } from "@/components/page-transition";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import {
-  getPasskeyKeypair,
-  signVersionedAndSend,
-  ensureDocumentFocusForPasskey,
-} from "@/lib/passkey-wallet";
+import { sendUserTransaction, signAndSendUserVersioned } from "@/lib/user-sign";
 import {
   DEFAULT_VOTE,
   MIN_STAKE_SOL,
@@ -48,7 +44,7 @@ function errText(e: unknown): string {
 }
 
 export default function StakePage() {
-  const { publicKey, balance, refreshBalance } = useWallet();
+  const { publicKey, balance, refreshBalance, walletKind } = useWallet();
   const { rpc, network } = useNetwork();
   const [amount, setAmount] = useState("1");
   const [vote, setVote] = useState(DEFAULT_VOTE);
@@ -192,28 +188,20 @@ export default function StakePage() {
       }
       if (bData.rentLamports) setRentLamports(bData.rentLamports);
 
-      // Single Face ID at send time — keep page focused (desktop Safari)
-      ensureDocumentFocusForPasskey();
       let signature: string;
       if (bData.sponsored) {
-        signature = await signVersionedAndSend(bData.tx, rpc, publicKey);
+        signature = await signAndSendUserVersioned(bData.tx, rpc, {
+          publicKey,
+          walletKind,
+        });
       } else {
-        const { keypair } = await getPasskeyKeypair(publicKey);
         const tx = Transaction.from(Buffer.from(bData.tx, "base64"));
         const connection = new Connection(rpc, "confirmed");
-        const { blockhash, lastValidBlockHeight } =
-          await connection.getLatestBlockhash("confirmed");
-        tx.recentBlockhash = blockhash;
-        tx.feePayer = keypair.publicKey;
-        tx.sign(keypair);
-        signature = await connection.sendRawTransaction(tx.serialize(), {
-          skipPreflight: false,
-          maxRetries: 3,
+        signature = await sendUserTransaction(tx, {
+          publicKey,
+          walletKind,
+          connection,
         });
-        await connection.confirmTransaction(
-          { signature, blockhash, lastValidBlockHeight },
-          "confirmed",
-        );
       }
 
       setSig(signature);
@@ -230,26 +218,12 @@ export default function StakePage() {
 
   const sendAuthTx = async (build: () => Transaction) => {
     if (!publicKey) throw new Error("Connect wallet first");
-    const { keypair } = await getPasskeyKeypair(publicKey);
-    if (keypair.publicKey.toBase58() !== publicKey) {
-      throw new Error("Passkey does not match connected wallet.");
-    }
     const connection = new Connection(rpc, "confirmed");
-    const tx = build();
-    const { blockhash, lastValidBlockHeight } =
-      await connection.getLatestBlockhash("confirmed");
-    tx.recentBlockhash = blockhash;
-    tx.feePayer = keypair.publicKey;
-    tx.sign(keypair);
-    const signature = await connection.sendRawTransaction(tx.serialize(), {
-      skipPreflight: false,
-      maxRetries: 3,
+    return sendUserTransaction(build(), {
+      publicKey,
+      walletKind,
+      connection,
     });
-    await connection.confirmTransaction(
-      { signature, blockhash, lastValidBlockHeight },
-      "confirmed"
-    );
-    return signature;
   };
 
   const handleDeactivate = async (stakeAddress: string) => {
@@ -330,7 +304,7 @@ export default function StakePage() {
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="stake SOL">
           <PageTransition>
-            <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-6">
+            <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-6">
               <div className="text-center space-y-2">
                 <Landmark className="mx-auto text-purple-400" size={36} />
                 <h1 className="text-3xl font-bold tracking-tight">Stake SOL</h1>
@@ -427,7 +401,7 @@ export default function StakePage() {
                   type="button"
                   disabled={busy || !amount}
                   onClick={() => void handleStake()}
-                  className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2"
                 >
                   {busy ? <Spinner size={16} /> : null}
                   Stake SOL

@@ -97,7 +97,7 @@ export function ConvertToSolCard() {
       <button
         onClick={convert}
         disabled={busy || done}
-        className="w-full bg-fuchsia-500 hover:bg-fuchsia-400 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 active:scale-[0.98]"
+        className="w-full bg-fuchsia-500 hover:bg-fuchsia-400 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 active:scale-[0.98]"
       >
         {done ? <><Check size={14} /> Converted!</> : busy ? "Converting…" : "Convert to SOL"}
       </button>

@@ -133,7 +133,7 @@ export default function HomePage() {
     return (
       <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
         <Navbar />
-        <main className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6 pb-28">
+        <main className="flex-1 app-shell-wide py-6 sm:py-10 lg:py-12 space-y-6 pb-28">
           <header className="space-y-1">
             <p className="text-[11px] uppercase tracking-wider text-violet-500 font-semibold">
               sol.new

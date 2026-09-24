@@ -265,6 +265,8 @@ type TokenData = {
   imageUrl: string | null;
   description: string | null;
   tokenProgram?: string | null;
+  launchpad?: string | null;
+  launchpadId?: string | null;
   score: number | null;
   risks: Risk[];
   rugged: boolean;
@@ -337,6 +339,11 @@ function TokenView({ data }: { data: TokenData }) {
             <h2 className="text-xl font-bold">{data.name}</h2>
             <span className="text-sm text-gray-400 dark:text-white/40 font-mono">${data.symbol}</span>
             <AddressTypeBadge type={data.addressType || "token_mint"} />
+            {data.launchpad && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border bg-violet-500/15 text-violet-600 dark:text-violet-300 border-violet-400/30">
+                {data.launchpad}
+              </span>
+            )}
             {data.tokenProgram && (
               <span className="text-[10px] font-mono uppercase tracking-wide text-gray-400 border border-black/10 dark:border-white/10 rounded-full px-2 py-0.5">
                 {data.tokenProgram}
@@ -497,8 +504,15 @@ function WalletView({
         <span className="font-mono text-xs text-gray-500 break-all">{address}</span>
         <CopyButton text={address} />
       </div>
-      <PortfolioDefiPanel address={address} compact />
-      <AddressTxHistory address={address} title="Transaction history" />
+      {/* Desktop: portfolio + history side by side */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 xl:gap-6 xl:items-start">
+        <div className="min-w-0 space-y-3">
+          <PortfolioDefiPanel address={address} compact />
+        </div>
+        <div className="min-w-0 space-y-3">
+          <AddressTxHistory address={address} title="Transaction history" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -670,7 +684,7 @@ function ScanInner() {
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
-        <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-6">
+        <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-6">
           <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-2 text-purple-500 dark:text-purple-400">
               <Search size={22} />
@@ -750,7 +764,7 @@ function ScanInner() {
           )}
 
           {result && (
-            <div className="bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-2xl p-4 sm:p-6 space-y-3">
+            <div className="bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-2xl p-4 sm:p-6 lg:p-8 space-y-3 lg:space-y-4">
               <div className="flex items-center gap-2">
                 <AddressTypeBadge
                   type={

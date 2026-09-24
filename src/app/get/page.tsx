@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { PageTransition } from "@/components/page-transition";
 import { Navbar } from "@/components/navbar";
 import { MoneyGramRampsCard } from "@/components/moneygram-ramps";
+import { CrossmintFundCard } from "@/components/crossmint-fund-card";
 import { ConnectGate } from "@/components/connect-gate";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
@@ -19,10 +20,11 @@ function CreditsBuySection() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!publicKey) {
-      setOk(null);
+      setOk(true);
       return;
     }
     try {
@@ -44,26 +46,87 @@ function CreditsBuySection() {
     void refresh();
   }, [refresh]);
 
+  // Apply credit after Stripe return — retry until paid + ledger write
   useEffect(() => {
-    try {
-      const q = new URLSearchParams(window.location.search);
-      if (q.get("credits") === "success") {
+    if (!publicKey) return;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const q = new URLSearchParams(window.location.search);
+        const successQ = q.get("credits") === "success";
+        const sid =
+          q.get("session_id") ||
+          sessionStorage.getItem("sol.new.credits.session") ||
+          "";
+        if (successQ && sid) {
+          try {
+            sessionStorage.setItem("sol.new.credits.session", sid);
+          } catch {
+            /* ignore */
+          }
+        }
+        if (!sid || !sid.startsWith("cs_")) return;
+        if (!successQ && !sessionStorage.getItem("sol.new.credits.session")) return;
+
         setSuccess(true);
-        const sid = q.get("session_id");
-        if (sid && publicKey) {
-          void fetch("/api/credits/confirm", {
+        setConfirming(true);
+        setError(null);
+
+        for (let i = 0; i < 8 && !cancelled; i++) {
+          const res = await fetch("/api/credits/confirm", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ sessionId: sid, wallet: publicKey }),
-          }).then(() => refresh());
-        } else {
-          void refresh();
+          });
+          const data = (await res.json()) as {
+            ok?: boolean;
+            paid?: boolean;
+            applied?: boolean;
+            balanceCredits?: number;
+            balanceCents?: number;
+            retry?: boolean;
+            error?: string;
+            status?: string;
+          };
+          if (res.ok && data.ok && data.paid) {
+            setBalance(Number(data.balanceCredits ?? data.balanceCents ?? 0));
+            try {
+              sessionStorage.removeItem("sol.new.credits.session");
+              const url = new URL(window.location.href);
+              url.searchParams.delete("credits");
+              url.searchParams.delete("session_id");
+              window.history.replaceState({}, "", url.pathname + url.search);
+            } catch {
+              /* ignore */
+            }
+            setConfirming(false);
+            void refresh();
+            return;
+          }
+          if (data.retry || data.status === "unpaid" || data.status === "processing") {
+            await new Promise((r) => setTimeout(r, 1500 + i * 500));
+            continue;
+          }
+          if (data.error) {
+            setError(data.error);
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 1200));
+        }
+        setConfirming(false);
+        void refresh();
+      } catch (e) {
+        if (!cancelled) {
+          setConfirming(false);
+          setError(e instanceof Error ? e.message : "Could not confirm payment");
         }
       }
-    } catch {
-      /* ignore */
-    }
-  }, [refresh, publicKey]);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [publicKey, refresh]);
 
   const buy = async () => {
     if (!publicKey) return;
@@ -75,11 +138,22 @@ function CreditsBuySection() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ wallet: publicKey }),
       });
-      const data = (await res.json()) as { ok?: boolean; url?: string; error?: string };
+      const data = (await res.json()) as {
+        ok?: boolean;
+        url?: string;
+        sessionId?: string;
+        error?: string;
+      };
       if (!res.ok || !data.ok || !data.url) {
         throw new Error(data.error || "Could not start checkout");
       }
-      // Same-tab for Apple Pay on iOS Safari
+      if (data.sessionId) {
+        try {
+          sessionStorage.setItem("sol.new.credits.session", data.sessionId);
+        } catch {
+          /* ignore */
+        }
+      }
       window.location.assign(data.url);
     } catch (e) {
       setError(friendlyError(e, "Checkout failed."));
@@ -87,6 +161,13 @@ function CreditsBuySection() {
     }
   };
 
+  if (!publicKey) {
+    return (
+      <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-5 text-xs text-gray-500 dark:text-white/50">
+        A$5 Apple Pay credits. Face ID below is only to receive them.
+      </div>
+    );
+  }
   if (ok === null) {
     return (
       <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-5 text-xs text-gray-500 flex items-center gap-2">
@@ -108,8 +189,8 @@ function CreditsBuySection() {
       </div>
       <p className="text-xs text-gray-500 dark:text-white/45 leading-relaxed">
         <strong className="font-semibold text-gray-800 dark:text-white/80">Live:</strong> buy{" "}
-        <strong className="font-semibold">A$5</strong> sol.new credits with Apple Pay or card (Stripe).
-        Digital credit for fees, links, and drops — not a crypto purchase.
+        <strong className="font-semibold">A$5</strong> sol.new credits with Apple Pay or card
+        (Stripe). Digital credit for fees, links, and drops — not a crypto purchase.
       </p>
 
       <div className="flex items-center justify-between rounded-xl bg-black/5 dark:bg-white/5 px-4 py-3">
@@ -121,23 +202,38 @@ function CreditsBuySection() {
       </div>
 
       {success && (
-        <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-lg px-3 py-2 text-emerald-700 dark:text-emerald-300 text-xs">
-          Payment received — credits will appear within a few seconds. Pull to refresh if needed.
+        <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-lg px-3 py-2 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2">
+          {confirming ? <Spinner size={12} /> : <Check size={14} className="shrink-0" />}
+          {confirming
+            ? "Payment received — applying credits…"
+            : balance > 0
+              ? `Credits updated — balance ${balance.toLocaleString()}.`
+              : "Payment received — refreshing balance…"}
         </div>
       )}
 
       <button
         type="button"
         onClick={() => void buy()}
-        disabled={busy || !publicKey}
-        className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer flex items-center justify-center gap-2"
+        disabled={busy || !publicKey || confirming}
+        className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2 min-h-[48px] touch-manipulation active:scale-[0.98]"
       >
         {busy ? <Spinner size={16} /> : null}
         Buy A$5 credits — Apple Pay
       </button>
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs">
-          {error}
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs space-y-1">
+          <p>{error}</p>
+          <button
+            type="button"
+            className="underline font-medium"
+            onClick={() => {
+              setError(null);
+              void refresh();
+            }}
+          >
+            Refresh balance
+          </button>
         </div>
       )}
       <p className="text-[11px] text-gray-400 dark:text-white/30">
@@ -169,17 +265,35 @@ export default function GetPage() {
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
-        <ConnectGate action="get SOL">
-          <PageTransition>
-          <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-8">
+        <PageTransition>
+          <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-8">
             <div className="text-center space-y-3">
               <AnimatedIcon icon={Download} size={40} className="text-purple-400" />
               <h1 className="text-3xl font-bold tracking-tight">Get funds</h1>
               <p className="text-gray-500 dark:text-white/50">
-                Receive SOL or USDC to your wallet.
+                A$5 Apple Pay, or receive SOL to your wallet.
               </p>
             </div>
 
+            <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-5 space-y-2 ring-1 ring-sky-500/10">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">A$5 / Apple Pay</p>
+              <p className="text-xs text-gray-500 dark:text-white/50 leading-relaxed">
+                Paid path when there is no sender. Face ID is only to land funds in your wallet.
+              </p>
+            </div>
+            <CrossmintFundCard />
+            <details className="rounded-xl border border-black/10 dark:border-white/10">
+              <summary className="cursor-pointer list-none px-4 py-3 text-xs font-semibold text-gray-500 dark:text-white/50 flex items-center justify-between">
+                <span>App credits (optional)</span>
+                <span className="text-[10px] font-medium text-gray-400">A$5 Stripe</span>
+              </summary>
+              <div className="px-2 pb-2">
+                <CreditsBuySection />
+              </div>
+            </details>
+
+            <ConnectGate action="get SOL">
+              <div className="space-y-8">
             {/* Your address */}
             <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-5 space-y-3">
               <p className="text-xs text-gray-500 dark:text-white/40 uppercase tracking-wider">Your address</p>
@@ -221,30 +335,26 @@ export default function GetPage() {
                 <button
                   onClick={handleAirdrop}
                   disabled={airdropping}
-                  className="w-full bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 text-yellow-300 font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                  className="w-full bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 text-yellow-300 font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                 >
                   {airdropping ? "Sending..." : airdropDone ? <><Check className="w-4 h-4 inline" /> 0.1 SOL sent!</> : "Airdrop 0.1 SOL"}
                 </button>
               </div>
             )}
 
-            {/* Stripe live credits — mainnet only */}
-            {network === "mainnet" && <CreditsBuySection />}
-
-            {/* MoneyGram — sandbox/test only (devnet) */}
             {network === "devnet" && <MoneyGramRampsCard />}
 
-            {/* View on explorer */}
             <a
               href={solscanUrl}
               target="_blank"
-              className="flex items-center justify-center gap-1.5 w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition text-center text-sm"
+              className="flex items-center justify-center gap-1.5 w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-lg px-3.5 py-2.5 hover:text-gray-900 dark:hover:text-white transition text-center text-sm"
             >
               View on sol.new <ExternalLink className="w-3.5 h-3.5 inline ml-1" />
             </a>
+              </div>
+            </ConnectGate>
           </div>
-          </PageTransition>
-        </ConnectGate>
+        </PageTransition>
       </main>
     </div>
   );

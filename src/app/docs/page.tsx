@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { TOKEN_LAUNCH_PRICES } from "@/lib/token-launch-pricing";
 
 type Action = { id: string; label: string; sol: number; usd: number | null; note: string };
 type Costs = { solUsd: number | null; priceSource: string | null; updatedAt: string; actions: Action[] };
@@ -50,7 +51,7 @@ export default function DocsPage() {
   return (
     <div className="min-h-screen">
       <Navbar />
-      <main className="max-w-3xl mx-auto px-6 py-10 space-y-10 text-sm text-gray-700 dark:text-white/70">
+      <main className="app-shell-wide py-10 space-y-10 text-sm text-gray-700 dark:text-white/70">
         <header className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">sol.new — docs</h1>
           <p className="text-gray-500 dark:text-white/40">
@@ -133,12 +134,49 @@ export default function DocsPage() {
           </p>
         </section>
 
+        <section id="token-launch" className="space-y-3">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Token launch (/token)</h2>
+          <p>
+            Create at <Link href="/token" className="text-violet-500 hover:underline">/token</Link>.
+            Only Meteora has a sol.new take (0.005 SOL, promo can waive). Everything else is protocol rent + their trade fee.
+          </p>
+          <div className="overflow-x-auto rounded-xl border border-black/10 dark:border-white/10">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-black/5 dark:bg-white/5 text-[10px] uppercase tracking-wide text-gray-500 dark:text-white/40">
+                <tr>
+                  <th className="px-4 py-2">Pad</th>
+                  <th className="px-4 py-2">Launch SOL</th>
+                  <th className="px-4 py-2">Trade fee</th>
+                  <th className="px-4 py-2">Quote / graduation</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/5 dark:divide-white/5">
+                {TOKEN_LAUNCH_PRICES.filter((p) => p.live).map((p) => (
+                    <tr key={p.id}>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900 dark:text-white">{p.label}</div>
+                        <div className="text-[11px] text-gray-400 dark:text-white/30">{p.note}</div>
+                      </td>
+                      <td className="px-4 py-3 font-mono">{p.costLabel}</td>
+                      <td className="px-4 py-3 font-mono">
+                        {p.tradeFeeBps != null ? `${(p.tradeFeeBps / 100).toFixed(2)}%` : "-"}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 dark:text-white/45">
+                        {p.quote} / {p.graduation}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Gifts</h2>
           <p>
             Create at <Link href="/gift" className="text-violet-500 hover:underline">/gift</Link>. Claim at{" "}
-            <code className="text-xs">/claim#&lt;secret&gt;</code>. The secret lives only in the URL fragment —
-            we never store it.
+            <code className="text-xs">/c/&lt;8+ chars&gt;</code>. Sender gets a short code. The claim seed is stored
+            server-side so chat apps cannot chop a hash. Incomplete codes say ask them to resend.
           </p>
           <ol className="list-decimal pl-5 space-y-1 text-xs sm:text-sm">
             <li>

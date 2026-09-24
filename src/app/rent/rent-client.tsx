@@ -347,7 +347,7 @@ export default function RentPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <PageShell max="md" innerClassName="space-y-6 py-8 sm:py-12">
+      <PageShell max="app" innerClassName="space-y-6 py-8 sm:py-12 lg:py-14">
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-violet-500/15 text-violet-500 mx-auto">
             <Coins className="w-6 h-6" />

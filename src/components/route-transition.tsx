@@ -3,13 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
+const DURATION_MS = 320;
+
 /**
- * Soft page enter — opacity only (no slide / transform).
- * Horizontal slides were glitchy on Seeker + sticky chrome and trapped fixed UI.
+ * Soft page enter — opacity + light vertical slide (not horizontal).
+ * Horizontal slides glitch sticky chrome / fixed UI on Seeker.
+ * Respects prefers-reduced-motion.
  */
 export function RouteTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
-  const [visible, setVisible] = useState(true);
+  const [phase, setPhase] = useState<"in" | "out">("in");
   const first = useRef(true);
   const reduceRef = useRef(false);
 
@@ -35,26 +38,31 @@ export function RouteTransition({ children }: { children: React.ReactNode }) {
 
     if (reduceRef.current) return;
 
-    // Brief fade-in without transform (safe for sticky headers + portals)
-    setVisible(false);
+    setPhase("out");
     const id = requestAnimationFrame(() => {
-      requestAnimationFrame(() => setVisible(true));
+      requestAnimationFrame(() => setPhase("in"));
     });
     return () => cancelAnimationFrame(id);
   }, [pathname]);
 
+  const reduce = reduceRef.current;
+  const shown = phase === "in";
+
   return (
-    <div
-      className="relative flex-1 flex flex-col min-h-0 w-full"
-      style={{
-        opacity: visible ? 1 : 0,
-        transition: reduceRef.current ? undefined : "opacity 140ms ease-out",
-        // Never leave a CSS transform — fixed menus / bottom nav stay correct
-        transform: "none",
-        willChange: visible ? "auto" : "opacity",
-      }}
-    >
-      {children}
+    <div className="relative flex-1 flex flex-col min-h-0 w-full overflow-x-clip">
+      <div
+        className="relative flex-1 flex flex-col min-h-0 w-full"
+        style={{
+          opacity: reduce || shown ? 1 : 0,
+          transform: reduce || shown ? "translate3d(0,0,0)" : "translate3d(0,12px,0)",
+          transition: reduce
+            ? undefined
+            : `opacity ${DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1), transform ${DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+          willChange: shown ? "auto" : "opacity, transform",
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }

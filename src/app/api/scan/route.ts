@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { mainnetRpcCall } from "@/lib/rpc-server";
+import {
+  PUMP_PROGRAM,
+  LAUNCHLAB_PROGRAM,
+  pumpBondingCurvePda,
+  launchlabPoolPda,
+  launchpadFromMarkets,
+  launchpadFromCopy,
+  labelFromAccountOwner,
+  mergeLaunchpad,
+  type LaunchpadHit,
+} from "@/lib/launchpad-detect";
+import { mobulaMintLookup } from "@/lib/mobula";
 
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const TOKEN_2022_PROGRAM = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
@@ -174,7 +186,7 @@ type RugcheckReport = {
 async function scanToken(address: string, info?: any) {
   const parsedMint = info?.data?.parsed?.info;
   const { getOnChainCreatedAt, formatAge } = await import("@/lib/onchain-age");
-  const [rugcheck, jup, createdAt] = await Promise.allSettled([
+  const [rugcheck, jup, createdAt, mobula] = await Promise.allSettled([
     fetch(`https://api.rugcheck.xyz/v1/tokens/${address}/report`, {
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(10_000),
@@ -185,6 +197,7 @@ async function scanToken(address: string, info?: any) {
     }).then((r) => (r.ok ? r.json() : null)),
 
     getOnChainCreatedAt(address),
+    mobulaMintLookup(address),
   ]);
 
   const rc: RugcheckReport | null = rugcheck.status === "fulfilled" ? rugcheck.value : null;
@@ -218,6 +231,32 @@ async function scanToken(address: string, info?: any) {
     rc?.token?.mintAuthority ?? parsedMint?.mintAuthority ?? null;
   const freezeAuthority: string | null =
     rc?.token?.freezeAuthority ?? parsedMint?.freezeAuthority ?? null;
+
+  let launchpadHit: LaunchpadHit | null = null;
+  try {
+    const curve = pumpBondingCurvePda(address);
+    const lab = launchlabPoolPda(address);
+    const [curveInfo, labInfo, authInfo] = await Promise.all([
+      curve ? getAccountInfo(curve) : Promise.resolve(null),
+      lab ? getAccountInfo(lab) : Promise.resolve(null),
+      mintAuthority ? getAccountInfo(mintAuthority) : Promise.resolve(null),
+    ]);
+    launchpadHit = mergeLaunchpad(
+      launchpadFromCopy(fileMeta?.description ?? rc?.fileMeta?.description ?? null),
+      curveInfo?.owner === PUMP_PROGRAM ? { id: "pump", label: "Pump" } : null,
+      labInfo?.owner === LAUNCHLAB_PROGRAM ? { id: "launchlab", label: "LaunchLab" } : null,
+      labelFromAccountOwner(authInfo?.owner as string | undefined),
+      labelFromAccountOwner(mintAuthority),
+      launchpadFromMarkets(rc?.markets),
+      mobula.status === "fulfilled" ? mobula.value?.launchpad ?? null : null,
+    );
+  } catch {
+    launchpadHit = mergeLaunchpad(
+      launchpadFromCopy(fileMeta?.description ?? null),
+      launchpadFromMarkets(rc?.markets),
+      mobula.status === "fulfilled" ? mobula.value?.launchpad ?? null : null,
+    );
+  }
   const name: string =
     rc?.tokenMeta?.name ??
     fileMeta?.name ??
@@ -276,6 +315,8 @@ async function scanToken(address: string, info?: any) {
     imageUrl,
     description,
     tokenProgram,
+    launchpad: launchpadHit?.label ?? null,
+    launchpadId: launchpadHit?.id ?? null,
     score: rc?.score ?? null,
     risks: rc?.risks ?? [],
     rugged: rc?.rugged ?? false,

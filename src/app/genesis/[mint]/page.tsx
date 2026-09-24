@@ -236,7 +236,7 @@ export default function GenesisDetailPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">
       <Navbar />
-      <main className="flex-1 px-4 py-6 sm:px-6 max-w-2xl mx-auto w-full space-y-6">
+      <main className="flex-1 app-shell py-6 space-y-6">
         {/* Back */}
         <Link href="/token" className="inline-flex items-center gap-1 text-sm text-gray-400 dark:text-white/40 hover:text-gray-600 dark:hover:text-white/60 transition">
           <ArrowLeft size={14} /> Token

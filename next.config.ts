@@ -1,14 +1,23 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["dev.sol.new", "192.168.1.105"],
-  // Keep fat browser/WASM stacks out of the Cloudflare Worker bundle
+  allowedDevOrigins: [
+    "dev.sol.new",
+    "192.168.1.105",
+    "192.168.1.164",
+    "*.trycloudflare.com",
+  ],
+  // Keep fat browser/WASM stacks out of the Cloudflare Worker server graph
   serverExternalPackages: [
     "privacycash",
     "@lightprotocol/hasher.rs",
+    "@heliuslabs/zolana",
     "three",
     "gsap",
     "canvas-confetti",
+    "snarkjs",
+    "ffjavascript",
+    "@raydium-io/raydium-sdk-v2",
   ],
   async redirects() {
     return [
@@ -32,16 +41,7 @@ const nextConfig: NextConfig = {
         destination: "https://starter.sol.new",
         permanent: false,
       },
-      {
-        source: "/memes",
-        destination: "https://memes.metasal.xyz",
-        permanent: false,
-      },
-      {
-        source: "/meme",
-        destination: "https://memes.metasal.xyz",
-        permanent: false,
-      },
+      // /memes is now a first-party page using memes.sol.new API
       {
         source: "/frame",
         destination: "/home",
@@ -80,6 +80,23 @@ const nextConfig: NextConfig = {
       { source: "/en/:path*", destination: "/:path*", permanent: true },
     ];
   },
+  async headers() {
+    const json = [{ key: "Content-Type", value: "application/json" }];
+    return [
+      { source: "/.well-known/apple-app-site-association", headers: json },
+      { source: "/apple-app-site-association", headers: json },
+      { source: "/.well-known/assetlinks.json", headers: json },
+    ];
+  },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push("@raydium-io/raydium-sdk-v2");
+      config.externals.push("@heliuslabs/zolana");
+    }
+    return config;
+  },
+  turbopack: {},
 };
 
 export default nextConfig;

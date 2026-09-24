@@ -1,5 +1,5 @@
 "use client";
-import { Coins, Rocket, Info, X, ArrowLeft, Users, Vote, Dog, Sparkles } from "lucide-react";
+import { Coins, Rocket, Info, X, ArrowLeft, Users, Vote, Dog, Sparkles, Layers, TrendingUp } from "lucide-react";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { PageTransition } from "@/components/page-transition";
 
@@ -7,23 +7,29 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/components/navbar";
-import { uploadImage, uploadMetadata } from "@/lib/api";
+import { uploadImage, uploadMetadata, madeAtSolNew } from "@/lib/api";
 import { useImagePaste } from "@/lib/use-image-paste";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { getPasskeyKeypair } from "@/lib/passkey-wallet";
-import { Connection, Keypair, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, Transaction, VersionedTransaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { PromoInput } from "@/components/promo-input";
 import { DynamicBondingCurveClient } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { analytics } from "@/lib/analytics";
 import { friendlyError } from "@/lib/friendly-errors";
+import { TOKEN_LAUNCH_PRICES, tokenLaunchCostLabel } from "@/lib/token-launch-pricing";
+import { TokenSocials, useTokenSocials } from "@/components/token-socials";
+import dynamic from "next/dynamic";
+
+const LaunchLabForm = dynamic(() => import("./launchlab-form"), { ssr: false });
+const StonkForm = dynamic(() => import("./stonk-form"), { ssr: false });
 
 const DBC_PARTNER_CONFIG_MAINNET = new PublicKey("8G4yr6Q7wHvpRBGj1u9ZisY9Q95HNAxBQknaqUNanpvA");
 const DBC_PARTNER_CONFIG_DEVNET = new PublicKey("QfakkckSG6L7hkuxiDQRWF7AW26MmrxBqgvMMmMzc3H");
 const dbcPartnerConfig = (network: string) =>
   network === "devnet" ? DBC_PARTNER_CONFIG_DEVNET : DBC_PARTNER_CONFIG_MAINNET;
 
-type Style = "pick" | "meteora" | "orynth" | "genesis" | "pump" | "bags" | "metadao" | "bonkfun";
+type Style = "pick" | "meteora" | "genesis" | "pump" | "bags" | "metadao" | "bonkfun" | "jup" | "launchlab" | "stonk";
 
 // ─── Style picker ─────────────────────────────────────────────────────────────
 
@@ -53,7 +59,7 @@ const STYLE_OPTIONS: {
     label: "Meteora",
     subtitle: "Custom bonding curve",
     detail: "Your own curve parameters, 1B supply, creator allocation, DAMM v2 graduation.",
-    cost: "~0.045 SOL",
+    cost: tokenLaunchCostLabel("meteora"),
     icon: <Coins size={22} />,
     accent: "orange",
     example: {
@@ -66,30 +72,13 @@ const STYLE_OPTIONS: {
       outcome: "Meteora's own token — made by the team behind this launch style.",
     },
   },
-  {
-    key: "orynth",
-    label: "Orynth",
-    subtitle: "Partner DBC launch",
-    detail: "Launch via Orynth Partner API — Meteora DBC, sol.new earns partner fees, mints end in red.",
-    cost: "~0.05 SOL",
-    icon: <Sparkles size={22} />,
-    accent: "purple",
-    example: {
-      name: "TOKENSHIT",
-      ticker: "TOKENSHIT",
-      image: "/icon-192.png",
-      description: "Launched through sol.new × Orynth.",
-      website: "sol.new",
-      twitter: "@soldotnew",
-      outcome: "Partner fee share on volume — claimable by sol.new.",
-    },
-  },
+
   {
     key: "pump",
     label: "Pump",
     subtitle: "pump.fun bonding curve",
     detail: "Launch on pump.fun's program. Free to create — just on-chain rent. Graduates to Raydium.",
-    cost: "~0.008 SOL",
+    cost: tokenLaunchCostLabel("pump"),
     icon: <Rocket size={22} />,
     accent: "purple",
     example: {
@@ -107,7 +96,7 @@ const STYLE_OPTIONS: {
     label: "Bags",
     subtitle: "Creator social token",
     detail: "Your personal token tied to your identity. Followers can hold a piece of your brand.",
-    cost: "~0.008 SOL",
+    cost: tokenLaunchCostLabel("bags"),
     icon: <Users size={22} />,
     accent: "blue",
     example: {
@@ -121,11 +110,65 @@ const STYLE_OPTIONS: {
     },
   },
   {
+    key: "jup",
+    label: "Jupiter",
+    subtitle: "Studio bonding curve",
+    detail: "Jupiter Studio meme preset. USDC curve 16k → 69k, then Meteora. Official Studio API.",
+    cost: tokenLaunchCostLabel("jup"),
+    icon: <Sparkles size={22} />,
+    accent: "lime",
+    example: {
+      name: "Jupiter",
+      ticker: "JUP",
+      image: "/examples/jup.svg",
+      description: "The liquidity and trading layer of Solana.",
+      website: "jup.ag",
+      twitter: "@JupiterExchange",
+      outcome: "Studio launches graduate to a Meteora pool with locked LP.",
+    },
+  },
+  {
+    key: "launchlab",
+    label: "LaunchLab",
+    subtitle: "Raydium bonding curve",
+    detail: "Raydium LaunchLab JustSendit-style create. Graduates to Raydium CPMM. Official SDK.",
+    cost: tokenLaunchCostLabel("launchlab"),
+    icon: <Layers size={22} />,
+    accent: "indigo",
+    example: {
+      name: "Raydium",
+      ticker: "RAY",
+      image: "/examples/launchlab.svg",
+      description: "Raydium AMM and LaunchLab.",
+      website: "raydium.io",
+      twitter: "@RaydiumProtocol",
+      outcome: "LaunchLab tokens graduate to Raydium CPMM once the SOL target is hit.",
+    },
+  },
+  {
+    key: "stonk",
+    label: "Stonk",
+    subtitle: "stonkfun.xyz quote pair",
+    detail: "Launch vs NVDAx, SPYx, SOL, or another mint. StonkFun public API. Passkey signs the fee.",
+    cost: tokenLaunchCostLabel("stonk"),
+    icon: <TrendingUp size={22} />,
+    accent: "green",
+    example: {
+      name: "STONK",
+      ticker: "STONK",
+      image: "/examples/jup.svg",
+      description: "StonkFun launchpad token.",
+      website: "stonkfun.xyz",
+      twitter: "@launchonsf",
+      outcome: "Quoted against tokenized stocks and other mints on LaunchLab.",
+    },
+  },
+  {
     key: "bonkfun",
     label: "Bonk",
     subtitle: "bonk.fun bonding curve",
     detail: "Launch on LetsBonk's curve. Graduates to Raydium — fees fund BONK burns.",
-    cost: "Coming soon",
+    cost: tokenLaunchCostLabel("bonkfun"),
     icon: <Dog size={22} />,
     accent: "amber",
     disabled: true,
@@ -144,7 +187,7 @@ const STYLE_OPTIONS: {
     label: "Genesis",
     subtitle: "Fair launch / TGE",
     detail: "Time-based deposit window. Price set by demand. Tokens claimed after the window closes.",
-    cost: "~0.01 SOL",
+    cost: tokenLaunchCostLabel("genesis"),
     icon: <Coins size={22} />,
     accent: "orange",
     example: {
@@ -162,7 +205,7 @@ const STYLE_OPTIONS: {
     label: "Metadao",
     subtitle: "Futarchy governance",
     detail: "On-chain prediction markets decide proposals. Governance by market consensus.",
-    cost: "~0.05 SOL",
+    cost: tokenLaunchCostLabel("metadao"),
     icon: <Vote size={22} />,
     accent: "green",
     example: {
@@ -207,6 +250,24 @@ const ACCENT_CLASSES: Record<string, { border: string; bg: string; text: string;
     bg: "bg-amber-500/5",
     text: "text-amber-600 dark:text-amber-400",
     btn: "bg-amber-500 hover:bg-amber-400",
+  },
+  cyan: {
+    border: "border-cyan-400/40",
+    bg: "bg-cyan-500/5",
+    text: "text-cyan-600 dark:text-cyan-400",
+    btn: "bg-cyan-500 hover:bg-cyan-400",
+  },
+  lime: {
+    border: "border-lime-400/40",
+    bg: "bg-lime-500/5",
+    text: "text-lime-600 dark:text-lime-400",
+    btn: "bg-lime-500 hover:bg-lime-400",
+  },
+  indigo: {
+    border: "border-indigo-400/40",
+    bg: "bg-indigo-500/5",
+    text: "text-indigo-600 dark:text-indigo-400",
+    btn: "bg-indigo-500 hover:bg-indigo-400",
   },
 };
 
@@ -404,7 +465,7 @@ function ExampleFormModal({
       aria-label={`How ${ex.name} was launched`}
     >
       <div
-        className="w-full sm:max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl"
+        className="w-full sm:max-w-lg lg:max-w-xl max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 flex items-center justify-between px-5 py-4 bg-white/90 dark:bg-black/90 backdrop-blur border-b border-black/10 dark:border-white/10">
@@ -475,7 +536,7 @@ function StylePicker({ onSelect }: { onSelect: (s: Exclude<Style, "pick">) => vo
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1">
           <AnimatedIcon icon={Coins} size={32} className="text-purple-400" />
           <h1 className="text-2xl font-bold tracking-tight">Launch a token</h1>
@@ -518,6 +579,45 @@ function StylePicker({ onSelect }: { onSelect: (s: Exclude<Style, "pick">) => vo
 
         <TopTokensBrowse />
         <ExampleTokens />
+
+        <div className="rounded-2xl border border-black/10 dark:border-white/10 overflow-hidden">
+          <div className="px-4 py-3 border-b border-black/10 dark:border-white/10 flex items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Launch pricing (mainnet)</h2>
+            <Link href="/docs#token-launch" className="text-[11px] text-purple-500 hover:underline">
+              Full table
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-black/5 dark:bg-white/5 text-[10px] uppercase tracking-wide text-gray-500 dark:text-white/40">
+                <tr>
+                  <th className="px-3 py-2">Pad</th>
+                  <th className="px-3 py-2">You pay</th>
+                  <th className="px-3 py-2">Trade</th>
+                  <th className="px-3 py-2">Quote / grad</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/5 dark:divide-white/5">
+                {TOKEN_LAUNCH_PRICES.filter((p) => p.live).map((p) => (
+                  <tr key={p.id}>
+                    <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{p.label}</td>
+                    <td className="px-3 py-2 font-mono">{p.costLabel}</td>
+                    <td className="px-3 py-2 font-mono">
+                      {p.tradeFeeBps != null ? `${(p.tradeFeeBps / 100).toFixed(2)}%` : "-"}
+                    </td>
+                    <td className="px-3 py-2 text-gray-500 dark:text-white/45">
+                      {p.quote} / {p.graduation}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="px-3 py-2 text-[11px] text-gray-400 dark:text-white/30">
+            Only Meteora 0.045 is a hard min (0.040 rent + 0.005 sol.new). Other SOL figures are typical rent.
+            85 SOL / 69k USDC are curve targets, not create fees. Image + metadata upload is free.
+          </p>
+        </div>
       </div>
 
       {exampleFor && <ExampleFormModal option={exampleFor} onClose={() => setExampleFor(null)} />}
@@ -533,15 +633,13 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
   const [description, setDescription] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [twitter, setTwitter] = useState("");
-  const [telegram, setTelegram] = useState("");
-  const [website, setWebsite] = useState("");
+  const socials = useTokenSocials();
   const [status, setStatus] = useState<"idle" | "auth" | "uploading" | "creating" | "confirming" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { publicKey, refreshBalance } = useWallet();
-  const { rpc } = useNetwork();
+  const { rpc, network, rotateDevnetRpc } = useNetwork();
 
   const acceptImage = useCallback((file: File) => {
     setImageFile(file);
@@ -560,17 +658,19 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
       setStatus("uploading");
       const uploaded = await uploadImage(imageFile);
       const imageUrl = uploaded.url;
-      const socials: Record<string, string> = {};
-      if (twitter) socials.twitter = twitter;
-      if (telegram) socials.telegram = telegram;
-      if (website) socials.website = website;
-      const metadata = await uploadMetadata({ name, symbol: ticker, description, image: imageUrl, ...socials });
+      const metadata = await uploadMetadata({ name, symbol: ticker, description, image: imageUrl, ...socials.filled });
 
       setStatus("creating");
       const res = await fetch("/api/launch/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, symbol: ticker, metadataUri: metadata.uri, creatorWallet: publicKey }),
+        body: JSON.stringify({
+          name,
+          symbol: ticker,
+          metadataUri: metadata.uri,
+          creatorWallet: publicKey,
+          network,
+        }),
       });
       const data = await res.json() as { ok?: boolean; tx?: string; mint?: string; blockhash?: string; lastValidBlockHeight?: number; error?: string };
       if (!data.ok || !data.tx || !data.mint) throw new Error(data.error ?? "Failed to build transaction");
@@ -578,8 +678,22 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
       const tx = Transaction.from(Buffer.from(data.tx, "base64"));
       tx.partialSign(userKeypair);
 
-      const connection = new Connection(rpc, "confirmed");
-      const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
+      let connection = new Connection(rpc, "confirmed");
+      let sig: string;
+      try {
+        sig = await connection.sendRawTransaction(tx.serialize(), {
+          skipPreflight: network === "devnet",
+          maxRetries: 3,
+        });
+      } catch (sendErr) {
+        const msg = sendErr instanceof Error ? sendErr.message : String(sendErr);
+        if (!/Blockhash not found|block height exceeded/i.test(msg)) throw sendErr;
+        connection = new Connection(network === "devnet" ? rotateDevnetRpc() : rpc, "confirmed");
+        sig = await connection.sendRawTransaction(tx.serialize(), {
+          skipPreflight: true,
+          maxRetries: 3,
+        });
+      }
 
       setStatus("confirming");
       await connection.confirmTransaction(
@@ -590,7 +704,16 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
       await fetch("/api/token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet: publicKey, name, symbol: ticker, description, imageUrl, metadataUri: metadata.uri, mintAddress: data.mint, network: "mainnet" }),
+        body: JSON.stringify({
+          wallet: publicKey,
+          name,
+          symbol: ticker,
+          description,
+          imageUrl,
+          metadataUri: metadata.uri,
+          mintAddress: data.mint,
+          network,
+        }),
       }).catch(() => {});
 
       // For Bags: also set up creator profile
@@ -604,10 +727,10 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
 
       await refreshBalance();
       analytics.tokenCreated(data.mint, ticker);
-      router.push(`/launch/${data.mint}`);
+      router.push(network === "devnet" ? `/address/${data.mint}` : `/launch/${data.mint}`);
     } catch (e: unknown) {
       analytics.launchFailed(ticker, String(e).slice(0, 120));
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendlyError(e instanceof Error ? e.message : String(e)));
       setStatus("error");
     }
   };
@@ -619,7 +742,7 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1 relative">
           <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
@@ -650,15 +773,7 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
           </label>
           <input id="pump-image" ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={(e) => { const f = e.target.files?.[0]; if (f) acceptImage(f); }} className="sr-only" />
 
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { key: "twitter", placeholder: "X / Twitter", value: twitter, set: setTwitter },
-              { key: "telegram", placeholder: "Telegram", value: telegram, set: setTelegram },
-              { key: "website", placeholder: "Website", value: website, set: setWebsite },
-            ].map(({ key, placeholder, value, set }) => (
-              <input key={key} type="text" placeholder={placeholder} value={value} onChange={(e) => set(e.target.value)} disabled={busy} className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 transition text-xs disabled:opacity-50" />
-            ))}
-          </div>
+          <TokenSocials socials={socials} accent={isBags ? "blue" : "purple"} disabled={busy} />
 
           {error && <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">{error}</div>}
 
@@ -684,9 +799,9 @@ function PumpForm({ style, onBack }: { style: "pump" | "bags"; onBack: () => voi
               <button
                 onClick={handleLaunch}
                 disabled={!name || !ticker || !imageFile}
-                className={`w-full ${ac.btn} disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed`}
+                className={`w-full ${ac.btn} disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed`}
               >
-                {isBags ? "Launch my token" : "Launch on pump.fun"}
+                {isBags ? "Launch my token" : network === "devnet" ? "Launch on pump.fun (devnet)" : "Launch on pump.fun"}
               </button>
               <p className="text-center text-xs text-gray-400 dark:text-white/30">~0.008 SOL · rent only · graduates to Raydium</p>
             </>
@@ -711,14 +826,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
   const [description, setDescription] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [website, setWebsite] = useState("https://");
-  const [twitter, setTwitter] = useState("https://x.com/");
-  const [telegram, setTelegram] = useState("https://t.me/");
-  const [instagram, setInstagram] = useState("https://instagram.com/");
-  const [github, setGithub] = useState("https://github.com/");
-  const [youtube, setYoutube] = useState("https://youtube.com/");
-  const [tiktok, setTiktok] = useState("https://tiktok.com/@");
-  const [activeSocials, setActiveSocials] = useState<Set<string>>(new Set());
+  const socials = useTokenSocials();
   const [promoCode, setPromoCode] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
   const [status, setStatus] = useState<"idle" | "auth" | "uploading" | "creating" | "confirming" | "done" | "error">("idle");
@@ -777,13 +885,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
         symbol: ticker,
         description,
         image: imageUrl,
-        ...(website && website !== "https://" && { website }),
-        ...(twitter && twitter !== "https://x.com/" && { twitter }),
-        ...(telegram && telegram !== "https://t.me/" && { telegram }),
-        ...(instagram && instagram !== "https://instagram.com/" && { instagram }),
-        ...(github && github !== "https://github.com/" && { github }),
-        ...(youtube && youtube !== "https://youtube.com/" && { youtube }),
-        ...(tiktok && tiktok !== "https://tiktok.com/@" && { tiktok }),
+        ...socials.filled,
       });
 
       setStatus("creating");
@@ -862,7 +964,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
   return (
     <>
       <PageTransition>
-        <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
+        <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
           <div className="text-center space-y-1 relative">
             <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
               <ArrowLeft size={15} />
@@ -894,34 +996,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
             </label>
             <input id="token-image-upload" ref={fileRef} type="file" accept="image/png,image/jpeg" onChange={handleFile} className="sr-only" />
 
-            {/* Social links */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-gray-400 dark:text-white/30">Add links:</span>
-                {[
-                  { key: "website", label: "Website", icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg> },
-                  { key: "twitter", label: "X", icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> },
-                  { key: "telegram", label: "Telegram", icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg> },
-                  { key: "instagram", label: "Instagram", icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg> },
-                  { key: "github", label: "GitHub", icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg> },
-                  { key: "youtube", label: "YouTube", icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg> },
-                  { key: "tiktok", label: "TikTok", icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg> },
-                ].map(({ key, label, icon }) => (
-                  <button key={key} type="button" onClick={() => {
-                    const next = new Set(activeSocials);
-                    if (next.has(key)) { next.delete(key); } else { next.add(key); }
-                    setActiveSocials(next);
-                  }} className={`p-2 rounded-lg border transition cursor-pointer ${activeSocials.has(key) ? "bg-orange-500/20 border-orange-400/50 text-orange-400" : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-400 dark:text-white/40 hover:text-gray-600 dark:hover:text-white/60"}`} title={label}>{icon}</button>
-                ))}
-              </div>
-              {activeSocials.has("website") && <input type="url" placeholder="Website URL" value={website} onChange={(e) => setWebsite(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition text-sm" />}
-              {activeSocials.has("twitter") && <input type="text" placeholder="X handle" value={twitter} onChange={(e) => setTwitter(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition text-sm" />}
-              {activeSocials.has("telegram") && <input type="text" placeholder="Telegram link" value={telegram} onChange={(e) => setTelegram(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition text-sm" />}
-              {activeSocials.has("instagram") && <input type="text" placeholder="Instagram handle" value={instagram} onChange={(e) => setInstagram(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition text-sm" />}
-              {activeSocials.has("github") && <input type="text" placeholder="GitHub URL" value={github} onChange={(e) => setGithub(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition text-sm" />}
-              {activeSocials.has("youtube") && <input type="text" placeholder="YouTube URL" value={youtube} onChange={(e) => setYoutube(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition text-sm" />}
-              {activeSocials.has("tiktok") && <input type="text" placeholder="TikTok handle" value={tiktok} onChange={(e) => setTiktok(e.target.value)} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-orange-400/50 focus:ring-1 focus:ring-orange-400/25 transition text-sm" />}
-            </div>
+            <TokenSocials socials={socials} accent="orange" disabled={busy} />
 
             {error && <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">{error}</div>}
 
@@ -953,7 +1028,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
             ) : (
               <>
                 <PromoInput onValidCode={setPromoCode} onClear={() => setPromoCode(null)} />
-                <button onClick={handleLaunch} disabled={!name || !ticker || !imageFile} className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed">
+                <button onClick={handleLaunch} disabled={!name || !ticker || !imageFile} className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed">
                   Launch token
                 </button>
               </>
@@ -967,7 +1042,7 @@ function MeteorForm({ onBack }: { onBack: () => void }) {
 
       {showInfo && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4" onClick={() => setShowInfo(false)}>
-          <div className="w-full sm:max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full sm:max-w-lg lg:max-w-xl max-h-[85vh] overflow-y-auto bg-white dark:bg-black rounded-t-2xl sm:rounded-2xl border border-black/10 dark:border-white/10 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 flex items-center justify-between px-5 py-4 bg-white/90 dark:bg-black/90 backdrop-blur border-b border-black/10 dark:border-white/10">
               <h2 className="text-lg font-bold flex items-center gap-2"><Info className="w-5 h-5 text-orange-400" /> How a token launch works</h2>
               <button type="button" onClick={() => setShowInfo(false)} aria-label="Close" className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer"><X className="w-5 h-5" /></button>
@@ -1001,6 +1076,7 @@ function GenesisForm({ onBack }: { onBack: () => void }) {
   const [description, setDescription] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const socials = useTokenSocials();
   const [durationIdx, setDurationIdx] = useState(0);
   const [status, setStatus] = useState<"idle" | "auth" | "uploading" | "creating" | "done" | "error">("idle");
   const [step, setStep] = useState(0);
@@ -1025,7 +1101,7 @@ function GenesisForm({ onBack }: { onBack: () => void }) {
 
       setStatus("uploading");
       const uploaded = await uploadImage(imageFile);
-      const metadata = await uploadMetadata({ name, symbol: ticker, description, image: uploaded.url });
+      const metadata = await uploadMetadata({ name, symbol: ticker, description, image: uploaded.url, ...socials.filled });
 
       setStatus("creating");
       const { createUmiWithKeypair } = await import("@/lib/umi-passkey");
@@ -1138,7 +1214,7 @@ function GenesisForm({ onBack }: { onBack: () => void }) {
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1 relative">
           <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
@@ -1164,6 +1240,8 @@ function GenesisForm({ onBack }: { onBack: () => void }) {
             )}
           </label>
           <input id="genesis-image" ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={(e) => { const f = e.target.files?.[0]; if (f) acceptImage(f); }} className="sr-only" />
+
+          <TokenSocials socials={socials} accent="orange" />
 
           {/* Deposit window */}
           <div>
@@ -1198,7 +1276,7 @@ function GenesisForm({ onBack }: { onBack: () => void }) {
         <button
           onClick={handleLaunch}
           disabled={busy || !name || !ticker || !imageFile}
-          className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {busy ? (status === "auth" ? "Authenticating…" : status === "uploading" ? "Uploading…" : "Creating…") : "Launch Genesis TGE"}
         </button>
@@ -1273,7 +1351,7 @@ function MetadaoForm({ onBack }: { onBack: () => void }) {
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1 relative">
           <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
@@ -1335,7 +1413,7 @@ function MetadaoForm({ onBack }: { onBack: () => void }) {
         <button
           onClick={handleCreate}
           disabled={busy || !valid}
-          className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {busy ? (status === "auth" ? "Authenticating…" : "Creating DAO…") : "Create Futarchy DAO"}
         </button>
@@ -1344,27 +1422,19 @@ function MetadaoForm({ onBack }: { onBack: () => void }) {
   );
 }
 
-
-// ─── Orynth Partner DBC launch ────────────────────────────────────────────────
-
-function OrynthForm({ onBack }: { onBack: () => void }) {
+function JupForm({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState("");
   const [ticker, setTicker] = useState("");
   const [description, setDescription] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [twitter, setTwitter] = useState("");
-  const [telegram, setTelegram] = useState("");
-  const [website, setWebsite] = useState("https://sol.new");
-  const [status, setStatus] = useState<
-    "idle" | "auth" | "uploading" | "creating" | "signing" | "confirming" | "done" | "error"
-  >("idle");
+  const socials = useTokenSocials();
+  const [status, setStatus] = useState<"idle" | "auth" | "uploading" | "creating" | "confirming" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
-  const [quoteSol, setQuoteSol] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const { publicKey, refreshBalance, balance } = useWallet();
-  const { rpc } = useNetwork();
+  const { publicKey, refreshBalance } = useWallet();
+  const ac = ACCENT_CLASSES.lime;
 
   const acceptImage = useCallback((file: File) => {
     setImageFile(file);
@@ -1372,289 +1442,136 @@ function OrynthForm({ onBack }: { onBack: () => void }) {
   }, []);
   useImagePaste(acceptImage);
 
-  useEffect(() => {
-    fetch("/api/orynth/quote", { cache: "no-store" })
-      .then((r) => r.json() as Promise<{ launchCost?: { requiredSol?: number } }>)
-      .then((j) => {
-        if (j.launchCost?.requiredSol != null) setQuoteSol(j.launchCost.requiredSol);
-      })
-      .catch(() => {});
-  }, []);
-
   const handleLaunch = async () => {
     if (!name || !ticker || !imageFile || !publicKey) return;
     setError(null);
-    analytics.launchInitiated(ticker, "orynth");
+    analytics.launchInitiated(ticker, "jup-studio");
     try {
       setStatus("auth");
       const { keypair: userKeypair } = await getPasskeyKeypair();
 
-      const need = quoteSol ?? 0.05;
-      if ((balance ?? 0) < need - 0.001) {
-        throw new Error(
-          `Need ~${need.toFixed(3)} SOL to launch (balance ${(balance ?? 0).toFixed(4)}). Open Get funds.`,
-        );
-      }
-
-      setStatus("uploading");
-      const uploaded = await uploadImage(imageFile);
-      const imageUrl = uploaded.url;
-
       setStatus("creating");
-      const prepRes = await fetch("/api/orynth/prepare", {
+      const ctype = imageFile.type || "image/png";
+      const built = await fetch("/api/launch/studio/create-tx", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          payerWalletAddress: publicKey,
-          name,
-          symbol: ticker,
-          description: description || `${name} launched on sol.new`,
-          imageUrl,
-          websiteUrl: website || "https://sol.new",
-          twitter: twitter || undefined,
-          telegram: telegram || undefined,
-          creatorUsername: publicKey.slice(0, 8),
+          creator: publicKey,
+          tokenName: name,
+          tokenSymbol: ticker,
+          tokenImageContentType: ctype,
         }),
       });
-      const prep = (await prepRes.json()) as {
+      const data = (await built.json()) as {
         ok?: boolean;
+        transaction?: string;
+        mint?: string;
+        imagePresignedUrl?: string;
+        metadataPresignedUrl?: string;
+        imageUrl?: string;
         error?: string;
-        launchId?: string;
-        preparedTxHex?: string;
-        mintAddress?: string | null;
       };
-      if (!prepRes.ok || !prep.launchId || !prep.preparedTxHex) {
-        throw new Error(prep.error || "Orynth prepare failed");
+      if (!data.ok || !data.transaction || !data.mint) throw new Error(data.error ?? "Studio did not return a tx");
+
+      setStatus("uploading");
+      if (data.imagePresignedUrl) {
+        const putImg = await fetch(data.imagePresignedUrl, { method: "PUT", headers: { "Content-Type": ctype }, body: imageFile });
+        if (!putImg.ok) throw new Error("Studio image upload failed");
       }
-
-      setStatus("signing");
-      const tx = Transaction.from(Buffer.from(prep.preparedTxHex, "hex"));
-      // poolCreator already signed server-side; payer signs here
-      tx.partialSign(userKeypair);
-      const signedTxHex = Buffer.from(tx.serialize()).toString("hex");
-
-      const subRes = await fetch("/api/orynth/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ launchId: prep.launchId, signedTxHex }),
-      });
-      const sub = (await subRes.json()) as {
-        ok?: boolean;
-        error?: string;
-        launch?: {
-          mintAddress?: string;
-          launchSignature?: string;
-          status?: string;
-          poolAddress?: string;
-        };
-        mintAddress?: string;
-      };
-      if (!subRes.ok) throw new Error(sub.error || "Orynth submit failed");
-
-      setStatus("confirming");
-      // poll status up to ~45s
-      let mint =
-        sub.launch?.mintAddress ||
-        sub.mintAddress ||
-        prep.mintAddress ||
-        null;
-      let sig = sub.launch?.launchSignature || null;
-      for (let i = 0; i < 15 && (!mint || !sig); i++) {
-        await new Promise((r) => setTimeout(r, 2000));
-        const st = await fetch(
-          `/api/orynth/status?launchId=${encodeURIComponent(prep.launchId)}`,
-        ).then((r) => r.json() as Promise<{
-          launch?: { mintAddress?: string; launchSignature?: string; status?: string };
-          mintAddress?: string;
-          launchSignature?: string;
-          status?: string;
-        }>);
-        const L = st.launch || st;
-        mint = (L as { mintAddress?: string }).mintAddress || mint;
-        sig = (L as { launchSignature?: string }).launchSignature || sig;
-        if ((L as { status?: string }).status === "launched" && mint) break;
-        if ((L as { status?: string }).status === "failed") {
-          throw new Error("Orynth reported launch failed");
-        }
-      }
-
-      if (mint) {
-        await fetch("/api/token", {
-          method: "POST",
+      if (data.metadataPresignedUrl) {
+        const putMeta = await fetch(data.metadataPresignedUrl, {
+          method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            wallet: publicKey,
             name,
             symbol: ticker,
-            description,
-            imageUrl,
-            mintAddress: mint,
-            network: "mainnet",
-            platform: "orynth",
+            description: madeAtSolNew(description),
+            image: data.imageUrl,
+            ...socials.filled,
           }),
-        }).catch(() => {});
+        });
+        if (!putMeta.ok) throw new Error("Studio metadata upload failed");
       }
 
+      const tx = VersionedTransaction.deserialize(Buffer.from(data.transaction, "base64"));
+      tx.sign([userKeypair]);
+      const signed = Buffer.from(tx.serialize()).toString("base64");
+
+      setStatus("confirming");
+      const form = new FormData();
+      form.append("transaction", signed);
+      form.append("owner", publicKey);
+      form.append("content", description || "");
+      const submitted = await fetch("/api/launch/studio/submit", { method: "POST", body: form });
+      const result = (await submitted.json()) as { ok?: boolean; error?: string; result?: { signature?: string; txid?: string } };
+      if (!submitted.ok || !result.ok) throw new Error(result.error ?? "Studio submit failed");
+
+      await fetch("/api/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet: publicKey,
+          name,
+          symbol: ticker,
+          description,
+          imageUrl: data.imageUrl,
+          mintAddress: data.mint,
+          network: "mainnet",
+        }),
+      }).catch(() => {});
+
       await refreshBalance();
-      if (mint) {
-        analytics.tokenCreated(mint, ticker);
-        analytics.launchCompleted(mint, ticker, "orynth");
-        router.push(`/token/${mint}`);
-      } else {
-        analytics.launchCompleted(prep.launchId, ticker, "orynth");
-        setStatus("done");
-        setError(null);
-        // stay with success message
-        throw new Error(
-          "Launch submitted — mint not ready yet. Check status shortly.",
-        );
-      }
+      analytics.tokenCreated(data.mint, ticker);
+      router.push(`/launch/${data.mint}`);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes("mint not ready")) {
-        setStatus("done");
-        setError(msg);
-        return;
-      }
-      analytics.launchFailed(ticker, msg.slice(0, 120));
-      setError(friendlyError(e, "Couldn't launch via Orynth."));
+      analytics.launchFailed(ticker, String(e).slice(0, 120));
+      setError(friendlyError(e instanceof Error ? e.message : String(e)));
       setStatus("error");
     }
   };
 
-  const busy = status !== "idle" && status !== "error" && status !== "done";
-  const ac = ACCENT_CLASSES.purple;
-
+  const busy = status !== "idle" && status !== "error";
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-4 mx-auto">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-4">
         <div className="text-center space-y-1 relative">
-          <button
-            type="button"
-            onClick={onBack}
-            className="absolute left-0 top-0 text-gray-400 hover:text-gray-600 transition flex items-center gap-1 text-sm"
-          >
+          <button onClick={onBack} className="absolute left-0 top-0 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition cursor-pointer flex items-center gap-1 text-sm">
             <ArrowLeft size={15} />
           </button>
           <AnimatedIcon icon={Sparkles} size={32} className={ac.text} />
-          <h1 className="text-2xl font-bold tracking-tight">Orynth launch</h1>
-          <p className="text-gray-500 dark:text-white/50 text-sm">
-            Partner DBC on Meteora · you pay ~{quoteSol?.toFixed(3) ?? "0.05"} SOL · fees to sol.new
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">Jupiter Studio</h1>
+          <p className="text-gray-500 dark:text-white/50 text-sm">Meme preset · USDC curve 16k → 69k · Meteora LP</p>
         </div>
-
         <div className="space-y-3">
-          <input
-            type="text"
-            placeholder="Token name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={busy}
-            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 disabled:opacity-50"
-          />
-          <input
-            type="text"
-            placeholder="Ticker"
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value.toUpperCase())}
-            maxLength={12}
-            disabled={busy}
-            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 font-mono disabled:opacity-50"
-          />
-          <textarea
-            placeholder="Description (optional)"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={2}
-            disabled={busy}
-            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 resize-none disabled:opacity-50"
-          />
-
-          <label
-            htmlFor="orynth-image"
-            className="flex items-center justify-center w-full bg-black/5 dark:bg-white/5 border border-dashed border-black/10 dark:border-white/10 rounded-xl px-4 py-4 cursor-pointer"
-          >
+          <input type="text" placeholder="Token name" value={name} onChange={(e) => setName(e.target.value)} disabled={busy} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-lime-400/50 transition disabled:opacity-50" />
+          <input type="text" placeholder="Ticker (e.g. JUP)" value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} maxLength={10} disabled={busy} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-lime-400/50 transition font-mono disabled:opacity-50" />
+          <textarea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} disabled={busy} className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-lime-400/50 transition resize-none disabled:opacity-50" />
+          <label htmlFor="jup-image" className="flex items-center justify-center w-full bg-black/5 dark:bg-white/5 border border-dashed border-black/10 dark:border-white/10 rounded-xl px-4 py-4 cursor-pointer hover:border-black/20 dark:hover:border-white/20 transition overflow-hidden">
             {imagePreview ? (
               <div className="flex items-center gap-3">
-                <img src={imagePreview} alt="" className="w-12 h-12 rounded-lg object-cover" />
-                <span className="text-sm text-gray-500">{imageFile?.name}</span>
+                <img src={imagePreview} alt="preview" className="w-12 h-12 rounded-lg object-cover" />
+                <span className="text-gray-500 dark:text-white/50 text-sm">{imageFile?.name}</span>
               </div>
             ) : (
-              <span className="text-sm text-gray-400">Tap to upload or paste an image</span>
+              <span className="text-gray-400 dark:text-white/30 text-sm">Tap to upload or paste an image</span>
             )}
           </label>
-          <input
-            id="orynth-image"
-            ref={fileRef}
-            type="file"
-            accept="image/png,image/jpeg,image/gif,image/webp"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) acceptImage(f);
-            }}
-            className="sr-only"
-          />
-
-          <div className="grid grid-cols-3 gap-2">
-            <input
-              type="text"
-              placeholder="X / Twitter"
-              value={twitter}
-              onChange={(e) => setTwitter(e.target.value)}
-              disabled={busy}
-              className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2.5 text-xs disabled:opacity-50"
-            />
-            <input
-              type="text"
-              placeholder="Telegram"
-              value={telegram}
-              onChange={(e) => setTelegram(e.target.value)}
-              disabled={busy}
-              className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2.5 text-xs disabled:opacity-50"
-            />
-            <input
-              type="text"
-              placeholder="Website"
-              value={website}
-              onChange={(e) => setWebsite(e.target.value)}
-              disabled={busy}
-              className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2.5 text-xs disabled:opacity-50"
-            />
-          </div>
-
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">
-              {error}
-            </div>
-          )}
-          {status === "done" && !error?.includes("Couldn't") && (
-            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3 text-emerald-600 text-sm">
-              Launch submitted. Mint may appear shortly on your portfolio.
-            </div>
-          )}
-
+          <input id="jup-image" ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={(e) => { const f = e.target.files?.[0]; if (f) acceptImage(f); }} className="sr-only" />
+          <TokenSocials socials={socials} accent="lime" disabled={busy} />
+          {error && <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">{error}</div>}
           {busy ? (
-            <p className="text-center text-sm text-gray-500">
-              {status === "auth" && "Face ID…"}
+            <p className="text-center text-sm text-gray-500 dark:text-white/50">
+              {status === "auth" && "Signing in…"}
               {status === "uploading" && "Uploading image…"}
-              {status === "creating" && "Orynth preparing…"}
-              {status === "signing" && "Signing & submitting…"}
-              {status === "confirming" && "Confirming on-chain…"}
+              {status === "creating" && "Building Studio tx…"}
+              {status === "confirming" && "Submitting…"}
             </p>
           ) : (
             <>
-              <button
-                type="button"
-                onClick={() => void handleLaunch()}
-                disabled={!name || !ticker || !imageFile || !publicKey}
-                className={`w-full ${ac.btn} disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3.5`}
-              >
-                Launch with Orynth
+              <button onClick={handleLaunch} disabled={!name || !ticker || !imageFile || !publicKey} className={`w-full ${ac.btn} disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 text-black font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed`}>
+                Launch on Jupiter Studio
               </button>
-              <p className="text-center text-xs text-gray-400">
-                ~{quoteSol?.toFixed(3) ?? "0.05"} SOL · mint ends in{" "}
-                <span className="font-mono text-purple-400">red</span> · partner fees to sol.new
-              </p>
+              <p className="text-center text-xs text-gray-400 dark:text-white/30">USDC meme curve · graduates to Meteora</p>
             </>
           )}
         </div>
@@ -1663,7 +1580,8 @@ function OrynthForm({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
+
+// ─── Main page ─
 
 export default function TokenPage() {
   const [style, setStyle] = useState<Style>("pick");
@@ -1672,13 +1590,15 @@ export default function TokenPage() {
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">
       <Navbar />
       <main className="flex-1 w-full pb-24">
-        <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8">
+        <div className="app-shell py-5 sm:py-8 lg:py-10">
           {style === "pick" && <StylePicker onSelect={setStyle} />}
           {style === "meteora" && <MeteorForm onBack={() => setStyle("pick")} />}
-          {style === "orynth" && <OrynthForm onBack={() => setStyle("pick")} />}
           {(style === "pump" || style === "bags") && <PumpForm style={style} onBack={() => setStyle("pick")} />}
           {style === "genesis" && <GenesisForm onBack={() => setStyle("pick")} />}
           {style === "metadao" && <MetadaoForm onBack={() => setStyle("pick")} />}
+          {style === "jup" && <JupForm onBack={() => setStyle("pick")} />}
+          {style === "launchlab" && <LaunchLabForm onBack={() => setStyle("pick")} />}
+          {style === "stonk" && <StonkForm onBack={() => setStyle("pick")} />}
         </div>
       </main>
     </div>

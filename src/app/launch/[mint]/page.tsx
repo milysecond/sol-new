@@ -28,6 +28,7 @@ type TokenData = {
   marketCapUsd: number | null;
   volume24h: number | null;
   pairAddress: string | null;
+  launchpad: string | null;
   bondingCurve: {
     realSolReserves: string | null;
     tokenTotalSupply: string | null;
@@ -388,6 +389,11 @@ export default function LaunchTokenPage() {
                     <div className="flex items-baseline gap-2 flex-wrap">
                       <h1 className="text-xl font-bold">{token.name ?? "Unknown"}</h1>
                       <span className="font-mono text-gray-500 dark:text-white/40">${token.symbol ?? "???"}</span>
+                      {token.launchpad && (
+                        <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-500">
+                          {token.launchpad}
+                        </span>
+                      )}
                     </div>
                     {token.description && <p className="text-sm text-gray-600 dark:text-white/60 mt-1 line-clamp-2">{token.description}</p>}
                     <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 dark:text-white/40">

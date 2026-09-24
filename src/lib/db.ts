@@ -394,6 +394,23 @@ export async function initDb() {
   } catch {
     // column already exists
   }
+  try {
+    await db.execute("ALTER TABLE claim_links ADD COLUMN claim_code TEXT");
+  } catch {
+    // column already exists
+  }
+  try {
+    await db.execute("ALTER TABLE claim_links ADD COLUMN claim_secret TEXT");
+  } catch {
+    // column already exists
+  }
+  try {
+    await db.execute(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_claim_links_code ON claim_links (claim_code)",
+    );
+  } catch {
+    // index already exists
+  }
   // POAP geo-lock columns (existing drops)
   for (const sql of [
     "ALTER TABLE poap_drops ADD COLUMN geo_lat REAL",
@@ -689,6 +706,22 @@ export async function markGroundKeyUsed(publicKey: string, wallet: string) {
   });
 }
 
+export async function releaseGroundKey(publicKey: string) {
+  await db.execute({
+    sql: "UPDATE ground_keys SET consumed = 0, consumed_by = NULL WHERE public_key = ? AND consumed_by = 'pending'",
+    args: [publicKey],
+  });
+}
+
+export async function getGroundSecret(publicKey: string): Promise<string | null> {
+  const row = await db.execute({
+    sql: "SELECT secret_key FROM ground_keys WHERE public_key = ? LIMIT 1",
+    args: [publicKey],
+  });
+  if (!row.rows.length) return null;
+  return (row.rows[0].secret_key as string) || null;
+}
+
 export async function countAvailableKeys(prefix: string) {
   const result = await db.execute({
     sql: "SELECT COUNT(*) as count FROM ground_keys WHERE prefix = ? AND consumed = 0",
@@ -797,20 +830,46 @@ export async function getInactivePushSubscriptions(minHours: number, maxHours: n
 }
 
 // ─── Claim links (gifts) ─────────────────────────────────────────────────────
-// Status bookkeeping only — the claim secret never touches the server; funds
-// move on-chain regardless of what this table says.
-
+// Gift claim links. Short codes (sol.new/c/xxxxxxxx) store the claim seed
+// so chat apps can chop long URLs. The code is the bearer token.
 export async function saveClaimLink(data: {
   publicKey: string;
   sender: string;
   amountLamports: number; // base units of the gifted token
   network: string;
   token?: string;
+  claimCode?: string;
+  claimSecret?: string;
 }) {
   await db.execute({
-    sql: `INSERT OR IGNORE INTO claim_links (public_key, sender, amount_lamports, network, token) VALUES (?, ?, ?, ?, ?)`,
-    args: [data.publicKey, data.sender, data.amountLamports, data.network, data.token || "SOL"],
+    sql: `INSERT INTO claim_links (public_key, sender, amount_lamports, network, token, claim_code, claim_secret)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(public_key) DO UPDATE SET
+            sender = excluded.sender,
+            amount_lamports = excluded.amount_lamports,
+            network = excluded.network,
+            token = excluded.token,
+            claim_code = COALESCE(excluded.claim_code, claim_links.claim_code),
+            claim_secret = COALESCE(excluded.claim_secret, claim_links.claim_secret)`,
+    args: [
+      data.publicKey,
+      data.sender,
+      data.amountLamports,
+      data.network,
+      data.token || "SOL",
+      data.claimCode || null,
+      data.claimSecret || null,
+    ],
   });
+}
+
+export async function getClaimLinkByCode(code: string) {
+  const r = await db.execute({
+    sql: `SELECT public_key, sender, amount_lamports, network, token, status, claimed_at, created_at, claim_code, claim_secret
+          FROM claim_links WHERE claim_code = ? LIMIT 1`,
+    args: [code],
+  });
+  return r.rows[0] ?? null;
 }
 
 export async function getClaimLink(publicKey: string) {
@@ -1911,9 +1970,11 @@ export async function creditWalletFromStripe(opts: {
   stripeSessionId: string;
   note?: string;
 }): Promise<{ balanceCents: number; applied: boolean }> {
-  const wallet = opts.wallet;
+  const wallet = opts.wallet.trim();
   const delta = Math.floor(opts.deltaCents);
+  if (!wallet) throw new Error("wallet required");
   if (delta <= 0) throw new Error("delta must be positive");
+  if (!opts.stripeSessionId) throw new Error("stripeSessionId required");
 
   // Already applied?
   const existing = await db.execute({
@@ -1933,6 +1994,32 @@ export async function creditWalletFromStripe(opts: {
   const cur = await getCreditBalanceCents(wallet);
   const next = cur + delta;
 
+  try {
+    await db.execute({
+      sql: `INSERT INTO credit_ledger (wallet, delta_cents, balance_after, kind, stripe_session_id, note)
+            VALUES (?, ?, ?, 'purchase', ?, ?)`,
+      args: [wallet, delta, next, opts.stripeSessionId, opts.note || "credits pack"],
+    });
+  } catch (e) {
+    // Unique race: another writer applied the same session
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/unique|constraint/i.test(msg)) {
+      const again = await db.execute({
+        sql: "SELECT balance_after FROM credit_ledger WHERE stripe_session_id = ? LIMIT 1",
+        args: [opts.stripeSessionId],
+      });
+      if (again.rows[0]) {
+        return {
+          balanceCents: Number(
+            (again.rows[0] as unknown as { balance_after?: number }).balance_after ?? 0,
+          ),
+          applied: false,
+        };
+      }
+    }
+    throw e;
+  }
+
   await db.execute({
     sql: `INSERT INTO credit_balances (wallet, balance_cents, updated_at)
           VALUES (?, ?, datetime('now'))
@@ -1940,11 +2027,6 @@ export async function creditWalletFromStripe(opts: {
             balance_cents = excluded.balance_cents,
             updated_at = datetime('now')`,
     args: [wallet, next],
-  });
-  await db.execute({
-    sql: `INSERT INTO credit_ledger (wallet, delta_cents, balance_after, kind, stripe_session_id, note)
-          VALUES (?, ?, ?, 'purchase', ?, ?)`,
-    args: [wallet, delta, next, opts.stripeSessionId, opts.note || "credits pack"],
   });
   return { balanceCents: next, applied: true };
 }

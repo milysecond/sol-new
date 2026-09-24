@@ -18,7 +18,7 @@ import { Spinner } from "@/components/spinner";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { getPasskeyKeypair } from "@/lib/passkey-wallet";
+import { sendUserTransaction, signUserTxB64 } from "@/lib/user-sign";
 import { friendlyError } from "@/lib/friendly-errors";
 import {
   bpsToPct,
@@ -27,7 +27,7 @@ import {
   type EarnToken,
   type BorrowVault,
 } from "@/lib/jup-lend";
-import { isWsolMint, unwrapAllWsol, wrapSol, WSOL_MINT } from "@/lib/wsol";
+import { buildUnwrapTx, buildWrapTx, getWsolUiBalance, isWsolMint, WSOL_MINT } from "@/lib/wsol";
 
 const WSOL = WSOL_MINT;
 const SOL_FEE_RESERVE = 0.01; // leave SOL for fees
@@ -38,13 +38,13 @@ const WRAP_EXTRA_LAMPORTS = 2_000;
 async function signAndSendBase64(
   connection: Connection,
   b64: string,
-  keypair: Keypair,
-  feePayer: PublicKey
+  publicKey: string,
+  walletKind: "passkey" | "external"
 ): Promise<string> {
-  const raw = Buffer.from(b64, "base64");
+  const signed = await signUserTxB64(b64, { publicKey, walletKind });
+  const raw = Buffer.from(signed, "base64");
   try {
     const vtx = VersionedTransaction.deserialize(raw);
-    vtx.sign([keypair]);
     const sig = await connection.sendRawTransaction(vtx.serialize(), {
       skipPreflight: false,
       maxRetries: 3,
@@ -54,24 +54,39 @@ async function signAndSendBase64(
   } catch (first) {
     try {
       const tx = Transaction.from(raw);
-      const { blockhash, lastValidBlockHeight } =
-        await connection.getLatestBlockhash("confirmed");
-      tx.recentBlockhash = blockhash;
-      if (!tx.feePayer) tx.feePayer = feePayer;
-      tx.partialSign(keypair);
       const sig = await connection.sendRawTransaction(tx.serialize(), {
         skipPreflight: false,
         maxRetries: 3,
       });
-      await connection.confirmTransaction(
-        { signature: sig, blockhash, lastValidBlockHeight },
-        "confirmed"
-      );
+      await connection.confirmTransaction(sig, "confirmed");
       return sig;
     } catch {
       throw first instanceof Error ? first : new Error(String(first));
     }
   }
+}
+
+async function wrapNativeForUser(
+  connection: Connection,
+  publicKey: string,
+  walletKind: "passkey" | "external",
+  ui: number,
+  extraLamports = 0
+) {
+  const tx = buildWrapTx(new PublicKey(publicKey), ui, extraLamports);
+  return sendUserTransaction(tx, { publicKey, walletKind, connection });
+}
+
+async function unwrapNativeForUser(
+  connection: Connection,
+  publicKey: string,
+  walletKind: "passkey" | "external"
+) {
+  const owner = new PublicKey(publicKey);
+  const n = await getWsolUiBalance(connection, owner);
+  if (!(n > 0)) return null;
+  const { tx, extra } = await buildUnwrapTx(connection, owner, n);
+  return sendUserTransaction(tx, { publicKey, walletKind, connection, extraSigners: extra });
 }
 
 async function fetchMintUiBalance(
@@ -248,7 +263,7 @@ function AmountControl({
 }
 
 export default function LoanPage() {
-  const { publicKey, balance, usdcBalance, refreshBalance } = useWallet();
+  const { publicKey, balance, usdcBalance, refreshBalance, walletKind } = useWallet();
   const { rpc, network } = useNetwork();
   const [tab, setTab] = useState<Tab>("lend");
   const [configured, setConfigured] = useState<boolean | null>(null);
@@ -485,17 +500,13 @@ export default function LoanPage() {
     setError(null);
     setSig(null);
     try {
-      const { keypair } = await getPasskeyKeypair(publicKey);
-      if (keypair.publicKey.toBase58() !== publicKey) {
-        throw new Error("Passkey does not match connected wallet");
-      }
       const connection = new Connection(rpc, "confirmed");
       const mint = earnToken.assetAddress;
 
       // Deposit SOL → wrap to WSOL ATA first
       if (action === "deposit" && isWsolMint(mint)) {
         setStatusHint("Wrapping SOL…");
-        await wrapSol(connection, keypair, parseAmt(amount), 0);
+        await wrapNativeForUser(connection, publicKey, walletKind, parseAmt(amount), 0);
       }
 
       setStatusHint(action === "deposit" ? "Depositing…" : "Withdrawing…");
@@ -519,15 +530,15 @@ export default function LoanPage() {
       const signature = await signAndSendBase64(
         connection,
         data.transaction,
-        keypair,
-        keypair.publicKey
+        publicKey,
+        walletKind
       );
 
       // Withdraw WSOL → unwrap to native SOL
       if (action === "withdraw" && isWsolMint(mint)) {
         setStatusHint("Unwrapping SOL…");
         try {
-          await unwrapAllWsol(connection, keypair);
+          await unwrapNativeForUser(connection, publicKey, walletKind);
         } catch {
           /* leave as WSOL if unwrap fails */
         }
@@ -609,20 +620,16 @@ export default function LoanPage() {
     setError(null);
     setSig(null);
     try {
-      const { keypair } = await getPasskeyKeypair(publicKey);
-      if (keypair.publicKey.toBase58() !== publicKey) {
-        throw new Error("Passkey does not match connected wallet");
-      }
       const connection = new Connection(rpc, "confirmed");
 
       // Wrap native SOL when depositing WSOL collateral or repaying WSOL debt
       if (borrowAction === "deposit" && colIsWsol) {
         setStatusHint("Wrapping SOL…");
-        await wrapSol(connection, keypair, parseAmt(colAmount), WRAP_EXTRA_LAMPORTS);
+        await wrapNativeForUser(connection, publicKey, walletKind, parseAmt(colAmount), WRAP_EXTRA_LAMPORTS);
       }
       if (borrowAction === "repay" && debtIsWsol) {
         setStatusHint("Wrapping SOL…");
-        await wrapSol(connection, keypair, parseAmt(debtAmount), WRAP_EXTRA_LAMPORTS);
+        await wrapNativeForUser(connection, publicKey, walletKind, parseAmt(debtAmount), WRAP_EXTRA_LAMPORTS);
       }
 
       setStatusHint("Submitting…");
@@ -648,8 +655,8 @@ export default function LoanPage() {
       const signature = await signAndSendBase64(
         connection,
         data.transaction,
-        keypair,
-        keypair.publicKey
+        publicKey,
+        walletKind
       );
 
       // Unwrap WSOL after withdraw collateral or borrow WSOL debt
@@ -659,7 +666,7 @@ export default function LoanPage() {
       ) {
         setStatusHint("Unwrapping SOL…");
         try {
-          await unwrapAllWsol(connection, keypair);
+          await unwrapNativeForUser(connection, publicKey, walletKind);
         } catch {
           /* keep WSOL */
         }
@@ -718,7 +725,7 @@ export default function LoanPage() {
   return (
     <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 flex flex-col w-full max-w-lg mx-auto px-3 sm:px-4 pt-4 sm:pt-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-10">
+      <main className="flex-1 flex flex-col app-shell px-3 sm:px-4 pt-4 sm:pt-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-10">
         <PageTransition>
           <div className="w-full space-y-4 sm:space-y-6">
             <div className="text-center space-y-1.5 sm:space-y-2 px-1">

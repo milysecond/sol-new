@@ -7,7 +7,6 @@ import {
   Search,
   ArrowLeftRight,
 } from "lucide-react";
-import { VersionedTransaction } from "@solana/web3.js";
 import { Navbar } from "@/components/navbar";
 import { ConnectGate } from "@/components/connect-gate";
 import { PageTransition } from "@/components/page-transition";
@@ -15,7 +14,7 @@ import { Spinner } from "@/components/spinner";
 import { AnimatedIcon } from "@/components/animated-icon";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
-import { getPasskeyKeypair, signVersionedWithKeypairAndSend } from "@/lib/passkey-wallet";
+import { signAndSendUserVersioned, signUserVersionedB64 } from "@/lib/user-sign";
 import { friendlyError } from "@/lib/friendly-errors";
 import { SOL_MINT, USDC_MINT } from "@/lib/jup-ultra";
 
@@ -86,7 +85,7 @@ function fmtUi(n: number | null | undefined, d = 4): string {
 }
 
 export default function SwapPage() {
-  const { publicKey, walletLabel, balance, usdcBalance, refreshBalance } = useWallet();
+  const { publicKey, walletLabel, balance, usdcBalance, refreshBalance, walletKind } = useWallet();
   const { network, rpc } = useNetwork();
   const [from, setFrom] = useState<TokenOpt>(PRESETS[0]);
   const [to, setTo] = useState<TokenOpt>(PRESETS[1]);
@@ -293,17 +292,9 @@ export default function SwapPage() {
     setError(null);
     setSig(null);
     try {
-      // 1) Face ID once for the *connected* wallet — pin passkey before build
-      const { keypair, address } = await getPasskeyKeypair(publicKey);
-      if (address !== publicKey) {
-        throw new Error(
-          `Passkey is for ${address.slice(0, 4)}…${address.slice(-4)}, not the connected wallet. Switch wallet or pick the matching passkey.`
-        );
-      }
-
       let signature: string | null = null;
 
-      // 2) Prefer sponsored fee-payer path when available
+      // Prefer sponsored fee-payer path when available
       if (sponsored) {
         try {
           const JUP = "https://lite-api.jup.ag/swap/v1";
@@ -355,12 +346,10 @@ export default function SwapPage() {
             feePayerEmpty?: boolean;
           };
           if (bRes.ok && bData.tx) {
-            signature = await signVersionedWithKeypairAndSend(
-              bData.tx,
-              rpc,
-              keypair,
-              publicKey
-            );
+            signature = await signAndSendUserVersioned(bData.tx, rpc, {
+              publicKey,
+              walletKind,
+            });
             if (quote.outAmount) {
               setQuoteOut(fromAtomic(String(quote.outAmount), to.decimals));
             }
@@ -371,7 +360,6 @@ export default function SwapPage() {
         }
       }
 
-      // 3) Ultra path — same connected passkey keypair (no second Face ID)
       if (!signature) {
         const q = new URLSearchParams({
           inputMint: from.mint,
@@ -389,11 +377,10 @@ export default function SwapPage() {
           throw new Error(oData.error || "Could not build swap");
         }
 
-        const tx = VersionedTransaction.deserialize(
-          Buffer.from(oData.order.transaction, "base64")
-        );
-        tx.sign([keypair]);
-        const signedTransaction = Buffer.from(tx.serialize()).toString("base64");
+        const signedTransaction = await signUserVersionedB64(oData.order.transaction, {
+          publicKey,
+          walletKind,
+        });
 
         const eRes = await fetch("/api/swap/execute", {
           method: "POST",
@@ -471,7 +458,7 @@ export default function SwapPage() {
   return (
     <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 w-full max-w-md mx-auto px-3 sm:px-4 pt-5 sm:pt-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
+      <main className="flex-1 app-shell pt-5 sm:pt-8 lg:pt-10 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <PageTransition>
           <div className="space-y-5">
             <div className="text-center space-y-1.5">

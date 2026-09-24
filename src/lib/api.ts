@@ -1,3 +1,10 @@
+export function madeAtSolNew(description?: string | null): string {
+  const mark = "made at sol.new";
+  const d = (description || "").trim();
+  if (d.toLowerCase().includes(mark)) return d;
+  return d ? `${d} - ${mark}` : mark;
+}
+
 export async function uploadImage(file: File): Promise<{ url: string; preview: string }> {
   const form = new FormData();
   form.append("image", file);
@@ -18,7 +25,7 @@ export async function uploadMetadata(meta: {
   const metadata: Record<string, string> = {
     name: meta.name,
     symbol: meta.symbol,
-    description: meta.description || "",
+    description: madeAtSolNew(meta.description),
     image: meta.image || "",
     createdOn: "sol.new",
   };

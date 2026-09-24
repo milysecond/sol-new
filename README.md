@@ -26,26 +26,29 @@ sol.new removes the complexity from Solana. No wallet downloads, no seed phrases
 
 ---
 
-## Pricing (mainnet, approx.)
+## Pricing (mainnet)
 
 | Action | Cost |
 |--------|------|
 | Passkey wallet | Free |
-| Token + bonding curve | ~0.05 SOL |
-| Standard NFT | ~0.01–0.02 SOL rent |
+| Token (Meteora DBC) | 0.045 SOL (0.040 rent + 0.005 sol.new) |
+| Token (Pump / Bags) | ~0.008 SOL rent, no sol.new fee |
+| Token (Jupiter Studio) | ~0.03 SOL rent + 1% trades (USDC curve) |
+| Token (LaunchLab) | ~0.03 SOL rent; 85 SOL is graduation not create |
+| Token (Genesis TGE) | ~0.01 SOL rent |
+| Token (MetaDAO) | ~0.05 SOL rent |
+| Standard NFT | ~0.01-0.02 SOL rent |
 | Compressed NFT | ~0.001 SOL platform + tiny network |
 | Multisig | ~0.05 SOL (incl. 0.01 platform) |
 | Custom short link | 0.01 SOL |
 | Gift (SOL/USDC) | Gift amount + claim fee float |
 | Lend / borrow | Network + protocol rates (Jupiter Lend) |
 
-Live cost table: [sol.new/docs](https://sol.new/docs) · `GET /api/costs`
+Live: [sol.new/docs](https://sol.new/docs) · [sol.new/token](https://sol.new/token) · `GET /api/costs`
 
-### Token launches (Meteora DBC)
+### Token launches
 
-- Trading fee starts ~2.5% → 1% over 24h → **creator**
-- Migration fee 1% at graduation → **creator**
-- Pool creation fee: **0 SOL**
+Source of truth: `src/lib/token-launch-pricing.ts`. Only Meteora takes 0.005 SOL (promo can waive). Curve targets (69 SOL, 85 SOL, 69k USDC) are graduation, not create fees.
 
 ---
 

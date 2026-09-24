@@ -36,8 +36,8 @@ release:
   android_details:
     cert_fingerprint: 61773d28fbf56b10a447233ef495c3f4e427ddd51238b14a3e89cbd44fdfd288
     min_sdk: 23
-    version: 1.0.1
-    version_code: 2
+    version: 1.0.2
+    version_code: 3
     locales:
       - en-US
   catalog:

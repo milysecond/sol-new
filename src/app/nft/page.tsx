@@ -251,11 +251,13 @@ export default function NftPage() {
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="mint an NFT">
           <PageTransition>
-          <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-4">
-            <div className="text-center space-y-1">
-              <AnimatedIcon icon={Image} size={32} className="text-green-400" />
-              <h1 className="text-2xl font-bold tracking-tight">Mint an NFT</h1>
-              <p className="text-gray-500 dark:text-white/50 text-sm">Turn any image into a Solana NFT.</p>
+          <div className="app-shell-wide py-6 sm:py-10 lg:py-12 space-y-8">
+            <div className="text-center lg:text-left space-y-2 max-w-3xl lg:max-w-none">
+              <AnimatedIcon icon={Image} size={36} className="text-green-400 mx-auto lg:mx-0" />
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">Mint an NFT</h1>
+              <p className="text-gray-500 dark:text-white/50 text-sm lg:text-base">
+                Turn any image into a Solana NFT — standard or compressed.
+              </p>
             </div>
 
             {status === "done" && result ? (
@@ -306,7 +308,7 @@ export default function NftPage() {
                   <a
                     href={mintHref(result.mint)}
                     target="_blank"
-                    className="flex items-center justify-center gap-1.5 w-full bg-green-500 hover:bg-green-400 text-white font-semibold rounded-xl px-4 py-3.5 transition text-center"
+                    className="flex items-center justify-center gap-1.5 w-full bg-green-500 hover:bg-green-400 text-white font-semibold rounded-lg px-3.5 py-2.5 transition text-center"
                   >
                     View your NFT on sol.new <ExternalLink className="w-3.5 h-3.5 inline ml-1" />
                   </a>
@@ -322,7 +324,7 @@ export default function NftPage() {
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                   }}
-                  className={`flex items-center justify-center gap-1.5 w-full border rounded-xl px-4 py-3 transition cursor-pointer ${
+                  className={`flex items-center justify-center gap-1.5 w-full border rounded-lg px-3.5 py-2.5 transition cursor-pointer ${
                     copied
                       ? "bg-green-500/15 border-green-400/40 text-green-500 dark:text-green-400"
                       : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white"
@@ -344,13 +346,44 @@ export default function NftPage() {
                     setImageFile(null);
                     setImagePreview(null);
                   }}
-                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition cursor-pointer"
+                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-lg px-3.5 py-2.5 hover:text-gray-900 dark:hover:text-white transition cursor-pointer"
                 >
                   Mint another
                 </button>
               </div></FadeIn>
             ) : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 lg:items-start">
+                {/* Desktop sticky preview */}
+                <div className="lg:col-span-5 xl:col-span-5 order-2 lg:order-1">
+                  <div className="lg:sticky lg:top-24 space-y-4">
+                    <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.03] aspect-square flex items-center justify-center overflow-hidden min-h-[280px] lg:min-h-[360px] xl:min-h-[420px] shadow-sm">
+                      {imagePreview ? (
+                        <img src={imagePreview} alt="preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="text-center px-8 text-gray-400 dark:text-white/35 text-sm space-y-3">
+                          <Image className="w-14 h-14 mx-auto opacity-40" />
+                          <p className="font-medium">Image preview</p>
+                          <p className="text-xs opacity-70 max-w-[14rem] mx-auto">
+                            Upload an image — full-size preview stays sticky while you edit
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    {(name || description) && (
+                      <div className="rounded-2xl border border-black/10 dark:border-white/10 p-4 space-y-1">
+                        <p className="font-semibold text-lg truncate">{name || "Untitled NFT"}</p>
+                        {description && (
+                          <p className="text-sm text-gray-500 dark:text-white/45 line-clamp-3">{description}</p>
+                        )}
+                        <p className="text-[11px] text-gray-400 pt-1 capitalize">
+                          {mintType} · ×{quantity}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="lg:col-span-7 xl:col-span-7 order-1 lg:order-2 space-y-4 max-w-2xl lg:max-w-none mx-auto lg:mx-0 w-full">
                 <input
                   type="text"
                   placeholder="NFT name"
@@ -389,7 +422,7 @@ export default function NftPage() {
                     <button
                       key={t}
                       onClick={() => setMintType(t)}
-                      className={`flex-1 border rounded-xl px-4 py-2.5 text-sm transition cursor-pointer ${
+                      className={`flex-1 border rounded-lg px-3 py-2 text-sm transition cursor-pointer ${
                         mintType === t
                           ? "bg-green-500/20 border-green-400/50 text-green-300"
                           : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:text-white hover:border-black/20 dark:hover:border-white/20"
@@ -477,7 +510,7 @@ export default function NftPage() {
                 <button
                   onClick={handleMint}
                   disabled={!name || !imageFile || status === "uploading" || status === "minting"}
-                  className="w-full bg-green-500 hover:bg-green-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
+                  className="w-full bg-green-500 hover:bg-green-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed"
                 >
                   {status === "uploading"
                     ? <><Spinner size={16} className="inline mr-2" />Uploading...</>
@@ -494,20 +527,21 @@ export default function NftPage() {
                     ? <span className="text-green-400">Free with promo code</span>
                     : `${((mintType === "standard" ? 0.02 : 0.001) * quantity).toFixed(3)} SOL${quantity > 1 ? ` (${(mintType === "standard" ? 0.02 : 0.001).toFixed(3)} × ${quantity})` : ""}`}
                 </p>
+                </div>
               </div>
             )}
           </div>
           </PageTransition>
         </ConnectGate>
 
-        <div className="mx-auto w-full max-w-lg px-4 sm:px-6 pt-6 pb-2 space-y-2">
+        <div className="app-shell pt-6 pb-2 space-y-2">
           <p className="text-center text-xs text-gray-400 dark:text-white/30">Looking to buy NFTs instead?</p>
           <div className="grid grid-cols-2 gap-3">
             <a
               href="https://magiceden.io/solana"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-medium text-gray-600 dark:text-white/60 hover:text-pink-500 dark:hover:text-pink-400 hover:border-pink-400/40 transition"
+              className="flex items-center justify-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3.5 py-2.5 text-sm font-medium text-gray-600 dark:text-white/60 hover:text-pink-500 dark:hover:text-pink-400 hover:border-pink-400/40 transition"
             >
               Magic Eden <ExternalLink className="w-3.5 h-3.5" />
             </a>
@@ -515,7 +549,7 @@ export default function NftPage() {
               href="https://www.tensor.trade"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-medium text-gray-600 dark:text-white/60 hover:text-sky-500 dark:hover:text-sky-400 hover:border-sky-400/40 transition"
+              className="flex items-center justify-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3.5 py-2.5 text-sm font-medium text-gray-600 dark:text-white/60 hover:text-sky-500 dark:hover:text-sky-400 hover:border-sky-400/40 transition"
             >
               Tensor <ExternalLink className="w-3.5 h-3.5" />
             </a>

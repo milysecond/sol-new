@@ -77,7 +77,7 @@ function GetStarted({
     <div className="mt-3 flex flex-col items-center gap-2 w-full max-w-xs mx-auto">
       <Link
         href="/onboard"
-        className="w-full bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-xl px-4 py-3.5 transition text-base text-center"
+        className="w-full bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-lg px-3.5 py-2.5 transition text-base text-center"
       >
         Get started
       </Link>

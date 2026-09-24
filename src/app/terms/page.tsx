@@ -13,7 +13,7 @@ export default function TermsPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white">
       <Navbar />
-      <main className="max-w-3xl mx-auto px-6 py-10 space-y-8 text-sm text-gray-700 dark:text-white/70">
+      <main className="app-shell-wide py-10 space-y-8 text-sm text-gray-700 dark:text-white/70">
         <header className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
             Terms of Use

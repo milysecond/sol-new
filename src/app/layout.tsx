@@ -13,6 +13,8 @@ import { SiteFooter } from "@/components/site-footer";
 import { WalletBrowserTitle } from "@/components/wallet-browser-title";
 import { RouteTransition } from "@/components/route-transition";
 import { DeepLinkGuard } from "@/components/deep-link-guard";
+import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
+import { VisualViewportSync } from "@/components/visual-viewport-sync";
 import { SolanaConnectorProvider } from "@/components/solana-connector-provider";
 import { ExternalWalletBridge } from "@/components/external-wallet-bridge";
 
@@ -144,7 +146,7 @@ export default function RootLayout({
               <ExternalWalletBridge />
               <WalletBrowserTitle />
               <PodPlayerProvider>
-                <div className="min-h-screen flex flex-col overflow-x-hidden">
+                <div className="min-h-app flex flex-col overflow-x-hidden">
                   <div className="flex-1 flex flex-col min-h-0">
                     <RouteTransition>{children}</RouteTransition>
                   </div>
@@ -160,6 +162,8 @@ export default function RootLayout({
         <InstallPrompt />
         <PushPrompt />
         <DeepLinkGuard />
+        <KeyboardShortcuts />
+        <VisualViewportSync />
         <script
           dangerouslySetInnerHTML={{
             __html: `if("serviceWorker"in navigator)window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js").then(r=>r.update()).catch(()=>{})})`,

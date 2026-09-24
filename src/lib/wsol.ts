@@ -1,5 +1,5 @@
 /**
- * Native SOL ↔ WSOL helpers for Jupiter Lend and other SPL flows.
+ * Native SOL <-> WSOL helpers for Jupiter Lend and other SPL flows.
  */
 import {
   Connection,
@@ -14,7 +14,9 @@ import {
   TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
   createCloseAccountInstruction,
+  createInitializeAccountInstruction,
   createSyncNativeInstruction,
+  createTransferCheckedInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 
@@ -31,13 +33,14 @@ export function wsolAta(owner: PublicKey): PublicKey {
 async function sendLegacy(
   connection: Connection,
   tx: Transaction,
-  payer: Keypair
+  payer: Keypair,
+  extra: Keypair[] = []
 ): Promise<string> {
   const { blockhash, lastValidBlockHeight } =
     await connection.getLatestBlockhash("confirmed");
   tx.recentBlockhash = blockhash;
   tx.feePayer = payer.publicKey;
-  tx.sign(payer);
+  tx.sign(payer, ...extra);
   const sig = await connection.sendRawTransaction(tx.serialize(), {
     skipPreflight: false,
     maxRetries: 3,
@@ -54,31 +57,38 @@ async function sendLegacy(
  * @param uiAmount SOL amount (human)
  * @param extraLamports tiny buffer for protocol rounding (default 0)
  */
+export function buildWrapTx(
+  owner: PublicKey,
+  uiAmount: number,
+  extraLamports = 0
+): Transaction {
+  if (!(uiAmount > 0)) throw new Error("Wrap amount must be positive");
+  const lamports = Math.ceil(uiAmount * LAMPORTS_PER_SOL) + Math.max(0, extraLamports);
+  const ata = wsolAta(owner);
+  return new Transaction().add(
+    createAssociatedTokenAccountIdempotentInstruction(
+      owner,
+      ata,
+      owner,
+      NATIVE_MINT,
+      TOKEN_PROGRAM_ID
+    ),
+    SystemProgram.transfer({
+      fromPubkey: owner,
+      toPubkey: ata,
+      lamports,
+    }),
+    createSyncNativeInstruction(ata, TOKEN_PROGRAM_ID)
+  );
+}
+
 export async function wrapSol(
   connection: Connection,
   payer: Keypair,
   uiAmount: number,
   extraLamports = 0
 ): Promise<string> {
-  if (!(uiAmount > 0)) throw new Error("Wrap amount must be positive");
-  const lamports = Math.ceil(uiAmount * LAMPORTS_PER_SOL) + Math.max(0, extraLamports);
-  const ata = wsolAta(payer.publicKey);
-  const tx = new Transaction().add(
-    createAssociatedTokenAccountIdempotentInstruction(
-      payer.publicKey,
-      ata,
-      payer.publicKey,
-      NATIVE_MINT,
-      TOKEN_PROGRAM_ID
-    ),
-    SystemProgram.transfer({
-      fromPubkey: payer.publicKey,
-      toPubkey: ata,
-      lamports,
-    }),
-    createSyncNativeInstruction(ata, TOKEN_PROGRAM_ID)
-  );
-  return sendLegacy(connection, tx, payer);
+  return sendLegacy(connection, buildWrapTx(payer.publicKey, uiAmount, extraLamports), payer);
 }
 
 /** WSOL ATA ui balance (0 if missing). */
@@ -123,4 +133,66 @@ export async function unwrapAllWsol(
     )
   );
   return sendLegacy(connection, tx, payer);
+}
+
+/**
+ * Unwrap wSOL back to native SOL.
+ * Full amount closes the ATA. Partial uses a temp account then closes it.
+ */
+export async function buildUnwrapTx(
+  connection: Connection,
+  owner: PublicKey,
+  uiAmount: number
+): Promise<{ tx: Transaction; extra: Keypair[] }> {
+  if (!(uiAmount > 0)) throw new Error("Unwrap amount must be positive");
+  const ata = wsolAta(owner);
+  let raw = 0;
+  try {
+    const res = await connection.getTokenAccountBalance(ata, "confirmed");
+    raw = Number(res.value.amount || 0);
+  } catch {
+    throw new Error("No wSOL in this wallet");
+  }
+  const want = Math.round(uiAmount * LAMPORTS_PER_SOL);
+  if (want > raw) throw new Error("Not enough wSOL");
+  if (want === raw) {
+    const tx = new Transaction().add(
+      createCloseAccountInstruction(ata, owner, owner, [], TOKEN_PROGRAM_ID)
+    );
+    return { tx, extra: [] };
+  }
+
+  const tmp = Keypair.generate();
+  const rent = await connection.getMinimumBalanceForRentExemption(165);
+  const tx = new Transaction().add(
+    SystemProgram.createAccount({
+      fromPubkey: owner,
+      newAccountPubkey: tmp.publicKey,
+      lamports: rent,
+      space: 165,
+      programId: TOKEN_PROGRAM_ID,
+    }),
+    createInitializeAccountInstruction(tmp.publicKey, NATIVE_MINT, owner, TOKEN_PROGRAM_ID),
+    createTransferCheckedInstruction(
+      ata,
+      NATIVE_MINT,
+      tmp.publicKey,
+      owner,
+      want,
+      9,
+      [],
+      TOKEN_PROGRAM_ID
+    ),
+    createCloseAccountInstruction(tmp.publicKey, owner, owner, [], TOKEN_PROGRAM_ID)
+  );
+  return { tx, extra: [tmp] };
+}
+
+export async function unwrapSol(
+  connection: Connection,
+  payer: Keypair,
+  uiAmount: number
+): Promise<string> {
+  const { tx, extra } = await buildUnwrapTx(connection, payer.publicKey, uiAmount);
+  return sendLegacy(connection, tx, payer, extra);
 }

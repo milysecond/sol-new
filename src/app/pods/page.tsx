@@ -218,7 +218,7 @@ export default function PodsPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white">
       <Navbar />
-      <main className={`max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6 ${now ? "pb-40 sm:pb-28" : "pb-24 sm:pb-8"}`}>
+      <main className={`app-shell-wide py-8 space-y-6 ${now ? "pb-40 sm:pb-28" : "pb-24 sm:pb-8"}`}>
         <header className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <Headphones className="w-7 h-7 text-fuchsia-500" /> Podcasts

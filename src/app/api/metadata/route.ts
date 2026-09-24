@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { initDb, saveMetadata } from "@/lib/db";
 import { notifyEvent } from "@/lib/notify";
+import { madeAtSolNew } from "@/lib/api";
 
 const recentIPs = new Map<string, number[]>();
 const RATE_LIMIT = 10;
@@ -32,7 +33,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid symbol" }, { status: 400 });
     }
 
-    const json = JSON.stringify(body);
+    const json = JSON.stringify({
+      ...body,
+      description: madeAtSolNew(typeof body.description === "string" ? body.description : ""),
+    });
     if (json.length > 16 * 1024) {
       return NextResponse.json({ error: "Metadata too large (max 16KB)" }, { status: 413 });
     }

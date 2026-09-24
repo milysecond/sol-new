@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
-import { initDb, saveClaimLink, getClaimLink, markClaimLinkClaimed } from "@/lib/db";
+import { initDb, saveClaimLink, getClaimLink, getClaimLinkByCode, markClaimLinkClaimed } from "@/lib/db";
 import { notifyEvent } from "@/lib/notify";
 
 const recentIPs = new Map<string, number[]>();
@@ -30,10 +30,14 @@ export async function POST(req: NextRequest) {
 
   try {
     await initDb();
-    const { publicKey, sender, amountLamports, network, token } = (await req.json()) as {
-      publicKey?: string; sender?: string; amountLamports?: number; network?: string; token?: string;
+    const { publicKey, sender, amountLamports, network, token, private: isPrivate } = (await req.json()) as {
+      publicKey?: string; sender?: string; amountLamports?: number; network?: string; token?: string; private?: boolean;
     };
-    if (!isPubkeyish(publicKey) || !isPubkeyish(sender)) {
+    if (!isPubkeyish(publicKey)) {
+      return NextResponse.json({ error: "Invalid publicKey" }, { status: 400 });
+    }
+    const privateGift = isPrivate === true || sender === "private";
+    if (!privateGift && !isPubkeyish(sender)) {
       return NextResponse.json({ error: "Invalid publicKey" }, { status: 400 });
     }
     const lamports = Number(amountLamports);
@@ -42,15 +46,16 @@ export async function POST(req: NextRequest) {
     }
     const net = network === "devnet" ? "devnet" : "mainnet";
     const tok = token === "USDC" || (typeof token === "string" && token.length > 10) ? token : "SOL";
-    await saveClaimLink({ publicKey, sender, amountLamports: lamports, network: net, token: tok });
+    const senderStored = privateGift ? "private" : (sender as string);
+    await saveClaimLink({ publicKey, sender: senderStored, amountLamports: lamports, network: net, token: tok });
 
     after(async () => {
       await notifyEvent({
         kind: "gift_created",
         emoji: "🎁",
-        title: "Gift link created",
+        title: privateGift ? "Private gift link created" : "Gift link created",
         fields: {
-          sender,
+          ...(privateGift ? { mode: "private" } : { sender: senderStored }),
           gift: publicKey,
           amount: String(lamports),
           token: tok,
@@ -68,6 +73,24 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     await initDb();
+    const code = (req.nextUrl.searchParams.get("code") || "").trim();
+    if (code) {
+      if (!/^[A-Za-z0-9]{8,16}$/.test(code)) {
+        return NextResponse.json({ found: false, truncated: code.length > 0 && code.length < 8 });
+      }
+      const row = await getClaimLinkByCode(code);
+      if (!row) return NextResponse.json({ found: false });
+      const secret = (row as { claim_secret?: string | null }).claim_secret || null;
+      const claimed = row.status === "claimed" || row.status === "reclaimed";
+      return NextResponse.json({
+        found: true,
+        publicKey: row.public_key,
+        status: row.status,
+        network: row.network,
+        token: (row as { token?: string }).token || "SOL",
+        secret: claimed ? null : secret,
+      });
+    }
     const pk = req.nextUrl.searchParams.get("pk");
     if (!isPubkeyish(pk)) {
       return NextResponse.json({ error: "Invalid pk" }, { status: 400 });

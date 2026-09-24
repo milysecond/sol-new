@@ -84,7 +84,7 @@ export default function CreatorPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">
       <Navbar />
-      <main className="flex-1 px-4 py-6 sm:px-6 max-w-2xl mx-auto w-full">
+      <main className="flex-1 app-shell py-6">
         {/* Profile header */}
         <div className="flex items-start gap-4 mb-6">
           <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 text-2xl font-bold shrink-0">

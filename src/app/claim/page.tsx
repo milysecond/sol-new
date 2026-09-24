@@ -16,6 +16,7 @@ import {
   inspectGift,
   sweepGift,
 } from "@/lib/gift-link";
+import { isFullClaimCode, isTruncatedClaimCode, parseClaimCodeFromPath } from "@/lib/claim-code";
 import { analytics } from "@/lib/analytics";
 import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import {
@@ -40,6 +41,7 @@ type TokenMeta = {
 type GiftState =
   | { kind: "loading" }
   | { kind: "invalid" }
+  | { kind: "truncated" }
   | { kind: "empty"; wasClaimed: boolean }
   | {
       kind: "ready";
@@ -199,14 +201,35 @@ export default function ClaimPage() {
       setNetwork(net);
       setMessage(params.get("m"));
 
-      const secret = parseGiftSecretFromLocation({
+      const pathCode = parseClaimCodeFromPath(window.location.pathname);
+      if (pathCode && isTruncatedClaimCode(pathCode)) {
+        if (!cancelled) setState({ kind: "truncated" });
+        return;
+      }
+
+      let secret = parseGiftSecretFromLocation({
         search: window.location.search,
         hash: window.location.hash,
         pathname: window.location.pathname,
       });
+
+      if (!secret && pathCode && isFullClaimCode(pathCode)) {
+        try {
+          const r = await fetch(`/api/gift?code=${encodeURIComponent(pathCode)}`, { cache: "no-store" });
+          const j = (await r.json()) as { found?: boolean; secret?: string | null; truncated?: boolean };
+          if (j.truncated) {
+            if (!cancelled) setState({ kind: "truncated" });
+            return;
+          }
+          if (j.found && j.secret) secret = j.secret;
+        } catch {
+          /* fall through */
+        }
+      }
+
       const gift = secret ? keypairFromSecret(secret) : null;
       if (!gift) {
-        if (!cancelled) setState({ kind: "invalid" });
+        if (!cancelled) setState(pathCode ? { kind: "truncated" } : { kind: "invalid" });
         return;
       }
 
@@ -434,14 +457,19 @@ export default function ClaimPage() {
               <AnimatedIcon icon={Gift} size={40} className="text-gray-400 dark:text-white/30" />
               <h1 className="text-2xl font-bold">This link doesn&apos;t look right</h1>
               <p className="text-gray-500 dark:text-white/50 text-sm">
-                Make sure you opened the complete link — gift links are long and easy to cut off.
+                Ask them to resend the full link. Gift links get cut off in chat.
               </p>
-              <Link
-                href="/gift"
-                className="inline-block text-amber-500 hover:text-amber-400 text-sm font-medium"
-              >
-                Send a gift yourself →
-              </Link>
+            </div>
+          )}
+
+          {state.kind === "truncated" && (
+            <div className="text-center space-y-3">
+              <AnimatedIcon icon={Gift} size={40} className="text-amber-400" />
+              <h1 className="text-2xl font-bold">Ask them to resend</h1>
+              <p className="text-gray-500 dark:text-white/50 text-sm">
+                This claim link is incomplete. Ask the sender to resend the full{" "}
+                <span className="font-mono">sol.new/c/…</span> code.
+              </p>
             </div>
           )}
 
@@ -542,7 +570,7 @@ export default function ClaimPage() {
                     type="button"
                     onClick={() => void handleClaim()}
                     disabled={claiming}
-                    className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer flex items-center justify-center gap-2 min-h-[52px] text-base"
+                    className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2 min-h-[52px] text-base"
                   >
                     {claiming ? (
                       <>
@@ -572,7 +600,7 @@ export default function ClaimPage() {
                     type="button"
                     onClick={() => void connect()}
                     disabled={walletLoading}
-                    className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer min-h-[52px]"
+                    className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer min-h-[52px]"
                   >
                     {walletLoading ? (
                       <>
@@ -645,13 +673,13 @@ export default function ClaimPage() {
               <div className="flex flex-col gap-2 pt-2">
                 <Link
                   href="/wallet"
-                  className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-xl px-4 py-3.5 transition text-center"
+                  className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg px-3.5 py-2.5 transition text-center"
                 >
                   Open my wallet
                 </Link>
                 <Link
                   href="/gift"
-                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition text-center"
+                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-lg px-3.5 py-2.5 hover:text-gray-900 dark:hover:text-white transition text-center"
                 >
                   Send someone a gift
                 </Link>

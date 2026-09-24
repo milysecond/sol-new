@@ -32,6 +32,8 @@ import {
   LineChart,
   Landmark,
   ArrowLeftRight,
+  Lock,
+  EyeOff,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -64,14 +66,19 @@ const SECTIONS: Section[] = [
     intro: "Passkey-secured Solana. No seed phrase, no install.",
     items: [
       { href: "/wallet", title: "Wallet", blurb: "Create or recover with Face ID / fingerprint.", icon: Wallet },
-      { href: "/get", title: "Get funds", blurb: "USDC via Bridge, SOL via card, or receive on-chain.", icon: Coins },
+      { href: "/private", title: "Private", blurb: "Privacy Cash ZK and Helius Rings. Also /anon and /prv8.", icon: EyeOff },
+      { href: "/zk", title: "ZK", blurb: "Shield SOL via zk.sol.new. Passkey signs.", icon: ShieldCheck },
+      { href: "/get", title: "Get funds", blurb: "A$5 Apple Pay, or receive on-chain.", icon: Coins },
+      { href: "/bridge", title: "Bridge", blurb: "USDC from Base, Arbitrum, Ethereum, or Sui via GUM.", icon: ArrowLeftRight },
       { href: "/wallet/send", title: "Send", blurb: "Transfer from your passkey wallet.", icon: ArrowUpRight },
       { href: "/portfolio", title: "Portfolio", blurb: "Balances and holdings overview.", icon: FolderOpen },
       { href: "/nfts", title: "Browse NFTs", blurb: "On-chain NFTs by address. Tensor and Magic Eden links.", icon: Layers },
       { href: "/burn", title: "Burn / reclaim", blurb: "Close empty token accounts, reclaim SOL rent.", icon: Flame },
       { href: "/earn", title: "Earn", blurb: "Protected USDC yield. Deposit and withdraw with Face ID.", icon: TrendingUp },
       { href: "/loan", title: "Loan", blurb: "Supply assets to earn, or borrow against collateral.", icon: Landmark },
+      { href: "/lock", title: "Lock", blurb: "Cliff unlock on Jupiter Lock. No protocol fee.", icon: Lock },
       { href: "/swap", title: "Swap", blurb: "Trade SOL, USDC, and any token with Face ID.", icon: ArrowLeftRight },
+      { href: "/wrap", title: "Wrap", blurb: "SOL to wSOL and unwrap back. Face ID. No fee.", icon: ArrowLeftRight },
       { href: "/stake", title: "Stake SOL", blurb: "Native validator staking. Delegate, deactivate, withdraw.", icon: TrendingUp },
       { href: "/lst", title: "Liquid stake", blurb: "LSTs: jitoSOL, mSOL, INF, and more.", icon: TrendingUp },
       { href: "/id", title: ".sol name", blurb: "Check and register a Solana name.", icon: AtSign },
@@ -85,6 +92,7 @@ const SECTIONS: Section[] = [
     intro: "Ship tokens, NFTs, and shared wallets in minutes.",
     items: [
       { href: "/token", title: "Token", blurb: "Launch an SPL token with a bonding curve.", icon: Coins },
+      { href: "/stonk", title: "StonkFun", blurb: "Launch vs stocks, SOL, or another mint on stonkfun.xyz.", icon: TrendingUp },
       { href: "/nft", title: "Mint NFT", blurb: "Image to NFT - standard or compressed.", icon: Image },
       { href: "/multisig", title: "Multisig", blurb: "Shared wallet with multiple signers.", icon: ShieldCheck },
       { href: "/launch", title: "Live launches", blurb: "Browse recent token launches.", icon: Rocket },
@@ -128,6 +136,7 @@ const SECTIONS: Section[] = [
       { href: "/address", title: "Address", blurb: "sol.new/address/<pubkey> — wallet, token, or program lookup.", icon: Activity },
       { href: "/scan", title: "Scan", blurb: "Wallet, token, or program lookup.", icon: Activity },
       { href: "/stocks", title: "Stocks", blurb: "Tokenized equities screener on Solana.", icon: LineChart },
+      { href: "/stonks", title: "Top stonks", blurb: "Highest mcap. Full list on stonkscreener.com.", icon: TrendingUp },
       { href: "/lists", title: "Lists", blurb: "Watchlists and quotes.", icon: List },
       { href: "/gallery", title: "Gallery", blurb: "Token gallery.", icon: Image },
       { href: "/compare", title: "Compare", blurb: "Side-by-side token compare.", icon: List },

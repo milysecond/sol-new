@@ -16,6 +16,7 @@ import {
 } from "@solana/spl-token";
 import { usdcMint } from "./usdc";
 import type { Network } from "./network";
+import { generateClaimCode } from "./claim-code";
 import { NATIVE_SOL_MINT, USDC_MAINNET, USDC_DEVNET } from "./wallet-tokens";
 
 /** "SOL" | "USDC" | mint address */
@@ -60,17 +61,28 @@ export function buildGiftUrl(
   secret: string,
   network: Network,
   message?: string,
-  origin = "https://sol.new"
+  origin = "https://sol.new",
+  code?: string,
 ): string {
+  const base = origin.replace(/\/$/, "");
+  const short = (code || "").trim();
+  if (short.length >= 8) {
+    const params = new URLSearchParams();
+    if (network === "devnet") params.set("n", "d");
+    if (message?.trim()) params.set("m", message.trim().slice(0, 80));
+    const qs = params.toString();
+    return qs ? `${base}/c/${short}?${qs}` : `${base}/c/${short}`;
+  }
   const params = new URLSearchParams();
-  // App Links / TWA / many WebViews STRIP the hash — secret must live in the query too.
   params.set("g", secret);
   if (network === "devnet") params.set("n", "d");
   if (message?.trim()) params.set("m", message.trim().slice(0, 80));
   const qs = params.toString();
-  const base = origin.replace(/\/$/, "");
-  // Keep # for browser-only privacy when hash is preserved; query is the durable path.
-  return `${base}/claim?${qs}#${secret}`;
+  return `${base}/claim?${qs}`;
+}
+
+export function newGiftClaimCode(): string {
+  return generateClaimCode(8);
 }
 
 /**

@@ -7,7 +7,7 @@ export default function ChangelogPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-10">
+      <main className="flex-1 app-shell py-8 sm:py-12 space-y-10">
         <header className="space-y-2">
           <div className="flex items-center gap-2 text-purple-400">
             <ScrollText size={28} />

@@ -103,28 +103,46 @@ export default function IdPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col pb-20 sm:pb-0">
       <Navbar />
-      <main className="flex-1 flex flex-col items-center px-4 py-8 sm:py-16">
+      <main className="flex-1 flex flex-col items-center px-0 py-8 sm:py-12 lg:py-16 w-full min-w-0">
         <PageTransition>
-          <div className="mx-auto w-full max-w-lg px-4 sm:px-6 py-5 sm:py-8 space-y-6">
+          <div className="app-shell-wide py-5 sm:py-8 lg:py-10 space-y-6">
             {/* Header */}
             <div className="text-center space-y-2">
               <AnimatedIcon icon={Search} size={32} className="text-purple-400" />
               <h1 className="text-3xl font-bold tracking-tight">Solana names</h1>
               <p className="text-gray-500 dark:text-white/50 text-sm">
-                Register .sol · look up .sol / .sns / .bonk / .skr
+                Register .sol · look up .sol · .sns · .bonk · .skr
               </p>
             </div>
 
-            {/* Resolve any name */}
-            <div className="rounded-2xl border border-purple-400/25 bg-purple-500/5 p-4 space-y-3">
+            {/* Resolve any name — .sol · .sns · .bonk · .skr */}
+            <div className="rounded-2xl border border-purple-400/25 bg-purple-500/5 p-4 sm:p-5 space-y-3">
               <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-white/40">
-                Look up
+                Look up name
               </p>
+              <div className="flex flex-wrap gap-2">
+                {(["sol", "sns", "skr", "bonk"] as const).map((tld) => (
+                  <button
+                    key={tld}
+                    type="button"
+                    className="rounded-lg border border-purple-400/30 bg-purple-500/10 px-2.5 py-1 text-xs font-mono text-purple-600 dark:text-purple-300 hover:bg-purple-500/20"
+                    onClick={() => {
+                      const el = document.getElementById("id-lookup") as HTMLInputElement | null;
+                      if (!el) return;
+                      const bare = el.value.trim().replace(/\.(sol|sns|skr|bonk)$/i, "");
+                      el.value = bare ? `${bare}.${tld}` : `name.${tld}`;
+                      el.focus();
+                    }}
+                  >
+                    .{tld}
+                  </button>
+                ))}
+              </div>
               <div className="flex gap-2">
                 <input
                   type="text"
                   id="id-lookup"
-                  placeholder="metasal.sol · name.skr · name.bonk"
+                  placeholder="metasal.sol · metasal.sns · name.skr · name.bonk"
                   className="flex-1 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-purple-400/50"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -145,6 +163,19 @@ export default function IdPage() {
                   Open
                 </button>
               </div>
+              <p className="text-[11px] text-gray-500 dark:text-white/40">
+                .sns resolves via SNS (AllDomains if live, else .sol alias). Try{" "}
+                <button
+                  type="button"
+                  className="underline text-purple-500"
+                  onClick={() => {
+                    window.location.href = "/id/metasal.sns";
+                  }}
+                >
+                  metasal.sns
+                </button>
+                .
+              </p>
             </div>
 
             {/* Register .sol */}
@@ -209,7 +240,7 @@ export default function IdPage() {
                       <button
                         onClick={handleRegister}
                         disabled={busy || !publicKey}
-                        className="w-full bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="w-full bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       >
                         {busy ? (
                           <><Spinner size={20} /> {statusLabel}</>

@@ -153,7 +153,7 @@ export default function AdminPage() {
             {authErr && <p className="text-sm text-red-400 text-center">Incorrect secret</p>}
             <button
               onClick={login}
-              className="w-full bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer"
+              className="w-full bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer"
             >
               Sign in
             </button>
@@ -230,7 +230,7 @@ export default function AdminPage() {
           <button
             onClick={generate}
             disabled={generating}
-            className="w-full bg-purple-500 hover:bg-purple-400 disabled:opacity-60 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2"
+            className="w-full bg-purple-500 hover:bg-purple-400 disabled:opacity-60 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2"
           >
             {generating ? <><Spinner size={16} /> Generating…</> : <><Plus className="w-4 h-4" /> Generate {customCode ? "1 code" : `${count} code${count > 1 ? "s" : ""}`}</>}
           </button>

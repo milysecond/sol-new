@@ -42,7 +42,7 @@ export default function ClipLandingPage() {
 
   return (
     <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white">
-      <div className="max-w-lg mx-auto px-4 pt-6 pb-24 space-y-8">
+      <div className="app-shell pt-6 pb-24 space-y-8">
         <PageBack />
 
         <header className="space-y-3 text-center">

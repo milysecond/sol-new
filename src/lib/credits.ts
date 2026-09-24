@@ -64,13 +64,17 @@ export async function createCreditsCheckoutSession(opts: {
     "https://sol.new/icon-512.png",
   );
 
-  body.set("metadata[wallet]", opts.wallet.slice(0, 64));
+  body.set("metadata[wallet]", opts.wallet);
   body.set("metadata[product]", "credits_pack_aud_5");
   body.set("metadata[credits]", String(CREDIT_PACK_CREDITS));
-  body.set("metadata[credit_cents]", String(CREDIT_PACK_AUD_CENTS));
+  body.set("metadata[credit_cents]", String(CREDIT_PACK_CREDITS));
+  // amount in AUD cents for display/bookkeeping
+  body.set("metadata[pack_aud_cents]", String(CREDIT_PACK_AUD_CENTS));
 
-  body.set("payment_intent_data[metadata][wallet]", opts.wallet.slice(0, 64));
+  body.set("payment_intent_data[metadata][wallet]", opts.wallet);
   body.set("payment_intent_data[metadata][product]", "credits_pack_aud_5");
+  body.set("payment_intent_data[metadata][credit_cents]", String(CREDIT_PACK_CREDITS));
+  body.set("payment_intent_data[metadata][credits]", String(CREDIT_PACK_CREDITS));
 
   if (opts.customerEmail) {
     body.set("customer_email", opts.customerEmail.slice(0, 256));

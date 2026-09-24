@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { TOKEN_LAUNCH_PRICES } from "@/lib/token-launch-pricing";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const JUP = `https://lite-api.jup.ag/price/v3?ids=${SOL_MINT}`;
@@ -6,7 +7,7 @@ const JUP = `https://lite-api.jup.ag/price/v3?ids=${SOL_MINT}`;
 const LAMPORT = 1 / 1_000_000_000;
 
 const ACTIONS = [
-  { id: "token_launch",     label: "Token launch (Meteora DBC)", sol: 0.03,    note: "real on-chain rent only — no platform fee" },
+  { id: "token_launch",     label: "Token launch (Meteora DBC)", sol: 0.045,   note: "0.040 rent + 0.005 sol.new (promo waives 0.005)" },
   { id: "nft_standard",     label: "NFT — Standard",             sol: 0.02,    note: "rent ≈ 0.015 + platform 0.005" },
   { id: "nft_compressed",   label: "NFT — Compressed",           sol: 0.001,   note: "platform fee only; Helius covers mint" },
   { id: "multisig_create",  label: "Multisig create (Squads)",   sol: 0.05,    note: "rent ≈ 0.04 + platform 0.01" },
@@ -36,8 +37,13 @@ export async function GET() {
     usd: solUsd != null ? +(a.sol * solUsd).toFixed(6) : null,
   }));
 
+  const tokenLaunches = TOKEN_LAUNCH_PRICES.map((p) => ({
+    ...p,
+    usd: solUsd != null && p.launchSol != null ? +(p.launchSol * solUsd).toFixed(6) : null,
+  }));
+
   return NextResponse.json(
-    { solUsd, priceSource, updatedAt: new Date().toISOString(), actions },
+    { solUsd, priceSource, updatedAt: new Date().toISOString(), actions, tokenLaunches },
     { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" } }
   );
 }

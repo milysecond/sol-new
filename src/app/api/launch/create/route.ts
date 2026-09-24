@@ -5,21 +5,21 @@ import { AnchorProvider } from "@coral-xyz/anchor";
 import { PumpFunSDK } from "pumpdotfun-sdk";
 import { notifyEvent } from "@/lib/notify";
 import { initDb, claimGroundKey } from "@/lib/db";
+import { rpcUrlFor } from "@/lib/rpc-server";
 
-import { mainnetRpcUrl } from "@/lib/rpc-server";
-
-function heliusRpc() {
-  return mainnetRpcUrl();
+function heliusRpc(network: "mainnet" | "devnet") {
+  return rpcUrlFor(network);
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, symbol, metadataUri, creatorWallet } = await req.json();
+    const { name, symbol, metadataUri, creatorWallet, network: netRaw } = await req.json();
     if (!name || !symbol || !metadataUri || !creatorWallet) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+    const network: "mainnet" | "devnet" = netRaw === "devnet" ? "devnet" : "mainnet";
 
-    const connection = new Connection(heliusRpc(), "confirmed");
+    const connection = new Connection(heliusRpc(network), "confirmed");
     const creator = new PublicKey(creatorWallet);
 
     // Dummy wallet — only needs publicKey for building instructions, no signing on server
@@ -31,9 +31,9 @@ export async function POST(req: NextRequest) {
     const provider = new AnchorProvider(connection, dummyWallet as any, { commitment: "confirmed" });
     const sdk = new PumpFunSDK(provider);
 
-    // Use a pre-ground NEW... vanity keypair; fall back to random if pool is empty
+    // Vanity NEW mints are mainnet-only. Devnet uses a random mint.
     await initDb().catch(() => {});
-    const groundKey = await claimGroundKey("NEW").catch(() => null);
+    const groundKey = network === "mainnet" ? await claimGroundKey("NEW").catch(() => null) : null;
     let mintKeypair: Keypair;
     if (groundKey) {
       const bs58 = (await import("bs58")).default;
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       kind: "pump_launch_tx_built",
       emoji: "🚀",
       title: "Pump.fun create tx built",
-      fields: { name, symbol, mint: mintKeypair.publicKey.toBase58(), creator: creatorWallet },
+      fields: { name, symbol, mint: mintKeypair.publicKey.toBase58(), creator: creatorWallet, network },
     }, { req });
 
     return NextResponse.json({
@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
       mint: mintKeypair.publicKey.toBase58(),
       blockhash,
       lastValidBlockHeight,
+      network,
     });
   } catch (e: unknown) {
     console.error("launch/create error:", e);

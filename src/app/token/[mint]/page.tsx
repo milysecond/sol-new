@@ -216,7 +216,7 @@ export default function LaunchPage() {
             </a>
             <button
               onClick={copyMint}
-              className="w-full flex items-center justify-center gap-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 transition cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 rounded-lg px-3.5 py-2.5 transition cursor-pointer"
             >
               {copied ? (
                 <>
@@ -289,7 +289,7 @@ export default function LaunchPage() {
           <div className="pt-2">
             <Link
               href="/token"
-              className="w-full flex items-center justify-center gap-2 bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-xl px-4 py-3.5 transition"
+              className="w-full flex items-center justify-center gap-2 bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-lg px-3.5 py-2.5 transition"
             >
               Launch yours on sol.new
               <ArrowRight className="w-4 h-4" />
