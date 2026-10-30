@@ -20,6 +20,7 @@ import {
   Gift,
   Trophy,
   FolderOpen,
+  Image,
   Menu,
 } from "lucide-react";
 import { AppNavMenu } from "@/components/app-nav-menu";
@@ -48,6 +49,7 @@ const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/wallet", label: "Wallet", icon: Wallet },
   { href: "/token", label: "Token", icon: Coins },
   { href: "/gift", label: "Gift", icon: Gift },
+  { href: "/memes", label: "Memes", icon: Image },
   { href: "/punt", label: "Punt", icon: Trophy },
   { href: "/portfolio", label: "Portfolio", icon: FolderOpen },
 ];
@@ -57,6 +59,7 @@ const TABLET_NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/wallet", label: "Wallet", icon: Wallet },
   { href: "/token", label: "Token", icon: Coins },
   { href: "/gift", label: "Gift", icon: Gift },
+  { href: "/memes", label: "Memes", icon: Image },
   { href: "/punt", label: "Punt", icon: Trophy },
   { href: "/portfolio", label: "Port", icon: FolderOpen },
 ];
@@ -66,6 +69,7 @@ const MOBILE_PRIMARY = [
   { href: "/wallet", label: "Wallet", icon: Wallet },
   { href: "/token", label: "Token", icon: Coins },
   { href: "/gift", label: "Gift", icon: Gift },
+  { href: "/memes", label: "Memes", icon: Image },
 ];
 
 export function Navbar() {
@@ -98,6 +102,7 @@ export function Navbar() {
     "/wallet",
     "/token",
     "/gift",
+    "/memes",
   ]);
   const [navHeaderH, setNavHeaderH] = useState(56);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -213,36 +218,18 @@ export function Navbar() {
       <div ref={headerRef} className="sticky top-0 z-[80] border-b border-black/10 dark:border-white/10 bg-white/90 dark:bg-black/90 backdrop-blur-md safe-top">
         <div className="flex items-center justify-between gap-2 px-2 sm:px-5 lg:px-6 py-2 sm:py-3 max-w-[1400px] mx-auto w-full">
           <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
-            {/* Logo first (leftmost) — menu activator in sidebar mode */}
-            {menuStyle === "sidebar" ? (
-              <button
-                type="button"
-                onClick={() => setShowMore((v) => !v)}
-                onDoubleClick={(e) => {
-                  e.preventDefault();
-                  router.push("/dir");
-                }}
-                className="flex items-center gap-2 shrink-0 min-h-[40px] pl-0.5 pr-1 justify-center cursor-pointer rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition"
-                aria-label="Open app menu"
-                title="Menu · double-tap for directory"
-              >
-                <img src="/icon-192.png" alt="sol.new" className="w-8 h-8 rounded-lg" />
-                <span className="text-lg sm:text-xl font-bold tracking-tight hidden md:inline">
-                  sol<span className="text-purple-500 dark:text-purple-400">.new</span>
-                </span>
-              </button>
-            ) : (
-              <Link
-                href="/home"
-                onDoubleClick={() => router.push("/dir")}
-                className="flex items-center gap-2 shrink-0 min-h-[40px] pl-0.5 pr-1 justify-center rounded-xl"
-              >
-                <img src="/icon-192.png" alt="sol.new" className="w-8 h-8 rounded-lg" />
-                <span className="text-lg sm:text-xl font-bold tracking-tight hidden md:inline">
-                  sol<span className="text-purple-500 dark:text-purple-400">.new</span>
-                </span>
-              </Link>
-            )}
+            {/* Logo — standard left position, always links home */}
+            <Link
+              href="/home"
+              onDoubleClick={() => router.push("/dir")}
+              className="flex items-center gap-2 shrink-0 min-h-[40px] pl-0.5 pr-1 justify-center rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition"
+              aria-label="sol.new home"
+            >
+              <img src="/icon-192.png" alt="sol.new" className="w-8 h-8 rounded-lg" />
+              <span className="text-lg sm:text-xl font-bold tracking-tight hidden md:inline">
+                sol<span className="text-purple-500 dark:text-purple-400">.new</span>
+              </span>
+            </Link>
 
             {/* Back sits after logo — nested routes only */}
             <PageBack />
@@ -303,33 +290,23 @@ export function Navbar() {
                   </Link>
                 );
               })}
-              <button
-                type="button"
-                onClick={() => setShowMore(true)}
-                className={`px-2.5 py-1.5 rounded-lg text-sm transition cursor-pointer ${
-                  moreActive
-                    ? "bg-purple-500/15 text-purple-800 dark:text-purple-200"
-                    : "text-gray-500 dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5"
-                }`}
-              >
-                {menuStyle === "sidebar" ? (
-                  <>
-                    <Menu size={15} className="inline mr-1" />
-                    Menu
-                  </>
-                ) : (
-                  <>
-                    <MoreHorizontal size={15} className="inline mr-1" />
-                    More
-                  </>
-                )}
-              </button>
             </div>
           </div>
 
           <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
             <SocialLinks />
             <ThemeToggle />
+
+            {/* Menu button on the right (standard) */}
+            <button
+              type="button"
+              onClick={() => setShowMore((v) => !v)}
+              aria-label="Open menu"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-gray-700 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/10 transition border border-black/10 dark:border-white/10 ml-1"
+            >
+              <Menu size={18} />
+              <span className="hidden lg:inline font-medium">Menu</span>
+            </button>
             {publicKey ? (
               <div className="relative">
                 <button

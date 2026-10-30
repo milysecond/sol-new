@@ -7,6 +7,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Coins,
   Gift,
+  Image,
   MoreHorizontal,
   Wallet,
   Zap,
@@ -26,7 +27,7 @@ export const BOTTOM_NAV_DEFAULT: string[] = [
   "/home",
   "/wallet",
   "/token",
-  "/gift",
+  "/memes",
 ];
 
 const FALLBACK_ICONS: Record<string, LucideIcon> = {
@@ -34,22 +35,31 @@ const FALLBACK_ICONS: Record<string, LucideIcon> = {
   "/wallet": Wallet,
   "/token": Coins,
   "/gift": Gift,
+  "/memes": Image,
 };
 
 export function readBottomNavHrefs(): string[] {
   if (typeof window === "undefined") return [...BOTTOM_NAV_DEFAULT];
   try {
     const raw = localStorage.getItem(BOTTOM_NAV_KEY);
-    if (!raw) return [...BOTTOM_NAV_DEFAULT];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [...BOTTOM_NAV_DEFAULT];
-    const hrefs = parsed
-      .filter((h): h is string => typeof h === "string" && h.startsWith("/"))
-      .slice(0, 4);
-    while (hrefs.length < 4) {
-      const fill = BOTTOM_NAV_DEFAULT.find((d) => !hrefs.includes(d));
-      if (!fill) break;
-      hrefs.push(fill);
+    let hrefs = !raw ? [...BOTTOM_NAV_DEFAULT] : (() => {
+      try {
+        const p = JSON.parse(raw);
+        if (!Array.isArray(p)) return [...BOTTOM_NAV_DEFAULT];
+        return p.filter((h): h is string => typeof h === "string" && h.startsWith("/")).slice(0, 4);
+      } catch { return [...BOTTOM_NAV_DEFAULT]; }
+    })();
+
+    // Ensure Memes is visible (promote after gift or append/replace last)
+    if (!hrefs.includes("/memes")) {
+      const g = hrefs.indexOf("/gift");
+      if (g !== -1 && g < 3) {
+        hrefs.splice(g + 1, 0, "/memes");
+        if (hrefs.length > 4) hrefs.pop();
+      } else {
+        // replace the last slot with memes to make it visible
+        hrefs[3] = "/memes";
+      }
     }
     return hrefs.length === 4 ? hrefs : [...BOTTOM_NAV_DEFAULT];
   } catch {
