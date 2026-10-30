@@ -17,6 +17,7 @@ import {
   Info,
   PanelLeft,
   LayoutGrid,
+  Pencil,
 } from "lucide-react";
 import { WalletShell } from "@/components/wallet-shell";
 import { useWallet } from "@/lib/wallet-context";
@@ -52,9 +53,12 @@ export default function WalletSettingsPage() {
     wallets,
     disconnect,
     removeWallet,
+    renameWallet,
     switchWallet,
     loading,
   } = useWallet();
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draftLabel, setDraftLabel] = useState("");
   const [hideBalances, setHideBalances] = useHideBalances();
   const [autoLockMin, setAutoLockMin] = useState(15);
   const [menuStyle, setMenuStyle] = useState<NavMenuStyle>("sidebar");
@@ -355,49 +359,112 @@ export default function WalletSettingsPage() {
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 flex items-center gap-1.5">
             <Users className="w-3.5 h-3.5" /> Accounts on this device
           </p>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Give each wallet a short name (e.g. Main, Trading). The on-chain address never changes.
+          </p>
           {wallets.length === 0 ? (
             <p className="text-sm text-gray-500">No wallets saved yet.</p>
           ) : (
             <ul className="space-y-2">
-              {wallets.map((w) => (
+              {wallets.map((w) => {
+                const custom = w.label && w.label !== w.pubkey;
+                const isEdit = editing === w.pubkey;
+                return (
                 <li
                   key={w.pubkey}
-                  className="flex items-center gap-2 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] px-3 py-2"
+                  className="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] px-3 py-2.5 space-y-2"
                 >
-                  <Wallet className="w-4 h-4 text-fuchsia-400 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-mono truncate">
-                      {w.pubkey.slice(0, 6)}…{w.pubkey.slice(-4)}
-                      {publicKey === w.pubkey && (
-                        <span className="ml-1.5 text-[10px] text-emerald-500 font-sans font-semibold">
-                          ACTIVE
-                        </span>
+                  <div className="flex items-center gap-2">
+                    <Wallet className="w-4 h-4 text-fuchsia-400 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      {isEdit ? (
+                        <form
+                          className="flex gap-1.5"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            renameWallet(w.pubkey, draftLabel);
+                            setEditing(null);
+                            toast.success(draftLabel.trim() ? `Labeled “${draftLabel.trim().slice(0, 32)}”` : "Label cleared");
+                          }}
+                        >
+                          <input
+                            autoFocus
+                            value={draftLabel}
+                            onChange={(e) => setDraftLabel(e.target.value)}
+                            maxLength={32}
+                            placeholder="e.g. Main wallet"
+                            className="flex-1 min-w-0 rounded-lg border border-fuchsia-400/40 bg-white dark:bg-black px-2 py-1.5 text-sm outline-none focus:border-fuchsia-400"
+                          />
+                          <button
+                            type="submit"
+                            className="rounded-lg bg-fuchsia-500 px-2.5 py-1.5 text-xs font-semibold text-white"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditing(null)}
+                            className="rounded-lg border border-black/10 dark:border-white/10 px-2 py-1.5 text-xs text-gray-500"
+                          >
+                            Cancel
+                          </button>
+                        </form>
+                      ) : (
+                        <>
+                          <p className="text-sm font-semibold truncate text-gray-900 dark:text-white">
+                            {custom ? w.label : "Unnamed"}
+                            {publicKey === w.pubkey && (
+                              <span className="ml-1.5 text-[10px] text-emerald-500 font-semibold">
+                                ACTIVE
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-[11px] font-mono text-gray-500 truncate" title={w.pubkey}>
+                            {w.pubkey.slice(0, 6)}…{w.pubkey.slice(-4)}
+                          </p>
+                        </>
                       )}
-                    </p>
+                    </div>
+                    {!isEdit && (
+                      <>
+                        <button
+                          type="button"
+                          aria-label="Rename wallet"
+                          onClick={() => {
+                            setEditing(w.pubkey);
+                            setDraftLabel(custom ? w.label : "");
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-fuchsia-500"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        {publicKey !== w.pubkey && (
+                          <button
+                            type="button"
+                            disabled={loading}
+                            onClick={() => void switchWallet(w.pubkey)}
+                            className="text-[11px] text-violet-500 font-medium"
+                          >
+                            Switch
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          aria-label="Remove from this device"
+                          onClick={() => {
+                            removeWallet(w.pubkey);
+                            toast.info("Removed from this device (passkey remains in system)");
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-red-400"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
                   </div>
-                  {publicKey !== w.pubkey && (
-                    <button
-                      type="button"
-                      disabled={loading}
-                      onClick={() => void switchWallet(w.pubkey)}
-                      className="text-[11px] text-violet-500 font-medium"
-                    >
-                      Switch
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    aria-label="Remove from this device"
-                    onClick={() => {
-                      removeWallet(w.pubkey);
-                      toast.info("Removed from this device (passkey remains in system)");
-                    }}
-                    className="p-1.5 text-gray-400 hover:text-red-400"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
           <Link

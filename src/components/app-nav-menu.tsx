@@ -124,11 +124,26 @@ export function AppNavMenu({
   useEffect(() => {
     if (!open) return;
     const saved = getMenuCustomOrder();
-    const base = NAV_ITEMS.filter((i) => i.href !== "/home").map((i) => i.href);
-    setCustomOrder(saved?.length ? applyOrder(
-      NAV_ITEMS.filter((i) => i.href !== "/home"),
-      saved,
-    ).map((i) => i.href) : base);
+    let base = NAV_ITEMS.filter((i) => i.href !== "/home").map((i) => i.href);
+
+    // Force /memes to be visible right after /gift in custom orders
+    if (saved?.length) {
+      const ordered = applyOrder(NAV_ITEMS.filter((i) => i.href !== "/home"), saved).map((i) => i.href);
+      if (!ordered.includes("/memes")) {
+        const g = ordered.indexOf("/gift");
+        if (g !== -1) {
+          ordered.splice(g + 1, 0, "/memes");
+        } else {
+          ordered.push("/memes");
+        }
+      }
+      setCustomOrder(ordered);
+    } else {
+      // insert in base for first time
+      const g = base.indexOf("/gift");
+      if (g !== -1) base.splice(g + 1, 0, "/memes");
+      setCustomOrder(base);
+    }
     setHydrated(true);
   }, [open]);
 

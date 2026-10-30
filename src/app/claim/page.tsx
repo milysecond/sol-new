@@ -542,7 +542,7 @@ export default function ClaimPage() {
                     type="button"
                     onClick={() => void handleClaim()}
                     disabled={claiming}
-                    className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer flex items-center justify-center gap-2 min-h-[52px] text-base"
+                    className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2 min-h-[52px] text-base"
                   >
                     {claiming ? (
                       <>
@@ -572,7 +572,7 @@ export default function ClaimPage() {
                     type="button"
                     onClick={() => void connect()}
                     disabled={walletLoading}
-                    className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer min-h-[52px]"
+                    className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer min-h-[52px]"
                   >
                     {walletLoading ? (
                       <>
@@ -645,13 +645,13 @@ export default function ClaimPage() {
               <div className="flex flex-col gap-2 pt-2">
                 <Link
                   href="/wallet"
-                  className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-xl px-4 py-3.5 transition text-center"
+                  className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg px-3.5 py-2.5 transition text-center"
                 >
                   Open my wallet
                 </Link>
                 <Link
                   href="/gift"
-                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-xl px-4 py-3 hover:text-gray-900 dark:hover:text-white transition text-center"
+                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 rounded-lg px-3.5 py-2.5 hover:text-gray-900 dark:hover:text-white transition text-center"
                 >
                   Send someone a gift
                 </Link>

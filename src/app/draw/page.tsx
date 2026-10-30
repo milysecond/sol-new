@@ -464,7 +464,7 @@ function DrawInner() {
   return (
     <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8 space-y-5 pb-safe">
+      <main className="flex-1 app-shell py-8 space-y-5 pb-safe">
         <FairRaffleCard />
         <header className="text-center space-y-2">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-violet-500/10 text-violet-500 mb-1">

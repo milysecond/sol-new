@@ -330,7 +330,7 @@ export default function StakePage() {
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="stake SOL">
           <PageTransition>
-            <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-6">
+            <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-6">
               <div className="text-center space-y-2">
                 <Landmark className="mx-auto text-purple-400" size={36} />
                 <h1 className="text-3xl font-bold tracking-tight">Stake SOL</h1>
@@ -427,7 +427,7 @@ export default function StakePage() {
                   type="button"
                   disabled={busy || !amount}
                   onClick={() => void handleStake()}
-                  className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2"
                 >
                   {busy ? <Spinner size={16} /> : null}
                   Stake SOL

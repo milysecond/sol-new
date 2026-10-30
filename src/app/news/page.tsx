@@ -56,7 +56,7 @@ export default function NewsPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white">
       <Navbar />
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6 pb-24 sm:pb-8">
+      <main className="app-shell-wide py-8 space-y-6 pb-24 sm:pb-8">
         <header className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">

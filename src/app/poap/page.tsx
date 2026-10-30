@@ -314,7 +314,7 @@ export default function PoapPage() {
   return (
     <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 w-full max-w-md mx-auto px-3 sm:px-4 pt-5 sm:pt-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
+      <main className="flex-1 app-shell pt-5 sm:pt-8 lg:pt-10 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <PageTransition>
           <div className="space-y-5">
             <div className="text-center space-y-1.5">

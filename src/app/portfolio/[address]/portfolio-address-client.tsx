@@ -78,7 +78,7 @@ export function PortfolioAddressClient({ address }: { address: string }) {
       <Navbar />
       <main className="flex-1 w-full pb-24">
         <PageTransition className="w-full">
-          <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-5">
+          <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-5">
             <div className="text-center space-y-1.5">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Portfolio</h1>
               <p className="text-sm text-gray-500 dark:text-white/45">

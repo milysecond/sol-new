@@ -284,7 +284,7 @@ export function StripeOnrampPanel({
           <button
             type="button"
             onClick={() => openCheckout(redirectUrl, true)}
-            className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer"
           >
             Continue — Apple Pay / card
           </button>

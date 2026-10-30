@@ -718,7 +718,7 @@ export default function LoanPage() {
   return (
     <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 flex flex-col w-full max-w-lg mx-auto px-3 sm:px-4 pt-4 sm:pt-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-10">
+      <main className="flex-1 flex flex-col app-shell px-3 sm:px-4 pt-4 sm:pt-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-10">
         <PageTransition>
           <div className="w-full space-y-4 sm:space-y-6">
             <div className="text-center space-y-1.5 sm:space-y-2 px-1">

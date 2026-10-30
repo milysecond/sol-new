@@ -62,7 +62,7 @@ export default function WhatsNewPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white">
       <Navbar />
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      <main className="app-shell-wide py-8 space-y-6">
         <header className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <Sparkles className="w-7 h-7 text-orange-400" /> What's new

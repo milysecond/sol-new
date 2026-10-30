@@ -169,7 +169,7 @@ function WelcomeModal({ onDismiss }: { onDismiss: () => void }) {
 
         <button
           onClick={dismiss}
-          className="mt-5 w-full bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer"
+          className="mt-5 w-full bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer"
         >
           Let's go
         </button>

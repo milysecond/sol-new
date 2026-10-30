@@ -102,7 +102,7 @@ export default function WalletFindPage() {
   return (
     <div className="min-h-dvh bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 w-full max-w-lg mx-auto px-3 sm:px-4 pt-5 pb-24 space-y-5">
+      <main className="flex-1 app-shell pt-5 lg:pt-8 pb-24 space-y-5">
         <PageTransition>
           <div className="text-center space-y-1.5">
             <Search className="mx-auto text-purple-500" size={28} />

@@ -249,7 +249,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
             <button
               onClick={handleLaunch}
               disabled={busy || !name || !ticker || !imageFile}
-              className="w-full bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {busy ? <><Spinner size={16} /> {statusLabel}</> : <><Rocket size={16} /> Launch on pump.fun</>}
             </button>
@@ -300,7 +300,7 @@ export default function LaunchPage() {
           </div>
           <button
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 bg-purple-500 hover:bg-purple-400 text-white font-medium rounded-xl px-4 py-2.5 text-sm transition cursor-pointer"
+            className="flex items-center gap-1.5 bg-purple-500 hover:bg-purple-400 text-white font-medium rounded-lg px-3 py-2 text-sm transition cursor-pointer"
           >
             <Plus size={16} /> Create
           </button>

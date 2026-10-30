@@ -143,7 +143,7 @@ export function IdNameClient({ name }: { name: string }) {
       <Navbar />
       <main className="flex-1 flex flex-col items-center px-4 py-8 sm:py-12">
         <PageTransition>
-          <div className="w-full max-w-lg space-y-6">
+          <div className="w-full max-w-2xl lg:max-w-4xl space-y-6">
             <div className="text-center space-y-2">
               <Search size={28} className="mx-auto text-purple-400" />
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
@@ -159,7 +159,7 @@ export function IdNameClient({ name }: { name: string }) {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="metasal.sol · name.skr · name.bonk"
+                placeholder="metasal.sol · name.sns · name.skr · name.bonk"
                 className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl px-5 py-4 pr-24 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 transition text-base"
                 autoCapitalize="none"
                 autoCorrect="off"

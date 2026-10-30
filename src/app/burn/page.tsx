@@ -160,7 +160,7 @@ export default function BurnPage() {
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="reclaim rent">
           <PageTransition>
-            <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-6">
+            <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-6">
               <div className="text-center space-y-2">
                 <Flame className="mx-auto text-orange-400" size={36} />
                 <h1 className="text-3xl font-bold tracking-tight">Burn / reclaim</h1>
@@ -247,7 +247,7 @@ export default function BurnPage() {
                 type="button"
                 disabled={busy || selectedEmpty.length === 0}
                 onClick={() => void closeSelected()}
-                className="w-full bg-orange-600 hover:bg-orange-500 disabled:opacity-40 text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer flex items-center justify-center gap-2"
+                className="w-full bg-orange-600 hover:bg-orange-500 disabled:opacity-40 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer flex items-center justify-center gap-2"
               >
                 {busy ? <Spinner size={16} /> : <Flame size={16} />}
                 Close {selectedEmpty.length} account

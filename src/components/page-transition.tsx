@@ -1,9 +1,8 @@
 "use client";
 
 /**
- * Local page wrapper — no transform animations (they fought RouteTransition
- * and sticky chrome on Seeker). RouteTransition handles a light opacity fade.
- * Always full-width so parent centering (mx-auto) works — never shrink-wrap.
+ * Local page section enter — soft slide-up + fade (slower, calmer).
+ * Does not fight sticky chrome (only content block, not full viewport).
  */
 export function PageTransition({
   children,
@@ -12,10 +11,14 @@ export function PageTransition({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <div className={`w-full min-w-0 ${className}`.trim()}>{children}</div>;
+  return (
+    <div className={`w-full min-w-0 animate-page-enter ${className}`.trim()}>
+      {children}
+    </div>
+  );
 }
 
-/** Soft enter without transform — opacity only. */
+/** Soft enter without layout thrash. */
 export function FadeIn({
   children,
   className = "",
@@ -24,7 +27,5 @@ export function FadeIn({
   delay?: number;
   className?: string;
 }) {
-  return (
-    <div className={`animate-[fadeIn_0.2s_ease-out] ${className}`}>{children}</div>
-  );
+  return <div className={`animate-page-enter ${className}`}>{children}</div>;
 }

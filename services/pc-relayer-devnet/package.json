@@ -1,0 +1,18 @@
+{
+  "name": "pc-relayer-devnet",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "index": "node src/indexer.js",
+    "create-alt": "node src/create-alt.js"
+  },
+  "dependencies": {
+    "@lightprotocol/hasher.rs": "^0.2.0",
+    "@solana/web3.js": "^1.98.4",
+    "better-sqlite3": "^11.10.0",
+    "bn.js": "^5.2.2",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}

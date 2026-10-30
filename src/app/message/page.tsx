@@ -119,7 +119,7 @@ function SignSection({ onSigned }: { onSigned: (r: { message: string; signature:
       <button
         onClick={handleSign}
         disabled={!message || busy}
-        className="w-full bg-teal-500 hover:bg-teal-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full bg-teal-500 hover:bg-teal-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {busy ? <><Spinner size={16} /> Signing…</> : "Sign with Face ID"}
       </button>
@@ -154,7 +154,7 @@ function SignSection({ onSigned }: { onSigned: (r: { message: string; signature:
                 <button
                   onClick={handleOnchain}
                   disabled={onchain.status === "sending"}
-                  className="w-full bg-black/10 dark:bg-white/10 hover:bg-black/15 dark:hover:bg-white/15 disabled:opacity-50 text-gray-900 dark:text-white font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full bg-black/10 dark:bg-white/10 hover:bg-black/15 dark:hover:bg-white/15 disabled:opacity-50 text-gray-900 dark:text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {onchain.status === "sending"
                     ? <><Spinner size={16} /> Writing on-chain…</>
@@ -250,7 +250,7 @@ function VerifySection({
       <button
         onClick={handleVerify}
         disabled={!canVerify}
-        className="w-full bg-black/10 dark:bg-white/10 hover:bg-black/15 dark:hover:bg-white/15 disabled:opacity-50 text-gray-900 dark:text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
+        className="w-full bg-black/10 dark:bg-white/10 hover:bg-black/15 dark:hover:bg-white/15 disabled:opacity-50 text-gray-900 dark:text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed"
       >
         Verify
       </button>

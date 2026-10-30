@@ -18,7 +18,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 /**
  * X / LinkedIn style left drawer — sits **below** the sticky header.
- * Opened via logo (when sidebar style is on) or Menu tab.
+ * Opened via the top-right hamburger or bottom nav "Menu" tab.
  */
 export function AppSideNav({
   open,

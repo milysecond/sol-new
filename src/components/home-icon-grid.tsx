@@ -111,7 +111,7 @@ export function HomeIconGrid() {
 
   if (!hydrated) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 min-h-[120px] animate-pulse">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 min-h-[120px] animate-pulse">
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
@@ -184,7 +184,7 @@ export function HomeIconGrid() {
         </Reorder.Group>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
             {pinned.map((p) => (
               <Link
                 key={p.href}

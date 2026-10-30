@@ -72,7 +72,7 @@ function LinkShell({ children }: { children?: React.ReactNode }) {
       <Navbar />
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         {children ?? (
-          <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 text-center text-gray-400 py-16">Loading…</div>
+          <div className="app-shell py-5 sm:py-8 lg:py-10 text-center text-gray-400 py-16">Loading…</div>
         )}
       </main>
     </div>
@@ -359,7 +359,7 @@ function LinkPageInner() {
 
   return (
     <LinkShell>
-      <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-5 sm:py-8 space-y-8">
+      <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-8">
         <div className="text-center space-y-3">
           <AnimatedIcon icon={Link2} size={40} className="text-sky-400" />
           <h1 className="text-3xl font-bold tracking-tight">Short links</h1>
@@ -473,7 +473,7 @@ function LinkPageInner() {
                 type="button"
                 onClick={() => void startSolanaPayQr()}
                 disabled={!url.trim() || busy}
-                className="w-full bg-sky-500 hover:bg-sky-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full bg-sky-500 hover:bg-sky-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <QrIcon className="w-4 h-4" />
                 Pay with Solana Pay QR · {CUSTOM_LINK_FEE_SOL} SOL
@@ -482,7 +482,7 @@ function LinkPageInner() {
                 type="button"
                 onClick={() => void createWithPasskey()}
                 disabled={!url.trim() || busy || !publicKey}
-                className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-40 text-gray-800 dark:text-white/80 font-semibold rounded-xl px-4 py-3 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-40 text-gray-800 dark:text-white/80 font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
               >
                 {busy ? (
                   <>
@@ -502,7 +502,7 @@ function LinkPageInner() {
               type="button"
               onClick={() => void createFree()}
               disabled={!url.trim() || busy}
-              className="w-full bg-sky-500 hover:bg-sky-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-sky-500 hover:bg-sky-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-lg px-3.5 py-2.5 transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {busy ? (
                 <>

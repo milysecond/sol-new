@@ -25,7 +25,25 @@ export const MAINNET_RPC_POOL = [
   "https://rpc.aex402.com",
 ] as const;
 
+/**
+ * Devnet: same-origin proxy first (uses server HELIUS_API_KEY),
+ * then public fallback (often 429).
+ */
+/**
+ * Devnet: browser-direct public first (CF worker IPs often blocked),
+ * then same-origin proxy, then official public.
+ */
+export const DEVNET_RPC_POOL = [
+  "https://solana-devnet.api.onfinality.io/public",
+  "/api/rpc?network=devnet",
+  ...(typeof process !== "undefined" && process.env.NEXT_PUBLIC_RPC_DEVNET
+    ? [process.env.NEXT_PUBLIC_RPC_DEVNET]
+    : []),
+  "https://api.devnet.solana.com",
+] as const;
+
 const RPC_PREF_KEY = "sol.new.rpc.mainnet";
+const DEVNET_RPC_PREF_KEY = "sol.new.rpc.devnet";
 
 export const RPC: Record<Network, string> = {
   mainnet:
@@ -33,7 +51,7 @@ export const RPC: Record<Network, string> = {
     MAINNET_RPC_POOL[0],
   devnet:
     (typeof process !== "undefined" && process.env.NEXT_PUBLIC_RPC_DEVNET) ||
-    "https://api.devnet.solana.com",
+    DEVNET_RPC_POOL[0],
 };
 
 interface NetworkState {
@@ -43,6 +61,8 @@ interface NetworkState {
   mainnetPool: readonly string[];
   /** Force next mainnet RPC after errors. */
   rotateMainnetRpc: () => string;
+  /** Force next devnet RPC after errors. */
+  rotateDevnetRpc: () => string;
   /** In-app address page only (never external explorers). */
   explorerUrl: (address: string) => string;
   toggle: () => void;
@@ -53,15 +73,23 @@ const NetworkContext = createContext<NetworkState>({
   rpc: RPC.mainnet,
   mainnetPool: MAINNET_RPC_POOL,
   rotateMainnetRpc: () => MAINNET_RPC_POOL[0],
+  rotateDevnetRpc: () => DEVNET_RPC_POOL[0],
   explorerUrl: (a) => addressPath(a),
   toggle: () => {},
 });
 
 export const useNetwork = () => useContext(NetworkContext);
 
+function resolveRpcUrl(url: string): string {
+  if (typeof window !== "undefined" && url.startsWith("/")) {
+    return `${window.location.origin}${url}`;
+  }
+  return url;
+}
+
 async function probeRpc(url: string): Promise<boolean> {
   try {
-    const res = await fetch(url, {
+    const res = await fetch(resolveRpcUrl(url), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -70,7 +98,7 @@ async function probeRpc(url: string): Promise<boolean> {
         method: "getSlot",
         params: [{ commitment: "processed" }],
       }),
-      signal: AbortSignal.timeout(6_000),
+      signal: AbortSignal.timeout(8_000),
     });
     if (!res.ok) return false;
     const j = (await res.json()) as { result?: unknown; error?: unknown };
@@ -80,12 +108,13 @@ async function probeRpc(url: string): Promise<boolean> {
   }
 }
 
-function poolWithPreferred(preferred?: string | null): string[] {
-  const base = [...MAINNET_RPC_POOL];
-  const env =
-    typeof process !== "undefined" ? process.env.NEXT_PUBLIC_RPC_URL?.trim() : "";
+function poolWithPreferred(
+  pool: readonly string[],
+  preferred?: string | null,
+  envUrl?: string | null,
+): string[] {
   const ordered: string[] = [];
-  for (const u of [preferred, env, ...base]) {
+  for (const u of [preferred, envUrl, ...pool]) {
     if (!u) continue;
     const n = u.replace(/\/+$/, "");
     if (!ordered.some((x) => x.replace(/\/+$/, "") === n)) ordered.push(n);
@@ -96,6 +125,7 @@ function poolWithPreferred(preferred?: string | null): string[] {
 export function NetworkProvider({ children }: { children: ReactNode }) {
   const [network, setNetwork] = useState<Network>("mainnet");
   const [mainnetRpc, setMainnetRpc] = useState<string>(RPC.mainnet);
+  const [devnetRpc, setDevnetRpc] = useState<string>(RPC.devnet);
 
   useEffect(() => {
     const saved = localStorage.getItem("sol.new.network") as Network | null;
@@ -114,7 +144,9 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     (async () => {
-      const candidates = poolWithPreferred(pref);
+      const envMain =
+        typeof process !== "undefined" ? process.env.NEXT_PUBLIC_RPC_URL?.trim() : "";
+      const candidates = poolWithPreferred(MAINNET_RPC_POOL, pref, envMain);
       for (const url of candidates) {
         const ok = await probeRpc(url);
         if (cancelled) return;
@@ -125,11 +157,34 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
           } catch {
             /* ignore */
           }
+          break;
+        }
+      }
+
+      const envDev =
+        typeof process !== "undefined"
+          ? process.env.NEXT_PUBLIC_RPC_DEVNET?.trim()
+          : "";
+      let dpref = localStorage.getItem(DEVNET_RPC_PREF_KEY);
+      // Prefer proxy if sticky public endpoint is rate-limited
+      if (dpref && /api\.devnet\.solana\.com/i.test(dpref)) {
+        dpref = DEVNET_RPC_POOL[0];
+      }
+      const dCandidates = poolWithPreferred(DEVNET_RPC_POOL, dpref, envDev);
+      for (const url of dCandidates) {
+        const ok = await probeRpc(url);
+        if (cancelled) return;
+        if (ok) {
+          setDevnetRpc(url);
+          try {
+            localStorage.setItem(DEVNET_RPC_PREF_KEY, url);
+          } catch {
+            /* ignore */
+          }
           return;
         }
       }
-      // all failed — keep first candidate
-      if (!cancelled) setMainnetRpc(candidates[0] || MAINNET_RPC_POOL[0]);
+      if (!cancelled) setDevnetRpc(dCandidates[0] || DEVNET_RPC_POOL[0]);
     })();
 
     return () => {
@@ -139,9 +194,9 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
 
   const rotateMainnetRpc = useCallback(() => {
     const candidates = poolWithPreferred(
-      typeof localStorage !== "undefined"
-        ? localStorage.getItem(RPC_PREF_KEY)
-        : null,
+      MAINNET_RPC_POOL,
+      typeof localStorage !== "undefined" ? localStorage.getItem(RPC_PREF_KEY) : null,
+      typeof process !== "undefined" ? process.env.NEXT_PUBLIC_RPC_URL?.trim() : null,
     );
     const cur = mainnetRpc.replace(/\/+$/, "");
     const idx = candidates.findIndex((u) => u.replace(/\/+$/, "") === cur);
@@ -155,6 +210,26 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     return next;
   }, [mainnetRpc]);
 
+  const rotateDevnetRpc = useCallback(() => {
+    const candidates = poolWithPreferred(
+      DEVNET_RPC_POOL,
+      typeof localStorage !== "undefined"
+        ? localStorage.getItem(DEVNET_RPC_PREF_KEY)
+        : null,
+      typeof process !== "undefined" ? process.env.NEXT_PUBLIC_RPC_DEVNET?.trim() : null,
+    );
+    const cur = devnetRpc.replace(/\/+$/, "");
+    const idx = candidates.findIndex((u) => u.replace(/\/+$/, "") === cur);
+    const next = candidates[(idx + 1) % candidates.length] || candidates[0]!;
+    setDevnetRpc(next);
+    try {
+      localStorage.setItem(DEVNET_RPC_PREF_KEY, next);
+    } catch {
+      /* ignore */
+    }
+    return next;
+  }, [devnetRpc]);
+
   const toggle = () => {
     const next = network === "mainnet" ? "devnet" : "mainnet";
     setNetwork(next);
@@ -164,7 +239,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
 
   const explorerUrl = (address: string) => addressPath(address);
 
-  const rpc = network === "mainnet" ? mainnetRpc : RPC.devnet;
+  const rpc = resolveRpcUrl(network === "mainnet" ? mainnetRpc : devnetRpc);
 
   return (
     <NetworkContext.Provider
@@ -173,6 +248,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
         rpc,
         mainnetPool: MAINNET_RPC_POOL,
         rotateMainnetRpc,
+        rotateDevnetRpc,
         explorerUrl,
         toggle,
       }}

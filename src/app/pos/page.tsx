@@ -183,7 +183,7 @@ export default function PosPage() {
       <Navbar />
       <main className="flex-1 w-full min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-12">
         <ConnectGate action="take payments">
-          <div className="mx-auto w-full max-w-md px-4 sm:px-6 py-5 sm:py-8 space-y-5">
+          <div className="app-shell py-5 sm:py-8 lg:py-10 space-y-5 lg:space-y-6">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1">
                 <div className="inline-flex items-center gap-2 text-violet-500 text-xs font-semibold uppercase tracking-wide">

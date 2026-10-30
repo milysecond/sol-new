@@ -54,7 +54,7 @@ export default function GovernPage() {
               href={`https://metadao.fi/dao/${dao}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-400 text-white font-semibold rounded-xl px-4 py-3.5 transition"
+              className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-400 text-white font-semibold rounded-lg px-3.5 py-2.5 transition"
             >
               Open on MetaDAO <ExternalLink size={15} />
             </a>

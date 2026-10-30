@@ -382,7 +382,7 @@ export default function PuntPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="flex-1 w-full max-w-2xl mx-auto px-4 py-8 space-y-8">
+      <main className="flex-1 app-shell py-8 space-y-8">
         <PageTransition>
         <div className="text-center space-y-3">
           <AnimatedIcon icon={Trophy} size={40} className="text-green-600 dark:text-green-400" />
