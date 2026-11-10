@@ -32,6 +32,7 @@ import {
   Trophy,
   Users,
   Wallet,
+  Waves,
   Zap,
 } from "lucide-react";
 
@@ -126,6 +127,16 @@ export const NAV_ITEMS: NavItem[] = [
     color: "text-orange-500 dark:text-orange-400",
     category: "create",
     home: true,
+  },
+  {
+    href: "/float",
+    label: "Float",
+    title: "Float",
+    desc: "Launch a coin on Float",
+    icon: Waves,
+    color: "text-cyan-600 dark:text-cyan-400",
+    category: "create",
+    home: false,
   },
   {
     href: "/nft",

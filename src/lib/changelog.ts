@@ -14,6 +14,14 @@ export type ChangelogEntry = {
 /** Newest first. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-11-10",
+    title: "Launch a coin on Float",
+    items: [
+      "/float — launch through Float's program with your passkey wallet.",
+      "Pick an enabled quote (stocks, SOL, USDC), a fee tier, and an optional fLoat vanity mint.",
+    ],
+  },
+  {
     date: "2026-08-19",
     title: "MoneyGram Ramps on Get funds",
     items: [

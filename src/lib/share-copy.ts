@@ -98,6 +98,28 @@ export function tokenLaunchSharePayload(opts: {
   };
 }
 
+/** Share a coin launched through Float's program. */
+export function floatLaunchSharePayload(opts: {
+  name: string;
+  symbol: string;
+  mint: string;
+  quoteSymbol: string;
+}): SharePayload {
+  const ticker = opts.symbol?.startsWith("$") ? opts.symbol : `$${opts.symbol}`;
+  const quote = opts.quoteSymbol?.startsWith("$") ? opts.quoteSymbol : opts.quoteSymbol;
+  const url = `https://www.floatlaunch.xyz/tokens/${opts.mint}`;
+  return {
+    title: `${opts.name} (${ticker}) on Float`,
+    text: [
+      `Just launched ${opts.name} (${ticker}) on Float via sol.new.`,
+      quote ? `Paired with ${quote}. Holders earn that asset from fees.` : "Holders earn the quote token from fees.",
+      `Mint: ${opts.mint}`,
+      url,
+    ].join("\n"),
+    url,
+  };
+}
+
 /** Ask a friend to send SOL/USDC to this wallet */
 export function requestFundsSharePayload(opts: {
   publicKey: string;

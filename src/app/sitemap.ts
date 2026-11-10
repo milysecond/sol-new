@@ -21,6 +21,7 @@ const STATIC_ROUTES: {
   { path: "/home", priority: 0.95, freq: "weekly" },
   { path: "/onboard", priority: 0.9, freq: "weekly" },
   { path: "/token", priority: 0.9, freq: "daily" },
+  { path: "/float", priority: 0.8, freq: "daily" },
   { path: "/nft", priority: 0.9, freq: "daily" },
   { path: "/multisig", priority: 0.8, freq: "weekly" },
   { path: "/wallet", priority: 0.8, freq: "weekly" },

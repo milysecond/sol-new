@@ -8,6 +8,7 @@ Full product map for agents: https://sol.new/llms-full.txt · Features: https://
 
 ### Create
 - [Token](https://sol.new/token): Launch an SPL token with a bonding curve in seconds.
+- [Float](https://sol.new/float): Launch a coin through Float's on-chain program, paired with an enabled quote token.
 - [NFT](https://sol.new/nft): Mint standard or compressed NFTs from an image.
 - [Multisig](https://sol.new/multisig): Shared wallets with multiple signers.
 - [.sol name](https://sol.new/id): Check and register a Solana name.

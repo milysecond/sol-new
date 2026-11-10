@@ -20,6 +20,7 @@
 | Path | Description |
 |------|-------------|
 | /token | Launch SPL token (Meteora DBC on mainnet) |
+| /float | Launch a coin through the Float program (enabled quote + fee tier) |
 | /token/[mint] | Token landing |
 | /nft | Mint standard or compressed NFT |
 | /multisig | Create Squads-style multisig |
