@@ -21,7 +21,7 @@ export type DasAsset = {
   grouping?: { group_key: string; group_value: string }[];
   ownership?: { owner?: string; frozen?: boolean; delegated?: boolean };
   compression?: { compressed?: boolean };
-  token_info?: { balance?: number; decimals?: number; symbol?: string };
+  token_info?: { balance?: number; decimals?: number; symbol?: string; token_program?: string };
   creators?: { address: string; verified?: boolean; share?: number }[];
 };
 
@@ -101,6 +101,12 @@ async function dasRpc<T>(method: string, params: unknown): Promise<T> {
     }
   }
   throw lastErr || new Error("DAS RPC failed");
+}
+
+export async function getAssetBatch(ids: string[]): Promise<(DasAsset | null)[]> {
+  if (!ids.length) return [];
+  const result = await dasRpc<(DasAsset | null)[]>("getAssetBatch", { ids });
+  return Array.isArray(result) ? result : [];
 }
 
 export async function getAssetsByOwner(opts: {

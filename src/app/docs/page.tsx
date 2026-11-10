@@ -163,6 +163,21 @@ export default function DocsPage() {
         </section>
 
         <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Float</h2>
+          <p>
+            Launch at <Link href="/float" className="text-violet-500 hover:underline">/float</Link> by calling
+            Float&apos;s on-chain program. A passkey wallet picks an enabled quote asset, a fee tier, a name
+            and ticker, and an image or metadata URI. Optional: a mint ending in{" "}
+            <code className="text-xs">fLoat</code> via <code className="text-xs">launch_keyed</code>.
+          </p>
+          <p className="text-xs text-gray-400 dark:text-white/30">
+            The Float program is unaudited and upgradeable by their team. They can pause launches or disable
+            a quote asset. sol.new reads the enabled quotes and sends launch or launch_keyed. Quote list:{" "}
+            <code className="text-xs">GET /api/float/quotes</code>.
+          </p>
+        </section>
+
+        <section className="space-y-3">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Lend & borrow</h2>
           <p>
             <Link href="/loan" className="text-violet-500 hover:underline">/loan</Link> — supply for yield or
@@ -261,6 +276,7 @@ export default function DocsPage() {
             <li>GET|POST /api/loan — lend / borrow</li>
             <li>GET|POST /api/link — short links</li>
             <li>GET|POST /api/creator/profile — profile + username</li>
+            <li>GET /api/float/quotes — enabled Float quote assets and fee tiers</li>
             <li>POST /api/draw · GET /api/draw/[id] — fair draw</li>
             <li>GET /api/receipt?signature= — receipt parse</li>
           </ul>

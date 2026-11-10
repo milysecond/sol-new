@@ -32,6 +32,7 @@ import {
   LineChart,
   Landmark,
   ArrowLeftRight,
+  Waves,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -85,6 +86,7 @@ const SECTIONS: Section[] = [
     intro: "Ship tokens, NFTs, and shared wallets in minutes.",
     items: [
       { href: "/token", title: "Token", blurb: "Launch an SPL token with a bonding curve.", icon: Coins },
+      { href: "/float", title: "Float", blurb: "Launch a coin through Float's program, paired with a stock, SOL, or USDC.", icon: Waves },
       { href: "/nft", title: "Mint NFT", blurb: "Image to NFT - standard or compressed.", icon: Image },
       { href: "/multisig", title: "Multisig", blurb: "Shared wallet with multiple signers.", icon: ShieldCheck },
       { href: "/launch", title: "Live launches", blurb: "Browse recent token launches.", icon: Rocket },

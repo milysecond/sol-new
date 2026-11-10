@@ -42,6 +42,7 @@
 | Feature | Path | One-liner |
 |---------|------|-----------|
 | Token launch | `/token` | SPL token + Meteora DBC bonding curve. |
+| Float launch | `/float` | Coin through Float's program, paired with an enabled quote. |
 | Token page | `/token/[mint]` | Public landing for a launched mint. |
 | NFT mint | `/nft` | Image → standard or compressed NFT. |
 | Multisig | `/multisig` | Shared wallet; `/multisig/[address]`. |
