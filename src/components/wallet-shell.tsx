@@ -23,6 +23,7 @@ import { Spinner } from "@/components/spinner";
 import { FaucetFooter } from "@/components/faucet-footer";
 import { formatSol, useHideBalances } from "@/lib/privacy";
 import { addressPath, EXPLORER_LABEL } from "@/lib/explorer";
+import { copyAddress as writeAddress } from "@/lib/copy-text";
 
 const tabs = [
   { id: "get", label: "Get", icon: Download, path: "/wallet/get" },
@@ -47,9 +48,11 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
 
   const copyAddress = () => {
     if (!publicKey) return;
-    void navigator.clipboard.writeText(publicKey);
-    setCopiedAddress(true);
-    setTimeout(() => setCopiedAddress(false), 2000);
+    void writeAddress(publicKey).then((ok) => {
+      if (!ok) return;
+      setCopiedAddress(true);
+      setTimeout(() => setCopiedAddress(false), 2000);
+    });
   };
 
   const balLabel =
@@ -92,7 +95,7 @@ export function WalletShell({ children }: { children: React.ReactNode }) {
                     className="text-left max-w-full group"
                     title={publicKey || undefined}
                   >
-                    <p className="text-gray-500 dark:text-white/50 text-[11px] sm:text-xs font-mono truncate group-active:text-fuchsia-400">
+                    <p className="text-gray-500 dark:text-white/50 text-[11px] sm:text-xs font-mono truncate select-none group-active:text-fuchsia-400">
                       {idLabel}
                       {walletKind === "external" && (
                         <span className="ml-1.5 text-[10px] font-sans text-violet-500 dark:text-violet-400">

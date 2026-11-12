@@ -23,6 +23,8 @@ import {
   Menu,
 } from "lucide-react";
 import { AppNavMenu } from "@/components/app-nav-menu";
+import { CopyableAddress } from "@/components/copyable-address";
+import { copyAddress } from "@/lib/copy-text";
 import { AppSideNav } from "@/components/app-side-nav";
 import {
   readNavMenuStyle,
@@ -379,12 +381,11 @@ export function Navbar() {
                       >
                       <div className="px-4 py-3 border-b border-black/10 dark:border-white/10">
                         {publicKey && (
-                          <p
-                            className="text-sm font-mono font-semibold text-gray-900 dark:text-white break-all"
-                            title={publicKey}
-                          >
-                            {publicKey}
-                          </p>
+                          <CopyableAddress
+                            address={publicKey}
+                            className="text-sm font-semibold text-gray-900 dark:text-white w-full"
+                            onCopied={() => setShowMenu(false)}
+                          />
                         )}
                         <p className="text-[10px] text-gray-400 mt-1">Wallet name = address</p>
                         {balance !== null ? (
@@ -445,8 +446,9 @@ export function Navbar() {
                       <button
                         type="button"
                         onClick={() => {
-                          navigator.clipboard.writeText(publicKey);
-                          setShowMenu(false);
+                          void copyAddress(publicKey).then((ok) => {
+                            if (ok) setShowMenu(false);
+                          });
                         }}
                         className="block w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
                       >
