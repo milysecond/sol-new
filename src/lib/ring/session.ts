@@ -243,11 +243,47 @@ export async function publicBalances(owner: Address): Promise<{ lamports: bigint
   return { lamports, usdc };
 }
 
+function isUnknownMint(e: unknown): boolean {
+  const anyE = e as { code?: unknown; message?: unknown } | null;
+  const code = typeof anyE?.code === "string" ? anyE.code : "";
+  const msg = typeof anyE?.message === "string" ? anyE.message : String(e ?? "");
+  return code === "TRANSACTION_UNKNOWN_MINT" || msg.includes("TRANSACTION_UNKNOWN_MINT");
+}
+
+/**
+ * A fresh SDK wallet only has SOL in its local registry. The on-chain USDC
+ * registration is loaded during sync only if a private USDC note is already
+ * present — so a first-time snapshot that asked `wallet.balance(USDC)` threw
+ * TRANSACTION_UNKNOWN_MINT and "Join the Default Ring" never appeared.
+ */
+async function ensureKnownAssets(rt: RingRuntime, session: RingSession): Promise<void> {
+  try {
+    session.wallet.balance(mintFor(rt, "USDC"));
+    return;
+  } catch (e) {
+    if (!isUnknownMint(e)) throw e;
+  }
+  try {
+    const { backfillAssetRegistry } = await import("@heliuslabs/spr/wallet");
+    await backfillAssetRegistry(session.wallet, {
+      solanaRpc: rt.client.solanaRpc,
+      commitment: rt.client.commitment,
+    });
+  } catch {
+    // Registry scan failed; SOL still works, USDC stays at zero below.
+  }
+}
+
 function assetView(rt: RingRuntime, session: RingSession, id: RingAssetId): RingAssetView {
-  const bal = session.wallet.balance(mintFor(rt, id));
-  const sorted = [...bal.utxos].map((u) => u.amount).sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
-  const spendable = sorted.slice(0, RING_MAX_LOCAL_INPUTS).reduce((t, a) => t + a, BigInt(0));
-  return { id, amount: bal.amount, notes: bal.utxos.length, spendable };
+  try {
+    const bal = session.wallet.balance(mintFor(rt, id));
+    const sorted = [...bal.utxos].map((u) => u.amount).sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
+    const spendable = sorted.slice(0, RING_MAX_LOCAL_INPUTS).reduce((t, a) => t + a, BigInt(0));
+    return { id, amount: bal.amount, notes: bal.utxos.length, spendable };
+  } catch (e) {
+    if (isUnknownMint(e)) return { id, amount: BigInt(0), notes: 0, spendable: BigInt(0) };
+    throw e;
+  }
 }
 
 export async function ringSnapshot(session: RingSession, opts: { sync: boolean; requireSlot?: bigint }): Promise<RingSnapshot> {
@@ -258,6 +294,7 @@ export async function ringSnapshot(session: RingSession, opts: { sync: boolean; 
     publicBalances(session.owner),
   ]);
   if (opts.sync) await syncRing(session, opts.requireSlot);
+  await ensureKnownAssets(rt, session);
   const history = rt.spr
     .getPrivateTransactions(session.wallet)
     .map((t) => ({
@@ -490,6 +527,7 @@ export type PayLinkContents = {
 export async function inspectPayLink(link: RingSession): Promise<PayLinkContents> {
   const rt = await getRingRuntime();
   await syncRing(link);
+  await ensureKnownAssets(rt, link);
   const { lamports } = await publicBalances(link.owner);
   const assets = { SOL: assetView(rt, link, "SOL"), USDC: assetView(rt, link, "USDC") };
   return { publicLamports: lamports, assets, empty: assets.SOL.amount === BigInt(0) && assets.USDC.amount === BigInt(0) };

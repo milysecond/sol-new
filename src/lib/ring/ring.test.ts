@@ -174,6 +174,9 @@ test("explainRingError hides kit 8100002 dumps and does not confuse CORS with Fa
   assert.equal(explainRingError(new Error("Cross-origin requests are not allowed.")), "Cross-origin requests are not allowed.");
   assert.equal(explainRingError(Object.assign(new Error("The user cancelled the operation."), { name: "NotAllowedError" })), "Face ID was cancelled. Nothing was sent.");
   assert.ok(!explainRingError(new Error("RPC method not allowed: getHealth")).includes("Face ID"));
+  const unknownMint = "That token isn't loaded on your private balance yet. Try SOL, or refresh and try again.";
+  assert.equal(explainRingError(Object.assign(new Error("TRANSACTION_UNKNOWN_MINT"), { code: "TRANSACTION_UNKNOWN_MINT" })), unknownMint);
+  assert.equal(explainRingError(new Error("TRANSACTION_UNKNOWN_MINT")), unknownMint);
 });
 
 test("honest copy: confidential, not anonymous; non-Ring sends are withdrawals", () => {
