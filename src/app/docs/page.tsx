@@ -153,6 +153,27 @@ export default function DocsPage() {
         </section>
 
         <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Ring (beta)</h2>
+          <p>
+            <Link href="/ring" className="text-violet-500 hover:underline">/ring</Link> holds a private SOL and USDC
+            balance on the permissionless Default Ring of Helius Privacy Rings. Shield, send, unshield, merge notes, and
+            read history with your Face ID wallet. Private pay links live at{" "}
+            <code className="text-xs">/ring/c/&lt;address&gt;#&lt;secret&gt;</code>; the secret stays in the fragment and
+            the claimer joins the Ring before the payment moves, so it lands in their private balance.
+          </p>
+          <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
+            <li>Confidential, not anonymous: asset and amount are hidden; sender and recipient addresses are public.</li>
+            <li>Shielding from a public balance and unshielding to one show the amount.</li>
+            <li>Sending to an address that isn&apos;t on the Ring is a public withdrawal, and is labelled that way.</li>
+            <li>Keys derive from your passkey (TSPP/derive/v1). Balances decrypt and proofs run on your device.</li>
+          </ul>
+          <p className="text-xs text-gray-400 dark:text-white/30">
+            Beta on mainnet. The 1.0 programs are in formal verification through the end of 2026. Separate from the
+            Privacy Cash send on /wallet/send.
+          </p>
+        </section>
+
+        <section className="space-y-3">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Short links</h2>
           <p>
             Creator: <Link href="/link" className="text-violet-500 hover:underline">/link</Link>. Canonical
@@ -277,6 +298,7 @@ export default function DocsPage() {
             <li>GET|POST /api/link — short links</li>
             <li>GET|POST /api/creator/profile — profile + username</li>
             <li>GET /api/float/quotes — enabled Float quote assets and fee tiers</li>
+            <li>POST /api/ring/rpc · POST /api/ring/spr/[method] · GET /api/ring/status — Ring proxy (same-origin, allow-listed)</li>
             <li>POST /api/draw · GET /api/draw/[id] — fair draw</li>
             <li>GET /api/receipt?signature= — receipt parse</li>
           </ul>

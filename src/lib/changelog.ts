@@ -14,6 +14,15 @@ export type ChangelogEntry = {
 /** Newest first. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-11-12",
+    title: "Ring: private pay links (beta)",
+    items: [
+      "/ring — shield, send, unshield, and merge SOL or USDC on the Default Ring of Helius Privacy Rings with your Face ID wallet.",
+      "Private pay links at /ring/c — the claimer joins the Ring with Face ID and the payment lands in their private balance.",
+      "Confidential, not anonymous: asset and amount are hidden, sender and recipient stay public. Beta on mainnet while the 1.0 programs finish formal verification.",
+    ],
+  },
+  {
     date: "2026-11-10",
     title: "Launch a coin on Float",
     items: [

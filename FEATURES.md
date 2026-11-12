@@ -58,6 +58,8 @@
 | Split | `/split` | Split a bill, tip, track who paid. |
 | Gift (send) | `/gift` | Fund a claimable link (SOL or USDC). |
 | Gift (claim) | `/claim#…` | Secret fragment + Face ID claim. |
+| Ring (beta) | `/ring` | Private SOL/USDC on Helius Privacy Rings (Default Ring): shield, send, unshield, merge, history. |
+| Ring pay link | `/ring/c/<address>#…` | Claim into a private balance with Face ID. Secret in the fragment only. |
 | Short links | `/link`, `/link/[code]` | `sol.new/link/…` (custom codes 0.01 SOL). |
 | Receipt | `/receipt/[signature]` | Shareable tx receipt. |
 
@@ -128,6 +130,7 @@
 | `GET /api/stats` | Aggregate counts. |
 | `POST /api/gift/create` | Unsigned gift funding tx + claim secret/URL. |
 | `POST /api/gift` | Register gift after on-chain fund. |
+| `POST /api/ring/rpc` · `POST /api/ring/spr/<method>` · `GET /api/ring/status` | Same-origin Solana RPC + privacy indexer proxy for `/ring` (allow-listed). |
 | `GET /api/gift?pk=` | Gift status (`token`, amount, status). |
 | `PATCH /api/gift` | Claimed / reclaimed. |
 | `GET/POST /api/loan` | Lend markets + deposit/withdraw/operate txs. |

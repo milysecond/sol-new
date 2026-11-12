@@ -19,7 +19,7 @@ sol.new removes the complexity from Solana. No wallet downloads, no seed phrases
 |------|--------|
 | **Create** | `/token` · `/float` · `/nft` · `/multisig` · `/id` |
 | **Wallet** | `/wallet` · `/get` · `/wallet/send` · `/portfolio` · `/burn` |
-| **Money** | `/pay` · `/split` · `/gift` · `/claim` · `/receipt` · `/link` |
+| **Money** | `/pay` · `/split` · `/gift` · `/claim` · `/ring` · `/receipt` · `/link` |
 | **Yield** | `/earn` · `/loan` · `/stake` · `/lst` |
 | **Explore** | `/scan` · `/lists` · `/launch` · `/stocks` · `/u/[username]` |
 | **Play** | `/draw` · `/punt` |

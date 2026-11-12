@@ -10,6 +10,15 @@ const nextConfig: NextConfig = {
     "gsap",
     "canvas-confetti",
   ],
+  // /ring proves zero-knowledge proofs in a worker. Document-Isolation-Policy
+  // (Chrome 137+) gives it crossOriginIsolated for threaded proving without
+  // COOP/COEP; other browsers fall back to single-threaded proving.
+  async headers() {
+    return [
+      { source: "/ring", headers: [{ key: "Document-Isolation-Policy", value: "isolate-and-credentialless" }] },
+      { source: "/ring/:path*", headers: [{ key: "Document-Isolation-Policy", value: "isolate-and-credentialless" }] },
+    ];
+  },
   async redirects() {
     return [
       {

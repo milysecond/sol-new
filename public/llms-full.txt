@@ -47,6 +47,8 @@
 | /split | Bill split |
 | /gift | Create gift link (uses /api/gift/create) |
 | /claim | Claim gift (#secret fragment) |
+| /ring | Private balances on Helius Privacy Rings, Default Ring (beta, mainnet): shield, send, unshield, merge, history |
+| /ring/c/[address] | Claim a private pay link (#secret fragment only) into the claimer's private balance |
 | /link | Short link creator |
 | /link/[code] | Short link landing (canonical) |
 | /l/[code] | Legacy short link → 308 to /link/[code] |

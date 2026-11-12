@@ -24,6 +24,7 @@ Full product map for agents: https://sol.new/llms-full.txt · Features: https://
 - [Pay](https://sol.new/pay): Solana Pay link or QR (SOL / USDC).
 - [Split](https://sol.new/split): Split a bill; share per-person links.
 - [Gift](https://sol.new/gift): Send SOL/USDC via claimable link (`/claim#secret`).
+- [Ring](https://sol.new/ring) (beta): Private SOL/USDC balances and pay links on Helius Privacy Rings (Default Ring). Confidential, not anonymous: amounts hidden, addresses public. Pay links at `/ring/c/<address>#secret`.
 - [Short links](https://sol.new/link): `sol.new/link/<code>` — free random; custom 0.01 SOL.
 - [Receipt](https://sol.new/receipt): Shareable transaction receipt.
 
