@@ -32,6 +32,7 @@ const STATIC_ROUTES: {
   { path: "/sub", priority: 0.85, freq: "weekly" },
   { path: "/split", priority: 0.8, freq: "weekly" },
   { path: "/gift", priority: 0.8, freq: "weekly" },
+  { path: "/ring", priority: 0.6, freq: "weekly" },
   { path: "/poap", priority: 0.8, freq: "weekly" },
   { path: "/link", priority: 0.7, freq: "weekly" }, // create UI only
   { path: "/punt", priority: 0.8, freq: "hourly" },

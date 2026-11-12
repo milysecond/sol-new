@@ -39,6 +39,7 @@ const DEEP_PREFIXES = [
   "/welcome",
   "/dir",
   "/float",
+  "/ring",
   "/docs",
   "/get",
   "/rent",

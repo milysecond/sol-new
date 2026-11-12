@@ -43,6 +43,7 @@ const DIRECTORY: { section: string; links: { label: string; href: string }[] }[]
       { label: "your wallet", href: "/wallet" },
       { label: "get funds", href: "/get" },
       { label: "send a gift link", href: "/gift" },
+      { label: "private pay links (beta)", href: "/ring" },
       { label: "pay / scan & pay", href: "/pay" },
       { label: "point of sale", href: "/pos" },
       { label: "split a bill", href: "/split" },
