@@ -135,6 +135,47 @@ test("failover skips a refusing endpoint and never echoes upstream hosts", async
   assert.ok(!explainRingError(new Error(`fetch failed ${hosts[0]}/v1/spr`)).includes("secret-one"));
 });
 
+test("failover uses redirect:manual and refuses redirects without leaking Location", async () => {
+  const hosts = ["https://secret-one.example.com", "https://secret-two.example.com"];
+  const inits: Array<RequestInit | undefined> = [];
+  const fakeFetch = (async (url: string, init?: RequestInit) => {
+    inits.push(init);
+    if (url.startsWith(hosts[0]!)) {
+      return new Response(null, { status: 302, headers: { location: `${hosts[0]}/elsewhere` } });
+    }
+    return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: 9 }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as unknown as typeof fetch;
+  const out = await forwardWithFailover({ endpoints: hosts, url: (e) => e, body: rpcReq("getSlot"), fetchImpl: fakeFetch });
+  assert.equal(out.status, 200);
+  assert.equal(out.endpointIndex, 1);
+  assert.ok(inits.every((init) => init?.redirect === "manual"));
+
+  const onlyRedirect = (async () =>
+    new Response(null, { status: 301, headers: { location: "https://secret-one.example.com/x" } })) as unknown as typeof fetch;
+  const bad = await forwardWithFailover({ endpoints: [hosts[0]!], url: (e) => e, body: "{}", fetchImpl: onlyRedirect });
+  const text = typeof bad.body === "string" ? bad.body : new TextDecoder().decode(bad.body);
+  assert.equal(bad.status, 502);
+  assert.ok(text.includes("redirected"));
+  assert.ok(!text.includes("secret-one"));
+  assert.ok(!text.includes("example.com"));
+});
+
+test("explainRingError hides kit 8100002 dumps and does not confuse CORS with Face ID", () => {
+  const dump =
+    "Solana error #8100002; Decode this error by running `npx @solana/errors decode -- 8100002 'X19jb2RlPTgxMDAwMDImaGVhZGVycz0lNUJvYmplY3QlMjBIZWFkZXJzJTVEJm1lc3NhZ2U9JnN0YXR1c0NvZGU9NTAy'`";
+  const friendly = "The Ring couldn't be reached just then. Nothing was sent — try again in a moment.";
+  assert.equal(explainRingError(new Error(dump)), friendly);
+  assert.equal(explainRingError(new Error("Ring endpoint 2 did not answer.")), friendly);
+  assert.equal(explainRingError(new Error("Network connection lost.")), friendly);
+  assert.ok(!explainRingError(new Error(dump)).toLowerCase().includes("npx"));
+  assert.equal(explainRingError(new Error("Cross-origin requests are not allowed.")), "Cross-origin requests are not allowed.");
+  assert.equal(explainRingError(Object.assign(new Error("The user cancelled the operation."), { name: "NotAllowedError" })), "Face ID was cancelled. Nothing was sent.");
+  assert.ok(!explainRingError(new Error("RPC method not allowed: getHealth")).includes("Face ID"));
+});
+
 test("honest copy: confidential, not anonymous; non-Ring sends are withdrawals", () => {
   assert.equal(ringSendKind(true), "private-transfer");
   assert.equal(ringSendKind(false), "public-withdrawal");

@@ -35,7 +35,29 @@ export function explainRingError(e: unknown): string {
   if (code && CODES[code]) return CODES[code]!;
   const msg = typeof anyE?.message === "string" ? anyE.message : String(e ?? "");
   const lower = msg.toLowerCase();
-  if (lower.includes("cancel") || lower.includes("notallowed") || lower.includes("not allowed")) {
+  const UNREACHABLE = "The Ring couldn't be reached just then. Nothing was sent — try again in a moment.";
+  // @solana/kit wraps HTTP 5xx as SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR (8100002),
+  // often with a "decode this error by running npx @solana/errors" dump.
+  if (
+    /\b8100002\b/.test(msg) ||
+    /solana error\s*#\s*8100002/i.test(msg) ||
+    /decode this error/i.test(msg) ||
+    /did not answer/.test(lower) ||
+    /answered\s+5\d\d/.test(lower) ||
+    /bad gateway/.test(lower) ||
+    /network connection lost/.test(lower)
+  ) {
+    return UNREACHABLE;
+  }
+  // Tight Face ID / WebAuthn cancel only — "not allowed" also appears on
+  // CORS and RPC-method refusals and must not be mapped to Face ID.
+  const name = typeof anyE?.name === "string" ? anyE.name : "";
+  if (
+    name === "NotAllowedError" ||
+    /notallowederror/i.test(msg) ||
+    ((lower.includes("cancel") || lower.includes("aborted")) &&
+      /face|webauthn|passkey|credential|user/.test(lower))
+  ) {
     return "Face ID was cancelled. Nothing was sent.";
   }
   if (lower.includes("insufficient") && lower.includes("lamports")) {
