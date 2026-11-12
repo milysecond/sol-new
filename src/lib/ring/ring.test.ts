@@ -13,6 +13,7 @@ import {
 } from "./constants";
 import { RING_BETA_NOTE, RING_PRIVACY_POINTS, ringHistoryLabel, ringSendKind, ringSendLabel } from "./copy";
 import { explainRingError, RingNeedsWithdrawalError } from "./errors";
+import { ringFlowMax, ringFlowPlan, ringJoinPlan, ringMergePlan, ringSuggestedAction, type RingFlowBalances } from "./flow";
 import { createRingLinkSecret, parsePastedRingLink, parseRingLink, ringLinkUrl } from "./link";
 import {
   checkRpcBody,
@@ -26,6 +27,20 @@ import {
 } from "./proxy";
 
 if (!globalThis.crypto) (globalThis as { crypto?: unknown }).crypto = webcrypto;
+
+const L = (sol: number) => BigInt(Math.round(sol * 1e9));
+const U = (usdc: number) => BigInt(Math.round(usdc * 1e6));
+const bal = (o: Partial<RingFlowBalances> & { sol?: [number, number]; usdc?: [number, number] } = {}): RingFlowBalances => ({
+  registered: o.registered ?? true,
+  mergingEnabled: o.mergingEnabled ?? true,
+  publicLamports: o.publicLamports ?? L(0.0399),
+  publicUsdc: o.publicUsdc ?? U(5),
+  assets: o.assets ?? {
+    SOL: { amount: L(o.sol?.[0] ?? 0.01), spendable: L(o.sol?.[0] ?? 0.01), notes: o.sol?.[1] ?? 1 },
+    USDC: { amount: U(o.usdc?.[0] ?? 0), spendable: U(o.usdc?.[0] ?? 0), notes: o.usdc?.[1] ?? 0 },
+  },
+});
+const ADDR_OK = "private-transfer" as const;
 
 const rpcReq = (method: string, params: unknown[] = []) => JSON.stringify({ jsonrpc: "2.0", id: 1, method, params });
 
@@ -279,4 +294,117 @@ test("probe: SDK syncs an empty wallet and simulates registration + deposit (not
     const v = r.result?.value as { err?: unknown } | undefined;
     assert.equal(v?.err ?? null, null, JSON.stringify(v?.err ?? r.error));
   }
+});
+
+test("flow: Sal's screenshot case says exactly how much is missing instead of a grey button", () => {
+  // 0.01 private, 0.0399 public, send 0.05 to a Ring user.
+  const plan = ringFlowPlan({ action: "send", asset: "SOL", amountText: "0.05", recipient: ADDR_OK, balances: bal() });
+  assert.equal(plan.status, "blocked");
+  if (plan.status !== "blocked") return;
+  // 0.0399 - 0.005 fee reserve = 0.0349 shieldable; 0.04 needed → 0.0051 short; max 0.0449.
+  assert.match(plan.reason, /0\.0051 SOL short/);
+  assert.match(plan.reason, /0\.0449 SOL/);
+  assert.equal(plan.suggestAmount, L(0.0449));
+});
+
+test("flow: amount above private but covered by public → shield first, then send", () => {
+  const plan = ringFlowPlan({ action: "send", asset: "SOL", amountText: "0.03", recipient: ADDR_OK, balances: bal() });
+  assert.equal(plan.status, "shield-first");
+  if (plan.status !== "shield-first") return;
+  assert.equal(plan.shieldAmount, L(0.02));
+  assert.equal(plan.amount, L(0.03));
+  assert.match(plan.reason, /You have 0\.01 SOL private\. Shield 0\.02 SOL more/);
+});
+
+test("flow: within private balance is ready", () => {
+  const plan = ringFlowPlan({ action: "send", asset: "SOL", amountText: "0.01", recipient: ADDR_OK, balances: bal() });
+  assert.deepEqual(plan, { status: "ready", amount: L(0.01) });
+});
+
+test("flow: every blocked state has a reason", () => {
+  const b = bal();
+  const cases = [
+    ringFlowPlan({ action: "send", asset: "SOL", amountText: "0.01", recipient: "empty", balances: b }),
+    ringFlowPlan({ action: "send", asset: "SOL", amountText: "0.01", recipient: "invalid", balances: b }),
+    ringFlowPlan({ action: "send", asset: "SOL", amountText: "", recipient: ADDR_OK, balances: b }),
+    ringFlowPlan({ action: "send", asset: "SOL", amountText: "0", recipient: ADDR_OK, balances: b }),
+    ringFlowPlan({ action: "send", asset: "SOL", amountText: "0.0000000001", recipient: ADDR_OK, balances: b }),
+    ringFlowPlan({ action: "send", asset: "SOL", amountText: "0.01", recipient: "lookup-failed", balances: b }),
+  ];
+  for (const c of cases) {
+    assert.equal(c.status, "blocked");
+    if (c.status === "blocked") assert.ok(c.reason.length > 10, c.reason);
+  }
+  assert.match((cases[1] as { reason: string }).reason, /valid Solana address/);
+  assert.equal((cases[5] as { fix?: string }).fix, "retry-lookup");
+  const checking = ringFlowPlan({ action: "send", asset: "SOL", amountText: "0.01", recipient: "checking", balances: b });
+  assert.equal(checking.status, "loading");
+});
+
+test("flow: not registered leads into Join for every action", () => {
+  for (const action of ["shield", "send", "link", "unshield"] as const) {
+    const plan = ringFlowPlan({ action, asset: "SOL", amountText: "0.01", recipient: ADDR_OK, balances: bal({ registered: false }) });
+    assert.equal(plan.status, "blocked");
+    if (plan.status === "blocked") assert.equal(plan.fix, "join");
+  }
+  assert.equal(ringJoinPlan(bal({ registered: false })).status, "ready");
+  const poor = ringJoinPlan(bal({ registered: false, publicLamports: L(0.001) }));
+  assert.equal(poor.status, "blocked");
+  assert.equal(ringMergePlan(bal({ registered: false }), "SOL").status, "blocked");
+});
+
+test("flow: pay link needs shielded balance plus the link fee", () => {
+  // 0 USDC private, 5 public → shield 2 then fund link.
+  const ok = ringFlowPlan({ action: "link", asset: "USDC", amountText: "2", balances: bal() });
+  assert.equal(ok.status, "shield-first");
+  if (ok.status === "shield-first") assert.equal(ok.shieldAmount, U(2));
+  const tooMuch = ringFlowPlan({ action: "link", asset: "USDC", amountText: "6", balances: bal() });
+  assert.equal(tooMuch.status, "blocked");
+  if (tooMuch.status === "blocked") assert.match(tooMuch.reason, /1 USDC short/);
+  // SOL link: shieldable = 0.0399 - 0.005 - 0.0025 = 0.0324; with 0.01 private → max 0.0424.
+  assert.equal(ringFlowMax({ action: "link", asset: "SOL", balances: bal() }), L(0.0424));
+  const noFee = ringFlowPlan({ action: "link", asset: "USDC", amountText: "1", balances: bal({ publicLamports: L(0.001) }) });
+  assert.equal(noFee.status, "blocked");
+  if (noFee.status === "blocked") assert.match(noFee.reason, /claimer's fees/);
+});
+
+test("flow: unshield and public withdrawals never shield first", () => {
+  const u = ringFlowPlan({ action: "unshield", asset: "SOL", amountText: "0.02", recipient: ADDR_OK, balances: bal() });
+  assert.equal(u.status, "blocked");
+  if (u.status === "blocked") assert.equal(u.suggestAmount, L(0.01));
+  const w = ringFlowPlan({ action: "send", asset: "SOL", amountText: "0.02", recipient: "public-withdrawal", balances: bal() });
+  assert.equal(w.status, "blocked");
+  if (w.status === "blocked") assert.match(w.reason, /public withdrawal/);
+  assert.equal(ringFlowMax({ action: "unshield", asset: "SOL", balances: bal() }), L(0.01));
+});
+
+test("flow: shield keeps a fee reserve and Max respects it", () => {
+  assert.equal(ringFlowMax({ action: "shield", asset: "SOL", balances: bal() }), L(0.0349));
+  const over = ringFlowPlan({ action: "shield", asset: "SOL", amountText: "0.0399", balances: bal() });
+  assert.equal(over.status, "blocked");
+  if (over.status === "blocked") assert.equal(over.suggestAmount, L(0.0349));
+  assert.equal(ringFlowPlan({ action: "shield", asset: "USDC", amountText: "5", balances: bal() }).status, "ready");
+  assert.equal(ringFlowPlan({ action: "shield", asset: "USDC", amountText: "5.01", balances: bal() }).status, "blocked");
+});
+
+test("flow: too many notes → merge first", () => {
+  const b = bal();
+  b.assets.SOL = { amount: L(1), spendable: L(0.5), notes: 12 };
+  const plan = ringFlowPlan({ action: "send", asset: "SOL", amountText: "0.8", recipient: ADDR_OK, balances: b });
+  assert.equal(plan.status, "blocked");
+  if (plan.status === "blocked") {
+    assert.equal(plan.fix, "merge");
+    assert.equal(plan.suggestAmount, L(0.5));
+  }
+  const m = ringMergePlan(bal({ mergingEnabled: false, sol: [0.01, 3] }), "SOL");
+  assert.equal(m.status === "blocked" && m.fix, "enable-merging");
+  assert.equal(ringMergePlan(bal(), "SOL").status, "blocked"); // 1 note
+  assert.equal(ringMergePlan(bal({ sol: [0.01, 3] }), "SOL").status, "ready");
+});
+
+test("flow: guide order opens Shield until there's a private balance", () => {
+  assert.equal(ringSuggestedAction(bal({ registered: false })), "shield");
+  assert.equal(ringSuggestedAction(bal({ sol: [0, 0] })), "shield");
+  assert.equal(ringSuggestedAction(bal()), "send");
+  assert.equal(ringSuggestedAction(null), "shield");
 });
