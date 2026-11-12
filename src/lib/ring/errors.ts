@@ -22,6 +22,8 @@ const CODES: Record<string, string> = {
   WALLET_TOO_MANY_INPUTS: "Too many notes for one proof. Merge your notes first.",
   WALLET_INSUFFICIENT_FUNDS: "Not enough private balance for that.",
   WALLET_USER_REGISTRY_RECORD_NOT_FOUND: "Set up your private balance first.",
+  // Fresh wallets only know SOL until the on-chain asset list is loaded.
+  TRANSACTION_UNKNOWN_MINT: "That token isn't loaded on your private balance yet. Try SOL, or refresh and try again.",
   CLIENT_TIMEOUT: "The Ring indexer took too long. Try again in a moment.",
   CLIENT_RPC: "Solana didn't confirm that in time. Check your history before retrying.",
   wasm_merge_too_wide: "That merge is too wide for this browser. Merge fewer notes.",
@@ -34,6 +36,8 @@ export function explainRingError(e: unknown): string {
   const code = typeof anyE?.code === "string" ? anyE.code : "";
   if (code && CODES[code]) return CODES[code]!;
   const msg = typeof anyE?.message === "string" ? anyE.message : String(e ?? "");
+  // SDK TransactionError uses the code as `message`; a wrapped Error may lose `.code`.
+  if (CODES[msg]) return CODES[msg]!;
   const lower = msg.toLowerCase();
   const UNREACHABLE = "The Ring couldn't be reached just then. Nothing was sent — try again in a moment.";
   // @solana/kit wraps HTTP 5xx as SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR (8100002),
