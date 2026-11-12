@@ -167,8 +167,21 @@ export async function forwardWithFailover(opts: {
         headers: { "content-type": "application/json", accept: "application/json" },
         body: opts.body,
         signal: ac.signal,
-        redirect: "error",
+        // workerd does not implement redirect:"error" — it throws TypeError
+        // immediately ("Invalid redirect value"), which we used to surface as
+        // "endpoint did not answer". Use "manual": refuse to follow, and never
+        // forward a Location host to the browser.
+        redirect: "manual",
       });
+      if (r.status >= 300 && r.status < 400) {
+        last = {
+          status: 502,
+          body: JSON.stringify({ error: `Ring endpoint ${i + 1} redirected.` }),
+          contentType: "application/json",
+          endpointIndex: i,
+        };
+        continue;
+      }
       const contentType = r.headers.get("content-type") || "application/json";
       const body = await r.arrayBuffer();
       last = { status: r.status, body, contentType, endpointIndex: i };
