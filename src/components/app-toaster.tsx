@@ -12,6 +12,9 @@ export function AppToaster() {
       position="top-center"
       richColors
       closeButton
+      duration={4000}
+      offset="calc(env(safe-area-inset-top, 0px) + 12px)"
+      style={{ zIndex: 2147483000 }}
       toastOptions={{
         classNames: {
           toast:

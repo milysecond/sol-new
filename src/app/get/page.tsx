@@ -11,6 +11,8 @@ import { Download, Copy, Check, Droplets, ExternalLink, DollarSign } from "lucid
 import { AnimatedIcon } from "@/components/animated-icon";
 import { friendlyError } from "@/lib/friendly-errors";
 import { Spinner } from "@/components/spinner";
+import { CopyableAddress } from "@/components/copyable-address";
+import { copyAddress as writeAddress } from "@/lib/copy-text";
 
 function CreditsBuySection() {
   const { publicKey } = useWallet();
@@ -155,9 +157,11 @@ export default function GetPage() {
 
   const copyAddress = useCallback(() => {
     if (!publicKey) return;
-    navigator.clipboard.writeText(publicKey);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    void writeAddress(publicKey).then((ok) => {
+      if (!ok) return;
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   }, [publicKey]);
 
 
@@ -184,7 +188,16 @@ export default function GetPage() {
             <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-5 space-y-3">
               <p className="text-xs text-gray-500 dark:text-white/40 uppercase tracking-wider">Your address</p>
               <div className="flex items-center gap-2">
-                <code className="flex-1 text-sm font-mono text-purple-300 break-all">{publicKey}</code>
+                {publicKey ? (
+                  <CopyableAddress
+                    address={publicKey}
+                    className="flex-1 text-sm text-purple-300"
+                    onCopied={() => {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                  />
+                ) : null}
                 <button
                   onClick={copyAddress}
                   className="shrink-0 p-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition cursor-pointer"

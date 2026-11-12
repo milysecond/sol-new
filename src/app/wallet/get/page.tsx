@@ -13,6 +13,8 @@ import { RequestFundsShare } from "@/components/request-funds-share";
 import { useWallet } from "@/lib/wallet-context";
 import { useNetwork } from "@/lib/network";
 import { addressPath, EXPLORER_LABEL } from "@/lib/explorer";
+import { CopyableAddress } from "@/components/copyable-address";
+import { copyAddress as writeAddress } from "@/lib/copy-text";
 
 function QrModal({
   open,
@@ -39,9 +41,21 @@ function QrModal({
       <div className="bg-white rounded-2xl p-3">
         <QrCode data={`solana:${publicKey}`} size={240} className="w-60 h-60 max-w-[min(60vw,240px)] max-h-[min(60vw,240px)]" />
       </div>
-      <p className="text-gray-600 dark:text-white/70 text-[11px] font-mono break-all text-center leading-relaxed px-1">
+      <button
+        type="button"
+        onClick={onCopy}
+        className="text-gray-600 dark:text-white/70 text-[11px] font-mono break-all text-center leading-relaxed px-1 w-full select-none touch-manipulation cursor-pointer"
+        title="Copy address"
+        aria-label={copied ? "Address copied" : "Copy address"}
+      >
         {publicKey}
-      </p>
+        {copied ? (
+          <span className="mt-1 flex items-center justify-center gap-1 font-sans font-medium text-emerald-500">
+            <Check size={12} aria-hidden />
+            Copied
+          </span>
+        ) : null}
+      </button>
       <button
         type="button"
         onClick={onCopy}
@@ -87,9 +101,11 @@ export default function WalletGetPage() {
 
   const copyAddress = useCallback(() => {
     if (!publicKey) return;
-    void navigator.clipboard.writeText(publicKey);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    void writeAddress(publicKey).then((ok) => {
+      if (!ok) return;
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   }, [publicKey]);
 
   // Always pin QR / ask / explorer to the live connected session
@@ -132,9 +148,14 @@ export default function WalletGetPage() {
                       {walletKind === "external" ? "connected wallet" : "your passkey wallet"}
                     </span>
                   </p>
-                  <code className="text-[11px] sm:text-xs font-mono text-fuchsia-500 dark:text-fuchsia-300 break-all block leading-snug select-all">
-                    {receivePk}
-                  </code>
+                  <CopyableAddress
+                    address={receivePk}
+                    className="text-[11px] sm:text-xs text-fuchsia-500 dark:text-fuchsia-300 block leading-snug w-full"
+                    onCopied={() => {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                  />
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
