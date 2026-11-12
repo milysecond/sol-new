@@ -67,3 +67,16 @@ export const RING_SIGNATURE_FEE_LAMPORTS = BigInt(5_000);
 export const RING_LINK_PREFIX = "/ring/c";
 
 export const RING_STORAGE_PREFIX = "sol.new.ring";
+
+/**
+ * Public SOL kept back when shielding SOL, so the shield and the private
+ * proof that follows can still pay their network fees.
+ */
+export const RING_FEE_RESERVE_LAMPORTS = BigInt(5_000_000);
+
+/** Least public SOL a private action (send, link, unshield, merge) needs for its fee. */
+export const RING_MIN_FEE_LAMPORTS = BigInt(100_000);
+
+/** Joining the Default Ring: registry record rent plus two signatures and the priority fee. */
+export const RING_JOIN_COST_LAMPORTS =
+  RING_REGISTRY_RECORD_RENT_LAMPORTS + RING_SIGNATURE_FEE_LAMPORTS * BigInt(2) + RING_PRIORITY_FEE_LAMPORTS;
