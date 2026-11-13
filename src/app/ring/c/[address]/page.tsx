@@ -112,7 +112,11 @@ function RingClaim() {
       setDone({ signatures: out.signatures });
       analytics.shareClicked("ring-claim", "/ring/c");
       // Refresh the link view so a second open shows it as claimed.
-      setView({ kind: "ready", contents: await m.inspectPayLink(linkRef.current) });
+      try {
+        setView({ kind: "ready", contents: await m.inspectPayLink(linkRef.current) });
+      } catch {
+        /* claimed state is already visible; indexer lag can clear on refresh */
+      }
     } catch (e) {
       setError(explainRingError(e));
     } finally {
