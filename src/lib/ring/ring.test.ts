@@ -509,3 +509,16 @@ test("social crawlers are allowed to preview noindex pay-link pages", () => {
   assert.deepEqual(social, { index: true, follow: true, "max-image-preview": "large" });
   assert.deepEqual(human, { index: false, follow: true, "max-image-preview": "large" });
 });
+
+test("Ring timeout and note reservation error codes map to plain-English hints", () => {
+  for (const code of [
+    "CLIENT_INDEXER_TIMEOUT",
+    "CLIENT_POLL_TIMED_OUT",
+    "CLIENT_PROVER_TIMEOUT",
+    "WALLET_NOTE_RESERVED",
+    "WALLET_SYNC",
+  ]) {
+    const msg = explainRingError(Object.assign(new Error(code), { code }));
+    assert.ok(msg && msg !== code && !msg.includes("_"), `Expected friendly copy for ${code}, got ${msg}`);
+  }
+});

@@ -1042,23 +1042,35 @@ function LinkPanel({ ctx }: { ctx: Ctx }) {
     if (step === "saved") reloadLinks();
   };
 
+  const softRefresh = async (slot?: bigint) => {
+    try {
+      await refresh(slot && slot > BigInt(0) ? slot : undefined);
+    } catch {
+      try {
+        await refresh();
+      } catch {
+        /* balance sync can lag; the link is already funded */
+      }
+    }
+  };
+
   const fund = async (amount: bigint) => {
     const m = await ring();
     const r = await m.createPayLink(session, asset, amount, note.trim() || undefined, onPayLinkStep);
-    await refresh(r.slot);
     setMade(r.url);
     setText("");
     setNote("");
     reloadLinks();
+    await softRefresh(r.slot);
   };
 
   const resume = (link: StoredRingLink) =>
     void run("Checking the link…", async () => {
       const m = await ring();
       const r = await m.resumePayLink(session, link, onPayLinkStep);
-      if (r.slot) await refresh(r.slot);
       setMade(r.url);
       reloadLinks();
+      await softRefresh(r.slot);
       return "Your pay link is ready.";
     });
 

@@ -23,6 +23,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `Portfolio ${short} — sol.new`,
     description: `Token balances and Jupiter DeFi positions for ${short}.`,
     path: `/portfolio/${encodeURIComponent(address)}`,
+    image: "https://sol.new/portfolio/opengraph-image",
   });
 }
 
