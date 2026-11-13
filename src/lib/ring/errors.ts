@@ -25,13 +25,21 @@ const CODES: Record<string, string> = {
   // Fresh wallets only know SOL until the on-chain asset list is loaded.
   TRANSACTION_UNKNOWN_MINT: "That token isn't loaded on your private balance yet. Try SOL, or refresh and try again.",
   CLIENT_TIMEOUT: "The Ring indexer took too long. Try again in a moment.",
-  CLIENT_RPC: "Solana didn't confirm that in time. Check your history before retrying.",
+  CLIENT_INDEXER_TIMEOUT: "The Ring indexer took too long to catch up. Refresh and check your link or balance before retrying.",
+  CLIENT_POLL_TIMED_OUT: "The Ring indexer didn't answer in time. Refresh and check your link or balance before retrying.",
+  CLIENT_PROVER_TIMEOUT: "Proving timed out on this device. Close other tabs and try again.",
+  WALLET_NOTE_RESERVED: "Those private funds are still held by an unfinished attempt. Wait a moment and try again.",
+  WALLET_SYNC: "Couldn't sync your private balance right now. Refresh and try again.",
+  CLIENT_RPC: "The transaction was sent but confirmation timed out. Check the link before retrying.",
   wasm_merge_too_wide: "That merge is too wide for this browser. Merge fewer notes.",
   wasm_out_of_memory: "This device ran out of memory while proving. Close other tabs and try again.",
 };
 
 export function explainRingError(e: unknown): string {
   if (e instanceof RingNeedsWithdrawalError || e instanceof RingMergeFirstError) return e.message;
+  if (typeof e === "object" && e && (e as { name?: string }).name === "RingConfirmError" && typeof (e as { message?: string }).message === "string") {
+    return (e as { message: string }).message;
+  }
   const anyE = e as { code?: unknown; message?: unknown; name?: unknown } | null;
   const code = typeof anyE?.code === "string" ? anyE.code : "";
   if (code && CODES[code]) return CODES[code]!;

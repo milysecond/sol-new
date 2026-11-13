@@ -37,9 +37,25 @@ export async function generateMetadata({
       robots: { index: false, follow: false },
     };
   }
+  const title = `${d.title} · POAP — sol.new`;
+  const description = "Claim this event POAP on sol.new";
   return {
-    title: `${d.title} · POAP — sol.new`,
-    description: "Claim this event POAP on sol.new",
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `https://sol.new/poap/${encodeURIComponent(code)}`,
+      siteName: "sol.new",
+      type: "website",
+      images: [{ url: "https://sol.new/poap/opengraph-image", width: 1200, height: 630, alt: title }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: ["https://sol.new/poap/opengraph-image"],
+    },
     robots: { index: true, follow: true },
   };
 }

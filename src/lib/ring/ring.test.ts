@@ -14,7 +14,10 @@ import {
 import { RING_BETA_NOTE, RING_PRIVACY_POINTS, ringHistoryLabel, ringSendKind, ringSendLabel } from "./copy";
 import { explainRingError, RingNeedsWithdrawalError } from "./errors";
 import { ringFlowMax, ringFlowPlan, ringJoinPlan, ringMergePlan, ringSuggestedAction, type RingFlowBalances } from "./flow";
+import { confirmRpcSignature, confirmationReached, RingConfirmError } from "./confirm";
 import { createRingLinkSecret, parsePastedRingLink, parseRingLink, ringLinkUrl } from "./link";
+import { classifyPayLinkFunding, expectedAmountOf, payLinkStatusLabel } from "./pay-link-status";
+import { isSocialCrawler, socialPreviewRobots } from "../social-crawlers";
 import {
   checkRpcBody,
   checkSprBody,
@@ -407,4 +410,115 @@ test("flow: guide order opens Shield until there's a private balance", () => {
   assert.equal(ringSuggestedAction(bal({ sol: [0, 0] })), "shield");
   assert.equal(ringSuggestedAction(bal()), "send");
   assert.equal(ringSuggestedAction(null), "shield");
+});
+
+test("pay link funding classification and labels", () => {
+  assert.equal(expectedAmountOf("1000000"), BigInt(1_000_000));
+  assert.equal(expectedAmountOf("nope"), BigInt(0));
+  const L = (pub: number, priv: number, exp: number) =>
+    classifyPayLinkFunding({
+      publicLamports: BigInt(pub),
+      privateAmount: BigInt(priv),
+      expectedAmount: BigInt(exp),
+    });
+  assert.equal(L(0, 0, 1_000_000), "empty");
+  assert.equal(L(2_500_000, 0, 1_000_000), "fee-only");
+  assert.equal(L(2_500_000, 400_000, 1_000_000), "partial");
+  assert.equal(L(2_500_000, 1_000_000, 1_000_000), "funded");
+  assert.equal(L(0, 1_000_000, 1_000_000), "funded");
+  assert.equal(payLinkStatusLabel("funding"), "not fully funded");
+  assert.equal(payLinkStatusLabel("funding", "fee-only"), "fee sent · finish funding");
+  assert.equal(payLinkStatusLabel("funding", "funded"), "open the link to check");
+  assert.equal(payLinkStatusLabel("ready"), "open the link to check");
+});
+
+test("HTTP confirm polls, retries blips, and searches history before giving up", async () => {
+  const calls: Array<{ history: boolean }> = [];
+  const rpc = {
+    getSignatureStatuses: async (_sig: string, opts: { searchTransactionHistory: boolean }) => {
+      calls.push({ history: opts.searchTransactionHistory });
+      if (calls.length === 1) throw new Error("temporary rpc blip");
+      if (calls.length === 2) return null;
+      return { err: null, confirmationStatus: "confirmed" as const, slot: 99 };
+    },
+  };
+  let t = 0;
+  const slot = await confirmRpcSignature(rpc, "sig111", {
+    timeoutMs: 20_000,
+    intervalMs: 1_000,
+    historyAfterMs: 8_000,
+    now: () => t,
+    sleep: async (ms) => {
+      t += ms;
+    },
+  });
+  assert.equal(slot, BigInt(99));
+  assert.equal(calls[0]?.history, false);
+  assert.ok(calls.length >= 3);
+});
+
+test("HTTP confirm throws when the transaction failed on-chain", async () => {
+  await assert.rejects(
+    () =>
+      confirmRpcSignature(
+        {
+          getSignatureStatuses: async () => ({ err: { InstructionError: [0, "Custom"] }, confirmationStatus: "confirmed", slot: 1 }),
+        },
+        "sig-fail",
+        { timeoutMs: 5_000, intervalMs: 1, historyAfterMs: 10_000, now: () => 0, sleep: async () => {} },
+      ),
+    (e: unknown) => e instanceof RingConfirmError && e.code === "CLIENT_RPC" && /failed on-chain/.test(e.message),
+  );
+});
+
+test("HTTP confirm does a final history search on timeout and can still succeed", async () => {
+  let t = 0;
+  let calls = 0;
+  const slot = await confirmRpcSignature(
+    {
+      getSignatureStatuses: async (_s, opts) => {
+        calls += 1;
+        if (opts.searchTransactionHistory) return { err: null, confirmationStatus: "finalized" as const, slot: 7 };
+        return null;
+      },
+    },
+    "sig-late",
+    {
+      timeoutMs: 3,
+      intervalMs: 1,
+      historyAfterMs: 100,
+      now: () => t,
+      sleep: async (ms) => {
+        t += ms + 10;
+      },
+    },
+  );
+  assert.equal(slot, BigInt(7));
+  assert.ok(calls >= 1);
+  assert.equal(confirmationReached({ err: null, confirmationStatus: "processed", slot: 1 }), false);
+  assert.equal(confirmationReached({ err: null, confirmationStatus: "confirmed", slot: 1 }), true);
+});
+
+test("social crawlers are allowed to preview noindex pay-link pages", () => {
+  assert.equal(isSocialCrawler("Twitterbot/1.0"), true);
+  assert.equal(isSocialCrawler("facebookexternalhit/1.1"), true);
+  assert.equal(isSocialCrawler("Mozilla/5.0 (compatible; Applebot/0.1)"), true);
+  assert.equal(isSocialCrawler("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15"), false);
+  const social = socialPreviewRobots("Twitterbot/1.0");
+  const human = socialPreviewRobots("Mozilla/5.0 (iPhone)");
+  assert.deepEqual(social, { index: true, follow: true, "max-image-preview": "large" });
+  assert.deepEqual(human, { index: false, follow: true, "max-image-preview": "large" });
+});
+
+test("Ring timeout and note reservation error codes map to plain-English hints", () => {
+  for (const code of [
+    "CLIENT_INDEXER_TIMEOUT",
+    "CLIENT_POLL_TIMED_OUT",
+    "CLIENT_PROVER_TIMEOUT",
+    "WALLET_NOTE_RESERVED",
+    "WALLET_SYNC",
+  ]) {
+    const msg = explainRingError(Object.assign(new Error(code), { code }));
+    assert.ok(msg && msg !== code && !msg.includes("_"), `Expected friendly copy for ${code}, got ${msg}`);
+  }
 });

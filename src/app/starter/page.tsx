@@ -28,11 +28,13 @@ export const metadata: Metadata = {
     url: `${site}/starter`,
     siteName: "sol.new",
     type: "website",
+    images: [{ url: `${site}/opengraph-image`, width: 1200, height: 630, alt: "Starter — Welcome to Solana" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Starter · Welcome to Solana · sol.new",
     description: "New to Solana? Your friendly start path on sol.new.",
+    images: [`${site}/opengraph-image`],
   },
   robots: { index: true, follow: true },
 };

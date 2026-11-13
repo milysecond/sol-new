@@ -6,6 +6,7 @@ export const metadata: Metadata = pageMeta({
   description:
     "Paste any Solana address to inspect a wallet, token, or program. Share as sol.new/address/<pubkey>.",
   path: "/scan",
+  image: "https://sol.new/address/opengraph-image",
 });
 
 /** Layout kept for legacy /scan deep links before middleware 308 → /address. */

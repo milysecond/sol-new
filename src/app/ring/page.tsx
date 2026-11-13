@@ -54,7 +54,8 @@ import {
 } from "@/lib/ring/flow";
 import { explainRingError, RingNeedsWithdrawalError } from "@/lib/ring/errors";
 import { ringLinkUrl } from "@/lib/ring/link";
-import type { KeyProgressInfo, RingSession, RingSnapshot, StoredRingLink } from "@/lib/ring/session";
+import { payLinkStatusLabel } from "@/lib/ring/pay-link-status";
+import type { KeyProgressInfo, PayLinkStep, RingSession, RingSnapshot, StoredRingLink } from "@/lib/ring/session";
 
 type Tab = "shield" | "send" | "link" | "unshield" | "merge" | "history";
 
@@ -114,6 +115,7 @@ type Ctx = {
   join: () => void;
   enableMerging: () => void;
   goTo: (t: Tab) => void;
+  setBusy: (s: string | null) => void;
 };
 
 function RingApp() {
@@ -311,7 +313,7 @@ function RingApp() {
       return "Merging is on.";
     });
 
-  const ctx: Ctx = { session, snap, busy, run, runSteps, refresh, join, enableMerging, goTo };
+  const ctx: Ctx = { session, snap, busy, run, runSteps, refresh, join, enableMerging, goTo, setBusy };
   const joinPlan = ringJoinPlan(snap);
 
   return (
@@ -989,7 +991,7 @@ function MergePanel({ ctx }: { ctx: Ctx }) {
 }
 
 function LinkPanel({ ctx }: { ctx: Ctx }) {
-  const { session, snap, busy, run, runSteps, refresh } = ctx;
+  const { session, snap, busy, run, runSteps, refresh, setBusy } = ctx;
   const [asset, setAsset] = useState<RingAssetId>("USDC");
   const [text, setText] = useState("");
   const [note, setNote] = useState("");
@@ -999,8 +1001,24 @@ function LinkPanel({ ctx }: { ctx: Ctx }) {
   const plan = ringFlowPlan({ action: "link", asset, amountText: text, balances: snap });
   const max = ringFlowMax({ action: "link", asset, balances: snap });
 
-  useEffect(() => {
+  const reloadLinks = useCallback(() => {
     void ring().then((m) => setLinks(m.loadRingLinks()));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void ring().then(async (m) => {
+      const all = m.loadRingLinks();
+      if (!cancelled) setLinks(all);
+      const next: StoredRingLink[] = [];
+      for (const l of all) {
+        next.push(l.status === "funding" ? await m.refreshPayLinkStatus(l) : l);
+      }
+      if (!cancelled) setLinks(next);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [made]);
 
   const copy = (url: string) =>
@@ -1012,14 +1030,49 @@ function LinkPanel({ ctx }: { ctx: Ctx }) {
       })
       .catch(() => {});
 
+  const PAY_LINK_STEP: Record<PayLinkStep, string> = {
+    saved: "Funding the link…",
+    prove: "Funding the link (proving on this device)…",
+    fee: "Sending the 0.0025 SOL fee…",
+    transfer: "Sending the private funds…",
+  };
+
+  const onPayLinkStep = (step: PayLinkStep) => {
+    setBusy(PAY_LINK_STEP[step]);
+    if (step === "saved") reloadLinks();
+  };
+
+  const softRefresh = async (slot?: bigint) => {
+    try {
+      await refresh(slot && slot > BigInt(0) ? slot : undefined);
+    } catch {
+      try {
+        await refresh();
+      } catch {
+        /* balance sync can lag; the link is already funded */
+      }
+    }
+  };
+
   const fund = async (amount: bigint) => {
     const m = await ring();
-    const r = await m.createPayLink(session, asset, amount, note.trim() || undefined);
-    await refresh(r.slot);
+    const r = await m.createPayLink(session, asset, amount, note.trim() || undefined, onPayLinkStep);
     setMade(r.url);
     setText("");
     setNote("");
+    reloadLinks();
+    await softRefresh(r.slot);
   };
+
+  const resume = (link: StoredRingLink) =>
+    void run("Checking the link…", async () => {
+      const m = await ring();
+      const r = await m.resumePayLink(session, link, onPayLinkStep);
+      setMade(r.url);
+      reloadLinks();
+      await softRefresh(r.slot);
+      return "Your pay link is ready.";
+    });
 
   return (
     <>
@@ -1117,10 +1170,20 @@ function LinkPanel({ ctx }: { ctx: Ctx }) {
                     <div className="font-medium">{fmt(l.asset, BigInt(l.amount))}</div>
                     <div className="text-xs text-gray-500 dark:text-white/40 truncate">
                       {l.note ? `${l.note} · ` : ""}
-                      {new Date(l.createdAt).toLocaleDateString()} · {l.status === "funding" ? "not fully funded" : "open the link to check"}
+                      {new Date(l.createdAt).toLocaleDateString()} · {payLinkStatusLabel(l.status)}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    {l.status === "funding" && (
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 px-2 disabled:opacity-40"
+                        disabled={Boolean(busy)}
+                        onClick={() => resume(l)}
+                      >
+                        Finish funding
+                      </button>
+                    )}
                     <button type="button" className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10" onClick={() => void copy(url)} aria-label="Copy link">
                       <Copy className="w-4 h-4" />
                     </button>
@@ -1132,6 +1195,10 @@ function LinkPanel({ ctx }: { ctx: Ctx }) {
               );
             })}
           </ul>
+          <p className="text-[11px] text-gray-400 dark:text-white/35">
+            The first private transfer downloads a proving key to this device and can take a minute. If confirmation
+            times out after the fee is sent, use Finish funding — we check the link before sending anything again.
+          </p>
         </div>
       )}
     </>

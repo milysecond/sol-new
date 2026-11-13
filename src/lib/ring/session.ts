@@ -28,8 +28,10 @@ import {
   RING_STORAGE_PREFIX,
   type RingAssetId,
 } from "./constants";
+import { confirmRpcSignature } from "./confirm";
 import { RingMergeFirstError, RingNeedsWithdrawalError } from "./errors";
-import { createRingLinkSecret, ringLinkUrl } from "./link";
+import { createRingLinkSecret, ringLinkUrl, seedFromRingSecret } from "./link";
+import { classifyPayLinkFunding, expectedAmountOf } from "./pay-link-status";
 
 type Spr = typeof import("@heliuslabs/spr");
 type Kit = typeof import("@solana/kit");
@@ -199,7 +201,10 @@ export async function openRingSession(seed: Uint8Array, opts: { persist: boolean
 
 export async function syncRing(session: RingSession, requireSlot?: bigint): Promise<void> {
   const rt = await getRingRuntime();
-  const config = requireSlot === undefined ? {} : { requireSlot };
+  const config =
+    requireSlot === undefined
+      ? {}
+      : { requireSlot, retry: { numRetries: 24, delayMs: BigInt(500), maxDelayMs: BigInt(4000) } };
   if (session.persist) {
     const { storageKey, cipher } = session.persist;
     await rt.spr.syncPersistedWallet({
@@ -323,6 +328,22 @@ export async function isRingRegistered(owner: string): Promise<boolean> {
   return isWalletRegistered({ rpc: rt.client, owner: owner as Address });
 }
 
+async function confirmLanded(rt: RingRuntime, signature: string): Promise<bigint> {
+  return confirmRpcSignature(
+    {
+      getSignatureStatuses: async (sig, opts) => {
+        const { value } = await rt.client.solanaRpc
+          .getSignatureStatuses([sig as never], { searchTransactionHistory: opts.searchTransactionHistory })
+          .send();
+        const st = value[0];
+        if (st == null) return null;
+        return { err: st.err, confirmationStatus: st.confirmationStatus, slot: st.slot };
+      },
+    },
+    signature,
+  );
+}
+
 /** Sign with every signer, send through the proxy, wait for confirmation. Returns [signature, slot]. */
 async function submit(tx: Transaction, signers: KeyPairSigner[]): Promise<{ signature: string; slot: bigint }> {
   const rt = await getRingRuntime();
@@ -332,7 +353,8 @@ async function submit(tx: Transaction, signers: KeyPairSigner[]): Promise<{ sign
     commitment: client.commitment,
   });
   const signature = kit.getSignatureFromTransaction(signed as never);
-  const slot = await client.confirmTransaction(signature);
+  // HTTP poll with retries. The SDK's confirmTransaction aborts on the first RPC blip.
+  const slot = await confirmLanded(rt, signature);
   return { signature, slot };
 }
 
@@ -352,7 +374,7 @@ async function transferSolPublic(from: KeyPairSigner, to: Address, lamports: big
     commitment: client.commitment,
   });
   const signature = kit.getSignatureFromTransaction(signed);
-  const slot = await client.confirmTransaction(signature);
+  const slot = await confirmLanded(rt, signature);
   return { signature, slot };
 }
 
@@ -408,49 +430,87 @@ function checkSpendable(rt: RingRuntime, session: RingSession, asset: RingAssetI
  * Private transfer to a Ring-registered Solana address. Refuses (instead of
  * silently withdrawing) when the recipient isn't registered.
  */
+function releaseNewReservations(wallet: Wallet, beforeIds: ReadonlySet<string>) {
+  try {
+    for (const entry of wallet._reservationEntries()) {
+      if (!beforeIds.has(entry.id)) wallet._releaseReservation(entry.id);
+    }
+  } catch {
+    /* ignore if already cleared */
+  }
+}
+
+function isBlockhashExpiredError(e: unknown): boolean {
+  const anyE = e as { message?: unknown; cause?: unknown } | null;
+  const causeMsg =
+    anyE?.cause && typeof (anyE.cause as { message?: unknown }).message === "string"
+      ? (anyE.cause as { message: string }).message
+      : "";
+  const msg = `${typeof anyE?.message === "string" ? anyE.message : String(e ?? "")} ${causeMsg}`.toLowerCase();
+  return msg.includes("blockhash not found") || msg.includes("blockheight exceeded") || msg.includes("transaction expired");
+}
+
 export async function sendPrivate(session: RingSession, recipient: string, asset: RingAssetId, amount: bigint) {
   const rt = await getRingRuntime();
   if (!(await isRingRegistered(recipient))) throw new RingNeedsWithdrawalError(recipient);
   checkSpendable(rt, session, asset, amount);
-  const tx = await rt.spr.buildTransferTransaction({
-    client: rt.client,
-    wallet: session.wallet,
-    keys: session.keys,
-    feePayer: session.owner,
-    recipient: recipient as Address,
-    amount,
-    ...(asset === "USDC" ? { asset: mintFor(rt, "USDC") } : {}),
-  });
-  return submit(tx, [session.signer]);
+  const beforeIds = new Set(session.wallet._reservationEntries().map((r) => r.id));
+  try {
+    const tx = await rt.spr.buildTransferTransaction({
+      client: rt.client,
+      wallet: session.wallet,
+      keys: session.keys,
+      feePayer: session.owner,
+      recipient: recipient as Address,
+      amount,
+      ...(asset === "USDC" ? { asset: mintFor(rt, "USDC") } : {}),
+    });
+    return await submit(tx, [session.signer]);
+  } catch (e) {
+    releaseNewReservations(session.wallet, beforeIds);
+    throw e;
+  }
 }
 
 /** Private → public. Destination, asset, and amount are visible on-chain. */
 export async function withdrawPublic(session: RingSession, recipient: string, asset: RingAssetId, amount: bigint) {
   const rt = await getRingRuntime();
   checkSpendable(rt, session, asset, amount);
-  const tx = await rt.spr.buildWithdrawalTransaction({
-    client: rt.client,
-    wallet: session.wallet,
-    keys: session.keys,
-    feePayer: session.owner,
-    recipient: recipient as Address,
-    amount,
-    ...(asset === "USDC" ? { asset: mintFor(rt, "USDC") } : {}),
-  });
-  return submit(tx, [session.signer]);
+  const beforeIds = new Set(session.wallet._reservationEntries().map((r) => r.id));
+  try {
+    const tx = await rt.spr.buildWithdrawalTransaction({
+      client: rt.client,
+      wallet: session.wallet,
+      keys: session.keys,
+      feePayer: session.owner,
+      recipient: recipient as Address,
+      amount,
+      ...(asset === "USDC" ? { asset: mintFor(rt, "USDC") } : {}),
+    });
+    return await submit(tx, [session.signer]);
+  } catch (e) {
+    releaseNewReservations(session.wallet, beforeIds);
+    throw e;
+  }
 }
 
 /** Merge the smallest notes of one asset into one (proved on this device). */
 export async function mergeNotes(session: RingSession, asset: RingAssetId) {
   const rt = await getRingRuntime();
-  const tx = await rt.spr.buildMergeTransaction({
-    client: rt.client,
-    wallet: session.wallet,
-    keys: session.keys,
-    feePayer: session.owner,
-    ...(asset === "USDC" ? { asset: mintFor(rt, "USDC") } : {}),
-  });
-  return submit(tx, [session.signer]);
+  const beforeIds = new Set(session.wallet._reservationEntries().map((r) => r.id));
+  try {
+    const tx = await rt.spr.buildMergeTransaction({
+      client: rt.client,
+      wallet: session.wallet,
+      keys: session.keys,
+      feePayer: session.owner,
+      ...(asset === "USDC" ? { asset: mintFor(rt, "USDC") } : {}),
+    });
+    return await submit(tx, [session.signer]);
+  } catch (e) {
+    releaseNewReservations(session.wallet, beforeIds);
+    throw e;
+  }
 }
 
 // ── Pay links ────────────────────────────────────────────────────────────
@@ -481,13 +541,58 @@ export function saveRingLink(link: StoredRingLink) {
   localStorage.setItem(LINKS_KEY, JSON.stringify(all.slice(0, 50)));
 }
 
+export type PayLinkStep = "saved" | "prove" | "fee" | "transfer";
+
+async function openStoredLinkSession(secret: string): Promise<RingSession> {
+  const seed = seedFromRingSecret(secret);
+  if (!seed) throw new Error("This saved link is damaged. It can't be checked from this device.");
+  try {
+    return await openRingSession(seed, { persist: false });
+  } finally {
+    seed.fill(0);
+  }
+}
+
+/** Re-read a saved link on-chain and mark it ready if the private funds already arrived. */
+export async function refreshPayLinkStatus(link: StoredRingLink): Promise<StoredRingLink> {
+  if (link.status !== "funding") return link;
+  let ephemeral: RingSession | null = null;
+  try {
+    ephemeral = await openStoredLinkSession(link.secret);
+    const contents = await inspectPayLink(ephemeral);
+    const kind = classifyPayLinkFunding({
+      publicLamports: contents.publicLamports,
+      privateAmount: contents.assets[link.asset]?.amount ?? BigInt(0),
+      expectedAmount: expectedAmountOf(link.amount),
+    });
+    if (kind === "funded") {
+      const ready: StoredRingLink = { ...link, status: "ready" };
+      saveRingLink(ready);
+      return ready;
+    }
+    return link;
+  } catch {
+    return link;
+  } finally {
+    destroyRingSession(ephemeral);
+  }
+}
+
 /**
  * Fund a pay link from the sender's PRIVATE balance:
- *  1. public SOL to the link wallet for the claimer's fees (RING_LINK_FEE_LAMPORTS),
- *  2. private transfer of `amount` to the link's shielded address (amount hidden).
- * The link is saved locally first so a half-funded link can still be reclaimed.
+ *  1. prove the private transfer on this device (no on-chain effect yet),
+ *  2. public SOL to the link wallet for the claimer's fees (RING_LINK_FEE_LAMPORTS),
+ *  3. private transfer of `amount` to the link's shielded address (amount hidden).
+ * The link is saved locally first so a half-funded link can still be finished.
+ * Proving happens before the fee so a stuck/failed proof doesn't leave 0.0025 SOL stranded.
  */
-export async function createPayLink(session: RingSession, asset: RingAssetId, amount: bigint, note?: string) {
+export async function createPayLink(
+  session: RingSession,
+  asset: RingAssetId,
+  amount: bigint,
+  note?: string,
+  onStep?: (s: PayLinkStep) => void,
+) {
   const rt = await getRingRuntime();
   checkSpendable(rt, session, asset, amount);
   const link = createRingLinkSecret();
@@ -503,19 +608,114 @@ export async function createPayLink(session: RingSession, asset: RingAssetId, am
     ...(note ? { note } : {}),
   };
   saveRingLink(stored);
-  await transferSolPublic(session.signer, link.address as Address, RING_LINK_FEE_LAMPORTS);
-  const tx = await rt.spr.buildTransferTransaction({
-    client: rt.client,
-    wallet: session.wallet,
-    keys: session.keys,
-    feePayer: session.owner,
-    recipient: ephKeypair.shieldedAddress(),
-    amount,
-    ...(asset === "USDC" ? { asset: mintFor(rt, "USDC") } : {}),
-  });
-  const sent = await submit(tx, [session.signer]);
-  saveRingLink({ ...stored, status: "ready" });
-  return { url: ringLinkUrl(link.address, link.secret, origin()), address: link.address, ...sent };
+  onStep?.("saved");
+  const beforeIds = new Set(session.wallet._reservationEntries().map((r) => r.id));
+  const buildLinkTx = () =>
+    rt.spr.buildTransferTransaction({
+      client: rt.client,
+      wallet: session.wallet,
+      keys: session.keys,
+      feePayer: session.owner,
+      recipient: ephKeypair.shieldedAddress(),
+      amount,
+      ...(asset === "USDC" ? { asset: mintFor(rt, "USDC") } : {}),
+    });
+  try {
+    onStep?.("prove");
+    let tx = await buildLinkTx();
+    onStep?.("fee");
+    await transferSolPublic(session.signer, link.address as Address, RING_LINK_FEE_LAMPORTS);
+    onStep?.("transfer");
+    let sent: { signature: string; slot: bigint };
+    try {
+      sent = await submit(tx, [session.signer]);
+    } catch (submitErr) {
+      const recovered = await refreshPayLinkStatus(stored);
+      if (recovered.status === "ready") {
+        return { url: ringLinkUrl(link.address, link.secret, origin()), address: link.address, signature: "", slot: BigInt(0) };
+      }
+      if (!isBlockhashExpiredError(submitErr)) throw submitErr;
+      releaseNewReservations(session.wallet, beforeIds);
+      onStep?.("prove");
+      tx = await buildLinkTx();
+      onStep?.("transfer");
+      sent = await submit(tx, [session.signer]);
+    }
+    saveRingLink({ ...stored, status: "ready" });
+    return { url: ringLinkUrl(link.address, link.secret, origin()), address: link.address, ...sent };
+  } catch (e) {
+    const recovered = await refreshPayLinkStatus(stored);
+    if (recovered.status === "ready") {
+      return { url: ringLinkUrl(link.address, link.secret, origin()), address: link.address, signature: "", slot: BigInt(0) };
+    }
+    releaseNewReservations(session.wallet, beforeIds);
+    throw e;
+  }
+}
+
+/**
+ * Finish or recover a pay link that was saved as "funding" (fee sent, proof
+ * timed out, or confirmation dropped). Inspects the link first so we never
+ * double-pay if the private transfer actually landed.
+ */
+export async function resumePayLink(session: RingSession, link: StoredRingLink, onStep?: (s: PayLinkStep) => void) {
+  const current = await refreshPayLinkStatus(link);
+  const url = ringLinkUrl(current.address, current.secret, origin());
+  if (current.status === "ready") return { url, address: current.address, signature: "", slot: BigInt(0) };
+
+  const rt = await getRingRuntime();
+  const amount = expectedAmountOf(current.amount);
+  let ephemeral: RingSession | null = null;
+  try {
+    ephemeral = await openStoredLinkSession(current.secret);
+    const contents = await inspectPayLink(ephemeral);
+    const privateAmount = contents.assets[current.asset]?.amount ?? BigInt(0);
+    const kind = classifyPayLinkFunding({
+      publicLamports: contents.publicLamports,
+      privateAmount,
+      expectedAmount: amount,
+    });
+    if (kind === "funded") {
+      saveRingLink({ ...current, status: "ready" });
+      return { url, address: current.address, signature: "", slot: BigInt(0) };
+    }
+    const remaining = amount > privateAmount ? amount - privateAmount : amount;
+    if (remaining <= BigInt(0)) {
+      saveRingLink({ ...current, status: "ready" });
+      return { url, address: current.address, signature: "", slot: BigInt(0) };
+    }
+    checkSpendable(rt, session, current.asset, remaining);
+    if (kind === "empty") {
+      onStep?.("fee");
+      await transferSolPublic(session.signer, current.address as Address, RING_LINK_FEE_LAMPORTS);
+    }
+    const beforeIds = new Set(session.wallet._reservationEntries().map((r) => r.id));
+    try {
+      onStep?.("prove");
+      const tx = await rt.spr.buildTransferTransaction({
+        client: rt.client,
+        wallet: session.wallet,
+        keys: session.keys,
+        feePayer: session.owner,
+        recipient: ephemeral.address,
+        amount: remaining,
+        ...(current.asset === "USDC" ? { asset: mintFor(rt, "USDC") } : {}),
+      });
+      onStep?.("transfer");
+      const sent = await submit(tx, [session.signer]);
+      saveRingLink({ ...current, status: "ready" });
+      return { url, address: current.address, ...sent };
+    } catch (innerErr) {
+      releaseNewReservations(session.wallet, beforeIds);
+      throw innerErr;
+    }
+  } catch (e) {
+    const recovered = await refreshPayLinkStatus(current);
+    if (recovered.status === "ready") return { url, address: current.address, signature: "", slot: BigInt(0) };
+    throw e;
+  } finally {
+    destroyRingSession(ephemeral);
+  }
 }
 
 export type PayLinkContents = {
