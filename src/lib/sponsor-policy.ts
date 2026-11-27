@@ -228,3 +228,125 @@ export function checkSponsoredTransaction(
     maxPriorityFeeLamports: priority,
   };
 }
+
+// ── Server-built sponsored txs (/api/swap/build, /api/stake/build) ─────────
+
+export const JUPITER_V6_PROGRAM = new PublicKey("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
+export const STAKE_PROGRAM = new PublicKey("Stake11111111111111111111111111111111111111");
+
+/** Programs a sponsored Jupiter swap may call (swap + wrap/unwrap SOL + ATA setup). */
+export const SWAP_ALLOWED_PROGRAMS = [
+  COMPUTE_BUDGET_PROGRAM_ID,
+  SYSTEM_PROGRAM_ID,
+  TOKEN_PROGRAM,
+  TOKEN_2022_PROGRAM,
+  ATA_PROGRAM,
+  JUPITER_V6_PROGRAM,
+];
+/** Programs a sponsored native-stake create + delegate may call. */
+export const STAKE_ALLOWED_PROGRAMS = [SYSTEM_PROGRAM_ID, STAKE_PROGRAM];
+
+export const SWAP_LIMITS = {
+  maxInstructions: 24,
+  maxComputeUnitLimit: 1_000_000,
+  defaultComputeUnitLimit: 400_000,
+  maxPriorityFeeLamports: 50_000,
+} as const;
+
+export type IxLike = {
+  programId: PublicKey;
+  keys: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[];
+  data: Uint8Array;
+};
+
+export type ClientIxResult = { ok: true; signers: string[] } | { ok: false; reason: string };
+
+/**
+ * Validate instructions that will be wrapped in a fee-payer-signed tx.
+ * Strictest rule: the fee payer must not appear in ANY instruction account list
+ * (signer, writable, authority, transfer source, owner — anything). With that,
+ * no program can debit the fee payer beyond the transaction fee.
+ */
+export function checkClientInstructions(
+  ixs: IxLike[],
+  feePayer: PublicKey,
+  allowedPrograms: PublicKey[],
+  maxInstructions: number = SWAP_LIMITS.maxInstructions,
+): ClientIxResult {
+  if (!ixs.length) return { ok: false, reason: "No instructions" };
+  if (ixs.length > maxInstructions) return { ok: false, reason: "Too many instructions" };
+  const signers = new Set<string>();
+  for (let n = 0; n < ixs.length; n++) {
+    const ix = ixs[n]!;
+    if (ix.programId.equals(feePayer)) return { ok: false, reason: `Instruction ${n}: fee payer used as program` };
+    if (!allowedPrograms.some((p) => p.equals(ix.programId))) {
+      return { ok: false, reason: `Instruction ${n}: program ${ix.programId.toBase58()} is not allowed` };
+    }
+    for (const k of ix.keys) {
+      if (k.pubkey.equals(feePayer)) {
+        return { ok: false, reason: `Instruction ${n}: fee payer appears in a client instruction` };
+      }
+      if (k.isSigner) signers.add(k.pubkey.toBase58());
+    }
+  }
+  return { ok: true, signers: [...signers] };
+}
+
+/**
+ * Replace client compute-budget instructions with capped ones: CU limit ≤ max
+ * (default when absent) and CU price lowered so price × limit ≤ max priority fee.
+ * Returns the non-budget instructions plus the capped budget instructions first.
+ */
+export function capComputeBudget(ixs: IxLike[]): { ixs: IxLike[]; limit: number; microLamports: number } {
+  let limit: number | null = null;
+  let price = BigInt(0);
+  const rest: IxLike[] = [];
+  for (const ix of ixs) {
+    if (!ix.programId.equals(COMPUTE_BUDGET_PROGRAM_ID)) {
+      rest.push(ix);
+      continue;
+    }
+    const d = ix.data;
+    if (d[0] === CB_SET_CU_LIMIT && d.length === 5) limit = readU32(d, 1);
+    else if (d[0] === CB_SET_CU_PRICE && d.length === 9) price = readU64(d, 1);
+    // anything else (heap frame, loaded-data limit) is dropped
+  }
+  const cuLimit = Math.min(limit ?? SWAP_LIMITS.defaultComputeUnitLimit, SWAP_LIMITS.maxComputeUnitLimit);
+  const maxPrice = BigInt(Math.floor((SWAP_LIMITS.maxPriorityFeeLamports * 1_000_000) / cuLimit));
+  const microLamports = Number(price < maxPrice ? price : maxPrice);
+  const limitData = new Uint8Array(5);
+  limitData[0] = CB_SET_CU_LIMIT;
+  new DataView(limitData.buffer).setUint32(1, cuLimit, true);
+  const priceData = new Uint8Array(9);
+  priceData[0] = CB_SET_CU_PRICE;
+  new DataView(priceData.buffer).setBigUint64(1, BigInt(microLamports), true);
+  return {
+    ixs: [
+      { programId: COMPUTE_BUDGET_PROGRAM_ID, keys: [], data: limitData },
+      { programId: COMPUTE_BUDGET_PROGRAM_ID, keys: [], data: priceData },
+      ...rest,
+    ],
+    limit: cuLimit,
+    microLamports,
+  };
+}
+
+/**
+ * Final check on a compiled tx before the fee payer signs: it is static key 0 and
+ * no compiled instruction references index 0 (lookup-table indexes can't be 0).
+ */
+export function feePayerOnlyPaysFees(tx: VersionedTransaction, feePayer: PublicKey): { ok: true } | { ok: false; reason: string } {
+  const msg = tx.message;
+  const keys = msg.staticAccountKeys;
+  if (!keys[0]?.equals(feePayer)) return { ok: false, reason: "Transaction fee payer is not sol.new" };
+  for (let i = 1; i < keys.length; i++) {
+    if (keys[i]!.equals(feePayer)) return { ok: false, reason: "Fee payer appears more than once" };
+  }
+  for (const ix of msg.compiledInstructions) {
+    if (ix.programIdIndex === 0 || ix.accountKeyIndexes.includes(0)) {
+      return { ok: false, reason: "Fee payer referenced by an instruction" };
+    }
+  }
+  if (msg.header.numRequiredSignatures > SPONSOR_LIMITS.maxSignatures) return { ok: false, reason: "Too many signers" };
+  return { ok: true };
+}

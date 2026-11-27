@@ -4,8 +4,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  Authorized,
   ComputeBudgetProgram,
   Keypair,
+  Lockup,
+  StakeProgram,
   PublicKey,
   SystemProgram,
   Transaction,
@@ -15,6 +18,13 @@ import {
 } from "@solana/web3.js";
 import {
   ATA_PROGRAM,
+  JUPITER_V6_PROGRAM,
+  STAKE_ALLOWED_PROGRAMS,
+  SWAP_ALLOWED_PROGRAMS,
+  SWAP_LIMITS,
+  capComputeBudget,
+  checkClientInstructions,
+  feePayerOnlyPaysFees,
   SPONSOR_LIMITS,
   TOKEN_2022_PROGRAM,
   TOKEN_PROGRAM,
@@ -298,4 +308,107 @@ test("rejects address lookup tables (v0)", () => {
   const r = checkSponsoredTransaction(new VersionedTransaction(msg), feePayer.publicKey);
   assert.equal(r.ok, false);
   if (!r.ok) assert.match(r.reason, /lookup/);
+});
+
+// ── /api/swap/build and /api/stake/build (server-built, fee-payer-signed) ──
+
+const trader = Keypair.generate().publicKey;
+function jupSwap(extraKeys: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] = []) {
+  return new TransactionInstruction({
+    programId: JUPITER_V6_PROGRAM,
+    keys: [
+      { pubkey: trader, isSigner: true, isWritable: false },
+      { pubkey: ata(trader, mint), isSigner: false, isWritable: true },
+      ...extraKeys,
+    ],
+    data: Buffer.from([0xe5, 0x17, 0xcb, 0x97, 1, 2, 3]),
+  });
+}
+const jupSetup = () => [
+  ataCreate(trader, trader),
+  SystemProgram.transfer({ fromPubkey: trader, toPubkey: ata(trader, mint), lamports: 1_000_000 }),
+  new TransactionInstruction({ programId: TOKEN_PROGRAM, keys: [{ pubkey: ata(trader, mint), isSigner: false, isWritable: true }], data: Buffer.from([17]) }),
+];
+
+test("swap: allows a normal Jupiter swap (setup + swap + unwrap)", () => {
+  const ixs = [...jupSetup(), jupSwap(), closeAccount(ata(trader, mint), trader, trader)];
+  const r = checkClientInstructions(ixs, feePayer.publicKey, SWAP_ALLOWED_PROGRAMS);
+  assert.ok(r.ok, r.ok ? "" : r.reason);
+  assert.deepEqual(r.signers, [trader.toBase58()]);
+});
+
+test("swap: rejects the fee payer anywhere in client instructions", () => {
+  const cases = [
+    SystemProgram.transfer({ fromPubkey: feePayer.publicKey, toPubkey: attacker, lamports: 1 }),
+    jupSwap([{ pubkey: feePayer.publicKey, isSigner: false, isWritable: true }]),
+    jupSwap([{ pubkey: feePayer.publicKey, isSigner: true, isWritable: false }]),
+    jupSwap([{ pubkey: feePayer.publicKey, isSigner: false, isWritable: false }]),
+    ataCreate(feePayer.publicKey, trader),
+    closeAccount(ata(trader, mint), feePayer.publicKey, trader),
+    transferChecked(ata(feePayer.publicKey, mint), ata(attacker, mint), feePayer.publicKey),
+  ];
+  for (const ix of cases) {
+    const r = checkClientInstructions([jupSwap(), ix], feePayer.publicKey, SWAP_ALLOWED_PROGRAMS);
+    assert.equal(r.ok, false);
+    if (!r.ok) assert.match(r.reason, /fee payer/);
+  }
+});
+
+test("swap: rejects programs outside the allowlist and oversized swaps", () => {
+  const evil = new TransactionInstruction({ programId: attacker, keys: [], data: Buffer.from([1]) });
+  const r = checkClientInstructions([jupSwap(), evil], feePayer.publicKey, SWAP_ALLOWED_PROGRAMS);
+  assert.equal(r.ok, false);
+  const many = Array.from({ length: SWAP_LIMITS.maxInstructions + 1 }, () => jupSwap());
+  assert.equal(checkClientInstructions(many, feePayer.publicKey, SWAP_ALLOWED_PROGRAMS).ok, false);
+});
+
+test("swap: compute budget is replaced with capped values", () => {
+  const { ixs, limit, microLamports } = capComputeBudget([
+    ComputeBudgetProgram.setComputeUnitLimit({ units: 5_000_000 }),
+    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000_000 }),
+    ComputeBudgetProgram.requestHeapFrame({ bytes: 256 * 1024 }),
+    jupSwap(),
+  ]);
+  assert.equal(limit, SWAP_LIMITS.maxComputeUnitLimit);
+  assert.ok((limit * microLamports) / 1_000_000 <= SWAP_LIMITS.maxPriorityFeeLamports);
+  assert.equal(ixs.length, 3); // limit + price + swap (heap frame dropped)
+  const low = capComputeBudget([ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10 }), jupSwap()]);
+  assert.equal(low.limit, SWAP_LIMITS.defaultComputeUnitLimit);
+  assert.equal(low.microLamports, 10);
+});
+
+test("compiled tx: fee payer may only pay fees", () => {
+  const good = v0([jupSwap()]);
+  assert.ok(feePayerOnlyPaysFees(good, feePayer.publicKey).ok);
+  const bad = v0([SystemProgram.transfer({ fromPubkey: feePayer.publicKey, toPubkey: attacker, lamports: 1 })]);
+  assert.equal(feePayerOnlyPaysFees(bad, feePayer.publicKey).ok, false);
+  const other = v0([jupSwap()]);
+  assert.equal(feePayerOnlyPaysFees(other, attacker).ok, false);
+});
+
+function stakeIxs(from: PublicKey) {
+  const stake = Keypair.generate().publicKey;
+  const vote = Keypair.generate().publicKey;
+  return [
+    ...StakeProgram.createAccountWithSeed({
+      fromPubkey: from, stakePubkey: stake, basePubkey: from, seed: "sn1",
+      authorized: new Authorized(from, from), lockup: new Lockup(0, 0, PublicKey.default), lamports: 1_000_000_000,
+    }).instructions,
+    ...StakeProgram.delegate({ stakePubkey: stake, authorizedPubkey: from, votePubkey: vote }).instructions,
+  ];
+}
+
+test("stake: allows create-with-seed + delegate from the user", () => {
+  const r = checkClientInstructions(stakeIxs(trader), feePayer.publicKey, STAKE_ALLOWED_PROGRAMS, 4);
+  assert.ok(r.ok, r.ok ? "" : r.reason);
+});
+
+test("stake: rejects wallet = fee payer (would stake the fee payer's SOL)", () => {
+  const r = checkClientInstructions(stakeIxs(feePayer.publicKey), feePayer.publicKey, STAKE_ALLOWED_PROGRAMS, 4);
+  assert.equal(r.ok, false);
+});
+
+test("stake: rejects non-stake programs", () => {
+  const r = checkClientInstructions([...stakeIxs(trader), jupSwap()], feePayer.publicKey, STAKE_ALLOWED_PROGRAMS, 4);
+  assert.equal(r.ok, false);
 });
