@@ -29,6 +29,54 @@ function bytesToCredId(rawId: ArrayBuffer | Uint8Array): string {
   return btoa(s);
 }
 
+function bytesToB64Url(bytes: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]!);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** Hosts where wallets must not be created (separate rp.id → orphan passkeys). */
+export function isPreviewPasskeyHost(): boolean {
+  if (typeof window === "undefined") return false;
+  const h = window.location.hostname.toLowerCase();
+  return h.endsWith(".workers.dev") || h === "workers.dev" || h.endsWith(".pages.dev");
+}
+
+export const PREVIEW_HOST_CREATE_MESSAGE =
+  "New wallets can only be created on sol.new. Passkeys made on this preview host won't work on sol.new.";
+
+export function shortAddress(address: string): string {
+  return `${address.slice(0, 4)}…${address.slice(-4)}`;
+}
+
+/** Name shown in the OS passkey sheet for a wallet: "sol.new · AbCd…wXyZ" (+ email). */
+export function passkeyAccountName(address: string, email?: string | null): string {
+  const base = `sol.new · ${shortAddress(address)}`;
+  const e = email?.trim();
+  return (e ? `${base} · ${e}` : base).slice(0, 64);
+}
+
+function randomTag(): string {
+  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  const b = crypto.getRandomValues(new Uint8Array(4));
+  return Array.from(b, (x) => alphabet[x % alphabet.length]).join("");
+}
+
+/** Unique, human name used at create() time (before the address is known). */
+function createTimeName(label?: string): string {
+  const l = label?.trim().replace(/\s+/g, " ");
+  return (l ? `sol.new · ${l}` : `sol.new · wallet ${randomTag()}`).slice(0, 64);
+}
+
+function userHandleOf(credential: PublicKeyCredential | null | undefined): Uint8Array | null {
+  try {
+    const uh = (credential?.response as AuthenticatorAssertionResponse | undefined)?.userHandle;
+    return uh && uh.byteLength ? new Uint8Array(uh) : null;
+  } catch {
+    return null;
+  }
+}
+
 function listKnownCredentialIds(): string[] {
   const ids: string[] = [];
   try {
@@ -103,6 +151,7 @@ function rememberCredential(
   address: string,
   rawId: ArrayBuffer,
   derivation?: WalletDerivation,
+  userHandle?: Uint8Array | null,
 ) {
   try {
     const credentialId = bytesToCredId(rawId);
@@ -111,8 +160,11 @@ function rememberCredential(
       credentialId?: string;
       label?: string;
       derivation?: WalletDerivation;
+      userId?: string;
+      email?: string;
+      passkeyName?: string;
     }[];
-    const idx = wallets.findIndex((w) => w.pubkey === address);
+    let idx = wallets.findIndex((w) => w.pubkey === address);
     if (idx >= 0) {
       wallets[idx].credentialId = credentialId;
       wallets[idx].label = address;
@@ -124,6 +176,32 @@ function rememberCredential(
         label: address,
         ...(derivation ? { derivation } : {}),
       });
+      idx = wallets.length - 1;
+    }
+    const entry = wallets[idx]!;
+    if (userHandle?.length) entry.userId = bytesToCredId(userHandle);
+    // Rename the passkey in the OS sheet (Signal API) — once per name, fire-and-forget.
+    const wanted = passkeyAccountName(address, entry.email);
+    if (entry.userId && entry.passkeyName !== wanted) {
+      const uid = entry.userId;
+      void signalPasskeyUserDetails({ userId: uid, name: wanted, displayName: wanted }).then(
+        (ok) => {
+          if (!ok) return;
+          try {
+            const list = JSON.parse(localStorage.getItem("sol.new.wallets") || "[]") as {
+              pubkey: string;
+              passkeyName?: string;
+            }[];
+            const e = list.find((w) => w.pubkey === address);
+            if (e) {
+              e.passkeyName = wanted;
+              localStorage.setItem("sol.new.wallets", JSON.stringify(list));
+            }
+          } catch {
+            /* ignore */
+          }
+        },
+      );
     }
     localStorage.setItem("sol.new.wallets", JSON.stringify(wallets));
     // Keep active session credential in sync when this is the connected wallet
@@ -140,6 +218,8 @@ function rememberCredential(
  * Do NOT await delays before WebAuthn — Android loses user activation.
  */
 export function ensureDocumentFocusForPasskey() {
+  // A pending autofill (conditional) request would block a modal prompt.
+  cancelConditionalPasskey();
   try {
     if (typeof document === "undefined") return;
     const ae = document.activeElement as HTMLElement | null;
@@ -322,7 +402,7 @@ async function deriveFromAssertion(
   throw new PrfRequiredError();
 }
 
-export async function createPasskeyWallet(_username?: string): Promise<{
+export async function createPasskeyWallet(label?: string): Promise<{
   publicKey: string;
   credentialId: string;
   userId: string;
@@ -332,10 +412,15 @@ export async function createPasskeyWallet(_username?: string): Promise<{
     throw new Error("Passkeys are not supported in this browser.");
   }
 
+  if (isPreviewPasskeyHost()) {
+    throw new Error(PREVIEW_HOST_CREATE_MESSAGE);
+  }
+
   // CRITICAL: no await/setTimeout before credentials.create — keeps user gesture on Android
   ensureDocumentFocusForPasskey();
 
-  const provisional = `sol.new-${Date.now().toString(36)}`;
+  // Unique, readable name in the passkey sheet (renamed to the address right after).
+  const accountName = createTimeName(label);
   const userIdBytes = crypto.getRandomValues(new Uint8Array(32));
   const userId = btoa(String.fromCharCode(...userIdBytes));
 
@@ -353,8 +438,8 @@ export async function createPasskeyWallet(_username?: string): Promise<{
     rp: { name: "sol.new", id: getRpId() },
     user: {
       id: userIdBytes,
-      name: provisional,
-      displayName: "sol.new wallet",
+      name: accountName,
+      displayName: accountName,
     },
     pubKeyCredParams: [
       { alg: -7, type: "public-key" },
@@ -471,7 +556,8 @@ export async function createPasskeyWallet(_username?: string): Promise<{
   seed.fill(0);
   const publicKey = keypair.publicKey.toBase58();
   const credentialId = bytesToCredId(credential.rawId);
-  rememberCredential(publicKey, credential.rawId, "prf-v1");
+  // Also renames the passkey to "sol.new · AbCd…wXyZ" via the Signal API.
+  rememberCredential(publicKey, credential.rawId, "prf-v1", userIdBytes);
 
   try {
     localStorage.setItem("sol.new.wallet", publicKey);
@@ -481,13 +567,6 @@ export async function createPasskeyWallet(_username?: string): Promise<{
     /* ignore */
   }
 
-  // Fire-and-forget rename — never block wallet activation on Signal API
-  void signalPasskeyUserDetails({
-    userId,
-    name: publicKey,
-    displayName: publicKey,
-  });
-
   return {
     publicKey,
     credentialId,
@@ -496,7 +575,12 @@ export async function createPasskeyWallet(_username?: string): Promise<{
   };
 }
 
-/** Update browser passkey account name when supported (Chrome). */
+/**
+ * Update the passkey's name in the OS sheet (Chrome 132+, Safari 26+).
+ * Only signalCurrentUserDetails is used. Never call signalAllAcceptedCredentials
+ * or signalUnknownCredential: on iOS/macOS 26 they delete passkeys of OTHER
+ * accounts on the same rp.id (WebKit bug 322267).
+ */
 export async function signalPasskeyUserDetails(opts: {
   userId: string;
   name: string;
@@ -506,16 +590,17 @@ export async function signalPasskeyUserDetails(opts: {
     const PK = PublicKeyCredential as unknown as {
       signalCurrentUserDetails?: (o: {
         rpId: string;
-        userId: BufferSource;
+        userId: string;
         name: string;
         displayName: string;
       }) => Promise<void>;
     };
     if (typeof PK.signalCurrentUserDetails !== "function") return false;
+    // Spec: userId is a base64url string (we store standard base64).
     const raw = Uint8Array.from(atob(opts.userId), (c) => c.charCodeAt(0));
     await PK.signalCurrentUserDetails({
       rpId: getRpId(),
-      userId: raw,
+      userId: bytesToB64Url(raw),
       name: opts.name.slice(0, 64),
       displayName: opts.displayName.slice(0, 64),
     });
@@ -604,11 +689,84 @@ export async function recoverPasskeyWallet(opts?: {
       `That passkey is for ${publicKey.slice(0, 4)}…${publicKey.slice(-4)}, not the selected wallet. Pick the matching passkey.`,
     );
   }
-  rememberCredential(publicKey, credential.rawId, derived.derivation);
+  rememberCredential(publicKey, credential.rawId, derived.derivation, userHandleOf(credential));
 
   return {
     publicKey,
     credentialId,
+    derivation: derived.derivation,
+  };
+}
+
+let conditionalAbort: AbortController | null = null;
+
+/** Abort a pending autofill (conditional) passkey request, if any. */
+export function cancelConditionalPasskey() {
+  try {
+    conditionalAbort?.abort();
+  } catch {
+    /* ignore */
+  }
+  conditionalAbort = null;
+}
+
+export async function isConditionalPasskeyAvailable(): Promise<boolean> {
+  try {
+    if (typeof window === "undefined" || !window.PublicKeyCredential) return false;
+    const PK = PublicKeyCredential as unknown as {
+      isConditionalMediationAvailable?: () => Promise<boolean>;
+    };
+    return typeof PK.isConditionalMediationAvailable === "function"
+      ? await PK.isConditionalMediationAvailable()
+      : false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Passkey autofill sign-in (mediation: "conditional"). Needs an input with
+ * autocomplete="username webauthn" on the page. Resolves null when aborted,
+ * unsupported, or the user never picks a passkey. Never creates a passkey.
+ */
+export async function startConditionalPasskeyUnlock(): Promise<{
+  publicKey: string;
+  credentialId: string;
+  derivation: WalletDerivation;
+} | null> {
+  if (!(await isConditionalPasskeyAvailable())) return null;
+  cancelConditionalPasskey();
+  const ac = new AbortController();
+  conditionalAbort = ac;
+  let credential: PublicKeyCredential | null = null;
+  try {
+    credential = (await navigator.credentials.get({
+      mediation: "conditional",
+      signal: ac.signal,
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rpId: getRpId(),
+        userVerification: "required",
+        extensions: { prf: { eval: { first: CHALLENGE } } },
+      },
+    } as CredentialRequestOptions)) as PublicKeyCredential | null;
+  } catch {
+    return null;
+  } finally {
+    if (conditionalAbort === ac) conditionalAbort = null;
+  }
+  if (!credential) return null;
+  const derived = await deriveFromAssertion(credential);
+  derived.keypair.secretKey.fill(0);
+  rememberCredential(
+    derived.address,
+    credential.rawId,
+    derived.derivation,
+    userHandleOf(credential),
+  );
+  return {
+    publicKey: derived.address,
+    credentialId: bytesToCredId(credential.rawId),
     derivation: derived.derivation,
   };
 }
@@ -675,7 +833,6 @@ async function authPasskeyOnce(opts?: {
         },
       },
     },
-    // Prefer conditional UI only when not forcing a full list
   })) as PublicKeyCredential;
 
   if (!credential) throw new Error("Passkey authentication cancelled");
@@ -712,7 +869,12 @@ export async function getPasskeyKeypair(
   try {
     const first = await authPasskeyOnce({ forAddress: expectedPublicKey, forcePicker: false });
     if (!expectedPublicKey || first.address === expectedPublicKey) {
-      rememberCredential(first.address, first.credential.rawId, first.derivation);
+      rememberCredential(
+        first.address,
+        first.credential.rawId,
+        first.derivation,
+        userHandleOf(first.credential),
+      );
       return { address: first.address, keypair: first.keypair };
     }
     // Wrong passkey for pinned path — ask user to pick the right one
@@ -737,7 +899,12 @@ export async function getPasskeyKeypair(
         `Wrong passkey. Connected wallet is ${expectedPublicKey.slice(0, 4)}…${expectedPublicKey.slice(-4)}, but that passkey is ${second.address.slice(0, 4)}…${second.address.slice(-4)}. Choose the passkey named with your full address.`,
       );
     }
-    rememberCredential(second.address, second.credential.rawId, second.derivation);
+    rememberCredential(
+      second.address,
+      second.credential.rawId,
+      second.derivation,
+      userHandleOf(second.credential),
+    );
     return { address: second.address, keypair: second.keypair };
   } catch (e) {
     if (isUserCancel(e)) {

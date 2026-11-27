@@ -367,7 +367,7 @@ export function MarketingSplash({
                 ) : (
                   <button
                     type="button"
-                    onClick={() => connect("My Wallet")}
+                    onClick={() => connect({ createNew: true })}
                     disabled={loading}
                     className="group inline-flex items-center justify-center gap-2 rounded-full bg-white text-black font-semibold px-7 py-4 text-base hover:bg-white/90 transition-colors disabled:opacity-60 cursor-pointer"
                   >
@@ -520,7 +520,7 @@ export function MarketingSplash({
             ) : (
               <button
                 type="button"
-                onClick={() => connect("My Wallet")}
+                onClick={() => connect({ createNew: true })}
                 disabled={loading}
                 className="group inline-flex items-center gap-2 rounded-full bg-white text-black font-semibold px-8 py-4 text-base hover:bg-white/90 transition-colors disabled:opacity-60 cursor-pointer"
               >

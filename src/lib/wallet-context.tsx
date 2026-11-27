@@ -9,6 +9,8 @@ import {
   identifyPasskeyWallet,
   provePasskeyWallet,
   signalPasskeyUserDetails,
+  passkeyAccountName,
+  startConditionalPasskeyUnlock,
 } from "./passkey-wallet";
 import { useNetwork } from "./network";
 import { analytics } from "./analytics";
@@ -27,6 +29,10 @@ export interface WalletEntry {
   userId?: string;
   /** Passkey seed derivation mode (audit H1). */
   derivation?: "prf-v1" | "rawid-legacy";
+  /** Email linked via magic link on this device (used only for the passkey name). */
+  email?: string;
+  /** Last name pushed to the OS passkey via signalCurrentUserDetails. */
+  passkeyName?: string;
 }
 
 export type WalletBalances = Record<string, { sol: number; usdc: number }>;
@@ -40,7 +46,13 @@ interface WalletState {
   usdcBalance: number | null;
   loading: boolean;
   error: string | null;
+  /**
+   * connect() / connect({}) = unlock an existing passkey only (never creates).
+   * connect({ createNew: true }) or connect("label") = explicit "Create a new wallet".
+   */
   connect: (username?: string | { createNew?: boolean }) => Promise<string | null>;
+  /** Passkey autofill (conditional mediation) sign-in; null when nothing picked. */
+  autofillUnlock: () => Promise<string | null>;
   recover: (opts?: { forcePicker?: boolean; forAddress?: string }) => Promise<string | null>;
   /** Probe one passkey from the full OS list; returns address (does not auto-activate). */
   identify: () => Promise<{ publicKey: string; credentialId: string; sol: number; usdc: number }>;
@@ -85,6 +97,7 @@ const WalletContext = createContext<WalletState>({
   disconnect: () => {},
   refreshBalance: async () => {},
   clearLoading: () => {},
+  autofillUnlock: async () => null,
   walletKind: "passkey",
   connectExternal: async () => null,
   activateExternal: () => {},
@@ -242,9 +255,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       }
 
       const createNew =
-        typeof username === "object" && username?.createNew === true;
+        typeof username === "string" ||
+        (typeof username === "object" && username?.createNew === true);
 
-      // Default Connect = unlock existing passkey. Only mint a new key when asked.
+      // Default Connect = unlock existing passkey. Only mint a new key on an
+      // explicit "Create a new wallet" action — never as a fallback.
       if (!createNew) {
         const list = loadWallets();
         const forcePicker =
@@ -281,7 +296,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           if (list.length > 0 || cancelled) {
             throw e;
           }
-          // Fresh device with zero wallets: create below
+          throw new Error(
+            "No sol.new passkey found here. New to sol.new? Tap “Create a new wallet”.",
+          );
         }
       }
 
@@ -413,10 +430,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
     const entry = list[idx];
     if (entry.userId) {
+      const name = passkeyAccountName(pubkey, entry.email);
       void signalPasskeyUserDetails({
         userId: entry.userId,
-        name: pubkey,
-        displayName: pubkey,
+        name,
+        displayName: name,
       });
     }
   };
@@ -606,6 +624,32 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [publicKey, network, refreshBalance]);
 
+  const autofillUnlock = async (): Promise<string | null> => {
+    try {
+      const result = await startConditionalPasskeyUnlock();
+      if (!result?.publicKey) return null;
+      setError(null);
+      activateWallet({
+        pubkey: result.publicKey,
+        credentialId: result.credentialId,
+        label: result.publicKey,
+        derivation: result.derivation,
+      });
+      fetch("/api/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Public key only — never send the credential ID (audit C1).
+        body: JSON.stringify({ publicKey: result.publicKey, derivation: result.derivation }),
+      }).catch(() => {});
+      analytics.walletRecovered();
+      return result.publicKey;
+    } catch (e) {
+      const { friendlyError } = await import("./friendly-errors");
+      setError(friendlyError(e, "Couldn't unlock that passkey. Try Sign in again."));
+      return null;
+    }
+  };
+
   const clearLoading = () => {
     setLoading(false);
     setError(null);
@@ -701,6 +745,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         disconnect,
         refreshBalance,
         clearLoading,
+        autofillUnlock,
         walletKind,
         connectExternal,
         activateExternal,

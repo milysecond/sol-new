@@ -596,7 +596,7 @@ export default function ClaimPage() {
                   )}
                   <button
                     type="button"
-                    onClick={() => void connect()}
+                    onClick={() => void connect({ createNew: true })}
                     disabled={walletLoading}
                     className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer min-h-[52px]"
                   >

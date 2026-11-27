@@ -19,6 +19,8 @@ import { Navbar } from "@/components/navbar";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { friendlyError } from "@/lib/friendly-errors";
+import { PasskeyAutofill, signInLabel } from "@/components/passkey-autofill";
+import { isPreviewPasskeyHost, PREVIEW_HOST_CREATE_MESSAGE } from "@/lib/passkey-wallet";
 
 type Goal = "gift" | "swap" | "stake" | "explore";
 
@@ -116,8 +118,10 @@ function markOnboardDone() {
  */
 export default function OnboardPage() {
   const router = useRouter();
-  const { publicKey, connect, recover, loading, error: walletError, clearLoading } =
+  const { publicKey, wallets, connect, recover, loading, error: walletError, clearLoading } =
     useWallet();
+  const [previewHost, setPreviewHost] = useState(false);
+  useEffect(() => setPreviewHost(isPreviewPasskeyHost()), []);
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +132,7 @@ export default function OnboardPage() {
   const cancelBusy = () => {
     setCreating(false);
     clearLoading();
-    setError("Cancelled — tap Create again when ready.");
+    setError("Cancelled — try again when ready.");
   };
 
   const goalMeta = useMemo(
@@ -195,7 +199,9 @@ export default function OnboardPage() {
     setError(null);
     setCreating(true);
     try {
-      const pk = await recover({ forcePicker: true });
+      const pk = await (wallets.length === 1
+        ? recover({ forAddress: wallets[0]!.pubkey })
+        : recover({ forcePicker: true }));
       if (!pk || pk.length < 32) {
         setError("Could not unlock a wallet from that passkey. Try again or Find wallet.");
         return;
@@ -356,14 +362,14 @@ export default function OnboardPage() {
                   ? "Wallet ready"
                   : busy
                     ? "Approve passkey…"
-                    : "Create your wallet"}
+                    : "Your wallet"}
               </h1>
               <p className="text-sm text-gray-500 max-w-sm mx-auto">
                 {publicKey
                   ? "You're connected. Next we’ll open your first step."
                   : busy
                     ? "Look for a fingerprint / face / screen-lock prompt. If nothing appears, cancel and try again."
-                    : "Tap once — your phone’s passkey creates a wallet. No seed phrase."}
+                    : "Have a sol.new passkey? Sign in. New here? Create a new wallet with Face ID — no seed phrase."}
               </p>
             </div>
             {(error || walletError) && (
@@ -384,23 +390,29 @@ export default function OnboardPage() {
               </button>
             ) : (
               <>
-                <button
-                  type="button"
-                  onClick={() => void createWallet()}
-                  disabled={busy}
-                  className="w-full min-h-[52px] rounded-2xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
-                >
-                  {busy && <Spinner size={20} state="composing" />}
-                  {busy ? "Waiting for passkey…" : "Create with passkey"}
-                </button>
+                <PasskeyAutofill onSignedIn={() => { markOnboardDone(); setStep(3); }} />
                 <button
                   type="button"
                   onClick={() => void unlockExisting()}
                   disabled={busy}
-                  className="w-full min-h-[48px] rounded-2xl border border-black/10 dark:border-white/10 text-sm font-medium text-gray-700 dark:text-white/70 disabled:opacity-50"
+                  className="w-full min-h-[52px] rounded-2xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
                 >
-                  I already have a passkey
+                  {busy && <Spinner size={20} state="composing" />}
+                  {busy ? "Waiting for passkey…" : signInLabel(wallets)}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => void createWallet()}
+                  disabled={busy || previewHost}
+                  className="w-full min-h-[52px] rounded-2xl border border-violet-500/40 text-violet-700 dark:text-violet-300 font-semibold disabled:opacity-50"
+                >
+                  Create a new wallet
+                </button>
+                {previewHost && (
+                  <p className="text-xs text-amber-600 dark:text-amber-300">
+                    {PREVIEW_HOST_CREATE_MESSAGE}
+                  </p>
+                )}
                 {busy && (
                   <button
                     type="button"
