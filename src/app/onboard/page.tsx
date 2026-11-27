@@ -19,7 +19,7 @@ import { Navbar } from "@/components/navbar";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
 import { friendlyError } from "@/lib/friendly-errors";
-import { PasskeyAutofill, signInLabel } from "@/components/passkey-autofill";
+import { PasskeyAutofill, OrderedAuthActions, signInLabel } from "@/components/passkey-autofill";
 import { isPreviewPasskeyHost, PREVIEW_HOST_CREATE_MESSAGE } from "@/lib/passkey-wallet";
 
 type Goal = "gift" | "swap" | "stake" | "explore";
@@ -369,7 +369,9 @@ export default function OnboardPage() {
                   ? "You're connected. Next we’ll open your first step."
                   : busy
                     ? "Look for a fingerprint / face / screen-lock prompt. If nothing appears, cancel and try again."
-                    : "Have a sol.new passkey? Sign in. New here? Create a new wallet with Face ID — no seed phrase."}
+                    : wallets.length
+                      ? "Sign in with your sol.new passkey, or create another wallet."
+                      : "New here? Create a new wallet with Face ID — no seed phrase. Already have a passkey on this phone? Sign in below."}
               </p>
             </div>
             {(error || walletError) && (
@@ -391,23 +393,34 @@ export default function OnboardPage() {
             ) : (
               <>
                 <PasskeyAutofill onSignedIn={() => { markOnboardDone(); setStep(3); }} />
-                <button
-                  type="button"
-                  onClick={() => void unlockExisting()}
-                  disabled={busy}
-                  className="w-full min-h-[52px] rounded-2xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
-                >
-                  {busy && <Spinner size={20} state="composing" />}
-                  {busy ? "Waiting for passkey…" : signInLabel(wallets)}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void createWallet()}
-                  disabled={busy || previewHost}
-                  className="w-full min-h-[52px] rounded-2xl border border-violet-500/40 text-violet-700 dark:text-violet-300 font-semibold disabled:opacity-50"
-                >
-                  Create a new wallet
-                </button>
+                <OrderedAuthActions
+                  hasLocal={wallets.length > 0}
+                  signIn={
+                    <button
+                      type="button"
+                      onClick={() => void unlockExisting()}
+                      disabled={busy}
+                      className={wallets.length > 0
+                        ? "w-full min-h-[52px] rounded-2xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
+                        : "w-full min-h-[52px] rounded-2xl border border-violet-500/40 text-violet-700 dark:text-violet-300 font-semibold disabled:opacity-50"}
+                    >
+                      {busy && <Spinner size={20} state="composing" />}
+                      {busy ? "Waiting for passkey…" : signInLabel(wallets)}
+                    </button>
+                  }
+                  create={
+                    <button
+                      type="button"
+                      onClick={() => void createWallet()}
+                      disabled={busy || previewHost}
+                      className={wallets.length > 0
+                        ? "w-full min-h-[52px] rounded-2xl border border-violet-500/40 text-violet-700 dark:text-violet-300 font-semibold disabled:opacity-50"
+                        : "w-full min-h-[52px] rounded-2xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"}
+                    >
+                      Create a new wallet
+                    </button>
+                  }
+                />
                 {previewHost && (
                   <p className="text-xs text-amber-600 dark:text-amber-300">
                     {PREVIEW_HOST_CREATE_MESSAGE}

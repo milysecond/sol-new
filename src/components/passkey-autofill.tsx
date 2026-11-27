@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useWallet, type WalletEntry } from "@/lib/wallet-context";
 import {
   cancelConditionalPasskey,
@@ -70,5 +70,28 @@ export function PasskeyAutofill({
         className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-violet-400/50"
       />
     </label>
+  );
+}
+
+/** Sign in first when this device already has a wallet; otherwise Create first. */
+export function OrderedAuthActions({
+  hasLocal,
+  signIn,
+  create,
+}: {
+  hasLocal: boolean;
+  signIn: ReactNode;
+  create: ReactNode;
+}) {
+  return hasLocal ? (
+    <>
+      {signIn}
+      {create}
+    </>
+  ) : (
+    <>
+      {create}
+      {signIn}
+    </>
   );
 }
