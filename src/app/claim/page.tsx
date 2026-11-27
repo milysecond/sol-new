@@ -13,6 +13,8 @@ import {
   CLAIM_FEE_LAMPORTS,
   keypairFromSecret,
   parseGiftSecretFromLocation,
+  scrubGiftSecretFromUrl,
+  CLAIM_SECRET_SESSION_KEY,
   inspectGift,
   sweepGift,
 } from "@/lib/gift-link";
@@ -199,11 +201,25 @@ export default function ClaimPage() {
       setNetwork(net);
       setMessage(params.get("m"));
 
-      const secret = parseGiftSecretFromLocation({
+      let secret = parseGiftSecretFromLocation({
         search: window.location.search,
         hash: window.location.hash,
         pathname: window.location.pathname,
       });
+      // Audit H4: keep the secret out of the URL bar / history / sync. Hold it
+      // in this tab's sessionStorage so a reload mid-claim still works.
+      try {
+        sessionStorage.removeItem("solnew.deeplink.entry");
+        sessionStorage.removeItem("solnew.deeplink.entry.t");
+        if (secret) {
+          sessionStorage.setItem(CLAIM_SECRET_SESSION_KEY, secret);
+        } else {
+          secret = sessionStorage.getItem(CLAIM_SECRET_SESSION_KEY);
+        }
+      } catch {
+        /* private mode */
+      }
+      scrubGiftSecretFromUrl();
       const gift = secret ? keypairFromSecret(secret) : null;
       if (!gift) {
         if (!cancelled) setState({ kind: "invalid" });
@@ -225,6 +241,11 @@ export default function ClaimPage() {
             const j = (await r.json()) as { found?: boolean; status?: string };
             wasClaimed =
               !!j.found && (j.status === "claimed" || j.status === "reclaimed");
+          } catch {
+            /* ignore */
+          }
+          try {
+            sessionStorage.removeItem(CLAIM_SECRET_SESSION_KEY);
           } catch {
             /* ignore */
           }
@@ -339,6 +360,11 @@ export default function ClaimPage() {
         tokens: state.tokens,
         signature,
       });
+      try {
+        sessionStorage.removeItem(CLAIM_SECRET_SESSION_KEY);
+      } catch {
+        /* ignore */
+      }
       fireConfetti();
       await refreshBalance();
       const { toast } = await import("@/lib/toast");

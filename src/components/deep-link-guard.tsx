@@ -9,7 +9,7 @@ const GUARD_MS = 12_000;
 /**
  * First-load deep-link guard (web + TWA).
  *
- * Android App Links never deliver URL fragments. Gift secrets use ?g=.
+ * Gift secrets live in the URL fragment (audit H4); legacy links used ?g=.
  * Also restores path if onboard/wallet shell steals the first paint.
  */
 const DEEP_PREFIXES = [

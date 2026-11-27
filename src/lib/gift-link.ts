@@ -63,26 +63,31 @@ export function buildGiftUrl(
   origin = "https://sol.new"
 ): string {
   const params = new URLSearchParams();
-  // App Links / TWA / many WebViews STRIP the hash — secret must live in the query too.
-  params.set("g", secret);
   if (network === "devnet") params.set("n", "d");
   if (message?.trim()) params.set("m", message.trim().slice(0, 80));
   const qs = params.toString();
   const base = origin.replace(/\/$/, "");
-  // Keep # for browser-only privacy when hash is preserved; query is the durable path.
-  return `${base}/claim?${qs}#${secret}`;
+  // Security audit H4: the claim secret lives ONLY in the fragment, which is
+  // never sent to the server, Cloudflare logs, analytics or link-preview bots.
+  return `${base}/claim${qs ? `?${qs}` : ""}#${secret}`;
 }
+
+/** sessionStorage key holding an in-progress claim secret (per tab only). */
+export const CLAIM_SECRET_SESSION_KEY = "solnew.claim.secret";
 
 /**
  * Resolve gift secret from location.
- * Order: query `g`/`s` → path `/claim/<secret>` → hash (legacy).
- * Hash alone fails on Seeker / Android App Links.
+ * Order: hash (current links) → legacy query `g`/`s` → legacy path `/claim/<secret>`.
+ * Legacy forms are still accepted so old links keep working, but callers must
+ * strip them from the URL right away (see scrubGiftSecretFromUrl).
  */
 export function parseGiftSecretFromLocation(loc: {
   search?: string;
   hash?: string;
   pathname?: string;
 }): string | null {
+  const fromHash = parseGiftSecret(loc.hash || "");
+  if (fromHash && fromHash.length > 20) return fromHash;
   try {
     const sp = new URLSearchParams(loc.search || "");
     const q = (sp.get("g") || sp.get("s") || "").trim();
@@ -91,10 +96,33 @@ export function parseGiftSecretFromLocation(loc: {
     const path = (loc.pathname || "").replace(/\/+$/, "");
     const m = path.match(/^\/claim\/([A-Za-z0-9_-]{20,})$/);
     if (m?.[1]) return m[1];
-
-    return parseGiftSecret(loc.hash || "");
   } catch {
-    return parseGiftSecret(loc.hash || "");
+    /* ignore */
+  }
+  return fromHash;
+}
+
+/**
+ * Remove the gift secret from the address bar and history (audit H4).
+ * Keeps only the non-secret `n` (network) and `m` (message) params.
+ */
+export function scrubGiftSecretFromUrl(): void {
+  try {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const keep = new URLSearchParams();
+    const n = sp.get("n");
+    const m = sp.get("m");
+    if (n) keep.set("n", n);
+    if (m) keep.set("m", m);
+    const qs = keep.toString();
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `/claim${qs ? `?${qs}` : ""}`,
+    );
+  } catch {
+    /* ignore */
   }
 }
 

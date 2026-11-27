@@ -18,7 +18,12 @@
   },
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 1
+    "head_sampling_rate": 1,
+    // Audit H4: invocation logs record every request URL (legacy gift links
+    // carried the claim secret in ?g=). Keep console logs, drop URL logging.
+    "logs": {
+      "invocation_logs": false
+    }
   },
   "vars": {
     "NEXT_PUBLIC_RPC_URL": "https://rpc.aex402.com",
