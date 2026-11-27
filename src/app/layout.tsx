@@ -13,6 +13,9 @@ import { SiteFooter } from "@/components/site-footer";
 import { WalletBrowserTitle } from "@/components/wallet-browser-title";
 import { RouteTransition } from "@/components/route-transition";
 import { DeepLinkGuard } from "@/components/deep-link-guard";
+import { LegacyWalletNotice } from "@/components/legacy-wallet-notice";
+import { WalletPageGaGuard } from "@/components/wallet-page-ga-guard";
+import { DEEPLINK_SCRIPT, gaScript, SW_SCRIPT, THEME_SCRIPT } from "@/lib/csp";
 import { SolanaConnectorProvider } from "@/components/solana-connector-provider";
 import { ExternalWalletBridge } from "@/components/external-wallet-bridge";
 
@@ -84,11 +87,11 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var p=location.pathname+location.search+location.hash;if(p&&p!=="/"&&p.indexOf("/onboard")!==0){sessionStorage.setItem("solnew.deeplink.entry",p);sessionStorage.setItem("solnew.deeplink.entry.t",String(Date.now()))}}catch(e){}})();`,
+            __html: DEEPLINK_SCRIPT,
           }}
         />
         {/* viewport also exported above; keep cover for PWA / notched devices */}
-        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.classList.add('dark')}catch(e){}})()` }} />
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
 
         <script
           type="application/ld+json"
@@ -129,12 +132,8 @@ export default function RootLayout({
           }}
         />
 
-        {process.env.NEXT_PUBLIC_GA_ID && (
-          <>
-            <script async src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`} />
-            <script dangerouslySetInnerHTML={{ __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','${process.env.NEXT_PUBLIC_GA_ID}')` }} />
-          </>
-        )}
+        {/* GA loads only off wallet pages (audit H3); see src/lib/csp.ts */}
+        {gaScript() && <script dangerouslySetInnerHTML={{ __html: gaScript() }} />}
       </head>
       <body className={`${bricolage.variable} ${bricolage.className} antialiased`}>
         <ThemeProvider>
@@ -145,6 +144,7 @@ export default function RootLayout({
               <WalletBrowserTitle />
               <PodPlayerProvider>
                 <div className="min-h-screen flex flex-col overflow-x-hidden">
+                  <LegacyWalletNotice />
                   <div className="flex-1 flex flex-col min-h-0">
                     <RouteTransition>{children}</RouteTransition>
                   </div>
@@ -160,9 +160,10 @@ export default function RootLayout({
         <InstallPrompt />
         <PushPrompt />
         <DeepLinkGuard />
+        <WalletPageGaGuard />
         <script
           dangerouslySetInnerHTML={{
-            __html: `if("serviceWorker"in navigator)window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js").then(r=>r.update()).catch(()=>{})})`,
+            __html: SW_SCRIPT,
           }}
         />
       </body>
