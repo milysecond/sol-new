@@ -5,7 +5,7 @@ import { useWallet } from "@/lib/wallet-context";
 import { Spinner } from "@/components/spinner";
 import { PageTransition } from "@/components/page-transition";
 import { KeyRound, Wallet } from "lucide-react";
-import { PasskeyAutofill, signInLabel } from "@/components/passkey-autofill";
+import { PasskeyAutofill, OrderedAuthActions, signInLabel } from "@/components/passkey-autofill";
 
 function isTelegramWebView() {
   if (typeof window === "undefined") return false;
@@ -83,7 +83,7 @@ export function ConnectGate({
                 <p className="text-gray-500 dark:text-white/40 text-sm">
                   {hasSaved
                     ? "Use your existing sol.new passkey wallet — same one as everywhere else."
-                    : "Sign in with your sol.new passkey, or create a new wallet with Face ID or fingerprint."}
+                    : "New here? Create a new wallet with Face ID or fingerprint. Already have a sol.new passkey? Sign in below."}
                 </p>
 
                 {error && (
@@ -125,25 +125,44 @@ export function ConnectGate({
 
                 <PasskeyAutofill />
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    void (wallets.length === 1
-                      ? recover({ forAddress: wallets[0]!.pubkey })
-                      : recover({ forcePicker: true }))
+                <OrderedAuthActions
+                  hasLocal={hasSaved}
+                  signIn={
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void (wallets.length === 1
+                          ? recover({ forAddress: wallets[0]!.pubkey })
+                          : recover({ forcePicker: true }))
+                      }
+                      disabled={loading}
+                      className={hasSaved
+                        ? "w-full bg-purple-500 hover:bg-purple-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
+                        : "w-full font-semibold rounded-xl px-4 py-3.5 transition text-sm cursor-pointer disabled:opacity-40 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/70"}
+                    >
+                      {loading ? (
+                        <>
+                          <Spinner size={16} className="inline mr-2" />
+                          Authenticating…
+                        </>
+                      ) : (
+                        signInLabel(wallets)
+                      )}
+                    </button>
                   }
-                  disabled={loading}
-                  className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <>
-                      <Spinner size={16} className="inline mr-2" />
-                      Authenticating…
-                    </>
-                  ) : (
-                    signInLabel(wallets)
-                  )}
-                </button>
+                  create={
+                    <button
+                      type="button"
+                      onClick={() => void connect({ createNew: true })}
+                      disabled={loading}
+                      className={hasSaved
+                        ? "w-full font-semibold rounded-xl px-4 py-3.5 transition text-sm cursor-pointer disabled:opacity-40 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/70"
+                        : "w-full bg-purple-500 hover:bg-purple-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"}
+                    >
+                      {loading ? "…" : "Create a new wallet"}
+                    </button>
+                  }
+                />
 
                 {loading && (
                   <button
@@ -161,20 +180,6 @@ export function ConnectGate({
                 >
                   Many passkeys? Find correct wallet →
                 </a>
-
-                <button
-                  type="button"
-                  onClick={() => void connect({ createNew: true })}
-                  disabled={loading}
-                  className="w-full font-semibold rounded-xl px-4 py-3.5 transition text-sm cursor-pointer disabled:opacity-40 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/70"
-                >
-                  {loading ? "…" : "Create a new wallet"}
-                </button>
-                {!hasSaved && (
-                  <p className="text-[11px] text-gray-500 dark:text-white/40 -mt-1">
-                    New here? Create a new wallet — Face ID / fingerprint, no seed phrase.
-                  </p>
-                )}
 
                 <div className="relative py-1">
                   <div className="absolute inset-0 flex items-center">
