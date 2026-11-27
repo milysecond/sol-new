@@ -3,22 +3,11 @@ import {
   feePayerConfigured,
   feePayerPubkey,
   sponsorAndSend,
+  SponsorRejected,
 } from "@/lib/fee-payer";
+import { clientIpFrom } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
-
-const recentIPs = new Map<string, number[]>();
-const RATE = 40;
-const WINDOW = 60_000;
-
-function limited(ip: string) {
-  const now = Date.now();
-  const ts = (recentIPs.get(ip) || []).filter((t) => now - t < WINDOW);
-  if (ts.length >= RATE) return true;
-  ts.push(now);
-  recentIPs.set(ip, ts);
-  return false;
-}
 
 /** GET — is sponsorship on + fee payer pubkey */
 export async function GET() {
@@ -40,6 +29,8 @@ export async function GET() {
 /**
  * POST { transaction: base64, network?: "mainnet"|"devnet" }
  * Co-sign + send a tx that already has feePayer = sol.new and other signers.
+ * Only allowlisted shapes (gift sweep / token-account close) are signed, with
+ * durable per-IP / per-wallet / global limits — see sponsorAndSend (audit C2).
  */
 export async function POST(req: NextRequest) {
   if (!feePayerConfigured()) {
@@ -48,12 +39,6 @@ export async function POST(req: NextRequest) {
       { status: 503 }
     );
   }
-  const ip =
-    req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "x";
-  if (limited(ip)) {
-    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
-  }
-
   try {
     const body = (await req.json()) as {
       transaction?: string;
@@ -69,12 +54,14 @@ export async function POST(req: NextRequest) {
     const result = await sponsorAndSend({
       transactionBase64: body.transaction,
       network: body.network,
+      clientIp: clientIpFrom(req.headers),
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
+    const status = e instanceof SponsorRejected ? e.status : 400;
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : String(e) },
-      { status: 400 }
+      { status }
     );
   }
 }
