@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST — mark email↔wallet verified after client proves passkey ownership.
- * Body: { token, wallet, credentialId? }
+ * Body: { token, wallet }  (any credentialId sent by old clients is ignored — audit C1)
  * wallet must match the token and the passkey-derived address on the client.
  */
 export async function POST(request: NextRequest) {
@@ -26,7 +26,6 @@ export async function POST(request: NextRequest) {
   let body: {
     token?: string;
     wallet?: string;
-    credentialId?: string;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -60,17 +59,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid email in token" }, { status: 400 });
   }
 
-  const credentialId =
-    (typeof body.credentialId === "string" && body.credentialId) ||
-    claims.credentialId ||
-    undefined;
-
   await initDb();
-  await saveWallet(body.wallet, credentialId);
+  await saveWallet(body.wallet);
   await upsertWalletEmail({
     email,
     wallet: body.wallet,
-    credentialId,
     verified: true,
   });
 

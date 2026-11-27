@@ -24,14 +24,15 @@ export async function POST(req: NextRequest) {
 
   try {
     await initDb();
-    const { publicKey, credentialId } = (await req.json()) as {
+    // Only the public key is read. Older clients may still send credentialId;
+    // it is ignored and never stored or logged (security audit C1).
+    const { publicKey } = (await req.json()) as {
       publicKey?: string;
-      credentialId?: string;
     };
     if (!publicKey || typeof publicKey !== "string" || publicKey.length > 64) {
       return NextResponse.json({ error: "Invalid publicKey" }, { status: 400 });
     }
-    const { created } = await saveWallet(publicKey, credentialId);
+    const { created } = await saveWallet(publicKey);
 
     // Log every register attempt with geo (new + reconnect)
     const ua = req.headers.get("user-agent") || "";
@@ -43,7 +44,6 @@ export async function POST(req: NextRequest) {
           title: created ? "New wallet created" : "Wallet connected",
           fields: {
             wallet: publicKey,
-            credentialId,
             ua: ua.slice(0, 120),
           },
         },

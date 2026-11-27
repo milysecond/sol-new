@@ -263,10 +263,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           fetch("/api/wallet", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              publicKey: result.publicKey,
-              credentialId: result.credentialId,
-            }),
+            // Public key only — never send the credential ID (audit C1).
+            body: JSON.stringify({ publicKey: result.publicKey }),
           }).catch(() => {});
           analytics.walletRecovered();
           return result.publicKey;
@@ -299,10 +297,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       fetch("/api/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          publicKey: result.publicKey,
-          credentialId: result.credentialId,
-        }),
+        // Public key only — never send the credential ID (audit C1).
+        body: JSON.stringify({ publicKey: result.publicKey }),
       }).catch(() => {});
       analytics.walletCreated(result.publicKey);
       return result.publicKey;
@@ -344,10 +340,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       fetch("/api/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          publicKey: result.publicKey,
-          credentialId: result.credentialId,
-        }),
+        // Public key only — never send the credential ID (audit C1).
+        body: JSON.stringify({ publicKey: result.publicKey }),
       }).catch(() => {});
       analytics.walletRecovered();
       return result.publicKey;
@@ -465,10 +459,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       fetch("/api/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          publicKey: result.publicKey,
-          credentialId: result.credentialId,
-        }),
+        // Public key only — never send the credential ID (audit C1).
+        body: JSON.stringify({ publicKey: result.publicKey }),
       }).catch(() => {});
 
       toast.success(`Switched to ${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`);

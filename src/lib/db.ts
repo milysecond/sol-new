@@ -539,31 +539,28 @@ export async function getWalletMultisigs(wallet: string) {
   return db.execute({ sql: "SELECT * FROM multisigs WHERE wallet = ? ORDER BY created_at DESC", args: [wallet] });
 }
 
-export async function saveWallet(publicKey: string, credentialId?: string): Promise<{ created: boolean }> {
+/**
+ * Register a passkey wallet by its public key only.
+ * Credential IDs are never stored: for wallets created without the WebAuthn PRF
+ * extension, SHA-256(credential ID) IS the wallet seed (security audit C1).
+ */
+export async function saveWallet(publicKey: string): Promise<{ created: boolean }> {
   const r = await db.execute({
-    sql: "INSERT OR IGNORE INTO wallets (public_key, credential_id) VALUES (?, ?)",
-    args: [publicKey, credentialId || null],
+    sql: "INSERT OR IGNORE INTO wallets (public_key) VALUES (?)",
+    args: [publicKey],
   });
-  if (credentialId) {
-    // Backfill credential if we already knew this wallet
-    await db.execute({
-      sql: "UPDATE wallets SET credential_id = COALESCE(credential_id, ?) WHERE public_key = ?",
-      args: [credentialId, publicKey],
-    });
-  }
   return { created: r.rowsAffected > 0 };
 }
 
 export async function getWalletByPublicKey(publicKey: string) {
   const r = await db.execute({
-    sql: "SELECT public_key, credential_id, created_at FROM wallets WHERE public_key = ? LIMIT 1",
+    sql: "SELECT public_key, created_at FROM wallets WHERE public_key = ? LIMIT 1",
     args: [publicKey],
   });
   const row = r.rows[0];
   if (!row) return null;
   return {
     publicKey: row.public_key as string,
-    credentialId: (row.credential_id as string) || null,
     createdAt: (row.created_at as string) || null,
   };
 }
@@ -572,23 +569,22 @@ export async function getWalletByPublicKey(publicKey: string) {
 export async function upsertWalletEmail(opts: {
   email: string;
   wallet: string;
-  credentialId?: string | null;
   verified?: boolean;
 }) {
   const email = opts.email.trim().toLowerCase();
   const verified = opts.verified ? 1 : 0;
   await db.execute({
+    // credential_id is intentionally never written (and cleared on update) — audit C1.
     sql: `INSERT INTO wallet_emails (email, wallet, credential_id, verified, verified_at)
-          VALUES (?, ?, ?, ?, CASE WHEN ? = 1 THEN datetime('now') ELSE NULL END)
+          VALUES (?, ?, NULL, ?, CASE WHEN ? = 1 THEN datetime('now') ELSE NULL END)
           ON CONFLICT(email) DO UPDATE SET
             wallet = excluded.wallet,
-            credential_id = COALESCE(excluded.credential_id, wallet_emails.credential_id),
+            credential_id = NULL,
             verified = CASE WHEN excluded.verified = 1 THEN 1 ELSE wallet_emails.verified END,
             verified_at = CASE WHEN excluded.verified = 1 THEN datetime('now') ELSE wallet_emails.verified_at END`,
     args: [
       email,
       opts.wallet,
-      opts.credentialId || null,
       verified,
       verified,
     ],
@@ -597,7 +593,7 @@ export async function upsertWalletEmail(opts: {
 
 export async function getWalletEmail(email: string) {
   const r = await db.execute({
-    sql: "SELECT email, wallet, credential_id, verified, verified_at FROM wallet_emails WHERE email = ? LIMIT 1",
+    sql: "SELECT email, wallet, verified, verified_at FROM wallet_emails WHERE email = ? LIMIT 1",
     args: [email.trim().toLowerCase()],
   });
   const row = r.rows[0];
@@ -605,7 +601,6 @@ export async function getWalletEmail(email: string) {
   return {
     email: row.email as string,
     wallet: row.wallet as string,
-    credentialId: (row.credential_id as string) || null,
     verified: Boolean(row.verified),
     verifiedAt: (row.verified_at as string) || null,
   };
@@ -613,13 +608,12 @@ export async function getWalletEmail(email: string) {
 
 export async function getEmailsForWallet(wallet: string) {
   const r = await db.execute({
-    sql: "SELECT email, wallet, credential_id, verified FROM wallet_emails WHERE wallet = ?",
+    sql: "SELECT email, wallet, verified FROM wallet_emails WHERE wallet = ?",
     args: [wallet],
   });
   return r.rows.map((row) => ({
     email: row.email as string,
     wallet: row.wallet as string,
-    credentialId: (row.credential_id as string) || null,
     verified: Boolean(row.verified),
   }));
 }

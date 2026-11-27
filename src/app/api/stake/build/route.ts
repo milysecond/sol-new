@@ -5,6 +5,7 @@ import {
   stakeSponsorConfigured,
 } from "@/lib/stake-build";
 import { STAKE_VALIDATORS, MIN_STAKE_SOL } from "@/lib/stake-validators";
+import { clientIpFrom } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -49,11 +50,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (stakeSponsorConfigured()) {
+      // Sponsors only allowlisted shapes within durable rate limits; otherwise
+      // returns a self-paid tx (sponsored: false) — see stake-build.ts.
       const built = await buildSponsoredStakeTx({
         wallet,
         seed,
         amountSol,
         vote,
+        clientIp: clientIpFrom(req.headers),
       });
       return NextResponse.json({ ok: true, ...built });
     }

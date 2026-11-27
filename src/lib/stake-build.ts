@@ -12,13 +12,29 @@ import {
   LAMPORTS_PER_SOL,
   Transaction,
 } from "@solana/web3.js";
-import { loadFeePayerKeypair, feePayerConfigured } from "@/lib/fee-payer";
+import {
+  loadFeePayerKeypair,
+  feePayerConfigured,
+  enforceSponsorLimits,
+  simulateFeePayerLoss,
+  SponsorRejected,
+} from "@/lib/fee-payer";
+import {
+  STAKE_ALLOWED_PROGRAMS,
+  checkClientInstructions,
+  feePayerOnlyPaysFees,
+} from "@/lib/sponsor-policy";
 import { mainnetRpcUrl } from "@/lib/rpc-server";
 import {
   STAKE_FEE_BUFFER_LAMPORTS,
   MIN_STAKE_SOL,
   MIN_STAKE_LAMPORTS,
+  STAKE_VALIDATORS,
 } from "@/lib/stake-validators";
+
+/** Fees the fee payer may lose per sponsored stake tx (2 signatures + margin). */
+const MAX_STAKE_SPEND_LAMPORTS = 20_000;
+const SPONSORED_VOTES = new Set(STAKE_VALIDATORS.map((v) => v.vote));
 
 export { feePayerConfigured as stakeSponsorConfigured };
 
@@ -28,6 +44,8 @@ export async function buildSponsoredStakeTx(opts: {
   seed: string;
   amountSol: number;
   vote: string;
+  /** cf-connecting-ip, for durable sponsor rate limits */
+  clientIp: string;
 }): Promise<{
   tx: string;
   stakePubkey: string;
@@ -113,13 +131,38 @@ export async function buildSponsoredStakeTx(opts: {
     }
   }
 
+  // Security (audit C2 follow-up): only sponsor the exact create+delegate shape,
+  // to an allowlisted validator, where the fee payer is never an instruction
+  // account (e.g. wallet = fee payer would have staked the fee payer's own SOL).
+  // Any check failing → fall through to the self-paid tx (user pays the fee).
+  let sponsoredTx: VersionedTransaction | null = null;
   if (useSponsor && feePayerKp) {
-    const msg = new TransactionMessage({
-      payerKey: feePayerKp.publicKey,
-      recentBlockhash: blockhash,
-      instructions: ixs,
-    }).compileToV0Message();
-    const vtx = new VersionedTransaction(msg);
+    try {
+      if (!SPONSORED_VOTES.has(votePubkey.toBase58())) {
+        throw new SponsorRejected("Validator not eligible for sponsorship");
+      }
+      const check = checkClientInstructions(ixs, feePayerKp.publicKey, STAKE_ALLOWED_PROGRAMS, 4);
+      if (!check.ok) throw new SponsorRejected(check.reason);
+      const msg = new TransactionMessage({
+        payerKey: feePayerKp.publicKey,
+        recentBlockhash: blockhash,
+        instructions: ixs,
+      }).compileToV0Message();
+      const vtx = new VersionedTransaction(msg);
+      const final = feePayerOnlyPaysFees(vtx, feePayerKp.publicKey);
+      if (!final.ok) throw new SponsorRejected(final.reason);
+      await enforceSponsorLimits({ scope: "stake", clientIp: opts.clientIp, wallets: [from.toBase58()] });
+      const loss = await simulateFeePayerLoss(conn, vtx, feePayerKp.publicKey);
+      if (loss > MAX_STAKE_SPEND_LAMPORTS) throw new SponsorRejected("Stake would cost the fee payer too much");
+      sponsoredTx = vtx;
+    } catch (e) {
+      console.warn("[stake] not sponsoring:", e instanceof Error ? e.message : e);
+      sponsoredTx = null;
+    }
+  }
+
+  if (sponsoredTx && feePayerKp) {
+    const vtx = sponsoredTx;
     vtx.sign([feePayerKp]);
     return {
       tx: Buffer.from(vtx.serialize()).toString("base64"),

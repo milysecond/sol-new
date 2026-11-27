@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  getWalletByPublicKey,
   getWalletEmail,
   initDb,
   upsertWalletEmail,
@@ -66,15 +65,16 @@ export async function GET(request: NextRequest) {
     ok: true,
     email: claims.email,
     wallet: claims.wallet,
-    credentialId: claims.credentialId || null,
     purpose: claims.purpose,
   });
 }
 
 /**
  * POST — send a magic link email tied to a passkey wallet.
- * Body: { email, wallet?, credentialId?, purpose?: 'link'|'open' }
+ * Body: { email, wallet?, purpose?: 'link'|'open' }
  * If wallet omitted, looks up a previously linked wallet for that email.
+ * Credential IDs are never accepted, looked up, or put in the link (audit C1);
+ * /magic finds the passkey by wallet address on the device instead.
  */
 export async function POST(request: NextRequest) {
   if (!resendConfigured() || !magicLinkConfigured()) {
@@ -95,7 +95,6 @@ export async function POST(request: NextRequest) {
   let body: {
     email?: string;
     wallet?: string;
-    credentialId?: string;
     purpose?: MagicLinkPurpose;
     website?: string;
   };
@@ -123,10 +122,6 @@ export async function POST(request: NextRequest) {
     typeof body.wallet === "string" && isValidWalletPubkey(body.wallet)
       ? body.wallet
       : null;
-  let credentialId =
-    typeof body.credentialId === "string" && body.credentialId.length < 512
-      ? body.credentialId
-      : undefined;
 
   const purpose: MagicLinkPurpose =
     body.purpose === "open" ? "open" : wallet ? "link" : "open";
@@ -143,19 +138,12 @@ export async function POST(request: NextRequest) {
       );
     }
     wallet = linked.wallet;
-    credentialId = linked.credentialId || credentialId;
-  }
-
-  if (!credentialId) {
-    const row = await getWalletByPublicKey(wallet);
-    if (row?.credentialId) credentialId = row.credentialId;
   }
 
   // Pending association until passkey proof on /magic
   await upsertWalletEmail({
     email,
     wallet,
-    credentialId,
     verified: false,
   });
 
@@ -163,7 +151,6 @@ export async function POST(request: NextRequest) {
     await sendMagicLinkEmail({
       email,
       wallet,
-      credentialId,
       purpose,
     });
   } catch (e) {

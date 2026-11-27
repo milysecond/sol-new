@@ -15,7 +15,9 @@ import {
   feePayerPubkey,
   loadFeePayerKeypair,
   sponsorAndSend,
+  SponsorRejected,
 } from "@/lib/fee-payer";
+import { clientIpFrom } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -119,11 +121,24 @@ export async function POST(req: NextRequest) {
           );
         }
       }
-      const result = await sponsorAndSend({
-        transactionBase64: body.transaction,
-        network: body.network === "devnet" ? "devnet" : "mainnet",
-        maxFeeLamports: 5_000_000, // 0.005 SOL fees max for batch
-      });
+      // sponsorAndSend enforces the full sponsor allowlist + durable rate limits.
+      let result: Awaited<ReturnType<typeof sponsorAndSend>>;
+      try {
+        result = await sponsorAndSend({
+          transactionBase64: body.transaction,
+          network: body.network === "devnet" ? "devnet" : "mainnet",
+          clientIp: clientIpFrom(req.headers),
+          maxSpendLamports: 100_000, // closes only: signature + priority fees
+        });
+      } catch (e) {
+        if (e instanceof SponsorRejected) {
+          return NextResponse.json(
+            { ok: false, error: e.message },
+            { status: e.status, headers: noStore },
+          );
+        }
+        throw e;
+      }
       return NextResponse.json(
         { ok: true, signature: result.signature, feePayer: result.feePayer, gasless: true },
         { headers: noStore },
