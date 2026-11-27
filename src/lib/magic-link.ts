@@ -9,10 +9,14 @@ import { SITE_URL, sendEmail } from "./resend";
 
 export type MagicLinkPurpose = "link" | "open";
 
+/**
+ * Claims carry only public data. Never put a WebAuthn credential ID here: for
+ * wallets created without PRF, SHA-256(credential ID) is the wallet seed, and a
+ * JWT payload is only base64, not encrypted (security audit C1).
+ */
 export type MagicLinkClaims = {
   email: string;
   wallet: string;
-  credentialId?: string;
   purpose: MagicLinkPurpose;
 };
 
@@ -50,7 +54,6 @@ export async function signMagicLink(
     wallet: claims.wallet,
     purpose: claims.purpose,
   };
-  if (claims.credentialId) body.credentialId = claims.credentialId;
 
   return new SignJWT(body)
     .setProtectedHeader({ alg: "HS256" })
@@ -82,10 +85,6 @@ export async function verifyMagicLink(
       email: email.trim().toLowerCase(),
       wallet,
       purpose,
-      credentialId:
-        typeof payload.credentialId === "string"
-          ? payload.credentialId
-          : undefined,
     };
   } catch {
     return null;
@@ -175,7 +174,6 @@ function magicEmailHtml(opts: {
 export async function sendMagicLinkEmail(opts: {
   email: string;
   wallet: string;
-  credentialId?: string;
   purpose?: MagicLinkPurpose;
 }): Promise<{ url: string }> {
   const purpose = opts.purpose || "link";
@@ -183,7 +181,6 @@ export async function sendMagicLinkEmail(opts: {
     {
       email: opts.email,
       wallet: opts.wallet,
-      credentialId: opts.credentialId,
       purpose,
     },
     60 * 60 * 24 * 7

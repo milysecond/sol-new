@@ -64,7 +64,6 @@ export async function POST(request: NextRequest) {
     source?: string;
     /** Linked passkey wallet (optional) */
     wallet?: string;
-    credentialId?: string;
     /** Honeypot — bots fill this; real users leave empty */
     website?: string;
   };
@@ -97,10 +96,6 @@ export async function POST(request: NextRequest) {
     typeof body.wallet === "string" && isValidWalletPubkey(body.wallet)
       ? body.wallet
       : null;
-  const credentialId =
-    typeof body.credentialId === "string" && body.credentialId.length < 512
-      ? body.credentialId
-      : undefined;
 
   try {
     const result = await subscribeToMailingList({
@@ -123,13 +118,11 @@ export async function POST(request: NextRequest) {
         await upsertWalletEmail({
           email,
           wallet,
-          credentialId,
           verified: false,
         });
         await sendMagicLinkEmail({
           email,
           wallet,
-          credentialId,
           purpose: "link",
         });
         magicLinkSent = true;

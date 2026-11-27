@@ -39,14 +39,6 @@ export function MailingListSignup({
       setError(null);
       setMessage(null);
       try {
-        let credentialId: string | undefined;
-        try {
-          credentialId =
-            localStorage.getItem("sol.new.credentialId") || undefined;
-        } catch {
-          /* ignore */
-        }
-
         const res = await fetch("/api/subscribe", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -55,7 +47,6 @@ export function MailingListSignup({
             source,
             website: website || undefined,
             wallet: publicKey || undefined,
-            credentialId,
           }),
         });
         const data = (await res.json().catch(() => ({}))) as {

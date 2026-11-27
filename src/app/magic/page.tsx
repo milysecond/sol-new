@@ -12,7 +12,6 @@ import { recoverPasskeyWallet } from "@/lib/passkey-wallet";
 type Claims = {
   email: string;
   wallet: string;
-  credentialId: string | null;
   purpose: "link" | "open";
 };
 
@@ -54,7 +53,6 @@ function MagicInner() {
           claims: {
             email: data.email,
             wallet: data.wallet,
-            credentialId: data.credentialId,
             purpose: data.purpose,
           },
         });
@@ -77,17 +75,16 @@ function MagicInner() {
     const { claims } = status;
     setBusy(true);
     try {
-      // Pin allowCredentials so the browser offers the right passkey when known
-      if (claims.credentialId) {
-        localStorage.setItem("sol.new.credentialId", claims.credentialId);
-      }
+      // Links carry no credential ID (audit C1). recoverPasskeyWallet pins the
+      // passkey this device already knows for claims.wallet, otherwise it opens
+      // the system picker and rejects any passkey that derives another address.
       localStorage.setItem("sol.new.wallet", claims.wallet);
 
       if (!window.PublicKeyCredential) {
         throw new Error("Passkeys require HTTPS and a supported browser.");
       }
 
-      const result = await recoverPasskeyWallet();
+      const result = await recoverPasskeyWallet({ forAddress: claims.wallet });
       if (result.publicKey !== claims.wallet) {
         throw new Error(
           `This passkey opens ${short(result.publicKey)}, not ${short(claims.wallet)}. Use the device that created this wallet.`
@@ -122,7 +119,6 @@ function MagicInner() {
         body: JSON.stringify({
           token,
           wallet: result.publicKey,
-          credentialId: result.credentialId,
         }),
       });
 
