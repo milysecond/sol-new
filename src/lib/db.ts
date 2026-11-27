@@ -348,6 +348,12 @@ export async function initDb() {
     /* ignore */
   }
   try {
+    // Passkey derivation mode per wallet (audit H1): "prf-v1" | "rawid-legacy"
+    await db.execute("ALTER TABLE wallets ADD COLUMN derivation TEXT");
+  } catch {
+    /* column already exists */
+  }
+  try {
     await db.execute("ALTER TABLE vrf_draws ADD COLUMN wallet TEXT");
   } catch {
     /* column already exists */
@@ -544,17 +550,30 @@ export async function getWalletMultisigs(wallet: string) {
  * Credential IDs are never stored: for wallets created without the WebAuthn PRF
  * extension, SHA-256(credential ID) IS the wallet seed (security audit C1).
  */
-export async function saveWallet(publicKey: string): Promise<{ created: boolean }> {
+export type WalletDerivation = "prf-v1" | "rawid-legacy";
+
+export async function saveWallet(
+  publicKey: string,
+  derivation?: WalletDerivation | null,
+): Promise<{ created: boolean }> {
   const r = await db.execute({
-    sql: "INSERT OR IGNORE INTO wallets (public_key) VALUES (?)",
-    args: [publicKey],
+    sql: "INSERT OR IGNORE INTO wallets (public_key, derivation) VALUES (?, ?)",
+    args: [publicKey, derivation ?? null],
   });
+  if (r.rowsAffected === 0 && derivation) {
+    // Record the mode once. An address comes from exactly one mode, so a
+    // recorded value is never overwritten by a later (unauthenticated) report.
+    await db.execute({
+      sql: "UPDATE wallets SET derivation = ? WHERE public_key = ? AND derivation IS NULL",
+      args: [derivation, publicKey],
+    });
+  }
   return { created: r.rowsAffected > 0 };
 }
 
 export async function getWalletByPublicKey(publicKey: string) {
   const r = await db.execute({
-    sql: "SELECT public_key, created_at FROM wallets WHERE public_key = ? LIMIT 1",
+    sql: "SELECT public_key, created_at, derivation FROM wallets WHERE public_key = ? LIMIT 1",
     args: [publicKey],
   });
   const row = r.rows[0];
@@ -562,6 +581,7 @@ export async function getWalletByPublicKey(publicKey: string) {
   return {
     publicKey: row.public_key as string,
     createdAt: (row.created_at as string) || null,
+    derivation: ((row.derivation as string) || null) as WalletDerivation | null,
   };
 }
 

@@ -99,20 +99,31 @@ function getAllowCredentials(forAddress?: string | null) {
  * Persist the (address ↔ credential) pairing learned from a successful auth,
  * so the next prompt can pin to the right passkey instead of listing them all.
  */
-function rememberCredential(address: string, rawId: ArrayBuffer) {
+function rememberCredential(
+  address: string,
+  rawId: ArrayBuffer,
+  derivation?: WalletDerivation,
+) {
   try {
     const credentialId = bytesToCredId(rawId);
     const wallets = JSON.parse(localStorage.getItem("sol.new.wallets") || "[]") as {
       pubkey: string;
       credentialId?: string;
       label?: string;
+      derivation?: WalletDerivation;
     }[];
     const idx = wallets.findIndex((w) => w.pubkey === address);
     if (idx >= 0) {
       wallets[idx].credentialId = credentialId;
       wallets[idx].label = address;
+      if (derivation) wallets[idx].derivation = derivation;
     } else {
-      wallets.push({ pubkey: address, credentialId, label: address });
+      wallets.push({
+        pubkey: address,
+        credentialId,
+        label: address,
+        ...(derivation ? { derivation } : {}),
+      });
     }
     localStorage.setItem("sol.new.wallets", JSON.stringify(wallets));
     // Keep active session credential in sync when this is the connected wallet
@@ -179,10 +190,143 @@ async function sha256(data: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(hash);
 }
 
+/**
+ * How a wallet's Ed25519 seed is derived from its passkey (audit H1).
+ * - "prf-v1": SHA-256(PRF(salt "sol.new-wallet-creation")). Required for all new wallets.
+ * - "rawid-legacy": SHA-256(credential rawId). Old fallback; weak (audit C1).
+ *   Still unlockable so users can move funds out, never created anymore.
+ */
+export type WalletDerivation = "prf-v1" | "rawid-legacy";
+
+export const PRF_REQUIRED_MESSAGE =
+  "This browser didn't return your passkey's secure key (PRF), so sol.new can't open the wallet safely here. Use Safari on iPhone/iPad/Mac (iOS 18+) or Chrome on Android/desktop, with your Apple or Google passkey.";
+
+export class PrfRequiredError extends Error {
+  constructor(message = PRF_REQUIRED_MESSAGE) {
+    super(message);
+    this.name = "PrfRequiredError";
+  }
+}
+
+type DerivedWallet = {
+  keypair: Keypair;
+  address: string;
+  derivation: WalletDerivation;
+};
+
+type StoredWalletRecord = {
+  pubkey?: string;
+  credentialId?: string;
+  derivation?: WalletDerivation;
+};
+
+function storedWallets(): StoredWalletRecord[] {
+  try {
+    return JSON.parse(localStorage.getItem("sol.new.wallets") || "[]") as StoredWalletRecord[];
+  } catch {
+    return [];
+  }
+}
+
+/** Recorded derivation mode for a wallet address on this device, if any. */
+export function getWalletDerivation(address?: string | null): WalletDerivation | undefined {
+  if (!address) return undefined;
+  return storedWallets().find((w) => w.pubkey === address)?.derivation;
+}
+
+/** Ask the server which of these addresses are known sol.new wallets. */
+async function knownWallets(addresses: string[]): Promise<Record<string, boolean>> {
+  try {
+    const qs = addresses.map((a) => `pk=${encodeURIComponent(a)}`).join("&");
+    const ac = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const t = setTimeout(() => ac?.abort(), 5000);
+    const r = await fetch(`/api/wallet?${qs}`, {
+      cache: "no-store",
+      ...(ac ? { signal: ac.signal } : {}),
+    });
+    clearTimeout(t);
+    if (!r.ok) return {};
+    const j = (await r.json()) as { found?: Record<string, boolean> };
+    return j.found || {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Pick the seed for an assertion without ever silently switching modes.
+ * - Pinned address: use whichever mode reproduces it (PRF first).
+ * - Recorded mode on this device: use it; a prf-v1 wallet never falls back to rawId.
+ * - Unknown: PRF wallet, unless the rawId address is an already-registered
+ *   sol.new wallet (legacy) and the PRF address is not.
+ * - No PRF and not a known legacy wallet: refuse (PrfRequiredError).
+ */
+async function deriveFromAssertion(
+  credential: PublicKeyCredential,
+  expectedAddress?: string | null,
+): Promise<DerivedWallet & { mismatch?: boolean }> {
+  const prfResult = credential.getClientExtensionResults()?.prf?.results?.first;
+  let prfWallet: DerivedWallet | null = null;
+  if (prfResult) {
+    const kp = Keypair.fromSeed((await sha256(new Uint8Array(prfResult))).slice(0, 32));
+    prfWallet = { keypair: kp, address: kp.publicKey.toBase58(), derivation: "prf-v1" };
+  }
+  const rawKp = Keypair.fromSeed(
+    (await sha256(new Uint8Array(credential.rawId))).slice(0, 32),
+  );
+  const rawWallet: DerivedWallet = {
+    keypair: rawKp,
+    address: rawKp.publicKey.toBase58(),
+    derivation: "rawid-legacy",
+  };
+
+  // Zero the candidate we don't use.
+  const keep = (w: DerivedWallet): DerivedWallet => {
+    if (w !== rawWallet) rawWallet.keypair.secretKey.fill(0);
+    if (prfWallet && w !== prfWallet) prfWallet.keypair.secretKey.fill(0);
+    return w;
+  };
+
+  if (expectedAddress) {
+    if (prfWallet && prfWallet.address === expectedAddress) return keep(prfWallet);
+    if (rawWallet.address === expectedAddress) return keep(rawWallet);
+    if (!prfWallet && getWalletDerivation(expectedAddress) !== "rawid-legacy") {
+      // Expected wallet is (or may be) PRF-derived, but this browser gave no PRF.
+      throw new PrfRequiredError();
+    }
+    return { ...keep(prfWallet || rawWallet), mismatch: true };
+  }
+
+  const credId = bytesToCredId(credential.rawId);
+  const recorded = storedWallets().find(
+    (w) => w.credentialId === credId && w.derivation && w.pubkey,
+  );
+  if (recorded?.derivation === "prf-v1") {
+    if (!prfWallet) throw new PrfRequiredError();
+    return keep(prfWallet);
+  }
+  if (recorded?.derivation === "rawid-legacy" && recorded.pubkey === rawWallet.address) {
+    return keep(rawWallet);
+  }
+  const localPubkeys = new Set(storedWallets().map((w) => w.pubkey));
+  if (prfWallet) {
+    if (localPubkeys.has(prfWallet.address)) return keep(prfWallet);
+    if (localPubkeys.has(rawWallet.address)) return keep(rawWallet);
+    const found = await knownWallets([prfWallet.address, rawWallet.address]);
+    if (!found[prfWallet.address] && found[rawWallet.address]) return keep(rawWallet);
+    return keep(prfWallet);
+  }
+  if (localPubkeys.has(rawWallet.address)) return keep(rawWallet);
+  const found = await knownWallets([rawWallet.address]);
+  if (found[rawWallet.address]) return keep(rawWallet);
+  throw new PrfRequiredError();
+}
+
 export async function createPasskeyWallet(_username?: string): Promise<{
   publicKey: string;
   credentialId: string;
   userId: string;
+  derivation: WalletDerivation;
 }> {
   if (typeof window === "undefined" || !window.PublicKeyCredential) {
     throw new Error("Passkeys are not supported in this browser.");
@@ -282,18 +426,52 @@ export async function createPasskeyWallet(_username?: string): Promise<{
 
   if (!credential) throw new Error("Passkey creation cancelled");
 
-  const prfResult = credential.getClientExtensionResults()?.prf?.results?.first;
+  let prfResult = credential.getClientExtensionResults()?.prf?.results?.first;
 
-  // Prefer PRF when available. Do NOT prompt a second get() here —
-  // a second biometrics dialog hangs many Android PWAs and loses the session.
-  const seed = prfResult
-    ? await sha256(new Uint8Array(prfResult))
-    : await sha256(new Uint8Array(credential.rawId));
+  // PRF is REQUIRED for new wallets (audit H1). Many authenticators only
+  // return PRF output on get(), not create(), so ask once more for this exact
+  // passkey. Never fall back to the credential ID (audit C1).
+  if (!prfResult) {
+    try {
+      ensureDocumentFocusForPasskey();
+      const assertion = (await withWebAuthnTimeout(
+        navigator.credentials.get({
+          publicKey: {
+            challenge: CHALLENGE,
+            rpId: getRpId(),
+            userVerification: "required",
+            timeout: 90_000,
+            allowCredentials: [
+              {
+                id: new Uint8Array(credential.rawId),
+                type: "public-key" as const,
+                transports: ["internal", "hybrid"] as AuthenticatorTransport[],
+              },
+            ],
+            extensions: { prf: { eval: { first: CHALLENGE } } },
+          },
+        }) as Promise<PublicKeyCredential | null>,
+        95_000,
+        "Passkey unlock",
+      )) as PublicKeyCredential | null;
+      prfResult = assertion?.getClientExtensionResults()?.prf?.results?.first;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `Passkey made, but one more Face ID step is needed to finish. Tap "Unlock wallet" to continue. (${msg})`,
+      );
+    }
+  }
+  if (!prfResult) {
+    throw new PrfRequiredError();
+  }
 
+  const seed = await sha256(new Uint8Array(prfResult));
   const keypair = Keypair.fromSeed(seed.slice(0, 32));
+  seed.fill(0);
   const publicKey = keypair.publicKey.toBase58();
   const credentialId = bytesToCredId(credential.rawId);
-  rememberCredential(publicKey, credential.rawId);
+  rememberCredential(publicKey, credential.rawId, "prf-v1");
 
   try {
     localStorage.setItem("sol.new.wallet", publicKey);
@@ -314,6 +492,7 @@ export async function createPasskeyWallet(_username?: string): Promise<{
     publicKey,
     credentialId,
     userId,
+    derivation: "prf-v1",
   };
 }
 
@@ -359,6 +538,7 @@ export async function recoverPasskeyWallet(opts?: {
 }): Promise<{
   publicKey: string;
   credentialId: string;
+  derivation: WalletDerivation;
 }> {
   if (typeof window === "undefined" || !window.PublicKeyCredential) {
     throw new Error("Passkeys are not supported in this browser.");
@@ -416,24 +596,20 @@ export async function recoverPasskeyWallet(opts?: {
   if (!credential) throw new Error("Passkey authentication cancelled");
 
   const credentialId = bytesToCredId(credential.rawId);
-  const prfResult = credential.getClientExtensionResults()?.prf?.results?.first;
-
-  const seed = prfResult
-    ? await sha256(new Uint8Array(prfResult))
-    : await sha256(new Uint8Array(credential.rawId));
-
-  const keypair = Keypair.fromSeed(seed.slice(0, 32));
-  const publicKey = keypair.publicKey.toBase58();
-  if (opts?.forAddress && publicKey !== opts.forAddress) {
+  const derived = await deriveFromAssertion(credential, opts?.forAddress);
+  const publicKey = derived.address;
+  derived.keypair.secretKey.fill(0);
+  if (derived.mismatch) {
     throw new Error(
       `That passkey is for ${publicKey.slice(0, 4)}…${publicKey.slice(-4)}, not the selected wallet. Pick the matching passkey.`,
     );
   }
-  rememberCredential(publicKey, credential.rawId);
+  rememberCredential(publicKey, credential.rawId, derived.derivation);
 
   return {
     publicKey,
     credentialId,
+    derivation: derived.derivation,
   };
 }
 
@@ -444,6 +620,7 @@ export async function recoverPasskeyWallet(opts?: {
 export async function provePasskeyWallet(address: string): Promise<{
   publicKey: string;
   credentialId: string;
+  derivation: WalletDerivation;
 }> {
   const a = address.trim();
   if (!a) throw new Error("Missing wallet address");
@@ -459,6 +636,7 @@ export async function provePasskeyWallet(address: string): Promise<{
 export async function identifyPasskeyWallet(): Promise<{
   publicKey: string;
   credentialId: string;
+  derivation: WalletDerivation;
 }> {
   return recoverPasskeyWallet({ forcePicker: true });
 }
@@ -471,7 +649,13 @@ export async function identifyPasskeyWallet(): Promise<{
 async function authPasskeyOnce(opts?: {
   forAddress?: string | null;
   forcePicker?: boolean;
-}): Promise<{ address: string; keypair: Keypair; credential: PublicKeyCredential }> {
+}): Promise<{
+  address: string;
+  keypair: Keypair;
+  credential: PublicKeyCredential;
+  derivation: WalletDerivation;
+  mismatch?: boolean;
+}> {
   ensureDocumentFocusForPasskey();
   const allowCredentials = opts?.forcePicker
     ? undefined
@@ -496,16 +680,14 @@ async function authPasskeyOnce(opts?: {
 
   if (!credential) throw new Error("Passkey authentication cancelled");
 
-  const prfResult = credential.getClientExtensionResults()?.prf?.results?.first;
-  let seed: Uint8Array;
-  if (prfResult) {
-    seed = await sha256(new Uint8Array(prfResult));
-  } else {
-    seed = await sha256(new Uint8Array(credential.rawId));
-  }
-  const keypair = Keypair.fromSeed(seed.slice(0, 32));
-  const address = keypair.publicKey.toBase58();
-  return { address, keypair, credential };
+  const derived = await deriveFromAssertion(credential, opts?.forAddress);
+  return {
+    address: derived.address,
+    keypair: derived.keypair,
+    credential,
+    derivation: derived.derivation,
+    mismatch: derived.mismatch,
+  };
 }
 
 export async function getPasskeyKeypair(
@@ -530,13 +712,13 @@ export async function getPasskeyKeypair(
   try {
     const first = await authPasskeyOnce({ forAddress: expectedPublicKey, forcePicker: false });
     if (!expectedPublicKey || first.address === expectedPublicKey) {
-      rememberCredential(first.address, first.credential.rawId);
+      rememberCredential(first.address, first.credential.rawId, first.derivation);
       return { address: first.address, keypair: first.keypair };
     }
     // Wrong passkey for pinned path — ask user to pick the right one
   } catch (e) {
     // User cancelled / denied — STOP. Do not open a second prompt.
-    if (isUserCancel(e)) {
+    if (isUserCancel(e) || e instanceof PrfRequiredError) {
       throw e instanceof Error
         ? e
         : new Error("Passkey authentication cancelled");
@@ -546,13 +728,16 @@ export async function getPasskeyKeypair(
 
   // 2) Full picker — user must pick the passkey that derives expected address
   try {
-    const second = await authPasskeyOnce({ forcePicker: true });
+    const second = await authPasskeyOnce({
+      forAddress: expectedPublicKey,
+      forcePicker: true,
+    });
     if (expectedPublicKey && second.address !== expectedPublicKey) {
       throw new Error(
         `Wrong passkey. Connected wallet is ${expectedPublicKey.slice(0, 4)}…${expectedPublicKey.slice(-4)}, but that passkey is ${second.address.slice(0, 4)}…${second.address.slice(-4)}. Choose the passkey named with your full address.`,
       );
     }
-    rememberCredential(second.address, second.credential.rawId);
+    rememberCredential(second.address, second.credential.rawId, second.derivation);
     return { address: second.address, keypair: second.keypair };
   } catch (e) {
     if (isUserCancel(e)) {
