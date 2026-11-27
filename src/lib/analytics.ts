@@ -1,6 +1,30 @@
+/**
+ * Strip anything that can carry a link secret (audit H4): the fragment and
+ * secret-bearing query params. Gift, pay and float links keep keys there.
+ */
+export function redactUrl(url: string): string {
+  try {
+    const u = new URL(url, "https://sol.new");
+    u.hash = "";
+    for (const k of ["g", "s", "k", "key", "secret", "t", "token"]) u.searchParams.delete(k);
+    const out = `${u.pathname}${u.search}`;
+    return /^https?:/i.test(url) ? `${u.origin}${out}` : out;
+  } catch {
+    return url.split(/[?#]/)[0] || "";
+  }
+}
+
 // Sends custom events to the GA4 tag loaded in layout.tsx (gtag.js).
 function sendEvent(event: string, data?: Record<string, unknown>): void {
   if (typeof window === "undefined") return;
+  if (data) {
+    data = { ...data };
+    for (const [k, v] of Object.entries(data)) {
+      if (typeof v === "string" && (k === "url" || /^https?:\/\//i.test(v) || (v.startsWith("/") && /[#?]/.test(v)))) {
+        data[k] = redactUrl(v);
+      }
+    }
+  }
   if (process.env.NODE_ENV !== "production") {
     console.debug("[analytics]", event, data);
   }

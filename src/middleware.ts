@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import {
+  buildWalletCsp,
+  inlineScriptHashes,
+  isWalletPath,
+  makeNonce,
+  SITE_SECURITY_HEADERS,
+  WALLET_SECURITY_HEADERS,
+} from "@/lib/csp";
 
 /**
  * SEO / host hygiene + default entry:
@@ -7,7 +15,38 @@ import type { NextRequest } from "next/server";
  * - `/` rewrites to onboard (default route; URL stays `/`)
  * - Short links, address pretty URLs
  */
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
+  const res = await route(request);
+  const path = request.nextUrl.pathname;
+  if (path.startsWith("/api/")) return res;
+  for (const [k, v] of Object.entries(SITE_SECURITY_HEADERS)) res.headers.set(k, v);
+  return res;
+}
+
+/**
+ * Wallet pages (audit H3): per-request nonce CSP. The CSP is set on the
+ * request too, so Next.js stamps the nonce on its own scripts.
+ */
+async function walletResponse(
+  request: NextRequest,
+  pathname: string,
+  rewriteTo?: URL,
+): Promise<NextResponse> {
+  const nonce = makeNonce();
+  const csp = buildWalletCsp(pathname, nonce, await inlineScriptHashes());
+  const reqHeaders = new Headers(request.headers);
+  reqHeaders.set("x-nonce", nonce);
+  reqHeaders.set("Content-Security-Policy", csp);
+  const res = rewriteTo
+    ? NextResponse.rewrite(rewriteTo, { request: { headers: reqHeaders } })
+    : NextResponse.next({ request: { headers: reqHeaders } });
+  res.headers.set("Content-Security-Policy", csp);
+  for (const [k, v] of Object.entries(WALLET_SECURITY_HEADERS)) res.headers.set(k, v);
+  res.headers.set("Cache-Control", "private, no-store");
+  return res;
+}
+
+async function route(request: NextRequest): Promise<NextResponse> {
   const url = request.nextUrl.clone();
   const host = request.headers.get("host")?.toLowerCase() || "";
   const path = url.pathname;
@@ -25,6 +64,7 @@ export function middleware(request: NextRequest) {
   if (path === "/" || path === "") {
     const done = request.cookies.get("sol_new_onboard_done")?.value === "1";
     url.pathname = done ? "/wallet/get" : "/onboard";
+    if (done) return walletResponse(request, url.pathname, url);
     return NextResponse.rewrite(url);
   }
 
@@ -32,6 +72,10 @@ export function middleware(request: NextRequest) {
   if (path === "/wallet" || path === "/wallet/") {
     url.pathname = "/wallet/get";
     return NextResponse.redirect(url, 308);
+  }
+
+  if (isWalletPath(path)) {
+    return walletResponse(request, path);
   }
 
   // Common crawler dead-ends

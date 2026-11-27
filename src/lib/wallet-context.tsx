@@ -25,6 +25,8 @@ export interface WalletEntry {
   label: string;
   /** WebAuthn user handle (base64) — enables renaming the passkey in browser settings */
   userId?: string;
+  /** Passkey seed derivation mode (audit H1). */
+  derivation?: "prf-v1" | "rawid-legacy";
 }
 
 export type WalletBalances = Record<string, { sol: number; usdc: number }>;
@@ -259,12 +261,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             pubkey: result.publicKey,
             credentialId: result.credentialId,
             label: result.publicKey,
+            derivation: result.derivation,
           });
           fetch("/api/wallet", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             // Public key only — never send the credential ID (audit C1).
-            body: JSON.stringify({ publicKey: result.publicKey }),
+            body: JSON.stringify({ publicKey: result.publicKey, derivation: result.derivation }),
           }).catch(() => {});
           analytics.walletRecovered();
           return result.publicKey;
@@ -293,12 +296,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         credentialId: result.credentialId,
         label: result.publicKey,
         userId: result.userId,
+        derivation: result.derivation,
       });
       fetch("/api/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // Public key only — never send the credential ID (audit C1).
-        body: JSON.stringify({ publicKey: result.publicKey }),
+        body: JSON.stringify({ publicKey: result.publicKey, derivation: result.derivation }),
       }).catch(() => {});
       analytics.walletCreated(result.publicKey);
       return result.publicKey;
@@ -336,12 +340,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         pubkey: result.publicKey,
         credentialId: result.credentialId,
         label: result.publicKey,
+        derivation: result.derivation,
       });
       fetch("/api/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // Public key only — never send the credential ID (audit C1).
-        body: JSON.stringify({ publicKey: result.publicKey }),
+        body: JSON.stringify({ publicKey: result.publicKey, derivation: result.derivation }),
       }).catch(() => {});
       analytics.walletRecovered();
       return result.publicKey;
@@ -381,6 +386,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         pubkey: result.publicKey,
         credentialId: result.credentialId,
         label: result.publicKey,
+        derivation: result.derivation,
       });
       setWallets(updated);
       return { publicKey: result.publicKey, credentialId: result.credentialId, sol, usdc };
@@ -454,13 +460,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         credentialId: result.credentialId,
         label: result.publicKey,
         userId: entry.userId,
+        derivation: result.derivation,
       });
 
       fetch("/api/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // Public key only — never send the credential ID (audit C1).
-        body: JSON.stringify({ publicKey: result.publicKey }),
+        body: JSON.stringify({ publicKey: result.publicKey, derivation: result.derivation }),
       }).catch(() => {});
 
       toast.success(`Switched to ${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`);

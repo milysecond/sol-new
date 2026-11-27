@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { pageMeta } from "@/lib/seo";
 
+// Audit H3: render per request so Next.js stamps the CSP nonce on its scripts.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = pageMeta({
   title: "Ring — private balances and pay links — sol.new",
   description:

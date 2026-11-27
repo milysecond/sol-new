@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["dev.sol.new", "192.168.1.105"],
+  // dev.sol.new removed (audit H2): subdomains share the sol.new passkey rpId.
+  allowedDevOrigins: ["192.168.1.105"],
   // Keep fat browser/WASM stacks out of the Cloudflare Worker bundle
   serverExternalPackages: [
     "privacycash",
