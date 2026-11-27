@@ -5,6 +5,7 @@ import { useWallet } from "@/lib/wallet-context";
 import { Spinner } from "@/components/spinner";
 import { PageTransition } from "@/components/page-transition";
 import { KeyRound, Wallet } from "lucide-react";
+import { PasskeyAutofill, signInLabel } from "@/components/passkey-autofill";
 
 function isTelegramWebView() {
   if (typeof window === "undefined") return false;
@@ -82,7 +83,7 @@ export function ConnectGate({
                 <p className="text-gray-500 dark:text-white/40 text-sm">
                   {hasSaved
                     ? "Use your existing sol.new passkey wallet — same one as everywhere else."
-                    : "Create a passkey wallet with Face ID or fingerprint. Name = your address."}
+                    : "Sign in with your sol.new passkey, or create a new wallet with Face ID or fingerprint."}
                 </p>
 
                 {error && (
@@ -122,9 +123,15 @@ export function ConnectGate({
                   </div>
                 )}
 
+                <PasskeyAutofill />
+
                 <button
                   type="button"
-                  onClick={() => void recover({ forcePicker: true })}
+                  onClick={() =>
+                    void (wallets.length === 1
+                      ? recover({ forAddress: wallets[0]!.pubkey })
+                      : recover({ forcePicker: true }))
+                  }
                   disabled={loading}
                   className="w-full bg-purple-500 hover:bg-purple-400 disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-400 dark:disabled:text-white/30 text-white font-semibold rounded-xl px-4 py-3.5 transition cursor-pointer disabled:cursor-not-allowed"
                 >
@@ -133,10 +140,8 @@ export function ConnectGate({
                       <Spinner size={16} className="inline mr-2" />
                       Authenticating…
                     </>
-                  ) : hasSaved ? (
-                    "Unlock with passkey"
                   ) : (
-                    "I already have a passkey wallet"
+                    signInLabel(wallets)
                   )}
                 </button>
 
@@ -161,21 +166,13 @@ export function ConnectGate({
                   type="button"
                   onClick={() => void connect({ createNew: true })}
                   disabled={loading}
-                  className={`w-full font-semibold rounded-xl px-4 py-3.5 transition text-sm cursor-pointer disabled:opacity-40 ${
-                    hasSaved
-                      ? "bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/70"
-                      : "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-600/25 ring-2 ring-violet-400/40 animate-pulse"
-                  }`}
+                  className="w-full font-semibold rounded-xl px-4 py-3.5 transition text-sm cursor-pointer disabled:opacity-40 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/70"
                 >
-                  {loading
-                    ? "…"
-                    : hasSaved
-                      ? "Create a new passkey wallet (only if needed)"
-                      : "✨ Create a new passkey wallet"}
+                  {loading ? "…" : "Create a new wallet"}
                 </button>
                 {!hasSaved && (
-                  <p className="text-[11px] text-violet-600 dark:text-violet-300 font-medium -mt-1">
-                    New here? Tap above — Face ID / fingerprint, no seed phrase.
+                  <p className="text-[11px] text-gray-500 dark:text-white/40 -mt-1">
+                    New here? Create a new wallet — Face ID / fingerprint, no seed phrase.
                   </p>
                 )}
 

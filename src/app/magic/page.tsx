@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { Fingerprint, ShieldCheck, AlertTriangle } from "lucide-react";
 import { Spinner } from "@/components/spinner";
 import { useWallet } from "@/lib/wallet-context";
-import { recoverPasskeyWallet } from "@/lib/passkey-wallet";
+import { recoverPasskeyWallet, passkeyAccountName, signalPasskeyUserDetails } from "@/lib/passkey-wallet";
 
 type Claims = {
   email: string;
@@ -100,10 +100,11 @@ function MagicInner() {
       try {
         const wallets = JSON.parse(
           localStorage.getItem("sol.new.wallets") || "[]"
-        ) as Array<{ pubkey: string; credentialId: string; label: string }>;
+        ) as Array<{ pubkey: string; credentialId: string; label: string; email?: string }>;
         const idx = wallets.findIndex((w) => w.pubkey === entry.pubkey);
-        if (idx >= 0) wallets[idx] = entry;
-        else wallets.push(entry);
+        // Keep derivation/userId from the passkey layer; email names the passkey.
+        if (idx >= 0) wallets[idx] = { ...wallets[idx], ...entry, email: claims.email };
+        else wallets.push({ ...entry, email: claims.email });
         localStorage.setItem("sol.new.wallets", JSON.stringify(wallets));
       } catch {
         /* ignore */
@@ -112,6 +113,21 @@ function MagicInner() {
       localStorage.setItem("sol.new.credentialId", result.credentialId);
       localStorage.setItem("sol.new.walletLabel", label);
       localStorage.setItem("sol.new.magicEmail", claims.email);
+      // Rename the passkey in the OS sheet to include the linked email.
+      try {
+        const saved = (
+          JSON.parse(localStorage.getItem("sol.new.wallets") || "[]") as Array<{
+            pubkey: string;
+            userId?: string;
+          }>
+        ).find((w) => w.pubkey === result.publicKey);
+        if (saved?.userId) {
+          const name = passkeyAccountName(result.publicKey, claims.email);
+          void signalPasskeyUserDetails({ userId: saved.userId, name, displayName: name });
+        }
+      } catch {
+        /* ignore */
+      }
 
       await fetch("/api/magic-link/confirm", {
         method: "POST",
